@@ -1,0 +1,62 @@
+{
+  "last_node_id": 1,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CcCKrea2InpaintSubjectScene",
+      "pos": [100, 100],
+      "size": [400, 650],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": null},
+        {"name": "clip", "type": "CLIP", "link": null},
+        {"name": "vae", "type": "VAE", "link": null},
+        {"name": "scene_image", "type": "IMAGE", "link": null},
+        {"name": "subject_image", "type": "IMAGE", "link": null},
+        {"name": "inpaint_mask", "type": "MASK", "link": null}
+      ],
+      "outputs": [
+        {"name": "patched_model", "type": "MODEL", "links": []},
+        {"name": "positive", "type": "CONDITIONING", "links": []},
+        {"name": "negative", "type": "CONDITIONING", "links": []},
+        {"name": "latent", "type": "LATENT", "links": []}
+      ],
+      "properties": {"Node name for S&R": "CcCKrea2InpaintSubjectScene"},
+      "widgets_values": [
+        "place the person smoothly into the masked area",
+        "",
+        1.0,
+        false,
+        2.5,
+        false,
+        "hard",
+        "balanced",
+        "normalize",
+        768,
+        512,
+        1024,
+        "balanced",
+        "normalize",
+        768,
+        512,
+        1024,
+        false,
+        0,
+        0,
+        1024,
+        1024,
+        1,
+        "fit",
+        "fit"
+      ]
+    }
+  ],
+  "links": [],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

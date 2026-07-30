@@ -1,0 +1,59 @@
+{
+  "last_node_id": 1,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CcCKrea2SubjectScene",
+      "pos": [100, 100],
+      "size": [400, 600],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": null},
+        {"name": "clip", "type": "CLIP", "link": null},
+        {"name": "subject_image", "type": "IMAGE", "link": null},
+        {"name": "scene_image", "type": "IMAGE", "link": null},
+        {"name": "vae", "type": "VAE", "link": null}
+      ],
+      "outputs": [
+        {"name": "patched_model", "type": "MODEL", "links": []},
+        {"name": "positive", "type": "CONDITIONING", "links": []},
+        {"name": "negative", "type": "CONDITIONING", "links": []},
+        {"name": "latent", "type": "LATENT", "links": []}
+      ],
+      "properties": {"Node name for S&R": "CcCKrea2SubjectScene"},
+      "widgets_values": [
+        "a cinematic photo of the person standing in the snowy forest",
+        "",
+        2.5,
+        false,
+        1.0,
+        false,
+        "hard",
+        "balanced",
+        "normalize",
+        768,
+        512,
+        1024,
+        "balanced",
+        "normalize",
+        768,
+        512,
+        1024,
+        1024,
+        1024,
+        1,
+        "fit",
+        "fit",
+        "empty"
+      ]
+    }
+  ],
+  "links": [],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

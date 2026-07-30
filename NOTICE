@@ -1,0 +1,26 @@
+CcC Krea2 (ComfyUI-CcC-Krea2)
+Copyright (C) 2026 CcC Krea2 Contributors
+
+This project incorporates architectural concepts, reference implementations, and design patterns from the following open-source projects:
+
+1. ComfyUI by the ComfyUI project (comfyanonymous)
+   https://github.com/comfyanonymous/ComfyUI
+   Licensed under the GNU General Public License v3.0 (GPL-3.0).
+
+2. ComfyUI-Krea2Edit by lbouaraba
+   https://github.com/lbouaraba/comfyui-krea2edit
+   Licensed under the Apache License, Version 2.0 (Apache-2.0).
+   Included logic for explicit model patch wrappers, SingleStreamDiT in-context forward sequences, RoPE 3D frame positioning, reference attention logit bias, and pixel-space reference fitting.
+
+3. ComfyUI-EditUtils by lrzjason
+   https://github.com/lrzjason/ComfyUI-EditUtils
+   Licensed under the GNU General Public License v3.0 (GPL-3.0).
+   Included logic for reference image processing, spatial dimension alignment, and masked image latents.
+
+4. ComfyUI-Krea2Moodboard by RedNodeAI
+   https://github.com/RedNodeAI/ComfyUI-Krea2Moodboard
+   Licensed under the GNU General Public License v3.0 (GPL-3.0).
+   Included UX concepts for semantic role ordering and positive/negative grounding consistency.
+
+This package is licensed under the GNU General Public License v3.0 (GPL-3.0).
+Model weights (Krea 2 checkpoints, Qwen3-VL text encoder, VAE, edit LoRAs) are separate works with their own respective licenses and are not distributed as part of this software package.

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ComfyUI-CcC-Krea2"
+version = "0.1.0"
+description = "ComfyUI custom nodes for Krea 2 reference-guided editing, with explicit model patching, subject, outfit and scene workflows, attention masks, grounding resize controls, selectable latent sources, and localized inpainting."
+readme = "README.md"
+authors = [
+    { name = "CcC Krea2 Contributors" }
+]
+license = { text = "GPL-3.0-only" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.22.0",
+    "pillow>=9.0.0",
+    "einops>=0.6.0",
+    "scipy>=1.8.0"
+]
+
+[project.urls]
+Repository = "https://github.com/demonccc/ComfyUI-CcC-Krea2"
+
+[tool.comfy]
+PublisherId = "CcC"
+DisplayName = "CcC Krea2"
+Icon = "🎨"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"

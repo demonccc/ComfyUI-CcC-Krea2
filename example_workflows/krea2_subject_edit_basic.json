@@ -1,0 +1,51 @@
+{
+  "last_node_id": 4,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CcCKrea2Subject",
+      "pos": [100, 100],
+      "size": [400, 500],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": null},
+        {"name": "clip", "type": "CLIP", "link": null},
+        {"name": "subject_image", "type": "IMAGE", "link": null},
+        {"name": "vae", "type": "VAE", "link": null}
+      ],
+      "outputs": [
+        {"name": "patched_model", "type": "MODEL", "links": [1]},
+        {"name": "positive", "type": "CONDITIONING", "links": [2]},
+        {"name": "negative", "type": "CONDITIONING", "links": [3]},
+        {"name": "latent", "type": "LATENT", "links": [4]}
+      ],
+      "properties": {"Node name for S&R": "CcCKrea2Subject"},
+      "widgets_values": [
+        "a cyberpunk portrait of a person in neon city",
+        "",
+        2.5,
+        false,
+        "hard",
+        "balanced",
+        "normalize",
+        768,
+        512,
+        1024,
+        1024,
+        1024,
+        1,
+        "fit",
+        "fit",
+        "empty"
+      ]
+    }
+  ],
+  "links": [],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
