@@ -28,7 +28,6 @@ from .constants import (
     DEFAULT_BOOST_SCENE,
     DEFAULT_BOOST_OUTFIT,
     DEFAULT_BOOST_SOURCE,
-    EXPERIMENTAL_OUTFIT_WARNING,
 )
 from .engine import Krea2EditEngine, NodeExecutionRequest
 
@@ -41,7 +40,7 @@ class BaseKrea2Node:
 
 
 class CcCKrea2Subject(BaseKrea2Node):
-    """CcC Krea2 - Subject node (Verified Single-Reference Workflow)."""
+    """CcC Krea2 - Subject node (Single-Reference Workflow)."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -49,17 +48,17 @@ class CcCKrea2Subject(BaseKrea2Node):
             "required": {
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
+                "vae": ("VAE", {"tooltip": "Required VAE for reference latent encoding and target latent creation."}),
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "Instruction for identity editing."}),
                 "subject_image": ("IMAGE", {"tooltip": "Primary subject reference image."}),
             },
             "optional": {
-                "vae": ("VAE", {"tooltip": "Required when reference images are connected or when encoding an image-based latent."}),
-                "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt string. Encoded with identical grounding geometry."}),
-                "subject_attention_mask": ("MASK", {"tooltip": "Optional mask controlling where attention boost is applied."}),
-                "subject_boost": ("FLOAT", {"default": DEFAULT_BOOST_SUBJECT, "min": 0.0, "max": 8.0, "step": 0.05, "tooltip": "Reference attention multiplier (>1 pulls harder to reference; 1=off)."}),
+                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+                "subject_attention_mask": ("MASK",),
+                "subject_boost": ("FLOAT", {"default": DEFAULT_BOOST_SUBJECT, "min": 0.0, "max": 8.0, "step": 0.05}),
                 "subject_mask_invert": ("BOOLEAN", {"default": False}),
-                "attention_mask_mode": (ATTENTION_MASK_MODES, {"default": "hard", "tooltip": "hard = binary threshold (stable path); soft = continuous weights (experimental)."}),
-                "subject_grounding_preset": (GROUNDING_PRESETS, {"default": "balanced", "tooltip": "balanced = 768px (standard); max_identity = 1024px; custom = user defined."}),
+                "attention_mask_mode": (ATTENTION_MASK_MODES, {"default": "hard"}),
+                "subject_grounding_preset": (GROUNDING_PRESETS, {"default": "balanced"}),
                 "subject_grounding_resize_mode": (GROUNDING_RESIZE_MODES, {"default": "normalize"}),
                 "subject_grounding_px": ("INT", {"default": DEFAULT_GROUNDING_PX_SUBJECT, "min": 128, "max": 4096, "step": 16}),
                 "subject_grounding_min_px": ("INT", {"default": DEFAULT_GROUNDING_MIN_PX, "min": 128, "max": 4096, "step": 16}),
@@ -67,20 +66,20 @@ class CcCKrea2Subject(BaseKrea2Node):
                 "width": ("INT", {"default": 1024, "min": 128, "max": 4096, "step": 16}),
                 "height": ("INT", {"default": 1024, "min": 128, "max": 4096, "step": 16}),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
-                "sampling_resize_mode": (SAMPLING_RESIZE_MODES, {"default": "fit", "tooltip": "Controls only the LATENT returned to KSampler (fit, crop, stretch)."}),
-                "reference_fit_mode": (REFERENCE_FIT_MODES, {"default": "fit", "tooltip": "Controls VAE reference token geometry (fit = resample inside target grid; crop = center-crop)."}),
+                "sampling_resize_mode": (SAMPLING_RESIZE_MODES, {"default": "fit"}),
+                "reference_fit_mode": (REFERENCE_FIT_MODES, {"default": "fit"}),
                 "latent_source": (["empty", "subject"], {"default": "empty"}),
             }
         }
 
-    def process(self, model, clip, prompt, subject_image, **kwargs):
+    def process(self, model, clip, vae, prompt, subject_image, **kwargs):
         request = NodeExecutionRequest(
             node_name="CcC Krea2 - Subject",
             model=model,
             clip=clip,
+            vae=vae,
             prompt=prompt,
             negative_prompt=kwargs.get("negative_prompt", ""),
-            vae=kwargs.get("vae", None),
             subject_image=subject_image,
             subject_attention_mask=kwargs.get("subject_attention_mask", None),
             subject_boost=kwargs.get("subject_boost", DEFAULT_BOOST_SUBJECT),
@@ -111,12 +110,12 @@ class CcCKrea2SubjectOutfit(BaseKrea2Node):
             "required": {
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
-                "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "Edit instruction."}),
-                "subject_image": ("IMAGE", {"tooltip": "Primary subject reference image."}),
-                "outfit_image": ("IMAGE", {"tooltip": "Outfit reference image. (Experimental: requires specialized outfit LoRA)."}),
+                "vae": ("VAE",),
+                "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "subject_image": ("IMAGE",),
+                "outfit_image": ("IMAGE",),
             },
             "optional": {
-                "vae": ("VAE",),
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "subject_attention_mask": ("MASK",),
                 "subject_boost": ("FLOAT", {"default": DEFAULT_BOOST_SUBJECT, "min": 0.0, "max": 8.0, "step": 0.05}),
@@ -144,14 +143,14 @@ class CcCKrea2SubjectOutfit(BaseKrea2Node):
             }
         }
 
-    def process(self, model, clip, prompt, subject_image, outfit_image, **kwargs):
+    def process(self, model, clip, vae, prompt, subject_image, outfit_image, **kwargs):
         request = NodeExecutionRequest(
             node_name="CcC Krea2 - Subject + Outfit",
             model=model,
             clip=clip,
+            vae=vae,
             prompt=prompt,
             negative_prompt=kwargs.get("negative_prompt", ""),
-            vae=kwargs.get("vae", None),
             subject_image=subject_image,
             outfit_image=outfit_image,
             subject_attention_mask=kwargs.get("subject_attention_mask", None),
@@ -183,7 +182,7 @@ class CcCKrea2SubjectOutfit(BaseKrea2Node):
 
 
 class CcCKrea2SubjectScene(BaseKrea2Node):
-    """CcC Krea2 - Subject + Scene node (Verified Dual Reference Workflow)."""
+    """CcC Krea2 - Subject + Scene node (Dual Reference Workflow)."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -191,12 +190,12 @@ class CcCKrea2SubjectScene(BaseKrea2Node):
             "required": {
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
+                "vae": ("VAE",),
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-                "subject_image": ("IMAGE", {"tooltip": "Primary subject reference image (placed last in sequence)."}),
-                "scene_image": ("IMAGE", {"tooltip": "Background/scene reference image (placed first in sequence)."}),
+                "subject_image": ("IMAGE",),
+                "scene_image": ("IMAGE",),
             },
             "optional": {
-                "vae": ("VAE",),
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "subject_attention_mask": ("MASK",),
                 "subject_boost": ("FLOAT", {"default": DEFAULT_BOOST_SUBJECT, "min": 0.0, "max": 8.0, "step": 0.05}),
@@ -224,14 +223,14 @@ class CcCKrea2SubjectScene(BaseKrea2Node):
             }
         }
 
-    def process(self, model, clip, prompt, subject_image, scene_image, **kwargs):
+    def process(self, model, clip, vae, prompt, subject_image, scene_image, **kwargs):
         request = NodeExecutionRequest(
             node_name="CcC Krea2 - Subject + Scene",
             model=model,
             clip=clip,
+            vae=vae,
             prompt=prompt,
             negative_prompt=kwargs.get("negative_prompt", ""),
-            vae=kwargs.get("vae", None),
             subject_image=subject_image,
             scene_image=scene_image,
             subject_attention_mask=kwargs.get("subject_attention_mask", None),
@@ -271,13 +270,13 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
             "required": {
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
+                "vae": ("VAE",),
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
                 "subject_image": ("IMAGE",),
                 "scene_image": ("IMAGE",),
-                "outfit_image": ("IMAGE", {"tooltip": "Experimental 3-reference workflow."}),
+                "outfit_image": ("IMAGE",),
             },
             "optional": {
-                "vae": ("VAE",),
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "subject_attention_mask": ("MASK",),
                 "subject_boost": ("FLOAT", {"default": DEFAULT_BOOST_SUBJECT, "min": 0.0, "max": 8.0, "step": 0.05}),
@@ -313,14 +312,14 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
             }
         }
 
-    def process(self, model, clip, prompt, subject_image, scene_image, outfit_image, **kwargs):
+    def process(self, model, clip, vae, prompt, subject_image, scene_image, outfit_image, **kwargs):
         request = NodeExecutionRequest(
             node_name="CcC Krea2 - Subject + Scene + Outfit",
             model=model,
             clip=clip,
+            vae=vae,
             prompt=prompt,
             negative_prompt=kwargs.get("negative_prompt", ""),
-            vae=kwargs.get("vae", None),
             subject_image=subject_image,
             scene_image=scene_image,
             outfit_image=outfit_image,
@@ -361,7 +360,7 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
 
 
 class CcCKrea2Inpaint(BaseKrea2Node):
-    """CcC Krea2 - Inpaint node for single image inpainting (Verified Workflow)."""
+    """CcC Krea2 - Inpaint node for single image inpainting."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -515,7 +514,7 @@ class CcCKrea2InpaintSubjectOutfit(BaseKrea2Node):
 
 
 class CcCKrea2InpaintSubjectScene(BaseKrea2Node):
-    """CcC Krea2 - Inpaint Subject + Scene node (Verified Dual-Reference Inpainting)."""
+    """CcC Krea2 - Inpaint Subject + Scene node (Dual-Reference Inpainting)."""
 
     @classmethod
     def INPUT_TYPES(cls):

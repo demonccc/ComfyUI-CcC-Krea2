@@ -1,25 +1,21 @@
 # Changelog
 
-All notable changes to the `ComfyUI-CcC-Krea2` custom node package will be documented in this file.
+All notable changes to the `ComfyUI-CcC-Krea2` package will be documented in this file.
 
-## [0.1.0] - 2026-07-30
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0-alpha] - 2026-07-30
 
 ### Added
-- Initial production release of `ComfyUI-CcC-Krea2`.
-- Seven explicit, reference-guided Krea 2 editing nodes under category `CcC/Krea2`:
-  - `CcC Krea2 - Subject`
-  - `CcC Krea2 - Subject + Outfit`
-  - `CcC Krea2 - Subject + Scene`
-  - `CcC Krea2 - Subject + Scene + Outfit`
-  - `CcC Krea2 - Inpaint`
-  - `CcC Krea2 - Inpaint Subject + Outfit`
-  - `CcC Krea2 - Inpaint Subject + Scene`
-- Per-instance model patching via ComfyUI `ModelPatcher` wrapper extensions (zero global monkey-patching).
-- Dual image path architecture: independent Qwen3-VL grounding resize and pixel-space VAE reference latent encoding.
-- Configurable Qwen3-VL grounding resize modes (`none`, `downscale_only`, `normalize`, `clamp`) for each reference role.
-- Pixel-space reference image transformations (`fit`, `crop`, `stretch`) matching VAE encoding and attention mask alignment.
-- Per-role reference attention boost dials (`subject_boost`, `scene_boost`, `outfit_boost`) and hard/soft attention masks.
-- Selectable single latent outputs (`empty`, `subject`, `scene`) with strict refusal of outfit latent options.
-- Inpainting support with base image latent preparation, noise mask attached, grow, blur, and invert controls.
-- Comprehensive CPU-safe unit test suite covering grounding, geometry, masks, latent selection, reference ordering, and patch isolation.
-- Example ComfyUI workflow JSON files for all seven nodes.
+- Experimental Alpha release of `ComfyUI-CcC-Krea2` suite.
+- 4 general editing nodes (`Subject`, `Subject + Outfit`, `Subject + Scene`, `Subject + Scene + Outfit`).
+- 3 inpainting nodes (`Inpaint`, `Inpaint Subject + Outfit`, `Inpaint Subject + Scene`).
+- Standard ComfyUI `DIFFUSION_MODEL` wrapper signature `(executor, x, timesteps, context, *wargs, **kwargs)` with closure transport.
+- Applied `model.model.process_latent_in(...)` to every reference VAE latent.
+- Native pixel-path reference geometry (`reference_fit_mode="fit"`) aligned to multiples of 16 without black canvas padding.
+- Explicit inpaint base role selection per node.
+- Pure PyTorch mask dilation via `F.max_pool2d` removing `scipy` dependency.
+- Model-driven empty latent generation honoring `batch_size`.
+- Mandatory VAE input across all 7 custom node definitions.
+- Unit test suite in `tests/` covering mock integration, geometry, masks, dynamic prompt templates, and patch isolation.

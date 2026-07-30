@@ -1,28 +1,18 @@
-"""Central orchestration engine for Krea 2 reference-guided editing nodes."""
+"""Execution orchestrator engine for CcC Krea2 custom node suite."""
 
 import logging
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Tuple, Any
+from dataclasses import dataclass
+from typing import Tuple, Dict, Any, Optional, List
 import torch
 
-from .constants import (
-    LOGGER_PREFIX,
-    ReferenceRole,
-    ROLE_ORDER_SUBJECT,
-    ROLE_ORDER_SUBJECT_OUTFIT,
-    ROLE_ORDER_SUBJECT_SCENE,
-    ROLE_ORDER_SUBJECT_SCENE_OUTFIT,
-    ROLE_ORDER_INPAINT,
-    ROLE_ORDER_INPAINT_SUBJECT_OUTFIT,
-    ROLE_ORDER_INPAINT_SUBJECT_SCENE,
-    EXPERIMENTAL_OUTFIT_WARNING,
-)
-from .validation import validate_krea2_model, align_dimensions
-from .references import ReferenceConfig, prepare_reference
-from .patch import patch_krea2_model
+from .constants import ReferenceRole, EXPERIMENTAL_OUTFIT_WARNING
+from .validation import validate_krea2_model
+from .references import ReferenceConfig, prepare_reference, PreparedReference
+from .latents import generate_krea2_latent
 from .conditioning import encode_krea2_conditioning
-from .latents import create_empty_latent, create_image_latent, create_inpaint_latent
-from .geometry import apply_sampling_transform
+from .patch import patch_krea2_model
+
+logger = logging.getLogger("CcCKrea2")
 
 
 @dataclass
@@ -31,233 +21,206 @@ class NodeExecutionRequest:
     model: Any
     clip: Any
     prompt: str
+    vae: Any
     negative_prompt: str = ""
-    vae: Optional[Any] = None
-
-    # Geometry & Latent outputs
-    width: int = 1024
-    height: int = 1024
-    batch_size: int = 1
-    sampling_resize_mode: str = "fit"      # Controls LATENT returned to KSampler (fit, crop, stretch)
-    reference_fit_mode: str = "fit"        # Controls VAE reference geometry (fit, crop)
-    latent_source: str = "empty"
-
-    # Images
     subject_image: Optional[torch.Tensor] = None
-    outfit_image: Optional[torch.Tensor] = None
     scene_image: Optional[torch.Tensor] = None
+    outfit_image: Optional[torch.Tensor] = None
     source_image: Optional[torch.Tensor] = None
-
-    # Attention masks
     subject_attention_mask: Optional[torch.Tensor] = None
-    outfit_attention_mask: Optional[torch.Tensor] = None
     scene_attention_mask: Optional[torch.Tensor] = None
+    outfit_attention_mask: Optional[torch.Tensor] = None
     source_attention_mask: Optional[torch.Tensor] = None
-
-    # Dials & Controls
-    subject_boost: float = 2.5
-    outfit_boost: float = 1.0
-    scene_boost: float = 1.0
-    source_boost: float = 1.0
-
-    subject_mask_invert: bool = False
-    outfit_mask_invert: bool = False
-    scene_mask_invert: bool = False
-    source_mask_invert: bool = False
-
-    attention_mask_mode: str = "hard"
-
-    # Grounding controls
-    subject_grounding_preset: str = "balanced"
-    subject_grounding_resize_mode: str = "normalize"
-    subject_grounding_px: int = 768
-    subject_grounding_min_px: int = 512
-    subject_grounding_max_px: int = 1024
-
-    outfit_grounding_preset: str = "balanced"
-    outfit_grounding_resize_mode: str = "normalize"
-    outfit_grounding_px: int = 768
-    outfit_grounding_min_px: int = 512
-    outfit_grounding_max_px: int = 1024
-
-    scene_grounding_preset: str = "balanced"
-    scene_grounding_resize_mode: str = "normalize"
-    scene_grounding_px: int = 768
-    scene_grounding_min_px: int = 512
-    scene_grounding_max_px: int = 1024
-
-    source_grounding_preset: str = "balanced"
-    source_grounding_resize_mode: str = "normalize"
-    source_grounding_px: int = 768
-    source_grounding_min_px: int = 512
-    source_grounding_max_px: int = 1024
-
-    # Inpainting specific controls
     inpaint_mask: Optional[torch.Tensor] = None
+    subject_boost: float = 2.5
+    scene_boost: float = 1.0
+    outfit_boost: float = 1.0
+    source_boost: float = 1.0
+    subject_mask_invert: bool = False
+    scene_mask_invert: bool = False
+    outfit_mask_invert: bool = False
+    source_mask_invert: bool = False
     inpaint_mask_invert: bool = False
     inpaint_mask_grow: int = 0
     inpaint_mask_blur: int = 0
-
-    role_order: List[ReferenceRole] = field(default_factory=lambda: ROLE_ORDER_SUBJECT)
+    attention_mask_mode: str = "hard"
+    subject_grounding_preset: str = "balanced"
+    subject_grounding_resize_mode: str = "normalize"
+    subject_grounding_px: int = 768
+    subject_grounding_min_px: int = 128
+    subject_grounding_max_px: int = 4096
+    scene_grounding_preset: str = "balanced"
+    scene_grounding_resize_mode: str = "normalize"
+    scene_grounding_px: int = 768
+    scene_grounding_min_px: int = 128
+    scene_grounding_max_px: int = 4096
+    outfit_grounding_preset: str = "balanced"
+    outfit_grounding_resize_mode: str = "normalize"
+    outfit_grounding_px: int = 768
+    outfit_grounding_min_px: int = 128
+    outfit_grounding_max_px: int = 4096
+    source_grounding_preset: str = "balanced"
+    source_grounding_resize_mode: str = "normalize"
+    source_grounding_px: int = 768
+    source_grounding_min_px: int = 128
+    source_grounding_max_px: int = 4096
+    width: int = 1024
+    height: int = 1024
+    batch_size: int = 1
+    sampling_resize_mode: str = "fit"
+    reference_fit_mode: str = "fit"
+    latent_source: str = "empty"
+    role_order: List[ReferenceRole] = None
 
 
 class Krea2EditEngine:
-    """Central engine executing the 7 reference-guided editing nodes."""
+    """Orchestrates execution of CcC Krea2 custom node operations."""
 
-    @staticmethod
-    def execute(request: NodeExecutionRequest) -> Tuple[Any, List[Any], List[Any], Dict[str, Any]]:
-        # 1. Validate incoming model
-        validate_krea2_model(request.model, request.node_name)
+    @classmethod
+    def execute(cls, req: NodeExecutionRequest) -> Tuple[Any, Any, Any, Dict[str, Any]]:
+        # 1. Model compatibility validation
+        validate_krea2_model(req.model, req.node_name)
 
-        # 2. Check for experimental workflow logging
-        has_outfit = any(r == ReferenceRole.OUTFIT for r in request.role_order)
-        has_three_refs = len(request.role_order) >= 3
-        if has_outfit or has_three_refs:
-            print(f"{LOGGER_PREFIX} Notice in node '{request.node_name}': {EXPERIMENTAL_OUTFIT_WARNING}")
+        # 2. Strict VAE requirement across all 7 nodes
+        if req.vae is None:
+            raise ValueError(f"[{req.node_name}] VAE input is required for reference processing and latent generation.")
 
-        # 3. Align width and height
-        target_w, target_h = align_dimensions(request.width, request.height, Multiple=16)
+        # 3. Log experimental workflow warning if outfit or 3-ref is involved
+        if req.outfit_image is not None or len(req.role_order or []) > 2:
+            logger.warning(EXPERIMENTAL_OUTFIT_WARNING)
 
-        # 4. Build reference configurations in strict role order
-        ref_configs: List[ReferenceConfig] = []
+        # 4. Explicit inpainting & sampling base image resolution
+        base_image = cls._resolve_base_image(req)
 
-        for role in request.role_order:
-            if role == ReferenceRole.SUBJECT and request.subject_image is not None:
-                ref_configs.append(ReferenceConfig(
-                    role=ReferenceRole.SUBJECT,
-                    image=request.subject_image,
-                    attention_mask=request.subject_attention_mask,
-                    boost=request.subject_boost,
-                    mask_invert=request.subject_mask_invert,
-                    grounding_preset=request.subject_grounding_preset,
-                    grounding_resize_mode=request.subject_grounding_resize_mode,
-                    grounding_px=request.subject_grounding_px,
-                    grounding_min_px=request.subject_grounding_min_px,
-                    grounding_max_px=request.subject_grounding_max_px,
-                    reference_fit_mode=request.reference_fit_mode
-                ))
-            elif role == ReferenceRole.OUTFIT and request.outfit_image is not None:
-                ref_configs.append(ReferenceConfig(
-                    role=ReferenceRole.OUTFIT,
-                    image=request.outfit_image,
-                    attention_mask=request.outfit_attention_mask,
-                    boost=request.outfit_boost,
-                    mask_invert=request.outfit_mask_invert,
-                    grounding_preset=request.outfit_grounding_preset,
-                    grounding_resize_mode=request.outfit_grounding_resize_mode,
-                    grounding_px=request.outfit_grounding_px,
-                    grounding_min_px=request.outfit_grounding_min_px,
-                    grounding_max_px=request.outfit_grounding_max_px,
-                    reference_fit_mode=request.reference_fit_mode
-                ))
-            elif role == ReferenceRole.SCENE and request.scene_image is not None:
-                ref_configs.append(ReferenceConfig(
-                    role=ReferenceRole.SCENE,
-                    image=request.scene_image,
-                    attention_mask=request.scene_attention_mask,
-                    boost=request.scene_boost,
-                    mask_invert=request.scene_mask_invert,
-                    grounding_preset=request.scene_grounding_preset,
-                    grounding_resize_mode=request.scene_grounding_resize_mode,
-                    grounding_px=request.scene_grounding_px,
-                    grounding_min_px=request.scene_grounding_min_px,
-                    grounding_max_px=request.scene_grounding_max_px,
-                    reference_fit_mode=request.reference_fit_mode
-                ))
-            elif role == ReferenceRole.SOURCE and request.source_image is not None:
-                ref_configs.append(ReferenceConfig(
-                    role=ReferenceRole.SOURCE,
-                    image=request.source_image,
-                    attention_mask=request.source_attention_mask,
-                    boost=request.source_boost,
-                    mask_invert=request.source_mask_invert,
-                    grounding_preset=request.source_grounding_preset,
-                    grounding_resize_mode=request.source_grounding_resize_mode,
-                    grounding_px=request.source_grounding_px,
-                    grounding_min_px=request.source_grounding_min_px,
-                    grounding_max_px=request.source_grounding_max_px,
-                    reference_fit_mode=request.reference_fit_mode
-                ))
+        # 5. Build reference configs in strict role order
+        ref_configs = cls._build_reference_configs(req)
 
-        # 5. Prepare references (dual path: grounding + VAE reference tokens) ONCE
-        prepared_refs = [
-            prepare_reference(
+        # 6. Dual-path reference preparation (Grounding + VAE latents with process_latent_in)
+        prepared_refs: List[PreparedReference] = []
+        grounding_images: List[torch.Tensor] = []
+
+        for cfg in ref_configs:
+            prep = prepare_reference(
                 config=cfg,
-                vae=request.vae,
-                target_h=target_h,
-                target_w=target_w,
-                reference_fit_mode=request.reference_fit_mode,
-                attention_mask_mode=request.attention_mask_mode
+                vae=req.vae,
+                model=req.model,
+                target_h=req.height,
+                target_w=req.width,
+                reference_fit_mode=req.reference_fit_mode,
+                attention_mask_mode=req.attention_mask_mode
             )
-            for cfg in ref_configs
-        ]
+            if prep is not None:
+                prepared_refs.append(prep)
+                if prep.grounding_image is not None:
+                    grounding_images.append(prep.grounding_image)
 
-        # 6. Patch model (per-instance ModelPatcher wrapper)
-        patched_model = patch_krea2_model(request.model)
-
-        # 7. Encode Qwen3-VL positive and negative conditioning
-        positive, negative = encode_krea2_conditioning(
-            clip=request.clip,
-            prompt=request.prompt,
-            negative_prompt=request.negative_prompt,
-            prepared_references=prepared_refs
+        # 7. ModelPatcher DiT forwarding patch (closure capture)
+        patched_model = patch_krea2_model(
+            model=req.model,
+            prepared_refs=prepared_refs,
+            target_h=req.height,
+            target_w=req.width
         )
 
-        # 8. Select & build single output LATENT (uses sampling_resize_mode: fit, crop, stretch)
-        output_latent: Dict[str, Any]
+        # 8. Encode Qwen3-VL conditionings
+        positive, negative = encode_krea2_conditioning(
+            clip=req.clip,
+            prompt=req.prompt,
+            negative_prompt=req.negative_prompt,
+            grounding_images=grounding_images
+        )
 
-        if "inpaint" in request.node_name.lower():
-            base_image: Optional[torch.Tensor] = None
-            if request.source_image is not None:
-                base_image = request.source_image
-            elif request.subject_image is not None:
-                base_image = request.subject_image
-            elif request.scene_image is not None:
-                base_image = request.scene_image
+        # 9. Generate model-driven KSampler target LATENT dictionary with batch_size honor
+        latent_dict = generate_krea2_latent(
+            model=req.model,
+            vae=req.vae,
+            width=req.width,
+            height=req.height,
+            batch_size=req.batch_size,
+            latent_source=req.latent_source if "Inpaint" not in req.node_name else "image",
+            base_image=base_image,
+            inpaint_mask=req.inpaint_mask,
+            inpaint_mask_invert=req.inpaint_mask_invert,
+            inpaint_mask_grow=req.inpaint_mask_grow,
+            inpaint_mask_blur=req.inpaint_mask_blur,
+            sampling_resize_mode=req.sampling_resize_mode
+        )
 
-            if base_image is None or request.vae is None:
-                output_latent = create_empty_latent(target_w, target_h, request.batch_size)
-            else:
-                from .masks import process_inpaint_mask
-                # Apply sampling transform to base image and inpaint mask
-                trans_base_img, trans_inpaint_mask = apply_sampling_transform(
-                    image=base_image,
-                    target_h=target_h,
-                    target_w=target_w,
-                    mode=request.sampling_resize_mode,
-                    mask=request.inpaint_mask,
-                    mask_interpolation="nearest"
-                )
+        return patched_model, positive, negative, latent_dict
 
-                processed_inpaint_mask = None
-                if trans_inpaint_mask is not None:
-                    processed_inpaint_mask = process_inpaint_mask(
-                        mask=trans_inpaint_mask,
-                        invert=request.inpaint_mask_invert,
-                        grow=request.inpaint_mask_grow,
-                        blur=request.inpaint_mask_blur
-                    )
-                output_latent = create_inpaint_latent(
-                    vae=request.vae,
-                    image=trans_base_img,
-                    noise_mask=processed_inpaint_mask
-                )
-        else:
-            sel_image: Optional[torch.Tensor] = None
-            if request.latent_source == "subject" and request.subject_image is not None:
-                sel_image = request.subject_image
-            elif request.latent_source == "scene" and request.scene_image is not None:
-                sel_image = request.scene_image
+    @classmethod
+    def _resolve_base_image(cls, req: NodeExecutionRequest) -> Optional[torch.Tensor]:
+        """Explicitly select base image per node contract without ambiguity."""
+        if req.node_name == "CcC Krea2 - Inpaint":
+            return req.source_image
+        elif req.node_name == "CcC Krea2 - Inpaint Subject + Outfit":
+            return req.subject_image
+        elif req.node_name == "CcC Krea2 - Inpaint Subject + Scene":
+            return req.scene_image
 
-            if sel_image is not None and request.vae is not None:
-                trans_sel_img, _ = apply_sampling_transform(
-                    image=sel_image,
-                    target_h=target_h,
-                    target_w=target_w,
-                    mode=request.sampling_resize_mode
-                )
-                output_latent = create_image_latent(request.vae, trans_sel_img)
-            else:
-                output_latent = create_empty_latent(target_w, target_h, request.batch_size)
+        # General editing nodes based on user's latent_source selection
+        if req.latent_source == "subject":
+            return req.subject_image
+        elif req.latent_source == "scene":
+            return req.scene_image
+        elif req.latent_source == "source":
+            return req.source_image
+        return None
 
-        return patched_model, positive, negative, output_latent
+    @classmethod
+    def _build_reference_configs(cls, req: NodeExecutionRequest) -> List[ReferenceConfig]:
+        configs = []
+        for role in req.role_order or []:
+            if role == ReferenceRole.SUBJECT and req.subject_image is not None:
+                configs.append(ReferenceConfig(
+                    role=role,
+                    image=req.subject_image,
+                    attention_mask=req.subject_attention_mask,
+                    boost=req.subject_boost,
+                    mask_invert=req.subject_mask_invert,
+                    grounding_preset=req.subject_grounding_preset,
+                    grounding_resize_mode=req.subject_grounding_resize_mode,
+                    grounding_px=req.subject_grounding_px,
+                    grounding_min_px=req.subject_grounding_min_px,
+                    grounding_max_px=req.subject_grounding_max_px
+                ))
+            elif role == ReferenceRole.SCENE and req.scene_image is not None:
+                configs.append(ReferenceConfig(
+                    role=role,
+                    image=req.scene_image,
+                    attention_mask=req.scene_attention_mask,
+                    boost=req.scene_boost,
+                    mask_invert=req.scene_mask_invert,
+                    grounding_preset=req.scene_grounding_preset,
+                    grounding_resize_mode=req.scene_grounding_resize_mode,
+                    grounding_px=req.scene_grounding_px,
+                    grounding_min_px=req.scene_grounding_min_px,
+                    grounding_max_px=req.scene_grounding_max_px
+                ))
+            elif role == ReferenceRole.OUTFIT and req.outfit_image is not None:
+                configs.append(ReferenceConfig(
+                    role=role,
+                    image=req.outfit_image,
+                    attention_mask=req.outfit_attention_mask,
+                    boost=req.outfit_boost,
+                    mask_invert=req.outfit_mask_invert,
+                    grounding_preset=req.outfit_grounding_preset,
+                    grounding_resize_mode=req.outfit_grounding_resize_mode,
+                    grounding_px=req.outfit_grounding_px,
+                    grounding_min_px=req.outfit_grounding_min_px,
+                    grounding_max_px=req.outfit_grounding_max_px
+                ))
+            elif role == ReferenceRole.SOURCE and req.source_image is not None:
+                configs.append(ReferenceConfig(
+                    role=role,
+                    image=req.source_image,
+                    attention_mask=req.source_attention_mask,
+                    boost=req.source_boost,
+                    mask_invert=req.source_mask_invert,
+                    grounding_preset=req.source_grounding_preset,
+                    grounding_resize_mode=req.source_grounding_resize_mode,
+                    grounding_px=req.source_grounding_px,
+                    grounding_min_px=req.source_grounding_min_px,
+                    grounding_max_px=req.source_grounding_max_px
+                ))
+        return configs

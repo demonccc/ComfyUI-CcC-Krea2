@@ -1,9 +1,7 @@
-"""Mask processing utilities for attention masks and inpainting noise masks."""
+"""Mask processing utilities for attention masks and inpainting noise masks using pure PyTorch operations."""
 
 import torch
 import torch.nn.functional as F
-import scipy.ndimage
-import numpy as np
 from typing import Tuple, Optional
 
 
@@ -13,7 +11,12 @@ def process_inpaint_mask(
     grow: int = 0,
     blur: int = 0
 ) -> torch.Tensor:
-    """Process an inpainting mask tensor."""
+    """Process an inpainting mask tensor using pure PyTorch operations.
+
+    Mask semantics:
+    - 1.0 (white): Editable / noised area
+    - 0.0 (black): Preserved area
+    """
     if mask is None:
         raise ValueError("Inpaint mask cannot be None.")
 
@@ -28,21 +31,15 @@ def process_inpaint_mask(
 
     m = m.clamp(0.0, 1.0)
 
+    # Pure PyTorch mask dilation via max_pool2d (replaces scipy)
     if grow > 0:
-        device = m.device
-        dtype = m.dtype
-        m_np = m.cpu().numpy()
         kernel_size = grow * 2 + 1
-        struct = np.ones((kernel_size, kernel_size), dtype=bool)
+        padding = grow
+        m_4d = m.unsqueeze(1)
+        m_dilated = F.max_pool2d(m_4d, kernel_size=kernel_size, stride=1, padding=padding)
+        m = m_dilated.squeeze(1).clamp(0.0, 1.0)
 
-        grown_batch = []
-        for i in range(m_np.shape[0]):
-            binary = m_np[i] > 0.5
-            dilated = scipy.ndimage.binary_dilation(binary, structure=struct)
-            grown_batch.append(dilated.astype(np.float32))
-
-        m = torch.from_numpy(np.stack(grown_batch)).to(device=device, dtype=dtype)
-
+    # Gaussian blur via 2D convolution
     if blur > 0:
         kernel_size = blur * 2 + 1
         sigma = blur / 2.0

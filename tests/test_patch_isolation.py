@@ -18,7 +18,7 @@ def test_patch_isolation():
     original = DummyModel()
 
     # Apply patch
-    patched = patch_krea2_model(original)
+    patched = patch_krea2_model(original, prepared_refs=[], target_h=1024, target_w=1024)
 
     # Verify original is completely unpatched and pristine
     assert "transformer_options" not in original.model_options
@@ -26,4 +26,4 @@ def test_patch_isolation():
     # Verify patched model has transformer_options with wrapper registered
     assert "transformer_options" in patched.model_options
     to = patched.model_options["transformer_options"]
-    assert "wrappers" in to or "ccc_krea2_edit" in str(to)
+    assert "wrappers" in to
