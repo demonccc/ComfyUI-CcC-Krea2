@@ -2,7 +2,7 @@
 
 import torch
 import torch.nn.functional as F
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
 
 def apply_sampling_transform(
@@ -34,13 +34,15 @@ def apply_reference_fit_transform(
     crop_tolerance: float = 0.1,
     mask_interpolation: str = "bicubic",
     alignment: int = 16
-) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
     """Transform reference image/mask for VAE reference tokens matching Krea 2 pixel-path geometry.
 
     Key principles:
     - NO black target-sized canvas padding.
-    - Preserves native fitted reference grid aligned to multiples of 16 (/16 training geometry).
+    - Preserves native fitted reference grid aligned to /16 floor dimensions.
     - Near-matched-AR crop tolerance: if AR difference <= crop_tolerance, center-crops directly to target AR.
+    - Genuine mismatches crop source to aligned grid then resize.
+    - Calculates fractional RoPE centering offsets.
     - Masks receive the exact same spatial transformation.
     """
     if mode not in ("fit", "crop"):
@@ -71,7 +73,7 @@ def apply_reference_fit_transform(
     target_ar = target_h / float(target_w)
     image_ar = ih / float(iw)
 
-    # If aspect ratios match within crop_tolerance or mode is 'crop', center-crop then resize to target grid
+    # 1. Mode 'crop' or near-matched AR within tolerance: center-crop directly to target AR then resize to target_h x target_w
     if mode == "crop" or abs(image_ar - target_ar) <= crop_tolerance:
         scale = max(target_h / float(ih), target_w / float(iw))
         new_h = int(round(ih * scale))
@@ -89,15 +91,21 @@ def apply_reference_fit_transform(
             scaled_mask = F.interpolate(mask_bchw, size=(new_h, new_w), mode=mask_m, **kwargs)
             cropped_mask = scaled_mask[..., y0:y0 + target_h, x0:x0 + target_w].squeeze(1).clamp(0.0, 1.0)
 
-        return cropped_img.movedim(1, -1).clamp(0.0, 1.0), cropped_mask
+        ref_fit_meta = {
+            "spatial_hw": (target_h, target_w),
+            "lat_hw": (target_h // 8, target_w // 8),
+            "y_offset": 0.0,
+            "x_offset": 0.0
+        }
+        return cropped_img.movedim(1, -1).clamp(0.0, 1.0), cropped_mask, ref_fit_meta
 
-    # 'fit' mode without black canvas padding: preserve native fitted grid aligned to multiples of 16
+    # 2. Genuine AR mismatch in 'fit' mode: /16 floor-aligned fitted dimensions without canvas padding
     scale = min(target_h / float(ih), target_w / float(iw))
     raw_h = ih * scale
     raw_w = iw * scale
 
-    fh = max(alignment, int(round(raw_h / float(alignment))) * alignment)
-    fw = max(alignment, int(round(raw_w / float(alignment))) * alignment)
+    fh = max(alignment, (int(raw_h) // alignment) * alignment)
+    fw = max(alignment, (int(raw_w) // alignment) * alignment)
 
     fitted_img = F.interpolate(img_bchw, size=(fh, fw), mode="bicubic", antialias=True)
 
@@ -107,7 +115,18 @@ def apply_reference_fit_transform(
         kwargs = {"antialias": True} if mask_m == "bicubic" else {}
         fitted_mask = F.interpolate(mask_bchw, size=(fh, fw), mode=mask_m, **kwargs).squeeze(1).clamp(0.0, 1.0)
 
-    return fitted_img.movedim(1, -1).clamp(0.0, 1.0), fitted_mask
+    # Fractional RoPE centering offsets
+    y_offset = (target_h - fh) / 2.0
+    x_offset = (target_w - fw) / 2.0
+
+    ref_fit_meta = {
+        "spatial_hw": (fh, fw),
+        "lat_hw": (fh // 8, fw // 8),
+        "y_offset": y_offset,
+        "x_offset": x_offset
+    }
+
+    return fitted_img.movedim(1, -1).clamp(0.0, 1.0), fitted_mask, ref_fit_meta
 
 
 def _apply_sampling_transform_internal(

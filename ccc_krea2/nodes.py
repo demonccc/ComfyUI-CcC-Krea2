@@ -422,6 +422,7 @@ class CcCKrea2Inpaint(BaseKrea2Node):
             batch_size=kwargs.get("batch_size", 1),
             sampling_resize_mode=kwargs.get("sampling_resize_mode", "fit"),
             reference_fit_mode=kwargs.get("reference_fit_mode", "fit"),
+            inpaint_base_role=ReferenceRole.SOURCE,
             role_order=ROLE_ORDER_INPAINT
         )
         return Krea2EditEngine.execute(request)
@@ -508,6 +509,7 @@ class CcCKrea2InpaintSubjectOutfit(BaseKrea2Node):
             batch_size=kwargs.get("batch_size", 1),
             sampling_resize_mode=kwargs.get("sampling_resize_mode", "fit"),
             reference_fit_mode=kwargs.get("reference_fit_mode", "fit"),
+            inpaint_base_role=ReferenceRole.SUBJECT,
             role_order=ROLE_ORDER_INPAINT_SUBJECT_OUTFIT
         )
         return Krea2EditEngine.execute(request)
@@ -594,6 +596,7 @@ class CcCKrea2InpaintSubjectScene(BaseKrea2Node):
             batch_size=kwargs.get("batch_size", 1),
             sampling_resize_mode=kwargs.get("sampling_resize_mode", "fit"),
             reference_fit_mode=kwargs.get("reference_fit_mode", "fit"),
+            inpaint_base_role=ReferenceRole.SCENE,
             role_order=ROLE_ORDER_INPAINT_SUBJECT_SCENE
         )
         return Krea2EditEngine.execute(request)

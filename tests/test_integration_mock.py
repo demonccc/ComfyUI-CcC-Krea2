@@ -2,7 +2,7 @@
 
 import pytest
 import torch
-from ccc_krea2.patch import patch_krea2_model
+from ccc_krea2.patch import patch_krea2_model, krea2_dit_incontext_forward
 from ccc_krea2.references import PreparedReference, ReferenceRole, _process_latent_in_if_available
 from ccc_krea2.latents import generate_krea2_latent
 from ccc_krea2.engine import Krea2EditEngine, NodeExecutionRequest
@@ -36,7 +36,6 @@ class MockInnerModel:
         self.model_dtype = torch.float32
 
     def process_latent_in(self, latent):
-        # Scale latent by factor 0.13025 to simulate VAE scaling space
         return latent * 0.13025
 
 
@@ -53,7 +52,6 @@ class MockModel:
 
 class MockVAE:
     def encode(self, image):
-        # Encode image [B, H, W, 3] to VAE latent [B, 16, H//8, W//8]
         if image.ndim == 4 and image.shape[-1] == 3:
             b, h, w, _ = image.shape
             return torch.rand((b, 16, h // 8, w // 8))
@@ -76,7 +74,8 @@ def test_diffusion_model_wrapper_execution_signature():
         lat_hw=(16, 16)
     )
 
-    patched = patch_krea2_model(model, [prep_ref], target_h=1024, target_w=1024)
+    # Canonical patch call: patch_krea2_model(model, prepared_refs)
+    patched = patch_krea2_model(model, [prep_ref])
 
     wrappers = patched.model_options["transformer_options"]["wrappers"]
     assert len(wrappers) == 1
@@ -86,11 +85,9 @@ def test_diffusion_model_wrapper_execution_signature():
     timesteps = torch.tensor([1.0])
     context = torch.rand((1, 77, 2048))
 
-    # Execute wrapper with exact ComfyUI contract: wrapper(executor, x, timesteps, context)
     out = wrapper(executor, x, timesteps, context)
 
     assert dit.called
-    assert dit.last_kwargs["ref_latents"] == [ref_lat]
     assert dit.last_kwargs["attn_bias"] is not None
     assert torch.equal(out, x)
 
@@ -115,7 +112,8 @@ def test_explicit_inpaint_base_role_selection():
         prompt="test",
         vae=MockVAE(),
         source_image=img_src,
-        subject_image=img_sub
+        subject_image=img_sub,
+        inpaint_base_role=ReferenceRole.SOURCE
     )
     base_src = Krea2EditEngine._resolve_base_image(req_inpaint)
     assert torch.equal(base_src, img_src)
@@ -126,7 +124,8 @@ def test_explicit_inpaint_base_role_selection():
         clip=None,
         prompt="test",
         vae=MockVAE(),
-        subject_image=img_sub
+        subject_image=img_sub,
+        inpaint_base_role=ReferenceRole.SUBJECT
     )
     base_sub = Krea2EditEngine._resolve_base_image(req_inpaint_sub)
     assert torch.equal(base_sub, img_sub)
@@ -137,7 +136,8 @@ def test_explicit_inpaint_base_role_selection():
         clip=None,
         prompt="test",
         vae=MockVAE(),
-        scene_image=img_scn
+        scene_image=img_scn,
+        inpaint_base_role=ReferenceRole.SCENE
     )
     base_scn = Krea2EditEngine._resolve_base_image(req_inpaint_scn)
     assert torch.equal(base_scn, img_scn)

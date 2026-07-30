@@ -33,6 +33,7 @@ class PreparedReference:
     boost: float
     spatial_hw: Tuple[int, int]
     lat_hw: Tuple[int, int]
+    ref_fit_meta: Optional[Dict[str, Any]] = None
 
 
 def prepare_reference(
@@ -62,7 +63,7 @@ def prepare_reference(
     )
 
     # 2. VAE Reference Latent Path
-    fitted_img, fitted_mask = apply_reference_fit_transform(
+    fitted_img, fitted_mask, ref_fit_meta = apply_reference_fit_transform(
         image=config.image,
         target_h=target_h,
         target_w=target_w,
@@ -73,11 +74,8 @@ def prepare_reference(
     # VAE encode reference image
     raw_vae_latent = vae.encode(fitted_img)
 
-    # Apply model.model.process_latent_in to share identical latent scaling space
-    processed_vae_latent = _process_latent_in_if_available(model, raw_vae_latent)
-
-    lat_h = processed_vae_latent.shape[-2]
-    lat_w = processed_vae_latent.shape[-1]
+    lat_h = raw_vae_latent.shape[-2]
+    lat_w = raw_vae_latent.shape[-1]
 
     # Process token attention mask matching lat_h, lat_w token grid
     token_mask = process_attention_mask(
@@ -93,11 +91,12 @@ def prepare_reference(
     return PreparedReference(
         role=config.role,
         grounding_image=grounding_img,
-        vae_latent=processed_vae_latent,
+        vae_latent=raw_vae_latent,
         token_attention_mask=token_mask,
         boost=config.boost,
         spatial_hw=(spatial_h, spatial_w),
-        lat_hw=(lat_h, lat_w)
+        lat_hw=(lat_h, lat_w),
+        ref_fit_meta=ref_fit_meta
     )
 
 

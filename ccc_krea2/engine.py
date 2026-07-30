@@ -70,6 +70,7 @@ class NodeExecutionRequest:
     sampling_resize_mode: str = "fit"
     reference_fit_mode: str = "fit"
     latent_source: str = "empty"
+    inpaint_base_role: Optional[ReferenceRole] = None
     role_order: List[ReferenceRole] = None
 
 
@@ -89,13 +90,13 @@ class Krea2EditEngine:
         if req.outfit_image is not None or len(req.role_order or []) > 2:
             logger.warning(EXPERIMENTAL_OUTFIT_WARNING)
 
-        # 4. Explicit inpainting & sampling base image resolution
+        # 4. Explicit inpainting & sampling base image resolution via inpaint_base_role or latent_source
         base_image = cls._resolve_base_image(req)
 
         # 5. Build reference configs in strict role order
         ref_configs = cls._build_reference_configs(req)
 
-        # 6. Dual-path reference preparation (Grounding + VAE latents with process_latent_in)
+        # 6. Dual-path reference preparation (Grounding + VAE latents)
         prepared_refs: List[PreparedReference] = []
         grounding_images: List[torch.Tensor] = []
 
@@ -114,15 +115,10 @@ class Krea2EditEngine:
                 if prep.grounding_image is not None:
                     grounding_images.append(prep.grounding_image)
 
-        # 7. ModelPatcher DiT forwarding patch (closure capture)
-        patched_model = patch_krea2_model(
-            model=req.model,
-            prepared_refs=prepared_refs,
-            target_h=req.height,
-            target_w=req.width
-        )
+        # 7. Canonical model patch call: patch_krea2_model(model, prepared_refs)
+        patched_model = patch_krea2_model(req.model, prepared_refs)
 
-        # 8. Encode Qwen3-VL conditionings
+        # 8. Encode Qwen3-VL conditionings (pure semantic grounding)
         positive, negative = encode_krea2_conditioning(
             clip=req.clip,
             prompt=req.prompt,
@@ -150,12 +146,12 @@ class Krea2EditEngine:
 
     @classmethod
     def _resolve_base_image(cls, req: NodeExecutionRequest) -> Optional[torch.Tensor]:
-        """Explicitly select base image per node contract without ambiguity."""
-        if req.node_name == "CcC Krea2 - Inpaint":
+        """Explicitly select base image per node contract using inpaint_base_role or latent_source."""
+        if req.inpaint_base_role == ReferenceRole.SOURCE:
             return req.source_image
-        elif req.node_name == "CcC Krea2 - Inpaint Subject + Outfit":
+        elif req.inpaint_base_role == ReferenceRole.SUBJECT:
             return req.subject_image
-        elif req.node_name == "CcC Krea2 - Inpaint Subject + Scene":
+        elif req.inpaint_base_role == ReferenceRole.SCENE:
             return req.scene_image
 
         # General editing nodes based on user's latent_source selection
