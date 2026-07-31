@@ -29,6 +29,12 @@ MAIN_NODE_TYPES = (
 )
 
 
+def _is_node_inside_group(node, group):
+    pos = node.get("pos", [0, 0])
+    gx, gy, gw, gh = group.get("bounding", [0, 0, 0, 0])
+    return gx <= pos[0] <= gx + gw and gy <= pos[1] <= gy + gh
+
+
 def test_expected_filenames_and_directory_contents():
     """1. Exactly the six expected workflow files exist."""
     workflows_dir = Path("workflows")
@@ -47,12 +53,16 @@ def test_workflow_json_parsing_and_loaders():
 
         assert isinstance(data, dict), f"Invalid JSON structure in {rel_path}"
 
-        node_types = [n.get("type") for n in data.get("nodes", [])]
+        nodes = data.get("nodes", [])
+        node_types = [n.get("type") for n in nodes]
         assert "UNETLoader" in node_types, f"Missing UNETLoader in {rel_path}"
         assert "CLIPLoader" in node_types, f"Missing CLIPLoader in {rel_path}"
         assert "VAELoader" in node_types, f"Missing VAELoader in {rel_path}"
-        assert "CcCKrea2LoRAStack" in node_types, f"Missing CcCKrea2LoRAStack in {rel_path}"
-        assert "CcCKrea2LoRAPromptSettings" in node_types, f"Missing CcCKrea2LoRAPromptSettings in {rel_path}"
+
+        stack_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAStack"]
+        ps_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAPromptSettings"]
+        assert len(stack_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAStack in {rel_path}"
+        assert len(ps_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAPromptSettings in {rel_path}"
 
         assert "LoraLoaderModelOnly" not in node_types, f"LoraLoaderModelOnly found in {rel_path}"
         assert "CheckpointLoaderSimple" not in node_types, f"CheckpointLoaderSimple found in {rel_path}"
@@ -83,47 +93,86 @@ def test_workflow_main_nodes_and_groups():
         assert "Models" in group_titles, f"Missing 'Models' group in {rel_path}"
         assert "Advanced Settings (disabled by default)" in group_titles, f"Missing Advanced Settings group in {rel_path}"
         assert "LoRA Stack + Edit + KSampler" in group_titles, f"Missing 'LoRA Stack + Edit + KSampler' group in {rel_path}"
+        assert "LoRA Prompt Augmentation (disabled by default)" in group_titles, f"Missing 'LoRA Prompt Augmentation' group in {rel_path}"
         assert "Output" in group_titles, f"Missing 'Output' group in {rel_path}"
 
 
-def test_lora_stack_and_prompt_settings_wiring():
-    """Verify wiring between CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack, and main node."""
+def test_lora_stack_and_prompt_settings_wiring_and_layout():
+    """Verify wiring and group layout for CcCKrea2LoRAPromptSettings and CcCKrea2LoRAStack."""
     for rel_path in EXPECTED_WORKFLOW_FILES:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         nodes = data.get("nodes", [])
         node_by_type = {n["type"]: n for n in nodes if "type" in n}
+        groups_by_title = {g["title"]: g for g in data.get("groups", []) if "title" in g}
 
         stack_node = node_by_type["CcCKrea2LoRAStack"]
         ps_node = node_by_type["CcCKrea2LoRAPromptSettings"]
         main_node = next(n for n in nodes if n.get("type") in MAIN_NODE_TYPES)
+        ksampler_node = next(n for n in nodes if n.get("type") == "KSampler")
 
-        link_map = {l[0]: l for l in data.get("links", [])}
+        # 1. Check prompt settings mode == 0 and disabled widget values
+        assert ps_node.get("mode") == 0, f"Prompt settings mode must be 0 in {rel_path}"
+        ps_widgets = ps_node.get("widgets_values", [])
+        assert ps_widgets[0] is False, f"Prompt settings enabled widget must be false in {rel_path}"
+        # All 4 per-slot prompt enabled must be False
+        assert ps_widgets[1] is False
+        assert ps_widgets[5] is False
+        assert ps_widgets[9] is False
+        assert ps_widgets[13] is False
+        # All positive/negative prompt texts must be empty strings
+        for text_idx in (3, 4, 7, 8, 11, 12, 15, 16):
+            assert ps_widgets[text_idx] == "", f"Prompt text widget index {text_idx} must be empty string in {rel_path}"
 
-        # 1. Prompt settings output -> LoRA stack input
+        # 2. Check LoRA Stack widgets
+        stack_widgets = stack_node.get("widgets_values", [])
+        assert stack_widgets[0] is True, f"LoRA Stack enabled widget must be true in {rel_path}"
+        assert stack_widgets[1] == 1.0, f"Global strength must be 1.0 in {rel_path}"
+        assert stack_widgets[2] is True, f"LoRA slot 1 must be enabled in {rel_path}"
+        assert stack_widgets[3] == "krea2_edit_lora.safetensors", f"LoRA slot 1 filename mismatch in {rel_path}"
+        assert stack_widgets[4] == 1.0, f"LoRA slot 1 strength must be 1.0 in {rel_path}"
+        # Slots 2, 3, 4 disabled
+        assert stack_widgets[5] is False
+        assert stack_widgets[8] is False
+        assert stack_widgets[11] is False
+
+        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
+
+        # 3. Wiring checks
+        # Prompt Settings -> Stack lora_prompt_settings
         ps_out_links = ps_node["outputs"][0]["links"]
         assert ps_out_links is not None and len(ps_out_links) == 1
         ps_link = link_map[ps_out_links[0]]
         assert ps_link[3] == stack_node["id"]
         assert ps_link[5] == "CCC_KREA2_LORA_PROMPT_SETTINGS"
 
-        # 2. LoRA stack prompt_augmentation output -> main node input
+        # Stack.model -> main node.model
+        stack_model_out_links = stack_node["outputs"][0]["links"]
+        assert stack_model_out_links is not None and len(stack_model_out_links) == 1
+        model_link = link_map[stack_model_out_links[0]]
+        assert model_link[3] == main_node["id"]
+        assert model_link[5] == "MODEL"
+
+        # Stack.prompt_augmentation -> main node.prompt_augmentation
         stack_aug_out_links = stack_node["outputs"][1]["links"]
         assert stack_aug_out_links is not None and len(stack_aug_out_links) == 1
         aug_link = link_map[stack_aug_out_links[0]]
         assert aug_link[3] == main_node["id"]
         assert aug_link[5] == "CCC_KREA2_PROMPT_AUGMENTATION"
 
-        # 3. Verify slot default values in stack (disabled slots)
-        stack_widgets = stack_node.get("widgets_values", [])
-        assert stack_widgets[0] is True  # stack enabled
-        assert stack_widgets[1] == 1.0  # global strength
-        assert stack_widgets[2] is True  # lora 1 enabled
-        # slots 2..4 disabled
-        assert stack_widgets[5] is False
-        assert stack_widgets[8] is False
-        assert stack_widgets[11] is False
+        # 4. Group containment checks
+        stack_group = groups_by_title["LoRA Stack + Edit + KSampler"]
+        ps_group = groups_by_title["LoRA Prompt Augmentation (disabled by default)"]
+
+        # Prompt Settings is inside prompt augmentation group, and NOT inside stack group
+        assert _is_node_inside_group(ps_node, ps_group), f"Prompt Settings node must be inside 'LoRA Prompt Augmentation' group in {rel_path}"
+        assert not _is_node_inside_group(ps_node, stack_group), f"Prompt Settings node must NOT be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
+
+        # Stack, main edit node, and KSampler are inside stack group
+        assert _is_node_inside_group(stack_node, stack_group), f"LoRA Stack node must be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
+        assert _is_node_inside_group(main_node, stack_group), f"Main edit node must be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
+        assert _is_node_inside_group(ksampler_node, stack_group), f"KSampler node must be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
 
 
 def test_advanced_settings_chaining_and_bypass():

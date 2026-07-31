@@ -831,8 +831,8 @@
       "id": 63,
       "type": "CcCKrea2LoRAPromptSettings",
       "pos": [
-        1240,
-        520
+        1640,
+        680
       ],
       "size": [
         315,
@@ -856,7 +856,7 @@
         "Node name for S&R": "CcCKrea2LoRAPromptSettings"
       },
       "widgets_values": [
-        true,
+        false,
         false,
         "append",
         "",
@@ -1095,7 +1095,7 @@
         1220,
         90,
         1150,
-        700
+        550
       ],
       "color": "#3f51b5"
     },
@@ -1108,6 +1108,16 @@
         450
       ],
       "color": "#5c5c2b"
+    },
+    {
+      "title": "LoRA Prompt Augmentation (disabled by default)",
+      "bounding": [
+        1620,
+        650,
+        355,
+        290
+      ],
+      "color": "#5c2b2b"
     }
   ],
   "config": {},
