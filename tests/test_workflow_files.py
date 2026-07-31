@@ -168,7 +168,7 @@ def test_qwen_workflows_and_non_qwen_isolation():
         assert "Qwen3VL_ModelConfig" in node_by_type, f"Missing Qwen3VL_ModelConfig in {rel_path}"
         assert "Qwen3VL_SamplingConfig" in node_by_type, f"Missing Qwen3VL_SamplingConfig in {rel_path}"
 
-        # 1-4. Socket types check: STRING
+        # Socket types check: STRING
         m_cfg = node_by_type["Qwen3VL_ModelConfig"]
         s_cfg = node_by_type["Qwen3VL_SamplingConfig"]
         qwen_node = node_by_type["SimpleQwenVLggufV2"]
@@ -182,7 +182,7 @@ def test_qwen_workflows_and_non_qwen_isolation():
 
         link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
 
-        # 5. Link tuples type check
+        # Link tuples type check
         m_out_link_id = m_cfg["outputs"][0]["links"][0]
         m_out_link = link_map[m_out_link_id]
         assert m_out_link[5] == "STRING", f"ModelConfig link type not STRING in {rel_path}"
@@ -194,39 +194,56 @@ def test_qwen_workflows_and_non_qwen_isolation():
         assert s_out_link[3] == qwen_node["id"], f"SamplingConfig link target mismatch in {rel_path}"
         assert s_out_link[4] == 6, f"SamplingConfig link target slot should be 6 (config_override) in {rel_path}"
 
-        # 7. ModelConfig widget count and order check
+        # ModelConfig widget count and specific values
         m_widgets = m_cfg.get("widgets_values", [])
         assert len(m_widgets) == 19, f"ModelConfig widget count mismatch: got {len(m_widgets)}, expected 19 in {rel_path}"
+        assert m_widgets[11] == "qwen25", f"chat_handler must be 'qwen25' in {rel_path}"
+        assert m_widgets[12] == "none", f"chat_format must be 'none' in {rel_path}"
+        assert m_widgets[17] == "F16", f"type_k must be 'F16' in {rel_path}"
+        assert m_widgets[18] == "F16", f"type_v must be 'F16' in {rel_path}"
+        assert "auto" not in (m_widgets[11], m_widgets[12]), f"auto found in chat handler/format in {rel_path}"
+        assert "default" not in (m_widgets[17], m_widgets[18]), f"default found in type_k/type_v in {rel_path}"
 
-        # 8. SamplingConfig widget count check
-        s_widgets = s_cfg.get("widgets_values", [])
-        assert len(s_widgets) == 10, f"SamplingConfig widget count mismatch: got {len(s_widgets)}, expected 10 in {rel_path}"
-
-        # 9. SimpleQwenVLggufV2 required widget count and order
+        # SimpleQwenVLggufV2 widgets (7 items)
         q_widgets = qwen_node.get("widgets_values", [])
-        assert len(q_widgets) == 6, f"SimpleQwenVLggufV2 widget count mismatch: got {len(q_widgets)}, expected 6 in {rel_path}"
-        assert q_widgets[0] == "qwen2_vl_7b_instruct"
-        assert q_widgets[1] == "default"
+        assert len(q_widgets) == 7, f"SimpleQwenVLggufV2 widget count mismatch: got {len(q_widgets)}, expected 7 in {rel_path}"
+        assert q_widgets[0] == "None", f"model_preset must be 'None' in {rel_path}"
+        assert q_widgets[1] == "None", f"system_preset must be 'None' in {rel_path}"
         user_prompt_text = q_widgets[2]
         assert isinstance(user_prompt_text, str)
-        assert isinstance(q_widgets[3], int)
-        assert q_widgets[4] is False
-        assert q_widgets[5] == "full"
+        assert isinstance(q_widgets[3], int), f"seed must be integer in {rel_path}"
+        assert q_widgets[4] == "fixed", f"control_after_generate must be 'fixed' in {rel_path}"
+        assert q_widgets[5] is False, f"unload_all_models must be false in {rel_path}"
+        assert q_widgets[6] == "subprocess", f"mode must be 'subprocess' in {rel_path}"
+        assert q_widgets[6] != "full", f"mode must not be 'full' in {rel_path}"
 
-        # 10. Canonical image role terms in user prompt
+        # Canonical image role terms in user prompt
         assert "subject image" in user_prompt_text
         assert "scene image" in user_prompt_text
         if "outfit" in rel_path:
             assert "outfit image" in user_prompt_text
 
-        # 11. Scene image connected to real `image` socket (slot index 0)
+        # Outputs check (4 outputs serialized, only text output linked)
+        outputs = qwen_node.get("outputs", [])
+        assert len(outputs) == 4, f"SimpleQwenVLggufV2 must serialize 4 outputs in {rel_path}"
+        output_names = [o["name"] for o in outputs]
+        assert output_names == ["text", "conditioning", "system_prompt", "user_prompt"]
+
+        text_out = next(o for o in outputs if o["name"] == "text")
+        assert text_out["links"] is not None and len(text_out["links"]) == 1
+
+        for unlinked_name in ("conditioning", "system_prompt", "user_prompt"):
+            out_obj = next(o for o in outputs if o["name"] == unlinked_name)
+            assert out_obj["links"] is None, f"{unlinked_name} output should not be linked in {rel_path}"
+
+        # Scene image connected to real `image` socket (slot index 0)
         qwen_img_link_id = qwen_node["inputs"][0]["link"]  # slot 0 is "image"
         qwen_img_link = link_map[qwen_img_link_id]
         scene_load_img_node = next(n for n in nodes if n["type"] == "LoadImage" and n.get("widgets_values", [""])[0] == "scene.jpg")
         assert qwen_img_link[1] == scene_load_img_node["id"], f"Scene LoadImage not connected to Qwen image socket in {rel_path}"
 
-        # 13. Qwen text output connected to CcC main node prompt input
-        qwen_text_link_id = qwen_node["outputs"][0]["links"][0]
+        # Qwen text output connected to CcC main node prompt input
+        qwen_text_link_id = text_out["links"][0]
         main_node = next(n for n in nodes if n["type"] in MAIN_NODE_TYPES)
         prompt_input = next(i for i in main_node["inputs"] if i["name"] == "prompt")
         assert prompt_input["link"] == qwen_text_link_id, f"Qwen text output not connected to main node prompt in {rel_path}"
