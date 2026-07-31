@@ -10,7 +10,7 @@ This project incorporates architectural concepts, reference implementations, and
 2. ComfyUI-Krea2Edit by lbouaraba
    https://github.com/lbouaraba/comfyui-krea2edit
    Licensed under the Apache License, Version 2.0 (Apache-2.0).
-   Included logic for explicit model patch wrappers, SingleStreamDiT in-context forward sequences, RoPE 3D frame positioning, reference attention logit bias, and pixel-space reference fitting.
+   Included logic for model patch wrappers, SingleStreamDiT in-context forward sequences, RoPE 3D frame positioning, reference attention logit bias, and pixel-space reference fitting.
 
 3. ComfyUI-EditUtils by lrzjason
    https://github.com/lrzjason/ComfyUI-EditUtils

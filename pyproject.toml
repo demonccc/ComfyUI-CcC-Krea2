@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ComfyUI-CcC-Krea2"
 version = "0.1.0"
-description = "ComfyUI custom nodes for Krea 2 reference-guided editing, with explicit model patching, subject, outfit and scene workflows, attention masks, grounding resize controls, selectable latent sources, and localized inpainting."
+description = "ComfyUI custom nodes for advanced Krea 2 reference-guided editing, including subject, outfit, scene and localized inpainting workflows."
 readme = "README.md"
 authors = [
     { name = "CcC Krea2 Contributors" }
@@ -17,11 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "torch>=2.0.0",
-    "numpy>=1.22.0",
     "pillow>=9.0.0",
-    "einops>=0.6.0",
-    "scipy>=1.8.0"
+    "einops>=0.6.0"
 ]
 
 [project.urls]

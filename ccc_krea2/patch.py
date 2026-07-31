@@ -1,7 +1,7 @@
 """Canonical ModelPatcher wrapper integration and DiT in-context forward execution."""
 
 import math
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import torch
 
 from .references import PreparedReference, _process_latent_in_if_available
@@ -55,17 +55,46 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             transformer_options=transformer_options,
         )
 
-    # Register closure using ModelPatcher API or transformer_options wrappers
-    if hasattr(patched_model, "add_wrapper_with_key"):
-        patched_model.add_wrapper_with_key("ccc_krea2_edit", krea2_edit_wrapper)
-    else:
-        if not hasattr(patched_model, "model_options"):
-            patched_model.model_options = {}
-        options = patched_model.model_options.setdefault("transformer_options", {})
-        wrappers = options.setdefault("wrappers", [])
-        wrappers.append(krea2_edit_wrapper)
+    # Registration using ComfyUI patcher_extension.WrappersMP.DIFFUSION_MODEL
+    _register_wrapper(patched_model, krea2_edit_wrapper)
 
     return patched_model
+
+
+def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
+    """Register wrapper using ComfyUI WrappersMP.DIFFUSION_MODEL with API fallback."""
+    registered = False
+
+    wrapper_type = None
+    try:
+        import comfy.patcher_extension
+        wrapper_type = comfy.patcher_extension.WrappersMP.DIFFUSION_MODEL
+    except Exception:
+        wrapper_type = "DIFFUSION_MODEL"
+
+    if hasattr(patched_model, "add_wrapper_with_key"):
+        try:
+            patched_model.add_wrapper_with_key(wrapper_type, "ccc_krea2_edit", wrapper)
+            registered = True
+        except TypeError:
+            try:
+                patched_model.add_wrapper_with_key("ccc_krea2_edit", wrapper)
+                registered = True
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    if not registered:
+        _fallback_options_register(patched_model, wrapper)
+
+
+def _fallback_options_register(patched_model: Any, wrapper: Any) -> None:
+    if not hasattr(patched_model, "model_options"):
+        patched_model.model_options = {}
+    options = patched_model.model_options.setdefault("transformer_options", {})
+    wrappers = options.setdefault("wrappers", [])
+    wrappers.append(wrapper)
 
 
 def krea2_dit_incontext_forward(
@@ -79,10 +108,52 @@ def krea2_dit_incontext_forward(
     ref_fit: List[Optional[Dict[str, Any]]],
     transformer_options: Dict[str, Any]
 ) -> torch.Tensor:
-    """Execute Krea2 SingleStreamDiT in-context forward pass with attention steering."""
-    ref_lens = [r.shape[-2] * r.shape[-1] for r in ref_latents]
-    tgt_len = x.shape[-2] * x.shape[-1] if x.ndim == 4 else x.shape[1]
+    """Execute Krea2 SingleStreamDiT in-context forward pass with 3D RoPE position IDs and attention logit steering."""
+    orig_ndim = x.ndim
+    if orig_ndim == 5:
+        x_4d = x.squeeze(2) if x.shape[2] == 1 else x[:, :, 0, :, :]
+    else:
+        x_4d = x
+
+    bs, c, target_h, target_w = x_4d.shape
     txt_len = context.shape[1] if context is not None else 0
+
+    ref_tokens_list: List[torch.Tensor] = []
+    ref_lens: List[int] = []
+    ref_pos_ids: List[torch.Tensor] = []
+
+    for i, (ref_lat, meta) in enumerate(zip(ref_latents, ref_fit)):
+        frame_idx = i + 1
+        ref_h = ref_lat.shape[-2]
+        ref_w = ref_lat.shape[-1]
+
+        if hasattr(dit_model, "img_in"):
+            ref_emb = dit_model.img_in(ref_lat)
+        elif hasattr(dit_model, "x_embedder"):
+            ref_emb = dit_model.x_embedder(ref_lat)
+        else:
+            ref_emb = ref_lat.flatten(2).transpose(1, 2)
+
+        if ref_emb.ndim == 4:
+            ref_emb = ref_emb.flatten(2).transpose(1, 2)
+
+        ref_tokens_list.append(ref_emb)
+        n_toks = ref_emb.shape[1]
+        ref_lens.append(n_toks)
+
+        y_off = meta.get("y_offset", 0.0) if meta else 0.0
+        x_off = meta.get("x_offset", 0.0) if meta else 0.0
+        pos_id = _build_ref_3d_rope_pos_ids(
+            frame_idx=frame_idx,
+            lat_h=ref_h,
+            lat_w=ref_w,
+            y_offset=y_off,
+            x_offset=x_off,
+            device=x.device
+        )
+        ref_pos_ids.append(pos_id)
+
+    tgt_len = target_h * target_w
 
     attn_bias = _compute_ref_attention_bias(
         boosts=ref_boosts,
@@ -94,21 +165,42 @@ def krea2_dit_incontext_forward(
         dtype=x.dtype
     )
 
-    # If dit_model has native forward expecting ref_latents / attn_bias
     if hasattr(dit_model, "forward"):
         try:
-            return dit_model.forward(
-                x,
+            out_tokens = dit_model.forward(
+                x_4d,
                 timesteps,
                 context,
-                ref_latents=ref_latents,
+                ref_latents=ref_tokens_list,
+                ref_pos_ids=ref_pos_ids,
                 attn_bias=attn_bias,
                 transformer_options=transformer_options
             )
+            return _reshaped_target_output(out_tokens, x, orig_ndim, bs, c, target_h, target_w)
         except TypeError:
             pass
 
-    return dit_model(x, timesteps, context)
+    out_tokens = dit_model(x_4d, timesteps, context)
+    return _reshaped_target_output(out_tokens, x, orig_ndim, bs, c, target_h, target_w)
+
+
+def _build_ref_3d_rope_pos_ids(
+    frame_idx: int,
+    lat_h: int,
+    lat_w: int,
+    y_offset: float,
+    x_offset: float,
+    device: torch.device
+) -> torch.Tensor:
+    """Build 3D RoPE position IDs [3, N] with fractional centering offsets."""
+    grid_y = torch.arange(lat_h, device=device, dtype=torch.float32) + y_offset / 8.0
+    grid_x = torch.arange(lat_w, device=device, dtype=torch.float32) + x_offset / 8.0
+
+    mesh_y, mesh_x = torch.meshgrid(grid_y, grid_x, indexing="ij")
+    mesh_t = torch.full_like(mesh_y, fill_value=float(frame_idx))
+
+    pos_ids = torch.stack([mesh_t.flatten(), mesh_y.flatten(), mesh_x.flatten()], dim=0)
+    return pos_ids
 
 
 def _compute_ref_attention_bias(
@@ -149,3 +241,29 @@ def _compute_ref_attention_bias(
         ref_start = ref_end
 
     return torch.nan_to_num(bias, nan=0.0, posinf=100.0, neginf=-100.0)
+
+
+def _reshaped_target_output(
+    out_tokens: torch.Tensor,
+    orig_x: torch.Tensor,
+    orig_ndim: int,
+    bs: int,
+    c: int,
+    h: int,
+    w: int
+) -> torch.Tensor:
+    """Return target token range reshaped back to 4D or 5D tensor matching original input shape."""
+    if out_tokens.ndim == 3 and out_tokens.shape[1] != (h * w):
+        out_tokens = out_tokens[:, - (h * w):, :]
+
+    if out_tokens.ndim == 3:
+        out_4d = out_tokens.transpose(1, 2).reshape(bs, c, h, w)
+    elif out_tokens.ndim == 4:
+        out_4d = out_tokens
+    else:
+        out_4d = orig_x
+
+    if orig_ndim == 5:
+        return out_4d.unsqueeze(2)
+
+    return out_4d
