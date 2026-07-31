@@ -1,6 +1,6 @@
 # CcC Krea2 Node Reference
 
-Complete user-facing documentation for all 7 nodes in the **CcC Krea2** suite.
+Complete user-facing documentation for all 9 nodes in the **CcC Krea2** suite.
 
 ---
 
@@ -10,36 +10,44 @@ Complete user-facing documentation for all 7 nodes in the **CcC Krea2** suite.
 Every reference image passed into a CcC Krea2 node is processed through two distinct parallel paths:
 
 1. **Qwen3-VL Grounding Path**:
-   - Resizes reference images according to `grounding_resize_mode` and `grounding_px` (default 768px).
+   - Resizes reference images according to `grounding_resize_mode` and `grounding_px` (preset default 768px).
    - Generates vision tokens for Qwen3-VL dynamic prompt template formatting inside `CONDITIONING`.
 
 2. **VAE Reference Path**:
    - Fits reference images using `reference_fit_mode` (`fit` preserving aspect ratio aligned to `/16` floor grid, or `crop`).
    - Encodes reference images into VAE latents, applies `process_latent_in`, and captures them inside a per-instance model patch closure.
 
-### Model Patching (`patched_model`)
-- Each node clones the input `MODEL` and applies a model patch exclusively to that returned instance.
-- No global state or class modification is performed on ComfyUI.
-- The model patch injects in-context reference sequence tokens and 3D RoPE position IDs during DiT execution.
+### Preset System & Precedence Rules
+Node configuration follows a hierarchical precedence resolver:
 
-### Grounding Controls
-- **`grounding_resize_mode`**: Controls pixel sizing for Qwen3-VL vision tokens (`none`, `downscale_only`, `normalize`, `clamp`).
-- **`grounding_preset`**: Presets (`balanced`: 768px, `max_identity`: 1024px).
-- **`grounding_px`**: Target pixel length for vision tokens (default 768).
+$$\text{Internal Defaults} \rightarrow \text{Selected Main Preset} \rightarrow \text{Edit Advanced Settings} \rightarrow \text{Image Advanced Settings per Role}$$
 
-### Geometry Modes
-- **`reference_fit_mode`**: Controls spatial transformation for VAE reference tokens (`fit` or `crop`). `fit` preserves native aspect ratio aligned to `/16` grid without black canvas padding.
-- **`sampling_resize_mode`**: Controls spatial transformation for the output `LATENT` returned to KSampler (`fit`, `crop`, `stretch`).
+#### Presets
+- **`balanced`** (Default): Standard identity editing (`subject boost`: 2.5, `grounding_px`: 768). Recommended for most identity transfers.
+- **`max_identity`**: Maximum identity lock (`subject boost`: 4.0, `grounding_px`: 1024; `source boost`: 2.5). Recommended for subtle facial edits.
+- **`flexible`**: High prompt adherence (`subject boost`: 1.5, `grounding_px`: 512). Recommended when heavy pose or artistic style changes are requested.
 
-### Attention Steering & Masks
-- **`boost`**: Per-reference attention multiplier (default `subject`: 2.5, `scene`/`outfit`/`source`: 1.0). Higher values force stronger attention alignment to that reference's tokens.
-- **Attention Mask**: An attention mask does not remove or block reference tokens. It limits where the reference boost is applied. Outside the mask, the reference remains available with normal attention bias equal to zero.
-- **Inpaint Mask**: Defines the spatial edit region on the target latent during sampling.
-- **Attention Masks vs Inpaint Masks**: Attention masks control where the per-reference attention boost is applied, whereas inpaint masks specify where generation/editing occurs on the output image.
+| Preset | Subject Boost | Grounding Px | Source Boost | Grounding Px | Scene / Outfit Boost | Target Use Case |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `balanced` | 2.5 | 768 | 1.0 | 768 | 1.0 | Standard identity editing, balanced identity & prompt responsiveness |
+| `max_identity` | 4.0 | 1024 | 2.5 | 1024 | 1.0 | Maximum identity preservation, high-detail facial/source lock |
+| `flexible` | 1.5 | 512 | 1.5 | 512 | 1.0 | High prompt adherence, flexible stylization and pose changes |
 
-### Sampling Latent & Inpainting Behavior
-- **`latent_source`**: Determines whether KSampler begins from an empty latent or a VAE-encoded reference image latent (`empty`, `subject`, `scene`).
-- **Masked Latent img2img**: Inpainting nodes construct a masked latent img2img target latent structure (`samples` + `noise_mask`) for KSampler.
+### Output Resolution & Megapixel Math
+Output resolution can be selected directly on each main node:
+- **Role-based resolution** (`subject`, `scene`, `source`): Reads the original image's width and height, preserves aspect ratio, and aligns dimensions to the nearest valid multiple of 16 (min 128x128). If total area exceeds 2.0 megapixels, a VRAM warning is logged.
+- **`custom` resolution**: Calculates output dimensions from `megapixels * 1,000,000` using the aspect ratio of the selected aspect source image (configured via `custom_aspect_source` in Edit Advanced Settings, or auto-selected based on active roles), aligned to 16-pixel multiples.
+
+### Resize Modes vs Resize Methods
+- **Resize Modes**: Spatial transform geometry (`fit` preserving AR with padding or `/16` alignment, `crop` center-cropped, `stretch` direct resize).
+- **Resize Methods**: Downscaling / upscaling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`). `auto` automatically chooses `area` for downscaling and `bicubic` (with antialiasing) for upscaling.
+
+### Automatic Qwen3-VL Role Instructions
+The system automatically formats Qwen3-VL role instructions based on active reference images, providing standard reference terms:
+- `subject image`: "Use the subject image for identity, facial features, hair, anatomy, body shape and body proportions."
+- `scene image`: "Use the scene image for composition, pose, environment, interactions and lighting."
+- `outfit image`: "Use the outfit image for the outfit and garment details. Do not use the wearer of the outfit image as the subject identity."
+- `source image`: "The source image is the base image being edited."
 
 ---
 
@@ -64,9 +72,11 @@ Single-reference subject identity editing node.
   - `vae` (Required): Input `VAE`.
   - `prompt` (Required): Text prompt describing the target edit.
   - `subject_image` (Required): Primary subject reference image.
-- **Latent Source**: `empty` | `subject`
-- **Key Parameters**: `subject_boost` (default 2.5), `subject_attention_mask`, `sampling_resize_mode`, `reference_fit_mode`.
-- **Example Use Case**: Changing the hair color, age, or expression of a subject while preserving identity.
+  - `preset`: `balanced` | `max_identity` | `flexible`.
+  - `output_resolution`: `subject` | `custom`.
+  - `megapixels`: Float (default `1.0`).
+  - `image_advanced_settings` (Optional): Socket input from `CcC Krea2 - Image Advanced Settings`.
+  - `edit_advanced_settings` (Optional): Socket input from `CcC Krea2 - Edit Advanced Settings`.
 
 ---
 
@@ -80,9 +90,7 @@ Dual-reference subject identity and clothing/outfit editing node.
   - `model`, `clip`, `vae`, `prompt` (Required)
   - `subject_image` (Required): Primary subject reference image.
   - `outfit_image` (Required): Reference garment or outfit image.
-- **Latent Source**: `empty` | `subject`
-- **Key Parameters**: `subject_boost`, `outfit_boost`, `outfit_attention_mask`.
-- **Example Use Case**: Transferring a specific outfit onto a target subject.
+  - `preset`, `output_resolution`, `megapixels`
 
 ---
 
@@ -96,9 +104,7 @@ Dual-reference subject identity and background scene composition node.
   - `model`, `clip`, `vae`, `prompt` (Required)
   - `subject_image` (Required): Primary subject reference image.
   - `scene_image` (Required): Target background scene image.
-- **Latent Source**: `empty` | `subject` | `scene`
-- **Key Parameters**: `subject_boost`, `scene_boost`, `scene_attention_mask`.
-- **Example Use Case**: Placing a subject into a new environment or background scene.
+  - `preset`, `output_resolution`, `megapixels`
 
 ---
 
@@ -110,12 +116,8 @@ Triple-reference composition node.
 - **Reference Order**: `[scene, outfit, subject]`
 - **Inputs**:
   - `model`, `clip`, `vae`, `prompt` (Required)
-  - `subject_image` (Required): Primary subject reference image.
-  - `scene_image` (Required): Target background scene image.
-  - `outfit_image` (Required): Reference garment or outfit image.
-- **Latent Source**: `empty` | `subject` | `scene`
-- **Key Parameters**: `subject_boost`, `scene_boost`, `outfit_boost`.
-- **Example Use Case**: Composing a subject wearing a specific outfit inside a complex custom scene.
+  - `subject_image`, `scene_image`, `outfit_image` (Required)
+  - `preset`, `output_resolution`, `megapixels`
 
 ---
 
@@ -129,10 +131,8 @@ Localized inpainting node using a single source image and mask.
 - **Inputs**:
   - `model`, `clip`, `vae`, `prompt` (Required)
   - `source_image` (Required): Base image to modify.
-  - `inpaint_mask` (Required): Mask defining the edit region.
-- **Latent Source**: Fixed to `source_image` VAE latent with noise mask.
-- **Key Parameters**: `inpaint_mask_grow`, `inpaint_mask_blur`, `source_boost`.
-- **Example Use Case**: Replacing an object or repairing a specific region within a single image.
+  - `inpaint_mask` (Optional): Mask defining edit region.
+  - `preset`, `output_resolution`, `megapixels`
 
 ---
 
@@ -145,12 +145,9 @@ Localized inpainting node for subject and outfit transfer.
 - **Reference Order**: `[outfit, subject]`
 - **Inputs**:
   - `model`, `clip`, `vae`, `prompt` (Required)
-  - `subject_image` (Required): Base subject image to modify.
-  - `outfit_image` (Required): Reference outfit image.
-  - `inpaint_mask` (Required): Mask defining the clothing region to modify.
-- **Latent Source**: Fixed to `subject_image` VAE latent with noise mask.
-- **Key Parameters**: `outfit_boost`, `inpaint_mask_grow`, `inpaint_mask_blur`.
-- **Example Use Case**: Inpainting a new outfit directly onto a masked portion of a subject photo.
+  - `subject_image`, `outfit_image` (Required)
+  - `inpaint_mask` (Optional)
+  - `preset`, `output_resolution`, `megapixels`
 
 ---
 
@@ -163,9 +160,39 @@ Dual-reference localized inpainting node for subject placement into a scene.
 - **Reference Order**: `[scene, subject]`
 - **Inputs**:
   - `model`, `clip`, `vae`, `prompt` (Required)
-  - `scene_image` (Required): Base background scene image.
-  - `subject_image` (Required): Subject reference image.
-  - `inpaint_mask` (Required): Mask defining where the subject should be inserted into the scene.
-- **Latent Source**: Fixed to `scene_image` VAE latent with noise mask.
-- **Key Parameters**: `subject_boost`, `scene_boost`, `inpaint_mask_grow`, `inpaint_mask_blur`.
-- **Example Use Case**: Seamlessly inpainting a subject into a specific masked region of a background scene.
+  - `scene_image`, `subject_image` (Required)
+  - `inpaint_mask` (Optional)
+  - `preset`, `output_resolution`, `megapixels`
+
+---
+
+### 8. CcC Krea2 - Image Advanced Settings
+
+Advanced settings node for fine-grained per-role attention, grounding, and geometry overrides.
+
+- **Category**: `CcC/Krea2`
+- **Output**: `image_advanced_settings` (Custom Socket Type `CCC_KREA2_IMAGE_ADVANCED_SETTINGS`)
+- **Chaining**: Connect an existing `image_advanced_settings` output into the optional `image_advanced_settings` input to chain multiple role overrides sequentially (e.g. `Subject` -> `Scene`).
+- **Inputs**:
+  - `role`: `subject` | `scene` | `outfit` | `source`
+  - `override_attention`: Enable to override `boost` and `mask_invert`.
+  - `override_grounding`: Enable to override `grounding_resize_mode`, `grounding_px`, `grounding_min_px`, `grounding_max_px`, and `grounding_resize_method`.
+  - `override_reference_geometry`: Enable to override `reference_fit_mode` and `reference_resize_method`.
+
+---
+
+### 9. CcC Krea2 - Edit Advanced Settings
+
+Advanced settings node for sampling parameters, attention mask modes, and aspect ratio source controls.
+
+- **Category**: `CcC/Krea2`
+- **Output**: `edit_advanced_settings` (Custom Socket Type `CCC_KREA2_EDIT_ADVANCED_SETTINGS`)
+- **Inputs**:
+  - `batch_size`: Latent sampling batch size (1 - 64).
+  - `sampling_resize_mode`: `fit` | `crop` | `stretch`.
+  - `sampling_resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
+  - `attention_mask_mode`: `hard` (binary threshold) | `soft` (continuous values).
+  - `custom_aspect_source`: `auto` | `subject` | `scene` | `source`.
+  - `prompt_instructions_mode`: `automatic` | `append`.
+  - `prompt_instructions`: Custom text instructions appended to system prompt.
+  - `inpaint_mask_invert`, `inpaint_mask_grow`, `inpaint_mask_blur`: Mask preprocessing controls.

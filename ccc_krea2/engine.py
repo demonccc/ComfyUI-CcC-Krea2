@@ -5,11 +5,17 @@ from dataclasses import dataclass
 from typing import Tuple, Dict, Any, Optional, List
 import torch
 
-from .constants import ReferenceRole, EXPERIMENTAL_OUTFIT_WARNING
+from .constants import ReferenceRole, EXPERIMENTAL_OUTFIT_WARNING, DEFAULT_SYSTEM_PROMPT
 from .validation import validate_krea2_model
+from .settings import (
+    ImageAdvancedSettingsBundle,
+    EditAdvancedSettings,
+    resolve_krea2_settings,
+)
+from .resolution import resolve_output_resolution
 from .references import ReferenceConfig, prepare_reference, PreparedReference
 from .latents import generate_krea2_latent
-from .conditioning import encode_krea2_conditioning
+from .conditioning import encode_krea2_conditioning, build_role_instructions
 from .patch import patch_krea2_model
 
 logger = logging.getLogger("CcCKrea2")
@@ -23,6 +29,11 @@ class NodeExecutionRequest:
     prompt: str
     vae: Any
     negative_prompt: str = ""
+    preset: str = "balanced"
+    output_resolution: str = "subject"
+    megapixels: float = 1.0
+    image_advanced_settings: Optional[ImageAdvancedSettingsBundle] = None
+    edit_advanced_settings: Optional[EditAdvancedSettings] = None
     subject_image: Optional[torch.Tensor] = None
     scene_image: Optional[torch.Tensor] = None
     outfit_image: Optional[torch.Tensor] = None
@@ -32,43 +43,6 @@ class NodeExecutionRequest:
     outfit_attention_mask: Optional[torch.Tensor] = None
     source_attention_mask: Optional[torch.Tensor] = None
     inpaint_mask: Optional[torch.Tensor] = None
-    subject_boost: float = 2.5
-    scene_boost: float = 1.0
-    outfit_boost: float = 1.0
-    source_boost: float = 1.0
-    subject_mask_invert: bool = False
-    scene_mask_invert: bool = False
-    outfit_mask_invert: bool = False
-    source_mask_invert: bool = False
-    inpaint_mask_invert: bool = False
-    inpaint_mask_grow: int = 0
-    inpaint_mask_blur: int = 0
-    attention_mask_mode: str = "hard"
-    subject_grounding_preset: str = "balanced"
-    subject_grounding_resize_mode: str = "normalize"
-    subject_grounding_px: int = 768
-    subject_grounding_min_px: int = 128
-    subject_grounding_max_px: int = 4096
-    scene_grounding_preset: str = "balanced"
-    scene_grounding_resize_mode: str = "normalize"
-    scene_grounding_px: int = 768
-    scene_grounding_min_px: int = 128
-    scene_grounding_max_px: int = 4096
-    outfit_grounding_preset: str = "balanced"
-    outfit_grounding_resize_mode: str = "normalize"
-    outfit_grounding_px: int = 768
-    outfit_grounding_min_px: int = 128
-    outfit_grounding_max_px: int = 4096
-    source_grounding_preset: str = "balanced"
-    source_grounding_resize_mode: str = "normalize"
-    source_grounding_px: int = 768
-    source_grounding_min_px: int = 128
-    source_grounding_max_px: int = 4096
-    width: int = 1024
-    height: int = 1024
-    batch_size: int = 1
-    sampling_resize_mode: str = "fit"
-    reference_fit_mode: str = "fit"
     latent_source: str = "empty"
     inpaint_base_role: Optional[ReferenceRole] = None
     role_order: List[ReferenceRole] = None
@@ -90,13 +64,40 @@ class Krea2EditEngine:
         if req.outfit_image is not None or len(req.role_order or []) > 2:
             logger.warning(EXPERIMENTAL_OUTFIT_WARNING)
 
-        # 4. Explicit inpainting & sampling base image resolution via inpaint_base_role or latent_source
+        # 4. Resolve settings via precedence hierarchy
+        active_roles = [r.value for r in req.role_order or []]
+        settings = resolve_krea2_settings(
+            preset_name=req.preset,
+            edit_settings=req.edit_advanced_settings,
+            image_settings=req.image_advanced_settings,
+            active_roles=active_roles,
+        )
+
+        # 5. Resolve output width and height
+        default_auto_role = cls._get_default_auto_role(req)
+        node_images = {
+            "subject": req.subject_image,
+            "scene": req.scene_image,
+            "outfit": req.outfit_image,
+            "source": req.source_image,
+        }
+
+        out_w, out_h = resolve_output_resolution(
+            output_resolution=req.output_resolution,
+            megapixels=req.megapixels,
+            node_images=node_images,
+            default_auto_role=default_auto_role,
+            custom_aspect_source=settings.custom_aspect_source,
+            node_name=req.node_name,
+        )
+
+        # 6. Base image resolution for sampling/inpainting
         base_image = cls._resolve_base_image(req)
 
-        # 5. Build reference configs in strict role order
-        ref_configs = cls._build_reference_configs(req)
+        # 7. Build reference configs using resolved role settings
+        ref_configs = cls._build_reference_configs(req, settings)
 
-        # 6. Dual-path reference preparation (Grounding + VAE latents)
+        # 8. Dual-path reference preparation (Grounding + VAE latents)
         prepared_refs: List[PreparedReference] = []
         grounding_images: List[torch.Tensor] = []
 
@@ -105,44 +106,67 @@ class Krea2EditEngine:
                 config=cfg,
                 vae=req.vae,
                 model=req.model,
-                target_h=req.height,
-                target_w=req.width,
-                reference_fit_mode=req.reference_fit_mode,
-                attention_mask_mode=req.attention_mask_mode
+                target_h=out_h,
+                target_w=out_w,
+                reference_fit_mode=cfg.reference_fit_mode,
+                attention_mask_mode=settings.attention_mask_mode,
             )
             if prep is not None:
                 prepared_refs.append(prep)
                 if prep.grounding_image is not None:
                     grounding_images.append(prep.grounding_image)
 
-        # 7. Canonical model patch call: patch_krea2_model(model, prepared_refs)
+        # 9. Canonical model patch call: patch_krea2_model(model, prepared_refs)
         patched_model = patch_krea2_model(req.model, prepared_refs)
 
-        # 8. Encode Qwen3-VL conditionings (pure semantic grounding)
+        # 10. System prompt role instructions & Qwen3-VL conditioning encoding
+        role_instructions = build_role_instructions(req.role_order or [])
+        if role_instructions:
+            sys_prompt = f"{DEFAULT_SYSTEM_PROMPT}\n\n{role_instructions}"
+        else:
+            sys_prompt = DEFAULT_SYSTEM_PROMPT
+
+        if settings.prompt_instructions_mode == "append" and settings.prompt_instructions:
+            sys_prompt = f"{sys_prompt}\n\n{settings.prompt_instructions}"
+
         positive, negative = encode_krea2_conditioning(
             clip=req.clip,
             prompt=req.prompt,
             negative_prompt=req.negative_prompt,
-            grounding_images=grounding_images
+            grounding_images=grounding_images,
+            system_prompt=sys_prompt,
         )
 
-        # 9. Generate model-driven KSampler target LATENT dictionary with batch_size honor
+        # 11. Generate target LATENT dictionary
         latent_dict = generate_krea2_latent(
             model=req.model,
             vae=req.vae,
-            width=req.width,
-            height=req.height,
-            batch_size=req.batch_size,
+            width=out_w,
+            height=out_h,
+            batch_size=settings.batch_size,
             latent_source=req.latent_source if "Inpaint" not in req.node_name else "image",
             base_image=base_image,
             inpaint_mask=req.inpaint_mask,
-            inpaint_mask_invert=req.inpaint_mask_invert,
-            inpaint_mask_grow=req.inpaint_mask_grow,
-            inpaint_mask_blur=req.inpaint_mask_blur,
-            sampling_resize_mode=req.sampling_resize_mode
+            inpaint_mask_invert=settings.inpaint_mask_invert,
+            inpaint_mask_grow=settings.inpaint_mask_grow,
+            inpaint_mask_blur=settings.inpaint_mask_blur,
+            sampling_resize_mode=settings.sampling_resize_mode,
         )
 
         return patched_model, positive, negative, latent_dict
+
+    @classmethod
+    def _get_default_auto_role(cls, req: NodeExecutionRequest) -> str:
+        """Determine default auto role for custom aspect ratio calculation."""
+        if req.inpaint_base_role == ReferenceRole.SOURCE:
+            return "source"
+        if ReferenceRole.SCENE in (req.role_order or []):
+            return "scene"
+        if ReferenceRole.SUBJECT in (req.role_order or []):
+            return "subject"
+        if ReferenceRole.SOURCE in (req.role_order or []):
+            return "source"
+        return "subject"
 
     @classmethod
     def _resolve_base_image(cls, req: NodeExecutionRequest) -> Optional[torch.Tensor]:
@@ -154,7 +178,6 @@ class Krea2EditEngine:
         elif req.inpaint_base_role == ReferenceRole.SCENE:
             return req.scene_image
 
-        # General editing nodes based on user's latent_source selection
         if req.latent_source == "subject":
             return req.subject_image
         elif req.latent_source == "scene":
@@ -164,59 +187,74 @@ class Krea2EditEngine:
         return None
 
     @classmethod
-    def _build_reference_configs(cls, req: NodeExecutionRequest) -> List[ReferenceConfig]:
+    def _build_reference_configs(cls, req: NodeExecutionRequest, settings: Any) -> List[ReferenceConfig]:
         configs = []
         for role in req.role_order or []:
+            r_str = role.value if hasattr(role, "value") else str(role)
+            r_set = settings.roles.get(r_str)
+
             if role == ReferenceRole.SUBJECT and req.subject_image is not None:
                 configs.append(ReferenceConfig(
                     role=role,
                     image=req.subject_image,
                     attention_mask=req.subject_attention_mask,
-                    boost=req.subject_boost,
-                    mask_invert=req.subject_mask_invert,
-                    grounding_preset=req.subject_grounding_preset,
-                    grounding_resize_mode=req.subject_grounding_resize_mode,
-                    grounding_px=req.subject_grounding_px,
-                    grounding_min_px=req.subject_grounding_min_px,
-                    grounding_max_px=req.subject_grounding_max_px
+                    boost=r_set.boost,
+                    mask_invert=r_set.mask_invert,
+                    grounding_preset="custom",
+                    grounding_resize_mode=r_set.grounding_resize_mode,
+                    grounding_px=r_set.grounding_px,
+                    grounding_min_px=r_set.grounding_min_px,
+                    grounding_max_px=r_set.grounding_max_px,
+                    grounding_resize_method=r_set.grounding_resize_method,
+                    reference_fit_mode=r_set.reference_fit_mode,
+                    reference_resize_method=r_set.reference_resize_method,
                 ))
             elif role == ReferenceRole.SCENE and req.scene_image is not None:
                 configs.append(ReferenceConfig(
                     role=role,
                     image=req.scene_image,
                     attention_mask=req.scene_attention_mask,
-                    boost=req.scene_boost,
-                    mask_invert=req.scene_mask_invert,
-                    grounding_preset=req.scene_grounding_preset,
-                    grounding_resize_mode=req.scene_grounding_resize_mode,
-                    grounding_px=req.scene_grounding_px,
-                    grounding_min_px=req.scene_grounding_min_px,
-                    grounding_max_px=req.scene_grounding_max_px
+                    boost=r_set.boost,
+                    mask_invert=r_set.mask_invert,
+                    grounding_preset="custom",
+                    grounding_resize_mode=r_set.grounding_resize_mode,
+                    grounding_px=r_set.grounding_px,
+                    grounding_min_px=r_set.grounding_min_px,
+                    grounding_max_px=r_set.grounding_max_px,
+                    grounding_resize_method=r_set.grounding_resize_method,
+                    reference_fit_mode=r_set.reference_fit_mode,
+                    reference_resize_method=r_set.reference_resize_method,
                 ))
             elif role == ReferenceRole.OUTFIT and req.outfit_image is not None:
                 configs.append(ReferenceConfig(
                     role=role,
                     image=req.outfit_image,
                     attention_mask=req.outfit_attention_mask,
-                    boost=req.outfit_boost,
-                    mask_invert=req.outfit_mask_invert,
-                    grounding_preset=req.outfit_grounding_preset,
-                    grounding_resize_mode=req.outfit_grounding_resize_mode,
-                    grounding_px=req.outfit_grounding_px,
-                    grounding_min_px=req.outfit_grounding_min_px,
-                    grounding_max_px=req.outfit_grounding_max_px
+                    boost=r_set.boost,
+                    mask_invert=r_set.mask_invert,
+                    grounding_preset="custom",
+                    grounding_resize_mode=r_set.grounding_resize_mode,
+                    grounding_px=r_set.grounding_px,
+                    grounding_min_px=r_set.grounding_min_px,
+                    grounding_max_px=r_set.grounding_max_px,
+                    grounding_resize_method=r_set.grounding_resize_method,
+                    reference_fit_mode=r_set.reference_fit_mode,
+                    reference_resize_method=r_set.reference_resize_method,
                 ))
             elif role == ReferenceRole.SOURCE and req.source_image is not None:
                 configs.append(ReferenceConfig(
                     role=role,
                     image=req.source_image,
                     attention_mask=req.source_attention_mask,
-                    boost=req.source_boost,
-                    mask_invert=req.source_mask_invert,
-                    grounding_preset=req.source_grounding_preset,
-                    grounding_resize_mode=req.source_grounding_resize_mode,
-                    grounding_px=req.source_grounding_px,
-                    grounding_min_px=req.source_grounding_min_px,
-                    grounding_max_px=req.source_grounding_max_px
+                    boost=r_set.boost,
+                    mask_invert=r_set.mask_invert,
+                    grounding_preset="custom",
+                    grounding_resize_mode=r_set.grounding_resize_mode,
+                    grounding_px=r_set.grounding_px,
+                    grounding_min_px=r_set.grounding_min_px,
+                    grounding_max_px=r_set.grounding_max_px,
+                    grounding_resize_method=r_set.grounding_resize_method,
+                    reference_fit_mode=r_set.reference_fit_mode,
+                    reference_resize_method=r_set.reference_resize_method,
                 ))
         return configs

@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from ccc_krea2.engine import Krea2EditEngine, NodeExecutionRequest
+from ccc_krea2.settings import EditAdvancedSettings
 from ccc_krea2.constants import ReferenceRole, VISION_PAD_TOKEN
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 from ccc_krea2.patch import patch_krea2_model
@@ -100,7 +101,7 @@ def test_engine_execute_subject_workflow():
         negative_prompt="blurry, distorted",
         vae=vae,
         subject_image=subject_img,
-        subject_boost=2.5,
+        preset="balanced",
         role_order=[ReferenceRole.SUBJECT]
     )
 
@@ -149,8 +150,7 @@ def test_engine_execute_subject_scene_workflow():
         vae=vae,
         subject_image=subject_img,
         scene_image=scene_img,
-        subject_boost=2.5,
-        scene_boost=1.0,
+        preset="balanced",
         role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT]
     )
 
@@ -186,7 +186,7 @@ def test_engine_execute_inpaint_subject_scene_workflow():
         scene_image=scene_img,
         inpaint_mask=inpaint_mask,
         inpaint_base_role=ReferenceRole.SCENE,
-        sampling_resize_mode="crop",
+        edit_advanced_settings=EditAdvancedSettings(sampling_resize_mode="crop"),
         role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT]
     )
 

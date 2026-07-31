@@ -213,7 +213,7 @@ def test_image_latent_batching_repetition():
     assert lat_dict["samples"].shape[0] == 4
 
 
-def test_all_seven_node_registrations():
+def test_all_node_registrations():
     expected = {
         "CcCKrea2Subject",
         "CcCKrea2SubjectOutfit",
@@ -222,5 +222,7 @@ def test_all_seven_node_registrations():
         "CcCKrea2Inpaint",
         "CcCKrea2InpaintSubjectOutfit",
         "CcCKrea2InpaintSubjectScene",
+        "CcCKrea2ImageAdvancedSettings",
+        "CcCKrea2EditAdvancedSettings",
     }
     assert set(NODE_CLASS_MAPPINGS.keys()) == expected

@@ -10,10 +10,13 @@ CcC Krea2 groups those editing patterns into a small set of purpose-built nodes.
 
 ## Features
 
+- Preset-driven workflow (`balanced`, `max_identity`, `flexible`) with simplified main node controls.
 - Subject identity editing.
 - Outfit and scene references.
 - Subject, outfit and scene combinations.
 - Localized inpainting.
+- Aspect-ratio-preserving role-based and custom megapixel output resolution.
+- Advanced settings socket nodes (`CcC Krea2 - Image Advanced Settings`, `CcC Krea2 - Edit Advanced Settings`).
 - Qwen3-VL grounding controls.
 - Per-reference attention boosts and masks.
 - Empty, subject-based or scene-based sampling latents.

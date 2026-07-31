@@ -21,6 +21,9 @@ class ReferenceConfig:
     grounding_px: int = 768
     grounding_min_px: int = 128
     grounding_max_px: int = 4096
+    grounding_resize_method: str = "auto"
+    reference_fit_mode: str = "fit"
+    reference_resize_method: str = "auto"
 
 
 @dataclass
@@ -42,7 +45,7 @@ def prepare_reference(
     model: Any,
     target_h: int,
     target_w: int,
-    reference_fit_mode: str = "fit",
+    reference_fit_mode: Optional[str] = None,
     attention_mask_mode: str = "hard"
 ) -> Optional[PreparedReference]:
     """Prepare reference for dual-path pipeline: Qwen3-VL grounding and VAE reference latent."""
@@ -51,6 +54,8 @@ def prepare_reference(
 
     if vae is None:
         raise ValueError(f"VAE model is required for encoding reference image (role: {config.role.value}).")
+
+    fit_mode = reference_fit_mode if reference_fit_mode is not None else config.reference_fit_mode
 
     # 1. Qwen3-VL Grounding Path
     grounding_img = resize_grounding_image(
@@ -63,12 +68,14 @@ def prepare_reference(
     )
 
     # 2. VAE Reference Latent Path
+    mask_interp = "nearest" if attention_mask_mode == "hard" else "bicubic"
     fitted_img, fitted_mask, ref_fit_meta = apply_reference_fit_transform(
         image=config.image,
         target_h=target_h,
         target_w=target_w,
-        mode=reference_fit_mode,
-        mask=config.attention_mask
+        mode=fit_mode,
+        mask=config.attention_mask,
+        mask_interpolation=mask_interp
     )
 
     # Invert spatial mask if requested
