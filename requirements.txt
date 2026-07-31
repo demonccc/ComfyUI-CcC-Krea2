@@ -1,2 +1,2 @@
-einops>=0.7.0
 pillow>=9.5.0
+einops>=0.7.0

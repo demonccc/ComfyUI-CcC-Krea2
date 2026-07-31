@@ -18,8 +18,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "pillow>=9.0.0",
-    "einops>=0.6.0"
+    "pillow>=9.5.0",
+    "einops>=0.7.0"
 ]
 
 [project.optional-dependencies]

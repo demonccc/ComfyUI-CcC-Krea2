@@ -399,18 +399,19 @@ def _compute_ref_attention_bias_patchified(
         b_val = math.log(safe_boost)
 
         if spatial_mask is not None:
-            m_bchw = spatial_mask.float()
+            m_bchw = spatial_mask[:1].float()
             if m_bchw.ndim == 2:
                 m_bchw = m_bchw.unsqueeze(0).unsqueeze(0)
             elif m_bchw.ndim == 3:
-                m_bchw = m_bchw.unsqueeze(1)
+                m_bchw = m_bchw.unsqueeze(0)
 
-            m_resized = F.interpolate(m_bchw, size=(r_gh, r_gw), mode="bicubic", antialias=True).squeeze()
+            m_resized = F.interpolate(m_bchw, size=(r_gh, r_gw), mode="bicubic", antialias=True)
+            m_2d = m_resized[0, 0]
 
             if mask_mode == "hard":
-                m_processed = (m_resized > 0.5).float()
+                m_processed = (m_2d > 0.5).float()
             else:
-                m_processed = m_resized.clamp(0.0, 1.0)
+                m_processed = m_2d.clamp(0.0, 1.0)
 
             m_flat = m_processed.reshape(-1).to(device=device, dtype=dtype)
             if m_flat.numel() == ref_len:
