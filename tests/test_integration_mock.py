@@ -14,43 +14,56 @@ class MockRealKrea2Block(nn.Module):
         super().__init__()
         self.last_attn_bias = None
 
-    def forward(self, x, freqs=None, tvec=None, attn_bias=None, transformer_options=None):
-        self.last_attn_bias = attn_bias
+    def forward(self, x, vec, freqs, mask=None, timestep_zero_index=None, transformer_options=None):
+        self.last_attn_bias = mask
         return x
 
 
+class MockLastLayer(nn.Module):
+    def __init__(self, hidden_dim, out_channels):
+        super().__init__()
+        self.linear = nn.Linear(hidden_dim, out_channels)
+
+    def forward(self, x, tvec):
+        return self.linear(x)
+
+
 class MockKrea2DiT(nn.Module):
-    def __init__(self, in_channels=16, patch_size=2, hidden_dim=64):
+    def __init__(self, in_channels=16, patch_size=2, hidden_dim=64, tdim=256):
         super().__init__()
         self.patch = patch_size
         self.channels = in_channels
+        self.tdim = tdim
         self.hidden_dim = hidden_dim
 
         self.first_layer = nn.Linear(in_channels * patch_size * patch_size, hidden_dim)
-        self.tproj_layer = nn.Linear(1, hidden_dim)
-        self.tmlp_layer = nn.Linear(hidden_dim, hidden_dim)
+        self.tproj_layer = nn.Linear(hidden_dim, hidden_dim)
+        self.tmlp_layer = nn.Linear(tdim, hidden_dim)
 
         self.block1 = MockRealKrea2Block()
         self.blocks = nn.ModuleList([self.block1])
-        self.last_layer = nn.Linear(hidden_dim, in_channels * patch_size * patch_size)
+        self.last = MockLastLayer(hidden_dim, in_channels * patch_size * patch_size)
 
     def _unpack_context(self, context):
+        return context
+
+    def txtfusion(self, context, mask=None, transformer_options=None):
+        return context
+
+    def txtmlp(self, context):
         return context
 
     def first(self, x_patch):
         return self.first_layer(x_patch)
 
-    def tproj(self, t):
-        return self.tproj_layer(t.unsqueeze(-1) if t.ndim == 1 else t)
-
     def tmlp(self, t_emb):
         return self.tmlp_layer(t_emb)
 
-    def pe_embedder(self, position_ids):
-        return torch.rand((position_ids.shape[1], self.hidden_dim))
+    def tproj(self, t):
+        return self.tproj_layer(t)
 
-    def last(self, h_seq):
-        return self.last_layer(h_seq)
+    def pe_embedder(self, position_ids):
+        return torch.rand((position_ids.shape[0], position_ids.shape[1], self.hidden_dim))
 
     def forward(self, x, timesteps, context):
         raise RuntimeError("Native forward must never be called during custom edit forward!")
