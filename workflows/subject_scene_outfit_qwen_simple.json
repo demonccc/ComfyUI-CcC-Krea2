@@ -173,7 +173,7 @@
         {"name": "image2", "type": "IMAGE", "link": null},
         {"name": "image3", "type": "IMAGE", "link": null},
         {"name": "audio", "type": "AUDIO", "link": null},
-        {"name": "video", "type": "VIDEO", "link": null},
+        {"name": "video", "type": "*", "link": null},
         {"name": "system_prompt_override", "type": "STRING", "link": null},
         {"name": "config_override", "type": "STRING", "link": 18},
         {"name": "variables", "type": "STRING", "link": null}
@@ -188,7 +188,7 @@
       "widgets_values": [
         "None",
         "None",
-        "Analyze the scene image and write one complete image-editing prompt.\n\nThe output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete outfit from the outfit image.\n\nPreserve the pose, composition, camera angle, environment, interactions and lighting of the scene image.\n\nRefer to the images using exactly these terms:\n- subject image\n- scene image\n- outfit image\n\nReturn only the final transformation prompt. Do not explain your analysis and do not add headings.",
+        "Analyze the scene image and write one complete image-editing prompt.\n\nThe output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete outfit from the outfit image.\n\nPreserve the pose, composition, camera angle, environment, interactions and lighting of the scene image.\n\nRefer to the images using exactly these terms:\n- subject image\n- scene image\n- outfit image\n\nReturn only the final transformation prompt.\nDo not explain your analysis and do not add headings.",
         123456789,
         "fixed",
         false,

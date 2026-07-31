@@ -154,6 +154,7 @@ def test_qwen_workflows_and_non_qwen_isolation():
     for rel_path in qwen_files:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+            assert isinstance(data, dict), f"Failed json.load for {rel_path}"
 
         raw_json_str = json.dumps(data)
         assert "QWEN3VL_CONFIG" not in raw_json_str, f"QWEN3VL_CONFIG string found in {rel_path}"
@@ -180,6 +181,10 @@ def test_qwen_workflows_and_non_qwen_isolation():
         cfg_override_inp = next(i for i in qwen_node["inputs"] if i["name"] == "config_override")
         assert cfg_override_inp["type"] == "STRING", f"SimpleQwenVLggufV2 config_override input not STRING in {rel_path}"
 
+        # Verify video input type is "*"
+        video_inp = next(i for i in qwen_node["inputs"] if i["name"] == "video")
+        assert video_inp["type"] == "*", f"SimpleQwenVLggufV2 video input type must be '*' in {rel_path}"
+
         link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
 
         # Link tuples type check
@@ -204,6 +209,10 @@ def test_qwen_workflows_and_non_qwen_isolation():
         assert "auto" not in (m_widgets[11], m_widgets[12]), f"auto found in chat handler/format in {rel_path}"
         assert "default" not in (m_widgets[17], m_widgets[18]), f"default found in type_k/type_v in {rel_path}"
 
+        # Qwen3VL_SamplingConfig widgets (10 items)
+        s_widgets = s_cfg.get("widgets_values", [])
+        assert len(s_widgets) == 10, f"Qwen3VL_SamplingConfig must have exactly 10 widget values in {rel_path}"
+
         # SimpleQwenVLggufV2 widgets (7 items)
         q_widgets = qwen_node.get("widgets_values", [])
         assert len(q_widgets) == 7, f"SimpleQwenVLggufV2 widget count mismatch: got {len(q_widgets)}, expected 7 in {rel_path}"
@@ -217,11 +226,14 @@ def test_qwen_workflows_and_non_qwen_isolation():
         assert q_widgets[6] == "subprocess", f"mode must be 'subprocess' in {rel_path}"
         assert q_widgets[6] != "full", f"mode must not be 'full' in {rel_path}"
 
-        # Canonical image role terms in user prompt
+        # Canonical image role terms and escaped newline in user prompt
         assert "subject image" in user_prompt_text
         assert "scene image" in user_prompt_text
         if "outfit" in rel_path:
             assert "outfit image" in user_prompt_text
+        assert "Return only the final transformation prompt.\nDo not explain" in user_prompt_text, (
+            f"user_prompt missing required escaped newline segment in {rel_path}"
+        )
 
         # Outputs check (4 outputs serialized, only text output linked)
         outputs = qwen_node.get("outputs", [])
