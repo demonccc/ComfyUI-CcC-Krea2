@@ -4,7 +4,7 @@ import pytest
 import torch
 import math
 from ccc_krea2.masks import process_inpaint_mask, process_attention_mask
-from ccc_krea2.patch import _compute_ref_attention_bias
+from ccc_krea2.patch import _compute_ref_attention_bias_patchified
 
 
 def test_inpaint_mask_processing():
@@ -42,16 +42,18 @@ def test_ref_attention_bias_numerical_safety():
     dtype = torch.float32
 
     # Boost = 1.0 -> No bias added (returns None)
-    bias_off = _compute_ref_attention_bias(
-        boosts=[1.0], txt_len=10, ref_lens=[64], tgt_len=64,
-        ref_masks=[None], device=device, dtype=dtype
+    bias_off = _compute_ref_attention_bias_patchified(
+        boosts=[1.0], txt_len=10, ref_token_lens=[64], tgt_len=64,
+        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
+        device=device, dtype=dtype
     )
     assert bias_off is None
 
     # Boost > 1.0 (e.g. 2.5) -> Positive log bias
-    bias_high = _compute_ref_attention_bias(
-        boosts=[2.5], txt_len=10, ref_lens=[64], tgt_len=64,
-        ref_masks=[None], device=device, dtype=dtype
+    bias_high = _compute_ref_attention_bias_patchified(
+        boosts=[2.5], txt_len=10, ref_token_lens=[64], tgt_len=64,
+        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
+        device=device, dtype=dtype
     )
     assert bias_high is not None
     assert not torch.isnan(bias_high).any()
@@ -60,9 +62,10 @@ def test_ref_attention_bias_numerical_safety():
     assert abs(bias_high[0, 0, 74, 10].item() - expected_val) < 1e-4
 
     # Boost < 1.0 (e.g. 0.5) -> Negative log bias
-    bias_low = _compute_ref_attention_bias(
-        boosts=[0.5], txt_len=10, ref_lens=[64], tgt_len=64,
-        ref_masks=[None], device=device, dtype=dtype
+    bias_low = _compute_ref_attention_bias_patchified(
+        boosts=[0.5], txt_len=10, ref_token_lens=[64], tgt_len=64,
+        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
+        device=device, dtype=dtype
     )
     assert bias_low is not None
     assert not torch.isnan(bias_low).any()
@@ -70,9 +73,10 @@ def test_ref_attention_bias_numerical_safety():
     assert bias_low[0, 0, 74, 10].item() < 0.0
 
     # Zero boost (0.0) -> Clamped to 1e-4, no log(0) -inf exception or NaN
-    bias_zero = _compute_ref_attention_bias(
-        boosts=[0.0], txt_len=10, ref_lens=[64], tgt_len=64,
-        ref_masks=[None], device=device, dtype=dtype
+    bias_zero = _compute_ref_attention_bias_patchified(
+        boosts=[0.0], txt_len=10, ref_token_lens=[64], tgt_len=64,
+        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
+        device=device, dtype=dtype
     )
     assert bias_zero is not None
     assert not torch.isnan(bias_zero).any()

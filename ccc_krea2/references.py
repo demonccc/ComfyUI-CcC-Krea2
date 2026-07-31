@@ -7,7 +7,6 @@ import torch
 from .constants import ReferenceRole
 from .geometry import apply_reference_fit_transform
 from .grounding import resize_grounding_image
-from .masks import process_attention_mask
 
 
 @dataclass
@@ -29,10 +28,11 @@ class PreparedReference:
     role: ReferenceRole
     grounding_image: Optional[torch.Tensor]
     vae_latent: Optional[torch.Tensor]
-    token_attention_mask: Optional[torch.Tensor]
+    spatial_attention_mask: Optional[torch.Tensor]
     boost: float
     spatial_hw: Tuple[int, int]
     lat_hw: Tuple[int, int]
+    mask_mode: str = "hard"
     ref_fit_meta: Optional[Dict[str, Any]] = None
 
 
@@ -71,20 +71,15 @@ def prepare_reference(
         mask=config.attention_mask
     )
 
+    # Invert spatial mask if requested
+    if fitted_mask is not None and config.mask_invert:
+        fitted_mask = 1.0 - fitted_mask
+
     # VAE encode reference image
     raw_vae_latent = vae.encode(fitted_img)
 
     lat_h = raw_vae_latent.shape[-2]
     lat_w = raw_vae_latent.shape[-1]
-
-    # Process token attention mask matching lat_h, lat_w token grid
-    token_mask = process_attention_mask(
-        mask=fitted_mask,
-        invert=config.mask_invert,
-        mode=attention_mask_mode,
-        token_grid=(lat_h, lat_w)
-    )
-
     spatial_h = fitted_img.shape[1]
     spatial_w = fitted_img.shape[2]
 
@@ -92,10 +87,11 @@ def prepare_reference(
         role=config.role,
         grounding_image=grounding_img,
         vae_latent=raw_vae_latent,
-        token_attention_mask=token_mask,
+        spatial_attention_mask=fitted_mask,
         boost=config.boost,
         spatial_hw=(spatial_h, spatial_w),
         lat_hw=(lat_h, lat_w),
+        mask_mode=attention_mask_mode,
         ref_fit_meta=ref_fit_meta
     )
 

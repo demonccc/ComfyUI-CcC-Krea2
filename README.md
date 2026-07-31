@@ -52,4 +52,4 @@ CcC Krea2 builds upon technical work and concepts from:
 
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0). See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms.
 
-*Disclaimer: This project is an independent community package and is not affiliated with or endorsed by Krea.ai, DeepSeek, or Qwen.*
+*Disclaimer: This project is an independent community package and is not affiliated with or endorsed by Krea.ai, Qwen, or the authors of the referenced models and LoRAs.*

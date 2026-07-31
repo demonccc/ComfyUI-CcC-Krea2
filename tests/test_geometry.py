@@ -34,7 +34,6 @@ def test_reference_fit_transform_modes():
     assert fit_img.shape == (1, 1024, 768, 3)
     assert fit_mask.shape == (1, 1024, 768)
     assert fit_meta["spatial_hw"] == (1024, 768)
-    assert fit_meta["lat_hw"] == (128, 96)
 
     # Crop mode: crops to target_h x target_w
     crop_img, crop_mask, crop_meta = apply_reference_fit_transform(img, target_h=1024, target_w=1024, mode="crop", mask=mask)

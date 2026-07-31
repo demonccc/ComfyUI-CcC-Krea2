@@ -1,7 +1,8 @@
-"""Integration-style unit tests using mocked WrapperExecutor and current ComfyUI signatures."""
+"""Integration-style unit tests using MockKrea2DiT and current ComfyUI signatures."""
 
 import pytest
 import torch
+import torch.nn as nn
 from ccc_krea2.patch import patch_krea2_model, krea2_dit_incontext_forward
 from ccc_krea2.references import PreparedReference, ReferenceRole, _process_latent_in_if_available
 from ccc_krea2.latents import generate_krea2_latent
@@ -9,16 +10,32 @@ from ccc_krea2.engine import Krea2EditEngine, NodeExecutionRequest
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 
-class MockSingleStreamDiT:
+class MockTransformerBlock(nn.Module):
     def __init__(self):
-        self.last_kwargs = {}
-        self.called = False
+        super().__init__()
+        self.last_attn_bias = None
 
-    def forward(self, x, timesteps, context, ref_latents=None, attn_bias=None, **kwargs):
-        self.called = True
-        self.last_kwargs = kwargs
-        self.last_kwargs["ref_latents"] = ref_latents
-        self.last_kwargs["attn_bias"] = attn_bias
+    def forward(self, x, vec_emb=None, rope_pos_ids=None, attn_bias=None, **kwargs):
+        self.last_attn_bias = attn_bias
+        return x
+
+
+class MockKrea2DiT(nn.Module):
+    def __init__(self, in_channels=16, patch_size=2, hidden_dim=64):
+        super().__init__()
+        self.patch_size = patch_size
+        self.hidden_dim = hidden_dim
+
+        self.img_in = nn.Linear(in_channels * patch_size * patch_size, hidden_dim)
+        self.txt_in = nn.Linear(2048, hidden_dim)
+        self.time_in = nn.Linear(1, hidden_dim)
+        self.vector_in = nn.Linear(hidden_dim, hidden_dim)
+
+        self.block1 = MockTransformerBlock()
+        self.blocks = nn.ModuleList([self.block1])
+        self.final_layer = nn.Linear(hidden_dim, in_channels * patch_size * patch_size)
+
+    def forward(self, x, timesteps, context):
         return x
 
 
@@ -27,7 +44,7 @@ class MockWrapperExecutor:
         self.class_obj = dit_model
 
     def __call__(self, x, timesteps, context, *wargs, **kwargs):
-        return self.class_obj.forward(x, timesteps, context, **kwargs)
+        return self.class_obj.forward(x, timesteps, context)
 
 
 class MockInnerModel:
@@ -54,13 +71,13 @@ class MockVAE:
     def encode(self, image):
         if image.ndim == 4 and image.shape[-1] == 3:
             b, h, w, _ = image.shape
-            return torch.rand((b, 16, h // 8, w // 8))
-        return torch.rand((1, 16, 16, 16))
+            return torch.ones((b, 16, h // 8, w // 8))
+        return torch.ones((1, 16, 16, 16))
 
 
 def test_diffusion_model_wrapper_execution_signature():
     model = MockModel()
-    dit = MockSingleStreamDiT()
+    dit = MockKrea2DiT()
     executor = MockWrapperExecutor(dit)
 
     ref_lat = torch.rand((1, 16, 16, 16))
@@ -68,31 +85,29 @@ def test_diffusion_model_wrapper_execution_signature():
         role=ReferenceRole.SUBJECT,
         grounding_image=torch.rand((1, 768, 768, 3)),
         vae_latent=ref_lat,
-        token_attention_mask=None,
+        spatial_attention_mask=None,
         boost=2.5,
         spatial_hw=(1024, 1024),
         lat_hw=(16, 16)
     )
 
-    # Canonical patch call: patch_krea2_model(model, prepared_refs)
     patched = patch_krea2_model(model, [prep_ref])
 
     wrappers = patched.model_options["transformer_options"]["wrappers"]
     assert len(wrappers) == 1
     wrapper = wrappers[0]
 
-    x = torch.rand((1, 16, 128, 128))
+    x = torch.rand((1, 16, 32, 32))
     timesteps = torch.tensor([1.0])
     context = torch.rand((1, 77, 2048))
 
     out = wrapper(executor, x, timesteps, context)
 
-    assert dit.called
-    assert dit.last_kwargs["attn_bias"] is not None
-    assert torch.equal(out, x)
+    assert dit.block1.last_attn_bias is not None
+    assert out.shape == (1, 16, 32, 32)
 
 
-def test_process_latent_in_execution():
+def test_process_latent_in_execution_only_for_references():
     model = MockModel()
     raw_latent = torch.ones((1, 16, 16, 16))
 

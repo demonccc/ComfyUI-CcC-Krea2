@@ -1,4 +1,4 @@
-"""Pixel-space geometric transformations matching native Krea 2 training-aligned geometry."""
+"""Pixel-space geometric transformations matching Krea 2 reference fit geometry."""
 
 import torch
 import torch.nn.functional as F
@@ -41,9 +41,8 @@ def apply_reference_fit_transform(
     - NO black target-sized canvas padding.
     - Preserves native fitted reference grid aligned to /16 floor dimensions.
     - Near-matched-AR crop tolerance: if AR difference <= crop_tolerance, center-crops directly to target AR.
-    - Genuine mismatches crop source to aligned grid then resize.
-    - Calculates fractional RoPE centering offsets.
-    - Masks receive the exact same spatial transformation.
+    - Genuine mismatches center-crop source to exact AR mapping before resize.
+    - Masks receive the exact same spatial crop and resize transformation.
     """
     if mode not in ("fit", "crop"):
         raise ValueError(f"Invalid reference_fit_mode '{mode}'. Expected 'fit' or 'crop'.")
@@ -91,15 +90,10 @@ def apply_reference_fit_transform(
             scaled_mask = F.interpolate(mask_bchw, size=(new_h, new_w), mode=mask_m, **kwargs)
             cropped_mask = scaled_mask[..., y0:y0 + target_h, x0:x0 + target_w].squeeze(1).clamp(0.0, 1.0)
 
-        ref_fit_meta = {
-            "spatial_hw": (target_h, target_w),
-            "lat_hw": (target_h // 8, target_w // 8),
-            "y_offset": 0.0,
-            "x_offset": 0.0
-        }
+        ref_fit_meta = {"spatial_hw": (target_h, target_w)}
         return cropped_img.movedim(1, -1).clamp(0.0, 1.0), cropped_mask, ref_fit_meta
 
-    # 2. Genuine AR mismatch in 'fit' mode: /16 floor-aligned fitted dimensions without canvas padding
+    # 2. Genuine AR mismatch in 'fit' mode: crop source to exact AR mapping before scaling to /16 floor dimensions
     scale = min(target_h / float(ih), target_w / float(iw))
     raw_h = ih * scale
     raw_w = iw * scale
@@ -107,25 +101,29 @@ def apply_reference_fit_transform(
     fh = max(alignment, (int(raw_h) // alignment) * alignment)
     fw = max(alignment, (int(raw_w) // alignment) * alignment)
 
-    fitted_img = F.interpolate(img_bchw, size=(fh, fw), mode="bicubic", antialias=True)
+    # Crop source to mapping aspect ratio (fh / fw)
+    fit_ar = fh / float(fw)
+    if image_ar > fit_ar:
+        crop_h = int(round(iw * fit_ar))
+        crop_w = iw
+    else:
+        crop_h = ih
+        crop_w = int(round(ih / fit_ar))
+
+    sy0 = (ih - crop_h) // 2
+    sx0 = (iw - crop_w) // 2
+    cropped_src = img_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+
+    fitted_img = F.interpolate(cropped_src, size=(fh, fw), mode="bicubic", antialias=True)
 
     fitted_mask = None
     if mask_bchw is not None:
         mask_m = "nearest" if mask_interpolation == "nearest" else "bicubic"
         kwargs = {"antialias": True} if mask_m == "bicubic" else {}
-        fitted_mask = F.interpolate(mask_bchw, size=(fh, fw), mode=mask_m, **kwargs).squeeze(1).clamp(0.0, 1.0)
+        cropped_mask_src = mask_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+        fitted_mask = F.interpolate(cropped_mask_src, size=(fh, fw), mode=mask_m, **kwargs).squeeze(1).clamp(0.0, 1.0)
 
-    # Fractional RoPE centering offsets
-    y_offset = (target_h - fh) / 2.0
-    x_offset = (target_w - fw) / 2.0
-
-    ref_fit_meta = {
-        "spatial_hw": (fh, fw),
-        "lat_hw": (fh // 8, fw // 8),
-        "y_offset": y_offset,
-        "x_offset": x_offset
-    }
-
+    ref_fit_meta = {"spatial_hw": (fh, fw)}
     return fitted_img.movedim(1, -1).clamp(0.0, 1.0), fitted_mask, ref_fit_meta
 
 
