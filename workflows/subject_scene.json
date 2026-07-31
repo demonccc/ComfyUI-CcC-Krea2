@@ -1,6 +1,6 @@
 {
   "last_node_id": 51,
-  "last_link_id": 13,
+  "last_link_id": 14,
   "nodes": [
     {
       "id": 10,
@@ -36,31 +36,76 @@
     },
     {
       "id": 1,
-      "type": "CheckpointLoaderSimple",
+      "type": "UNETLoader",
       "pos": [460, 150],
-      "size": [315, 98],
+      "size": [315, 82],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [],
       "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [3], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [4], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [5], "slot_index": 2}
+        {"name": "MODEL", "type": "MODEL", "links": [3], "slot_index": 0}
       ],
-      "properties": {"Node name for S&R": "CheckpointLoaderSimple"},
-      "widgets_values": ["flux1-dev.safetensors"]
+      "properties": {"Node name for S&R": "UNETLoader"},
+      "widgets_values": ["krea2_unet.safetensors", "default"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [460, 270],
+      "size": [315, 82],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "CLIP", "type": "CLIP", "links": [5], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "CLIPLoader"},
+      "widgets_values": ["qwen_clip.safetensors", "krea2"]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [460, 390],
+      "size": [315, 82],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "VAE", "type": "VAE", "links": [6, 7], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["qwen_vae.safetensors"]
     },
     {
       "id": 20,
       "type": "CcCKrea2ImageAdvancedSettings",
-      "pos": [100, 840],
+      "pos": [100, 850],
       "size": [340, 360],
       "flags": {},
-      "order": 3,
+      "order": 5,
       "mode": 2,
       "inputs": [
         {"name": "image_advanced_settings", "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS", "link": null}
+      ],
+      "outputs": [
+        {"name": "image_advanced_settings", "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS", "links": [8], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "CcCKrea2ImageAdvancedSettings"},
+      "widgets_values": ["scene", false, 1.0, false, false, "normalize", 768, 512, 1024, "auto", false, "fit", "auto"]
+    },
+    {
+      "id": 22,
+      "type": "CcCKrea2ImageAdvancedSettings",
+      "pos": [460, 850],
+      "size": [340, 360],
+      "flags": {},
+      "order": 6,
+      "mode": 2,
+      "inputs": [
+        {"name": "image_advanced_settings", "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS", "link": 8}
       ],
       "outputs": [
         {"name": "image_advanced_settings", "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS", "links": null}
@@ -71,10 +116,10 @@
     {
       "id": 21,
       "type": "CcCKrea2EditAdvancedSettings",
-      "pos": [460, 840],
+      "pos": [820, 850],
       "size": [340, 360],
       "flags": {},
-      "order": 4,
+      "order": 7,
       "mode": 2,
       "inputs": [],
       "outputs": [
@@ -84,23 +129,21 @@
       "widgets_values": [1, "fit", "auto", "hard", "max_megapixels", 2.0, "auto", "automatic", "", false, 0, 0]
     },
     {
-      "id": 2,
-      "type": "LoraLoader",
+      "id": 4,
+      "type": "LoraLoaderModelOnly",
       "pos": [850, 150],
-      "size": [315, 126],
+      "size": [315, 82],
       "flags": {},
-      "order": 5,
+      "order": 8,
       "mode": 0,
       "inputs": [
-        {"name": "model", "type": "MODEL", "link": 3},
-        {"name": "clip", "type": "CLIP", "link": 4}
+        {"name": "model", "type": "MODEL", "link": 3}
       ],
       "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [6], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [7], "slot_index": 1}
+        {"name": "MODEL", "type": "MODEL", "links": [4], "slot_index": 0}
       ],
-      "properties": {"Node name for S&R": "LoraLoader"},
-      "widgets_values": ["krea2_edit_lora.safetensors", 1.0, 1.0]
+      "properties": {"Node name for S&R": "LoraLoaderModelOnly"},
+      "widgets_values": ["krea2_edit_lora.safetensors", 1.0]
     },
     {
       "id": 30,
@@ -108,12 +151,12 @@
       "pos": [1200, 150],
       "size": [400, 420],
       "flags": {},
-      "order": 6,
+      "order": 9,
       "mode": 0,
       "inputs": [
-        {"name": "model", "type": "MODEL", "link": 6},
-        {"name": "clip", "type": "CLIP", "link": 7},
-        {"name": "vae", "type": "VAE", "link": 5},
+        {"name": "model", "type": "MODEL", "link": 4},
+        {"name": "clip", "type": "CLIP", "link": 5},
+        {"name": "vae", "type": "VAE", "link": 6},
         {"name": "subject_image", "type": "IMAGE", "link": 1},
         {"name": "scene_image", "type": "IMAGE", "link": 2},
         {"name": "subject_attention_mask", "type": "MASK", "link": null},
@@ -122,10 +165,10 @@
         {"name": "edit_advanced_settings", "type": "CCC_KREA2_EDIT_ADVANCED_SETTINGS", "link": null}
       ],
       "outputs": [
-        {"name": "patched_model", "type": "MODEL", "links": [8], "slot_index": 0},
-        {"name": "positive", "type": "CONDITIONING", "links": [9], "slot_index": 1},
-        {"name": "negative", "type": "CONDITIONING", "links": [10], "slot_index": 2},
-        {"name": "latent", "type": "LATENT", "links": [11], "slot_index": 3}
+        {"name": "patched_model", "type": "MODEL", "links": [9], "slot_index": 0},
+        {"name": "positive", "type": "CONDITIONING", "links": [10], "slot_index": 1},
+        {"name": "negative", "type": "CONDITIONING", "links": [11], "slot_index": 2},
+        {"name": "latent", "type": "LATENT", "links": [12], "slot_index": 3}
       ],
       "properties": {"Node name for S&R": "CcCKrea2SubjectScene"},
       "widgets_values": [
@@ -143,16 +186,16 @@
       "pos": [1640, 150],
       "size": [315, 474],
       "flags": {},
-      "order": 7,
+      "order": 10,
       "mode": 0,
       "inputs": [
-        {"name": "model", "type": "MODEL", "link": 8},
-        {"name": "positive", "type": "CONDITIONING", "link": 9},
-        {"name": "negative", "type": "CONDITIONING", "link": 10},
-        {"name": "latent_image", "type": "LATENT", "link": 11}
+        {"name": "model", "type": "MODEL", "link": 9},
+        {"name": "positive", "type": "CONDITIONING", "link": 10},
+        {"name": "negative", "type": "CONDITIONING", "link": 11},
+        {"name": "latent_image", "type": "LATENT", "link": 12}
       ],
       "outputs": [
-        {"name": "LATENT", "type": "LATENT", "links": [12], "slot_index": 0}
+        {"name": "LATENT", "type": "LATENT", "links": [13], "slot_index": 0}
       ],
       "properties": {"Node name for S&R": "KSampler"},
       "widgets_values": [123456789, "fixed", 20, 1.0, "euler", "simple", 1.0]
@@ -163,14 +206,14 @@
       "pos": [1980, 150],
       "size": [210, 46],
       "flags": {},
-      "order": 8,
+      "order": 11,
       "mode": 0,
       "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 12},
-        {"name": "vae", "type": "VAE", "link": 5}
+        {"name": "samples", "type": "LATENT", "link": 13},
+        {"name": "vae", "type": "VAE", "link": 7}
       ],
       "outputs": [
-        {"name": "IMAGE", "type": "IMAGE", "links": [13], "slot_index": 0}
+        {"name": "IMAGE", "type": "IMAGE", "links": [14], "slot_index": 0}
       ],
       "properties": {"Node name for S&R": "VAEDecode"},
       "widgets_values": []
@@ -181,11 +224,12 @@
       "pos": [1980, 250],
       "size": [315, 270],
       "flags": {},
-      "order": 9,
+      "order": 12,
       "mode": 0,
       "inputs": [
-        {"name": "images", "type": "IMAGE", "link": 13}
+        {"name": "images", "type": "IMAGE", "link": 14}
       ],
+      "outputs": [],
       "properties": {"Node name for S&R": "SaveImage"},
       "widgets_values": ["krea2_subject_scene"]
     }
@@ -193,32 +237,38 @@
   "links": [
     [1, 10, 0, 30, 3, "IMAGE"],
     [2, 11, 0, 30, 4, "IMAGE"],
-    [3, 1, 0, 2, 0, "MODEL"],
-    [4, 1, 1, 2, 1, "CLIP"],
-    [5, 1, 2, 30, 2, "VAE"],
-    [6, 2, 0, 30, 0, "MODEL"],
-    [7, 2, 1, 30, 1, "CLIP"],
-    [8, 30, 0, 40, 0, "MODEL"],
-    [9, 30, 1, 40, 1, "CONDITIONING"],
-    [10, 30, 2, 40, 2, "CONDITIONING"],
-    [11, 30, 3, 40, 3, "LATENT"],
-    [12, 40, 0, 50, 0, "LATENT"],
-    [13, 50, 0, 51, 0, "IMAGE"]
+    [3, 1, 0, 4, 0, "MODEL"],
+    [4, 4, 0, 30, 0, "MODEL"],
+    [5, 2, 0, 30, 1, "CLIP"],
+    [6, 3, 0, 30, 2, "VAE"],
+    [7, 3, 0, 50, 1, "VAE"],
+    [8, 20, 0, 22, 0, "CCC_KREA2_IMAGE_ADVANCED_SETTINGS"],
+    [9, 30, 0, 40, 0, "MODEL"],
+    [10, 30, 1, 40, 1, "CONDITIONING"],
+    [11, 30, 2, 40, 2, "CONDITIONING"],
+    [12, 30, 3, 40, 3, "LATENT"],
+    [13, 40, 0, 50, 0, "LATENT"],
+    [14, 50, 0, 51, 0, "IMAGE"]
   ],
   "groups": [
     {
-      "title": "Images",
-      "bounding": [80, 90, 355, 730],
+      "title": "Subject Image",
+      "bounding": [80, 90, 355, 390],
+      "color": "#2b5c2b"
+    },
+    {
+      "title": "Scene Image",
+      "bounding": [80, 430, 355, 390],
       "color": "#2b5c2b"
     },
     {
       "title": "Models",
-      "bounding": [440, 90, 355, 400],
+      "bounding": [440, 90, 355, 450],
       "color": "#2b3b5c"
     },
     {
       "title": "Advanced Settings (disabled by default)",
-      "bounding": [80, 800, 740, 430],
+      "bounding": [80, 810, 1100, 430],
       "color": "#5c2b2b"
     },
     {

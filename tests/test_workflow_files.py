@@ -1,4 +1,4 @@
-"""Structural validation tests for example workflow files."""
+"""Structural validation tests for example workflow JSON files."""
 
 import json
 from pathlib import Path
@@ -12,81 +12,222 @@ EXPECTED_WORKFLOW_FILES = [
     "workflows/subject_scene_outfit_qwen_simple.json",
 ]
 
-CCC_MAIN_NODE_TYPES = {
-    "CcCKrea2Subject",
-    "CcCKrea2SubjectOutfit",
-    "CcCKrea2SubjectScene",
-    "CcCKrea2SubjectSceneOutfit",
-    "CcCKrea2Inpaint",
-    "CcCKrea2InpaintSubjectOutfit",
-    "CcCKrea2InpaintSubjectScene",
+EXPECTED_ROLES_PER_WORKFLOW = {
+    "workflows/subject_edit.json": (["subject"], "CcCKrea2Subject"),
+    "workflows/subject_scene.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
+    "workflows/subject_outfit.json": (["outfit", "subject"], "CcCKrea2SubjectOutfit"),
+    "workflows/subject_outfit_scene.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
+    "workflows/subject_scene_qwen_simple.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
+    "workflows/subject_scene_outfit_qwen_simple.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
 }
 
-
-def test_workflow_files_exist_and_parse():
-    """1. The six workflow files exist and parse as valid JSON."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        path = Path(rel_path)
-        assert path.exists(), f"Missing workflow file: {rel_path}"
-
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        assert isinstance(data, dict), f"Invalid JSON structure in {rel_path}"
-        assert "nodes" in data, f"Workflow {rel_path} missing 'nodes' array"
-        assert "groups" in data, f"Workflow {rel_path} missing 'groups' array"
+MAIN_NODE_TYPES = (
+    "CcCKrea2Subject",
+    "CcCKrea2SubjectScene",
+    "CcCKrea2SubjectOutfit",
+    "CcCKrea2SubjectSceneOutfit",
+)
 
 
-def test_workflow_contains_ccc_main_node():
-    """2. Each workflow contains at least one CcC Krea2 main node."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        node_types = {node.get("type") for node in data.get("nodes", [])}
-        main_nodes_found = node_types.intersection(CCC_MAIN_NODE_TYPES)
-        assert len(main_nodes_found) > 0, f"No CcC Krea2 main node found in {rel_path}"
-
-
-def test_workflow_contains_advanced_settings_group():
-    """3. Each workflow contains an Advanced Settings group."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        group_titles = [g.get("title", "") for g in data.get("groups", [])]
-        has_adv_group = any("Advanced Settings" in title for title in group_titles)
-        assert has_adv_group, f"Advanced Settings group missing in {rel_path} (found: {group_titles})"
-
-
-def test_qwen_workflows_contain_qwen_vlm_node():
-    """4. The two Qwen workflows contain a node indicating Simple Qwen-VL Vision Language Model."""
-    qwen_files = [
-        "workflows/subject_scene_qwen_simple.json",
-        "workflows/subject_scene_outfit_qwen_simple.json",
-    ]
-
-    for rel_path in qwen_files:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        found_qwen = False
-        for node in data.get("nodes", []):
-            node_type = str(node.get("type", ""))
-            node_title = str(node.get("properties", {}).get("Node name for S&R", "")) or str(node.get("title", ""))
-            if "Simple Qwen-VL" in node_type or "Simple Qwen-VL" in node_title or "SimpleQwenVL" in node_type:
-                found_qwen = True
-                break
-
-        assert found_qwen, f"Qwen VLM node missing in {rel_path}"
-
-
-def test_expected_filenames_match_directory_contents():
-    """5. The workflow directory contains exactly the six expected workflow files."""
+def test_expected_filenames_and_directory_contents():
+    """1. Exactly the six expected workflow files exist."""
     workflows_dir = Path("workflows")
     assert workflows_dir.exists(), "workflows directory does not exist"
 
     found_files = set(str(p).replace("\\", "/") for p in workflows_dir.glob("*.json"))
     expected_files = set(EXPECTED_WORKFLOW_FILES)
-
     assert found_files == expected_files, f"Mismatch in workflow files: found {found_files}, expected {expected_files}"
+
+
+def test_workflow_json_parsing_and_loaders():
+    """2-7. JSON parses, uses Krea2 loader stack, and does not use forbidden legacy loaders."""
+    for rel_path in EXPECTED_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert isinstance(data, dict), f"Invalid JSON structure in {rel_path}"
+
+        node_types = [n.get("type") for n in data.get("nodes", [])]
+        assert "UNETLoader" in node_types, f"Missing UNETLoader in {rel_path}"
+        assert "CLIPLoader" in node_types, f"Missing CLIPLoader in {rel_path}"
+        assert "VAELoader" in node_types, f"Missing VAELoader in {rel_path}"
+        assert "LoraLoaderModelOnly" in node_types, f"Missing LoraLoaderModelOnly in {rel_path}"
+
+        assert "CheckpointLoaderSimple" not in node_types, f"CheckpointLoaderSimple found in {rel_path}"
+        assert "LoraLoader" not in node_types, f"Standard LoraLoader found in {rel_path}"
+
+        raw_json_str = json.dumps(data)
+        assert "flux1-dev.safetensors" not in raw_json_str, f"flux1-dev.safetensors found in {rel_path}"
+
+
+def test_workflow_main_nodes_and_groups():
+    """8-10. Main nodes, individual image groups, and required standard groups."""
+    for rel_path, (roles, expected_main_node) in EXPECTED_ROLES_PER_WORKFLOW.items():
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        nodes = data.get("nodes", [])
+        node_types = [n.get("type") for n in nodes]
+        assert expected_main_node in node_types, f"Expected {expected_main_node} in {rel_path}"
+
+        group_titles = [g.get("title", "") for g in data.get("groups", [])]
+
+        # Check individual image groups
+        for role in roles:
+            expected_title = f"{role.capitalize()} Image"
+            assert expected_title in group_titles, f"Missing group '{expected_title}' in {rel_path}"
+
+        # Standard groups
+        assert "Models" in group_titles, f"Missing 'Models' group in {rel_path}"
+        assert "Advanced Settings (disabled by default)" in group_titles, f"Missing Advanced Settings group in {rel_path}"
+        assert "LoRA + Edit + KSampler" in group_titles, f"Missing 'LoRA + Edit + KSampler' group in {rel_path}"
+        assert "Output" in group_titles, f"Missing 'Output' group in {rel_path}"
+
+
+def test_advanced_settings_chaining_and_bypass():
+    """11-14. Mode == 2, main node adv inputs disconnected, role count & chain order match."""
+    for rel_path, (expected_chain, expected_main_node) in EXPECTED_ROLES_PER_WORKFLOW.items():
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        nodes = data.get("nodes", [])
+        main_node = next(n for n in nodes if n.get("type") == expected_main_node)
+
+        # Check main node sockets disconnected
+        for inp in main_node.get("inputs", []):
+            if inp.get("name") in ("image_advanced_settings", "edit_advanced_settings"):
+                assert inp.get("link") is None, f"{inp['name']} should be disconnected in {rel_path}"
+
+        # Check advanced setting nodes mode == 2
+        img_adv_nodes = [n for n in nodes if n.get("type") == "CcCKrea2ImageAdvancedSettings"]
+        edit_adv_nodes = [n for n in nodes if n.get("type") == "CcCKrea2EditAdvancedSettings"]
+
+        assert len(img_adv_nodes) == len(expected_chain), f"Expected {len(expected_chain)} image adv nodes in {rel_path}"
+        assert len(edit_adv_nodes) == 1, f"Expected 1 edit adv node in {rel_path}"
+
+        for n in img_adv_nodes + edit_adv_nodes:
+            assert n.get("mode") == 2, f"Node {n['type']} in {rel_path} should have mode=2 (bypassed)"
+
+        # Check chained order
+        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
+        node_by_id = {n["id"]: n for n in nodes}
+
+        # Find head of chain (no incoming link)
+        head_node = next(n for n in img_adv_nodes if n.get("inputs", [{}])[0].get("link") is None)
+
+        chain_roles = []
+        curr = head_node
+        while curr:
+            role = curr.get("widgets_values", [""])[0]
+            chain_roles.append(role)
+
+            out_links = curr.get("outputs", [{}])[0].get("links")
+            if out_links:
+                next_link_id = out_links[0]
+                link_tuple = link_map[next_link_id]
+                target_node_id = link_tuple[3]
+                curr = node_by_id.get(target_node_id)
+                if curr and curr.get("type") != "CcCKrea2ImageAdvancedSettings":
+                    curr = None
+            else:
+                curr = None
+
+        assert chain_roles == expected_chain, f"Chain order mismatch in {rel_path}: got {chain_roles}, expected {expected_chain}"
+
+
+def test_qwen_workflows_and_non_qwen_isolation():
+    """15-20. Upstream Qwen3VL node types, config chaining, scene img wiring, prompt wiring."""
+    qwen_files = [
+        "workflows/subject_scene_qwen_simple.json",
+        "workflows/subject_scene_outfit_qwen_simple.json",
+    ]
+    non_qwen_files = [f for f in EXPECTED_WORKFLOW_FILES if f not in qwen_files]
+
+    for rel_path in non_qwen_files:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        node_types = [n.get("type") for n in data.get("nodes", [])]
+        assert not any("Qwen" in t for t in node_types), f"Qwen node found in non-Qwen workflow {rel_path}"
+
+    for rel_path in qwen_files:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        group_titles = [g.get("title", "") for g in data.get("groups", [])]
+        assert "Qwen Prompt Builder" in group_titles, f"Missing 'Qwen Prompt Builder' group in {rel_path}"
+
+        nodes = data.get("nodes", [])
+        node_by_type = {n.get("type"): n for n in nodes}
+
+        assert "SimpleQwenVLggufV2" in node_by_type, f"Missing SimpleQwenVLggufV2 in {rel_path}"
+        assert "Qwen3VL_ModelConfig" in node_by_type, f"Missing Qwen3VL_ModelConfig in {rel_path}"
+        assert "Qwen3VL_SamplingConfig" in node_by_type, f"Missing Qwen3VL_SamplingConfig in {rel_path}"
+
+        assert "SimpleQwenVL" not in node_by_type, f"Deprecated SimpleQwenVL in {rel_path}"
+        assert "SimpleQwenVLgguf" not in node_by_type, f"Deprecated SimpleQwenVLgguf in {rel_path}"
+
+        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
+
+        # Check config chaining: ModelConfig -> SamplingConfig -> SimpleQwenVLggufV2
+        m_cfg = node_by_type["Qwen3VL_ModelConfig"]
+        s_cfg = node_by_type["Qwen3VL_SamplingConfig"]
+        qwen_node = node_by_type["SimpleQwenVLggufV2"]
+
+        m_out_link = m_cfg["outputs"][0]["links"][0]
+        assert link_map[m_out_link][3] == s_cfg["id"], f"ModelConfig not wired to SamplingConfig in {rel_path}"
+
+        s_out_link = s_cfg["outputs"][0]["links"][0]
+        assert link_map[s_out_link][3] == qwen_node["id"], f"SamplingConfig not wired to SimpleQwenVLggufV2 in {rel_path}"
+
+        # Check scene image wired to Qwen image input
+        qwen_img_link = next(i["link"] for i in qwen_node["inputs"] if i["name"] == "image")
+        scene_load_img_node = next(n for n in nodes if n["type"] == "LoadImage" and n.get("widgets_values", [""])[0] == "scene.jpg")
+        assert link_map[qwen_img_link][1] == scene_load_img_node["id"], f"Scene LoadImage not connected to Qwen image input in {rel_path}"
+
+        # Check Qwen text wired to main node prompt input
+        qwen_text_link = qwen_node["outputs"][0]["links"][0]
+        main_node = next(n for n in nodes if n["type"] in MAIN_NODE_TYPES)
+        prompt_input = next(i for i in main_node["inputs"] if i["name"] == "prompt")
+        assert prompt_input["link"] == qwen_text_link, f"Qwen text output not connected to main node prompt input in {rel_path}"
+
+
+def test_metadata_and_graph_integrity():
+    """21-22. Maxima match, unique IDs, valid links."""
+    for rel_path in EXPECTED_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        nodes = data.get("nodes", [])
+        links = data.get("links", [])
+
+        node_ids = [n["id"] for n in nodes]
+        link_ids = [link_item[0] for link_item in links]
+
+        assert len(node_ids) == len(set(node_ids)), f"Duplicate node IDs in {rel_path}"
+        assert len(link_ids) == len(set(link_ids)), f"Duplicate link IDs in {rel_path}"
+
+        max_node_id = max(node_ids)
+        max_link_id = max(link_ids)
+
+        assert data.get("last_node_id") == max_node_id, f"last_node_id mismatch in {rel_path}: got {data.get('last_node_id')}, expected {max_node_id}"
+        assert data.get("last_link_id") == max_link_id, f"last_link_id mismatch in {rel_path}: got {data.get('last_link_id')}, expected {max_link_id}"
+
+        node_id_set = set(node_ids)
+        link_id_set = set(link_ids)
+
+        for link_item in links:
+            lid, src_id, src_slot, dst_id, dst_slot, ltype = link_item
+            assert src_id in node_id_set, f"Link {lid} references non-existent src node {src_id} in {rel_path}"
+            assert dst_id in node_id_set, f"Link {lid} references non-existent dst node {dst_id} in {rel_path}"
+
+        for n in nodes:
+            for inp in n.get("inputs", []):
+                link_id = inp.get("link")
+                if link_id is not None:
+                    assert link_id in link_id_set, f"Node {n['id']} input references non-existent link {link_id} in {rel_path}"
+
+            for out in n.get("outputs", []):
+                out_links = out.get("links")
+                if out_links:
+                    for lid in out_links:
+                        assert lid in link_id_set, f"Node {n['id']} output references non-existent link {lid} in {rel_path}"
