@@ -5,9 +5,10 @@ import torch
 import torch.nn as nn
 
 from ccc_krea2.engine import Krea2EditEngine, NodeExecutionRequest
-from ccc_krea2.constants import ReferenceRole
+from ccc_krea2.constants import ReferenceRole, VISION_PAD_TOKEN
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 from ccc_krea2.patch import patch_krea2_model
+from ccc_krea2.conditioning import build_krea2_qwen_template
 
 
 class MockCLIPTokenizer:
@@ -68,6 +69,21 @@ class MockVAE:
             val = float(image.mean().item())
             return torch.full((b, 16, h // 8, w // 8), fill_value=val)
         return torch.ones((1, 16, 16, 16))
+
+
+def test_qwen_template_placeholder():
+    """Verify Qwen3-VL llama template vision block counts and positional placeholder {}."""
+    for num_images in (1, 2, 3):
+        template = build_krea2_qwen_template(num_images=num_images)
+
+        # 1. Exactly one vision placeholder per grounding image
+        assert template.count(VISION_PAD_TOKEN) == num_images
+
+        # 2. Contains exactly one positional placeholder "{}"
+        assert template.count("{}") == 1
+
+        # 3. Does NOT contain "{prompt}"
+        assert "{prompt}" not in template
 
 
 def test_engine_execute_subject_workflow():
@@ -209,7 +225,12 @@ def test_wrapper_compatibility_fallback_nested_structure():
     assert "diffusion_model" in wrappers
     diff_wrappers = wrappers["diffusion_model"]
     assert "ccc_krea2_edit" in diff_wrappers
-    assert callable(diff_wrappers["ccc_krea2_edit"])
+
+    # Assert the stored value is a list with one callable wrapper
+    wrapper_list = diff_wrappers["ccc_krea2_edit"]
+    assert isinstance(wrapper_list, list)
+    assert len(wrapper_list) == 1
+    assert callable(wrapper_list[0])
 
 
 def test_nodes_via_mappings():

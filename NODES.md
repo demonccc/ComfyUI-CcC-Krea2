@@ -35,7 +35,7 @@ Every reference image passed into a CcC Krea2 node is processed through two dist
 - **`boost`**: Per-reference attention multiplier (default `subject`: 2.5, `scene`/`outfit`/`source`: 1.0). Higher values force stronger attention alignment to that reference's tokens.
 - **Attention Mask**: An attention mask does not remove or block reference tokens. It limits where the reference boost is applied. Outside the mask, the reference remains available with normal attention bias equal to zero.
 - **Inpaint Mask**: Defines the spatial edit region on the target latent during sampling.
-- **Attention Masks vs Inpaint Masks**: Attention masks guide reference feature extraction, whereas inpaint masks specify where generation/editing occurs on the output image.
+- **Attention Masks vs Inpaint Masks**: Attention masks control where the per-reference attention boost is applied, whereas inpaint masks specify where generation/editing occurs on the output image.
 
 ### Sampling Latent & Inpainting Behavior
 - **`latent_source`**: Determines whether KSampler begins from an empty latent or a VAE-encoded reference image latent (`empty`, `subject`, `scene`).

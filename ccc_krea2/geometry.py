@@ -69,35 +69,29 @@ def apply_reference_fit_transform(
         if mask_bchw.shape[0] != bs:
             mask_bchw = mask_bchw[:1].repeat(bs, 1, 1, 1)
 
-    scale = min(target_h / float(ih), target_w / float(iw))
+    scale_fit = min(target_h / float(ih), target_w / float(iw))
     is_near_match = (
-        (ih * scale >= target_h * (1.0 - crop_tolerance)) and
-        (iw * scale >= target_w * (1.0 - crop_tolerance))
+        (ih * scale_fit >= target_h * (1.0 - crop_tolerance)) and
+        (iw * scale_fit >= target_w * (1.0 - crop_tolerance))
     )
 
     # 1. Mode 'crop' or near-matched scale: center-crop original source image first, then resize to target_h x target_w
     if mode == "crop" or is_near_match:
-        target_ar = target_h / float(target_w)
-        image_ar = ih / float(iw)
+        scale_crop = max(target_h / float(ih), target_w / float(iw))
+        crop_h = min(ih, int(round(target_h / scale_crop)))
+        crop_w = min(iw, int(round(target_w / scale_crop)))
 
-        if image_ar > target_ar:
-            crop_h = ih
-            crop_w = int(round(ih / target_ar))
-        else:
-            crop_h = int(round(iw * target_ar))
-            crop_w = iw
+        y0 = (ih - crop_h) // 2
+        x0 = (iw - crop_w) // 2
 
-        sy0 = (ih - crop_h) // 2
-        sx0 = (iw - crop_w) // 2
-
-        cropped_src = img_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+        cropped_src = img_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
         fitted_img = F.interpolate(cropped_src, size=(target_h, target_w), mode="bicubic", antialias=True)
 
         fitted_mask = None
         if mask_bchw is not None:
             mask_m = "nearest" if mask_interpolation == "nearest" else "bicubic"
             kwargs = {"antialias": True} if mask_m == "bicubic" else {}
-            cropped_mask_src = mask_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+            cropped_mask_src = mask_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
             fitted_mask = F.interpolate(cropped_mask_src, size=(target_h, target_w), mode=mask_m, **kwargs).squeeze(1).clamp(0.0, 1.0)
 
         ref_fit_meta = {"spatial_hw": (target_h, target_w)}

@@ -88,27 +88,12 @@ def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
 
 
 def _fallback_options_register(patched_model: Any, wrapper: Any, wrapper_type: Any = "diffusion_model") -> None:
-    """Fallback options registration using nested dictionary structure or comfy.patcher_extension."""
+    """Fallback options registration using nested dictionary structure."""
     if not hasattr(patched_model, "model_options"):
         patched_model.model_options = {}
 
     options = patched_model.model_options
-    try:
-        import comfy.patcher_extension
-        if hasattr(comfy.patcher_extension, "add_wrapper_with_key"):
-            comfy.patcher_extension.add_wrapper_with_key(
-                wrapper_type,
-                "ccc_krea2_edit",
-                wrapper,
-                options=options,
-                is_model_options=True
-            )
-            return
-    except Exception:
-        pass
 
-    # Nested dictionary fallback matching ComfyUI wrapper structure:
-    # transformer_options -> wrappers -> diffusion_model -> {"ccc_krea2_edit": wrapper}
     t_options = options.setdefault("transformer_options", {})
     wrappers = t_options.setdefault("wrappers", {})
 
@@ -116,7 +101,13 @@ def _fallback_options_register(patched_model: Any, wrapper: Any, wrapper_type: A
     if isinstance(wrappers, dict):
         diff_wrappers = wrappers.setdefault(w_key, {})
         if isinstance(diff_wrappers, dict):
-            diff_wrappers["ccc_krea2_edit"] = wrapper
+            existing = diff_wrappers.get("ccc_krea2_edit")
+            if existing is None:
+                diff_wrappers["ccc_krea2_edit"] = [wrapper]
+            elif isinstance(existing, list):
+                existing.append(wrapper)
+            else:
+                diff_wrappers["ccc_krea2_edit"] = [existing, wrapper]
         elif isinstance(diff_wrappers, list):
             diff_wrappers.append(wrapper)
 

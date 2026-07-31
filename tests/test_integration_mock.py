@@ -127,7 +127,8 @@ def test_diffusion_model_wrapper_execution_signature():
     if isinstance(wrappers, dict):
         diff_wrappers = wrappers.get("diffusion_model", wrappers)
         if isinstance(diff_wrappers, dict):
-            wrapper = diff_wrappers["ccc_krea2_edit"]
+            stored = diff_wrappers["ccc_krea2_edit"]
+            wrapper = stored[0] if isinstance(stored, list) else stored
         else:
             wrapper = diff_wrappers[0]
     else:

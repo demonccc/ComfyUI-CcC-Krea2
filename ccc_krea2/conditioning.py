@@ -10,11 +10,14 @@ from .constants import (
 
 
 def build_krea2_qwen_template(num_images: int, system_prompt: str = DEFAULT_SYSTEM_PROMPT) -> str:
-    """Builds the Qwen3-VL template dynamically matching the exact count of vision images."""
+    """Builds the Qwen3-VL template dynamically matching the exact count of vision images.
+
+    Contract expected by ComfyUI / Qwen3-VL tokenizer uses positional placeholder '{}'.
+    """
     vision_blocks = VISION_PAD_TOKEN * num_images
     return (
         f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-        f"<|im_start|>user\n{vision_blocks}{{prompt}}<|im_end|>\n"
+        f"<|im_start|>user\n{vision_blocks}{{}}<|im_end|>\n"
         f"<|im_start|>assistant\n"
     )
 
