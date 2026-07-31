@@ -124,8 +124,14 @@ def test_diffusion_model_wrapper_execution_signature():
     patched = patch_krea2_model(model, [prep_ref])
 
     wrappers = patched.model_options["transformer_options"]["wrappers"]
-    assert len(wrappers) == 1
-    wrapper = wrappers[0]
+    if isinstance(wrappers, dict):
+        diff_wrappers = wrappers.get("diffusion_model", wrappers)
+        if isinstance(diff_wrappers, dict):
+            wrapper = diff_wrappers["ccc_krea2_edit"]
+        else:
+            wrapper = diff_wrappers[0]
+    else:
+        wrapper = wrappers[0]
 
     x = torch.rand((1, 16, 32, 32))
     timesteps = torch.tensor([1.0])

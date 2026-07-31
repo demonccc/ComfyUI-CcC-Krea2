@@ -100,7 +100,7 @@ class CcCKrea2Subject(BaseKrea2Node):
 
 
 class CcCKrea2SubjectOutfit(BaseKrea2Node):
-    """CcC Krea2 - Subject + Outfit node (Experimental Outfit Workflow)."""
+    """CcC Krea2 - Subject + Outfit node."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -260,7 +260,7 @@ class CcCKrea2SubjectScene(BaseKrea2Node):
 
 
 class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
-    """CcC Krea2 - Subject + Scene + Outfit node (Experimental 3-Ref Workflow)."""
+    """CcC Krea2 - Subject + Scene + Outfit node."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -427,7 +427,7 @@ class CcCKrea2Inpaint(BaseKrea2Node):
 
 
 class CcCKrea2InpaintSubjectOutfit(BaseKrea2Node):
-    """CcC Krea2 - Inpaint Subject + Outfit node (Experimental Outfit Inpainting)."""
+    """CcC Krea2 - Inpaint Subject + Outfit node."""
 
     @classmethod
     def INPUT_TYPES(cls):

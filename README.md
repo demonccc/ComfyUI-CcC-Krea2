@@ -24,9 +24,7 @@ CcC Krea2 groups those editing patterns into a small set of purpose-built nodes.
 
 CcC Krea2 requires a Krea 2 edit LoRA trained to work with the in-context editing model patch introduced by ComfyUI-Krea2Edit. A regular Krea 2 text-to-image LoRA does not provide the required editing behavior.
 
-The nodes work particularly well with the Identity Edit LoRA, including Identity Edit v1.2, which is the recommended starting point for subject and subject + scene workflows.
-
-How each reference is interpreted depends on the LoRA training, reference order and prompt. The nodes expose subject, outfit and scene roles, but the loaded edit LoRA ultimately determines how strongly those roles are understood.
+Reference interpretation depends on the loaded Krea 2 edit LoRA, reference order and prompt. Identity Edit v1.2 is the recommended starting point.
 
 ## Installation
 

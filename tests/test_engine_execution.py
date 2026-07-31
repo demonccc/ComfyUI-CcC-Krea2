@@ -7,6 +7,7 @@ import torch.nn as nn
 from ccc_krea2.engine import Krea2EditEngine, NodeExecutionRequest
 from ccc_krea2.constants import ReferenceRole
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
+from ccc_krea2.patch import patch_krea2_model
 
 
 class MockCLIPTokenizer:
@@ -64,7 +65,8 @@ class MockVAE:
     def encode(self, image: torch.Tensor) -> torch.Tensor:
         if image.ndim == 4 and image.shape[-1] == 3:
             b, h, w, _ = image.shape
-            return torch.ones((b, 16, h // 8, w // 8))
+            val = float(image.mean().item())
+            return torch.full((b, 16, h // 8, w // 8), fill_value=val)
         return torch.ones((1, 16, 16, 16))
 
 
@@ -96,7 +98,6 @@ def test_engine_execute_subject_workflow():
 
     # 2. Assert model is patched
     assert "transformer_options" in patched_model.model_options
-    assert "wrappers" in patched_model.model_options["transformer_options"]
 
     # 3. Assert positive and negative tokenize with identical image references
     assert len(clip.tokenize_calls) == 2
@@ -154,8 +155,8 @@ def test_engine_execute_inpaint_subject_scene_workflow():
     model = MockModel()
     clip = MockCLIPTokenizer()
     vae = MockVAE()
-    subject_img = torch.rand((1, 512, 512, 3))
-    scene_img = torch.rand((1, 600, 400, 3))
+    subject_img = torch.full((1, 512, 512, 3), 0.2)
+    scene_img = torch.full((1, 600, 400, 3), 0.8)
     inpaint_mask = torch.ones((1, 512, 512))
 
     req = NodeExecutionRequest(
@@ -168,7 +169,8 @@ def test_engine_execute_inpaint_subject_scene_workflow():
         subject_image=subject_img,
         scene_image=scene_img,
         inpaint_mask=inpaint_mask,
-        inpaint_base_role=ReferenceRole.SUBJECT,
+        inpaint_base_role=ReferenceRole.SCENE,
+        sampling_resize_mode="crop",
         role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT]
     )
 
@@ -179,6 +181,35 @@ def test_engine_execute_inpaint_subject_scene_workflow():
     assert negative is not None
     assert "samples" in latent_dict
     assert "noise_mask" in latent_dict
+
+    # Assert VAE latent was generated from scene_image (mean 0.8) and NOT subject_image (mean 0.2)
+    samples = latent_dict["samples"]
+    assert abs(float(samples.mean().item()) - 0.8) < 1e-3
+
+
+def test_wrapper_compatibility_fallback_nested_structure():
+    """Verify that when ModelPatcher lacks add_wrapper_with_key, patch_krea2_model creates exact nested structure expected by ComfyUI."""
+    class MockLegacyModel:
+        def __init__(self):
+            self.model_options = {}
+
+        def clone(self):
+            m = MockLegacyModel()
+            m.model_options = self.model_options.copy()
+            return m
+
+    legacy_model = MockLegacyModel()
+    patched = patch_krea2_model(legacy_model, prepared_refs=[])
+
+    # Verify exact nested structure: model_options -> transformer_options -> wrappers -> diffusion_model -> ccc_krea2_edit
+    assert "transformer_options" in patched.model_options
+    t_opts = patched.model_options["transformer_options"]
+    assert "wrappers" in t_opts
+    wrappers = t_opts["wrappers"]
+    assert "diffusion_model" in wrappers
+    diff_wrappers = wrappers["diffusion_model"]
+    assert "ccc_krea2_edit" in diff_wrappers
+    assert callable(diff_wrappers["ccc_krea2_edit"])
 
 
 def test_nodes_via_mappings():

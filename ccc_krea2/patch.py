@@ -84,15 +84,41 @@ def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
             pass
 
     if not registered:
-        _fallback_options_register(patched_model, wrapper)
+        _fallback_options_register(patched_model, wrapper, wrapper_type)
 
 
-def _fallback_options_register(patched_model: Any, wrapper: Any) -> None:
+def _fallback_options_register(patched_model: Any, wrapper: Any, wrapper_type: Any = "diffusion_model") -> None:
+    """Fallback options registration using nested dictionary structure or comfy.patcher_extension."""
     if not hasattr(patched_model, "model_options"):
         patched_model.model_options = {}
-    options = patched_model.model_options.setdefault("transformer_options", {})
-    wrappers = options.setdefault("wrappers", [])
-    wrappers.append(wrapper)
+
+    options = patched_model.model_options
+    try:
+        import comfy.patcher_extension
+        if hasattr(comfy.patcher_extension, "add_wrapper_with_key"):
+            comfy.patcher_extension.add_wrapper_with_key(
+                wrapper_type,
+                "ccc_krea2_edit",
+                wrapper,
+                options=options,
+                is_model_options=True
+            )
+            return
+    except Exception:
+        pass
+
+    # Nested dictionary fallback matching ComfyUI wrapper structure:
+    # transformer_options -> wrappers -> diffusion_model -> {"ccc_krea2_edit": wrapper}
+    t_options = options.setdefault("transformer_options", {})
+    wrappers = t_options.setdefault("wrappers", {})
+
+    w_key = str(wrapper_type)
+    if isinstance(wrappers, dict):
+        diff_wrappers = wrappers.setdefault(w_key, {})
+        if isinstance(diff_wrappers, dict):
+            diff_wrappers["ccc_krea2_edit"] = wrapper
+        elif isinstance(diff_wrappers, list):
+            diff_wrappers.append(wrapper)
 
 
 def _pad_to_patch_size(tensor: torch.Tensor, patch_size: int) -> torch.Tensor:

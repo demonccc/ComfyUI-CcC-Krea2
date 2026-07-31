@@ -40,8 +40,8 @@ def apply_reference_fit_transform(
     Key principles:
     - NO black target-sized canvas padding.
     - Preserves native fitted reference grid aligned to /16 floor dimensions.
-    - Near-matched-AR crop tolerance: CROP_TOL = 0.08.
-    - Genuine mismatches crop source to round(fitted_dimension / fit_scale) before resize.
+    - Near-matched scale check: (image_h * scale >= target_h * (1 - 0.08)) and (image_w * scale >= target_w * (1 - 0.08)).
+    - For near-match or crop modes, center-crop source image first then resize to target_h x target_w.
     - Masks receive the exact same spatial crop and resize transformation.
     """
     if mode not in ("fit", "crop"):
@@ -69,29 +69,39 @@ def apply_reference_fit_transform(
         if mask_bchw.shape[0] != bs:
             mask_bchw = mask_bchw[:1].repeat(bs, 1, 1, 1)
 
-    target_ar = target_h / float(target_w)
-    image_ar = ih / float(iw)
+    scale = min(target_h / float(ih), target_w / float(iw))
+    is_near_match = (
+        (ih * scale >= target_h * (1.0 - crop_tolerance)) and
+        (iw * scale >= target_w * (1.0 - crop_tolerance))
+    )
 
-    # 1. Mode 'crop' or near-matched AR within CROP_TOL = 0.08: center-crop directly to target AR then resize to target_h x target_w
-    if mode == "crop" or abs(image_ar - target_ar) <= crop_tolerance:
-        scale = max(target_h / float(ih), target_w / float(iw))
-        new_h = int(round(ih * scale))
-        new_w = int(round(iw * scale))
+    # 1. Mode 'crop' or near-matched scale: center-crop original source image first, then resize to target_h x target_w
+    if mode == "crop" or is_near_match:
+        target_ar = target_h / float(target_w)
+        image_ar = ih / float(iw)
 
-        scaled_img = F.interpolate(img_bchw, size=(new_h, new_w), mode="bicubic", antialias=True)
-        y0 = (new_h - target_h) // 2
-        x0 = (new_w - target_w) // 2
-        cropped_img = scaled_img[..., y0:y0 + target_h, x0:x0 + target_w]
+        if image_ar > target_ar:
+            crop_h = ih
+            crop_w = int(round(ih / target_ar))
+        else:
+            crop_h = int(round(iw * target_ar))
+            crop_w = iw
 
-        cropped_mask = None
+        sy0 = (ih - crop_h) // 2
+        sx0 = (iw - crop_w) // 2
+
+        cropped_src = img_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+        fitted_img = F.interpolate(cropped_src, size=(target_h, target_w), mode="bicubic", antialias=True)
+
+        fitted_mask = None
         if mask_bchw is not None:
             mask_m = "nearest" if mask_interpolation == "nearest" else "bicubic"
             kwargs = {"antialias": True} if mask_m == "bicubic" else {}
-            scaled_mask = F.interpolate(mask_bchw, size=(new_h, new_w), mode=mask_m, **kwargs)
-            cropped_mask = scaled_mask[..., y0:y0 + target_h, x0:x0 + target_w].squeeze(1).clamp(0.0, 1.0)
+            cropped_mask_src = mask_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+            fitted_mask = F.interpolate(cropped_mask_src, size=(target_h, target_w), mode=mask_m, **kwargs).squeeze(1).clamp(0.0, 1.0)
 
         ref_fit_meta = {"spatial_hw": (target_h, target_w)}
-        return cropped_img.movedim(1, -1).clamp(0.0, 1.0), cropped_mask, ref_fit_meta
+        return fitted_img.movedim(1, -1).clamp(0.0, 1.0), fitted_mask, ref_fit_meta
 
     # 2. Genuine AR mismatch in 'fit' mode: align to /16 floor dimensions and crop source
     fit_scale = min(target_h / float(ih), target_w / float(iw))

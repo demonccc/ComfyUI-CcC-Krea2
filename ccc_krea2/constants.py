@@ -47,7 +47,6 @@ DEFAULT_SYSTEM_PROMPT = (
 VISION_PAD_TOKEN = "<|vision_start|><|image_pad|><|vision_end|>"
 
 EXPERIMENTAL_OUTFIT_WARNING = (
-    "EXPERIMENTAL WORKFLOW: The standard Krea 2 Identity Edit LoRA is verified for single reference "
-    "(subject/source) and two-reference (scene, subject) ordering. Outfit role and 3-reference "
-    "workflows require specialized edit LoRAs trained for those specific roles."
+    "Reference interpretation depends on the loaded Krea 2 edit LoRA, "
+    "reference order and prompt. Identity Edit v1.2 is the recommended starting point."
 )

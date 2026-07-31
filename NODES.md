@@ -33,7 +33,7 @@ Every reference image passed into a CcC Krea2 node is processed through two dist
 
 ### Attention Steering & Masks
 - **`boost`**: Per-reference attention multiplier (default `subject`: 2.5, `scene`/`outfit`/`source`: 1.0). Higher values force stronger attention alignment to that reference's tokens.
-- **Attention Mask**: Restricts which spatial region of a reference image contributes tokens to cross-attention.
+- **Attention Mask**: An attention mask does not remove or block reference tokens. It limits where the reference boost is applied. Outside the mask, the reference remains available with normal attention bias equal to zero.
 - **Inpaint Mask**: Defines the spatial edit region on the target latent during sampling.
 - **Attention Masks vs Inpaint Masks**: Attention masks guide reference feature extraction, whereas inpaint masks specify where generation/editing occurs on the output image.
 
@@ -46,7 +46,7 @@ Every reference image passed into a CcC Krea2 node is processed through two dist
 ## Shared Compatibility Note
 
 > [!NOTE]
-> How each reference is interpreted during generation depends on the loaded Krea 2 edit LoRA, reference sequence order, and prompt guidance. While nodes expose explicit `subject`, `outfit`, `scene`, and `source` roles, the edit LoRA ultimately determines how strongly multi-reference compositions are understood.
+> Reference interpretation depends on the loaded Krea 2 edit LoRA, reference order and prompt. Identity Edit v1.2 is the recommended starting point.
 
 ---
 
@@ -72,7 +72,7 @@ Single-reference subject identity editing node.
 
 ### 2. CcC Krea2 - Subject + Outfit
 
-Experimental dual-reference subject identity and clothing/outfit editing node.
+Dual-reference subject identity and clothing/outfit editing node.
 
 - **Category**: `CcC/Krea2`
 - **Reference Order**: `[outfit, subject]`
@@ -104,7 +104,7 @@ Dual-reference subject identity and background scene composition node.
 
 ### 4. CcC Krea2 - Subject + Scene + Outfit
 
-Experimental triple-reference composition node.
+Triple-reference composition node.
 
 - **Category**: `CcC/Krea2`
 - **Reference Order**: `[scene, outfit, subject]`
@@ -138,7 +138,7 @@ Localized inpainting node using a single source image and mask.
 
 ### 6. CcC Krea2 - Inpaint Subject + Outfit
 
-Experimental localized inpainting node for subject and outfit transfer.
+Localized inpainting node for subject and outfit transfer.
 
 - **Category**: `CcC/Krea2`
 - **Base Image**: `subject_image`
