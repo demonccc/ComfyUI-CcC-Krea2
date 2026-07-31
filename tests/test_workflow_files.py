@@ -146,12 +146,17 @@ def test_qwen_workflows_and_non_qwen_isolation():
     for rel_path in non_qwen_files:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        raw_json_str = json.dumps(data)
+        assert "QWEN3VL_CONFIG" not in raw_json_str, f"QWEN3VL_CONFIG found in {rel_path}"
         node_types = [n.get("type") for n in data.get("nodes", [])]
         assert not any("Qwen" in t for t in node_types), f"Qwen node found in non-Qwen workflow {rel_path}"
 
     for rel_path in qwen_files:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        raw_json_str = json.dumps(data)
+        assert "QWEN3VL_CONFIG" not in raw_json_str, f"QWEN3VL_CONFIG string found in {rel_path}"
 
         group_titles = [g.get("title", "") for g in data.get("groups", [])]
         assert "Qwen Prompt Builder" in group_titles, f"Missing 'Qwen Prompt Builder' group in {rel_path}"
@@ -163,32 +168,68 @@ def test_qwen_workflows_and_non_qwen_isolation():
         assert "Qwen3VL_ModelConfig" in node_by_type, f"Missing Qwen3VL_ModelConfig in {rel_path}"
         assert "Qwen3VL_SamplingConfig" in node_by_type, f"Missing Qwen3VL_SamplingConfig in {rel_path}"
 
-        assert "SimpleQwenVL" not in node_by_type, f"Deprecated SimpleQwenVL in {rel_path}"
-        assert "SimpleQwenVLgguf" not in node_by_type, f"Deprecated SimpleQwenVLgguf in {rel_path}"
-
-        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
-
-        # Check config chaining: ModelConfig -> SamplingConfig -> SimpleQwenVLggufV2
+        # 1-4. Socket types check: STRING
         m_cfg = node_by_type["Qwen3VL_ModelConfig"]
         s_cfg = node_by_type["Qwen3VL_SamplingConfig"]
         qwen_node = node_by_type["SimpleQwenVLggufV2"]
 
-        m_out_link = m_cfg["outputs"][0]["links"][0]
-        assert link_map[m_out_link][3] == s_cfg["id"], f"ModelConfig not wired to SamplingConfig in {rel_path}"
+        assert m_cfg["outputs"][0]["type"] == "STRING", f"ModelConfig output not STRING in {rel_path}"
+        assert s_cfg["inputs"][0]["type"] == "STRING", f"SamplingConfig input not STRING in {rel_path}"
+        assert s_cfg["outputs"][0]["type"] == "STRING", f"SamplingConfig output not STRING in {rel_path}"
 
-        s_out_link = s_cfg["outputs"][0]["links"][0]
-        assert link_map[s_out_link][3] == qwen_node["id"], f"SamplingConfig not wired to SimpleQwenVLggufV2 in {rel_path}"
+        cfg_override_inp = next(i for i in qwen_node["inputs"] if i["name"] == "config_override")
+        assert cfg_override_inp["type"] == "STRING", f"SimpleQwenVLggufV2 config_override input not STRING in {rel_path}"
 
-        # Check scene image wired to Qwen image input
-        qwen_img_link = next(i["link"] for i in qwen_node["inputs"] if i["name"] == "image")
+        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
+
+        # 5. Link tuples type check
+        m_out_link_id = m_cfg["outputs"][0]["links"][0]
+        m_out_link = link_map[m_out_link_id]
+        assert m_out_link[5] == "STRING", f"ModelConfig link type not STRING in {rel_path}"
+        assert m_out_link[3] == s_cfg["id"], f"ModelConfig link target mismatch in {rel_path}"
+
+        s_out_link_id = s_cfg["outputs"][0]["links"][0]
+        s_out_link = link_map[s_out_link_id]
+        assert s_out_link[5] == "STRING", f"SamplingConfig link type not STRING in {rel_path}"
+        assert s_out_link[3] == qwen_node["id"], f"SamplingConfig link target mismatch in {rel_path}"
+        assert s_out_link[4] == 6, f"SamplingConfig link target slot should be 6 (config_override) in {rel_path}"
+
+        # 7. ModelConfig widget count and order check
+        m_widgets = m_cfg.get("widgets_values", [])
+        assert len(m_widgets) == 19, f"ModelConfig widget count mismatch: got {len(m_widgets)}, expected 19 in {rel_path}"
+
+        # 8. SamplingConfig widget count check
+        s_widgets = s_cfg.get("widgets_values", [])
+        assert len(s_widgets) == 10, f"SamplingConfig widget count mismatch: got {len(s_widgets)}, expected 10 in {rel_path}"
+
+        # 9. SimpleQwenVLggufV2 required widget count and order
+        q_widgets = qwen_node.get("widgets_values", [])
+        assert len(q_widgets) == 6, f"SimpleQwenVLggufV2 widget count mismatch: got {len(q_widgets)}, expected 6 in {rel_path}"
+        assert q_widgets[0] == "qwen2_vl_7b_instruct"
+        assert q_widgets[1] == "default"
+        user_prompt_text = q_widgets[2]
+        assert isinstance(user_prompt_text, str)
+        assert isinstance(q_widgets[3], int)
+        assert q_widgets[4] is False
+        assert q_widgets[5] == "full"
+
+        # 10. Canonical image role terms in user prompt
+        assert "subject image" in user_prompt_text
+        assert "scene image" in user_prompt_text
+        if "outfit" in rel_path:
+            assert "outfit image" in user_prompt_text
+
+        # 11. Scene image connected to real `image` socket (slot index 0)
+        qwen_img_link_id = qwen_node["inputs"][0]["link"]  # slot 0 is "image"
+        qwen_img_link = link_map[qwen_img_link_id]
         scene_load_img_node = next(n for n in nodes if n["type"] == "LoadImage" and n.get("widgets_values", [""])[0] == "scene.jpg")
-        assert link_map[qwen_img_link][1] == scene_load_img_node["id"], f"Scene LoadImage not connected to Qwen image input in {rel_path}"
+        assert qwen_img_link[1] == scene_load_img_node["id"], f"Scene LoadImage not connected to Qwen image socket in {rel_path}"
 
-        # Check Qwen text wired to main node prompt input
-        qwen_text_link = qwen_node["outputs"][0]["links"][0]
+        # 13. Qwen text output connected to CcC main node prompt input
+        qwen_text_link_id = qwen_node["outputs"][0]["links"][0]
         main_node = next(n for n in nodes if n["type"] in MAIN_NODE_TYPES)
         prompt_input = next(i for i in main_node["inputs"] if i["name"] == "prompt")
-        assert prompt_input["link"] == qwen_text_link, f"Qwen text output not connected to main node prompt input in {rel_path}"
+        assert prompt_input["link"] == qwen_text_link_id, f"Qwen text output not connected to main node prompt in {rel_path}"
 
 
 def test_metadata_and_graph_integrity():

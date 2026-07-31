@@ -83,58 +83,102 @@
       "id": 61,
       "type": "Qwen3VL_ModelConfig",
       "pos": [460, 520],
-      "size": [340, 120],
+      "size": [340, 520],
       "flags": {},
       "order": 5,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {"name": "config_override", "type": "STRING", "link": null}
+      ],
       "outputs": [
-        {"name": "config", "type": "QWEN3VL_CONFIG", "links": [15], "slot_index": 0}
+        {"name": "config", "type": "STRING", "links": [15], "slot_index": 0}
       ],
       "properties": {"Node name for S&R": "Qwen3VL_ModelConfig"},
-      "widgets_values": ["Qwen2-VL-7B-Instruct-GGUF", "fp16"]
+      "widgets_values": [
+        "Qwen/Qwen2-VL-7B-Instruct-GGUF/qwen2-vl-7b-instruct-q4_k_m.gguf",
+        "Qwen/Qwen2-VL-7B-Instruct-GGUF/mmproj-qwen2-vl-7b-instruct-f16.gguf",
+        4096,
+        2048,
+        512,
+        99,
+        0,
+        8,
+        true,
+        false,
+        true,
+        "auto",
+        "auto",
+        false,
+        false,
+        false,
+        false,
+        "default",
+        "default"
+      ]
     },
     {
       "id": 62,
       "type": "Qwen3VL_SamplingConfig",
       "pos": [850, 520],
-      "size": [340, 120],
+      "size": [340, 320],
       "flags": {},
       "order": 6,
       "mode": 0,
       "inputs": [
-        {"name": "config_override", "type": "QWEN3VL_CONFIG", "link": 15}
+        {"name": "config_override", "type": "STRING", "link": 15}
       ],
       "outputs": [
-        {"name": "config", "type": "QWEN3VL_CONFIG", "links": [16], "slot_index": 0}
+        {"name": "config", "type": "STRING", "links": [16], "slot_index": 0}
       ],
       "properties": {"Node name for S&R": "Qwen3VL_SamplingConfig"},
-      "widgets_values": [512, 0.7, 0.9]
+      "widgets_values": [
+        512,
+        0.7,
+        0.9,
+        0.05,
+        40,
+        1.1,
+        0.0,
+        0.0,
+        256,
+        1280
+      ]
     },
     {
       "id": 60,
       "type": "SimpleQwenVLggufV2",
       "pos": [1240, 520],
-      "size": [350, 260],
+      "size": [350, 480],
       "flags": {},
       "order": 7,
       "mode": 0,
       "inputs": [
         {"name": "image", "type": "IMAGE", "link": 14},
-        {"name": "config_override", "type": "QWEN3VL_CONFIG", "link": 16}
+        {"name": "image2", "type": "IMAGE", "link": null},
+        {"name": "image3", "type": "IMAGE", "link": null},
+        {"name": "audio", "type": "AUDIO", "link": null},
+        {"name": "video", "type": "VIDEO", "link": null},
+        {"name": "system_prompt_override", "type": "STRING", "link": null},
+        {"name": "config_override", "type": "STRING", "link": 16},
+        {"name": "variables", "type": "STRING", "link": null}
       ],
       "outputs": [
         {"name": "text", "type": "STRING", "links": [17], "slot_index": 0}
       ],
       "properties": {"Node name for S&R": "SimpleQwenVLggufV2"},
       "widgets_values": [
-        "Analyze the scene image and write one complete image-editing prompt.\n\nThe output prompt must replace the main person in the scene image with the person from the subject image.\n\nPreserve the pose, composition, camera angle, environment, interactions, lighting and outfit of the scene image unless the transformation requires a change.\n\nRefer to the images using exactly these terms:\n- subject image\n- scene image\n\nReturn only the final transformation prompt. Do not explain your analysis and do not add headings."
+        "qwen2_vl_7b_instruct",
+        "default",
+        "Analyze the scene image and write one complete image-editing prompt.\n\nThe output prompt must replace the main person in the scene image with the person from the subject image.\n\nPreserve the pose, composition, camera angle, environment, interactions, lighting and outfit of the scene image unless the transformation requires a change.\n\nRefer to the images using exactly these terms:\n- subject image\n- scene image\n\nReturn only the final transformation prompt. Do not explain your analysis and do not add headings.",
+        123456789,
+        false,
+        "full"
       ]
     },
     {
       "id": 20,
       "type": "CcCKrea2ImageAdvancedSettings",
-      "pos": [100, 850],
+      "pos": [100, 1100],
       "size": [340, 360],
       "flags": {},
       "order": 8,
@@ -151,7 +195,7 @@
     {
       "id": 22,
       "type": "CcCKrea2ImageAdvancedSettings",
-      "pos": [460, 850],
+      "pos": [460, 1100],
       "size": [340, 360],
       "flags": {},
       "order": 9,
@@ -168,7 +212,7 @@
     {
       "id": 21,
       "type": "CcCKrea2EditAdvancedSettings",
-      "pos": [820, 850],
+      "pos": [820, 1100],
       "size": [340, 360],
       "flags": {},
       "order": 10,
@@ -302,8 +346,8 @@
     [12, 30, 3, 40, 3, "LATENT"],
     [13, 40, 0, 50, 0, "LATENT"],
     [14, 11, 0, 60, 0, "IMAGE"],
-    [15, 61, 0, 62, 0, "QWEN3VL_CONFIG"],
-    [16, 62, 0, 60, 1, "QWEN3VL_CONFIG"],
+    [15, 61, 0, 62, 0, "STRING"],
+    [16, 62, 0, 60, 6, "STRING"],
     [17, 60, 0, 30, 3, "STRING"],
     [18, 50, 0, 51, 0, "IMAGE"]
   ],
@@ -325,12 +369,12 @@
     },
     {
       "title": "Qwen Prompt Builder",
-      "bounding": [440, 480, 1180, 320],
+      "bounding": [440, 480, 1180, 580],
       "color": "#5c2b5c"
     },
     {
       "title": "Advanced Settings (disabled by default)",
-      "bounding": [80, 810, 1100, 430],
+      "bounding": [80, 1060, 1100, 430],
       "color": "#5c2b2b"
     },
     {
