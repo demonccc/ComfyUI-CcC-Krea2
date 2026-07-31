@@ -17,6 +17,7 @@ from .references import ReferenceConfig, prepare_reference, PreparedReference
 from .latents import generate_krea2_latent
 from .conditioning import encode_krea2_conditioning, build_role_instructions
 from .patch import patch_krea2_model
+from .prompt_augmentation import PromptAugmentation, apply_prompt_augmentation
 
 logger = logging.getLogger("CcCKrea2")
 
@@ -32,6 +33,7 @@ class NodeExecutionRequest:
     preset: str = "balanced"
     output_resolution: str = "subject"
     megapixels: float = 1.0
+    prompt_augmentation: Optional[PromptAugmentation] = None
     image_advanced_settings: Optional[ImageAdvancedSettingsBundle] = None
     edit_advanced_settings: Optional[EditAdvancedSettings] = None
     subject_image: Optional[torch.Tensor] = None
@@ -131,10 +133,17 @@ class Krea2EditEngine:
         if settings.prompt_instructions_mode == "append" and settings.prompt_instructions:
             sys_prompt = f"{sys_prompt}\n\n{settings.prompt_instructions}"
 
+        # Merge effective positive and negative prompts with prompt augmentation
+        eff_prompt, eff_neg_prompt = apply_prompt_augmentation(
+            positive_prompt=req.prompt,
+            negative_prompt=req.negative_prompt,
+            augmentation=req.prompt_augmentation,
+        )
+
         positive, negative = encode_krea2_conditioning(
             clip=req.clip,
-            prompt=req.prompt,
-            negative_prompt=req.negative_prompt,
+            prompt=eff_prompt,
+            negative_prompt=eff_neg_prompt,
             grounding_images=grounding_images,
             system_prompt=sys_prompt,
         )

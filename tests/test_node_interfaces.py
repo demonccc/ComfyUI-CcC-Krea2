@@ -3,11 +3,12 @@
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 from ccc_krea2.conditioning import build_role_instructions
 from ccc_krea2.constants import ReferenceRole
+from ccc_krea2.prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 
 
 def test_node_mappings_count_and_keys():
-    assert len(NODE_CLASS_MAPPINGS) == 9
-    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 9
+    assert len(NODE_CLASS_MAPPINGS) == 11
+    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 11
 
     expected_keys = [
         "CcCKrea2Subject",
@@ -19,10 +20,15 @@ def test_node_mappings_count_and_keys():
         "CcCKrea2InpaintSubjectScene",
         "CcCKrea2ImageAdvancedSettings",
         "CcCKrea2EditAdvancedSettings",
+        "CcCKrea2LoRAPromptSettings",
+        "CcCKrea2LoRAStack",
     ]
     for k in expected_keys:
         assert k in NODE_CLASS_MAPPINGS
         assert k in NODE_DISPLAY_NAME_MAPPINGS
+
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2LoRAPromptSettings"] == "CcC Krea2 - LoRA Prompt Settings"
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2LoRAStack"] == "CcC Krea2 - LoRA Stack"
 
 
 def test_main_nodes_widget_signature_refactor():
@@ -59,6 +65,7 @@ def test_main_nodes_widget_signature_refactor():
         "megapixels",
         "image_advanced_settings",
         "edit_advanced_settings",
+        "prompt_augmentation",
     ]
 
     for key in main_node_keys:
@@ -75,6 +82,9 @@ def test_main_nodes_widget_signature_refactor():
         # Check new widgets ARE present
         for nw in new_widgets:
             assert nw in all_inputs, f"New widget '{nw}' must be present in node '{key}'"
+
+        # Check prompt_augmentation socket type
+        assert opt["prompt_augmentation"] == (CCC_KREA2_PROMPT_AUGMENTATION,)
 
 
 def test_image_advanced_settings_node_chaining():

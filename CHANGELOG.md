@@ -5,6 +5,16 @@ All notable changes to the `ComfyUI-CcC-Krea2` package will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `CcC Krea2 - LoRA Stack` node (`CcCKrea2LoRAStack`) for model-only LoRA stacking (up to 4 slots) with global/slot strengths, persistent slot loader instances, and prompt augmentation accumulators.
+- `CcC Krea2 - LoRA Prompt Settings` node (`CcCKrea2LoRAPromptSettings`) for slot-level positive and negative prompt fragment configuration with `prepend` and `append` positioning.
+- Immutable prompt augmentation module (`ccc_krea2/prompt_augmentation.py`) supporting deterministic text merging via double newline `\n\n` separators without mutating input strings.
+- Optional `prompt_augmentation` socket on all 7 Krea 2 main nodes.
+- Full LoRA Stack integration across all 6 production example workflow JSON files in `workflows/`.
+- Unit test suites `tests/test_prompt_augmentation.py` and `tests/test_lora_nodes.py`, as well as updated interface and workflow tests.
+
 ## [0.1.0-alpha] - 2026-07-30
 
 ### Added

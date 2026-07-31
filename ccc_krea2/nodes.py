@@ -25,6 +25,8 @@ from .settings import (
     ImageAdvancedSettingsBundle,
     EditAdvancedSettings,
 )
+from .prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
+from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
 from .engine import Krea2EditEngine, NodeExecutionRequest
 
 
@@ -181,6 +183,7 @@ class CcCKrea2Subject(BaseKrea2Node):
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "subject_attention_mask": ("MASK",),
                 "latent_source": (["empty", "subject"], {"default": "empty"}),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -197,6 +200,7 @@ class CcCKrea2Subject(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "subject"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             subject_image=subject_image,
@@ -229,6 +233,7 @@ class CcCKrea2SubjectOutfit(BaseKrea2Node):
                 "subject_attention_mask": ("MASK",),
                 "outfit_attention_mask": ("MASK",),
                 "latent_source": (["empty", "subject"], {"default": "empty"}),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -245,6 +250,7 @@ class CcCKrea2SubjectOutfit(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "subject"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             subject_image=subject_image,
@@ -279,6 +285,7 @@ class CcCKrea2SubjectScene(BaseKrea2Node):
                 "subject_attention_mask": ("MASK",),
                 "scene_attention_mask": ("MASK",),
                 "latent_source": (["empty", "subject", "scene"], {"default": "empty"}),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -295,6 +302,7 @@ class CcCKrea2SubjectScene(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "scene"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             subject_image=subject_image,
@@ -331,6 +339,7 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
                 "scene_attention_mask": ("MASK",),
                 "outfit_attention_mask": ("MASK",),
                 "latent_source": (["empty", "subject", "scene"], {"default": "empty"}),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -347,6 +356,7 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "scene"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             subject_image=subject_image,
@@ -381,6 +391,7 @@ class CcCKrea2Inpaint(BaseKrea2Node):
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "inpaint_mask": ("MASK",),
                 "source_attention_mask": ("MASK",),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -397,6 +408,7 @@ class CcCKrea2Inpaint(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "source"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             source_image=source_image,
@@ -431,6 +443,7 @@ class CcCKrea2InpaintSubjectOutfit(BaseKrea2Node):
                 "inpaint_mask": ("MASK",),
                 "subject_attention_mask": ("MASK",),
                 "outfit_attention_mask": ("MASK",),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -447,6 +460,7 @@ class CcCKrea2InpaintSubjectOutfit(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "subject"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             subject_image=subject_image,
@@ -483,6 +497,7 @@ class CcCKrea2InpaintSubjectScene(BaseKrea2Node):
                 "inpaint_mask": ("MASK",),
                 "subject_attention_mask": ("MASK",),
                 "scene_attention_mask": ("MASK",),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
                 "edit_advanced_settings": (CCC_KREA2_EDIT_ADVANCED_SETTINGS,),
             },
@@ -499,6 +514,7 @@ class CcCKrea2InpaintSubjectScene(BaseKrea2Node):
             preset=kwargs.get("preset", "balanced"),
             output_resolution=kwargs.get("output_resolution", "scene"),
             megapixels=kwargs.get("megapixels", 1.0),
+            prompt_augmentation=kwargs.get("prompt_augmentation", None),
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             subject_image=subject_image,
@@ -523,6 +539,8 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2InpaintSubjectScene": CcCKrea2InpaintSubjectScene,
     "CcCKrea2ImageAdvancedSettings": CcCKrea2ImageAdvancedSettings,
     "CcCKrea2EditAdvancedSettings": CcCKrea2EditAdvancedSettings,
+    "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
+    "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -535,4 +553,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2InpaintSubjectScene": "CcC Krea2 - Inpaint Subject + Scene",
     "CcCKrea2ImageAdvancedSettings": "CcC Krea2 - Image Advanced Settings",
     "CcCKrea2EditAdvancedSettings": "CcC Krea2 - Edit Advanced Settings",
+    "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
+    "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
 }

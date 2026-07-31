@@ -40,7 +40,7 @@ def test_expected_filenames_and_directory_contents():
 
 
 def test_workflow_json_parsing_and_loaders():
-    """2-7. JSON parses, uses Krea2 loader stack, and does not use forbidden legacy loaders."""
+    """2-7. JSON parses, uses Krea2 loader stack, and does not use legacy LoRA loaders."""
     for rel_path in EXPECTED_WORKFLOW_FILES:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -51,8 +51,10 @@ def test_workflow_json_parsing_and_loaders():
         assert "UNETLoader" in node_types, f"Missing UNETLoader in {rel_path}"
         assert "CLIPLoader" in node_types, f"Missing CLIPLoader in {rel_path}"
         assert "VAELoader" in node_types, f"Missing VAELoader in {rel_path}"
-        assert "LoraLoaderModelOnly" in node_types, f"Missing LoraLoaderModelOnly in {rel_path}"
+        assert "CcCKrea2LoRAStack" in node_types, f"Missing CcCKrea2LoRAStack in {rel_path}"
+        assert "CcCKrea2LoRAPromptSettings" in node_types, f"Missing CcCKrea2LoRAPromptSettings in {rel_path}"
 
+        assert "LoraLoaderModelOnly" not in node_types, f"LoraLoaderModelOnly found in {rel_path}"
         assert "CheckpointLoaderSimple" not in node_types, f"CheckpointLoaderSimple found in {rel_path}"
         assert "LoraLoader" not in node_types, f"Standard LoraLoader found in {rel_path}"
 
@@ -80,8 +82,48 @@ def test_workflow_main_nodes_and_groups():
         # Standard groups
         assert "Models" in group_titles, f"Missing 'Models' group in {rel_path}"
         assert "Advanced Settings (disabled by default)" in group_titles, f"Missing Advanced Settings group in {rel_path}"
-        assert "LoRA + Edit + KSampler" in group_titles, f"Missing 'LoRA + Edit + KSampler' group in {rel_path}"
+        assert "LoRA Stack + Edit + KSampler" in group_titles, f"Missing 'LoRA Stack + Edit + KSampler' group in {rel_path}"
         assert "Output" in group_titles, f"Missing 'Output' group in {rel_path}"
+
+
+def test_lora_stack_and_prompt_settings_wiring():
+    """Verify wiring between CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack, and main node."""
+    for rel_path in EXPECTED_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        nodes = data.get("nodes", [])
+        node_by_type = {n["type"]: n for n in nodes if "type" in n}
+
+        stack_node = node_by_type["CcCKrea2LoRAStack"]
+        ps_node = node_by_type["CcCKrea2LoRAPromptSettings"]
+        main_node = next(n for n in nodes if n.get("type") in MAIN_NODE_TYPES)
+
+        link_map = {l[0]: l for l in data.get("links", [])}
+
+        # 1. Prompt settings output -> LoRA stack input
+        ps_out_links = ps_node["outputs"][0]["links"]
+        assert ps_out_links is not None and len(ps_out_links) == 1
+        ps_link = link_map[ps_out_links[0]]
+        assert ps_link[3] == stack_node["id"]
+        assert ps_link[5] == "CCC_KREA2_LORA_PROMPT_SETTINGS"
+
+        # 2. LoRA stack prompt_augmentation output -> main node input
+        stack_aug_out_links = stack_node["outputs"][1]["links"]
+        assert stack_aug_out_links is not None and len(stack_aug_out_links) == 1
+        aug_link = link_map[stack_aug_out_links[0]]
+        assert aug_link[3] == main_node["id"]
+        assert aug_link[5] == "CCC_KREA2_PROMPT_AUGMENTATION"
+
+        # 3. Verify slot default values in stack (disabled slots)
+        stack_widgets = stack_node.get("widgets_values", [])
+        assert stack_widgets[0] is True  # stack enabled
+        assert stack_widgets[1] == 1.0  # global strength
+        assert stack_widgets[2] is True  # lora 1 enabled
+        # slots 2..4 disabled
+        assert stack_widgets[5] is False
+        assert stack_widgets[8] is False
+        assert stack_widgets[11] is False
 
 
 def test_advanced_settings_chaining_and_bypass():

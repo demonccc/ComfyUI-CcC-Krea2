@@ -1,6 +1,6 @@
 # CcC Krea2 Node Reference
 
-Complete user-facing documentation for all 9 nodes in the **CcC Krea2** suite.
+Complete user-facing documentation for all 11 nodes in the **CcC Krea2** suite.
 
 ---
 
@@ -62,7 +62,7 @@ The `workflows/` directory contains six production-ready ComfyUI workflow JSON f
 - `subject_scene_qwen_simple.json`: Subject + scene workflow integrated with Simple Qwen-VL Vision Language Model prompt builder.
 - `subject_scene_outfit_qwen_simple.json`: Subject + scene + outfit workflow integrated with Simple Qwen-VL VLM.
 
-Each workflow is organized into distinct visual node groups (`Images`, `Models`, `Advanced Settings (disabled by default)`, `LoRA + Edit + KSampler`, `Output`, and optional `Qwen Prompt Builder`).
+Each workflow is organized into distinct visual node groups (`Images`, `Models`, `Advanced Settings (disabled by default)`, `LoRA Stack + Edit + KSampler`, `Output`, and optional `Qwen Prompt Builder`).
 
 ---
 
@@ -90,6 +90,7 @@ Single-reference subject identity editing node.
   - `preset`: `balanced` | `max_identity` | `flexible`.
   - `output_resolution`: `subject` | `custom`.
   - `megapixels`: Float (default `1.0`).
+  - `prompt_augmentation` (Optional): Socket input from `CcC Krea2 - LoRA Stack`.
   - `image_advanced_settings` (Optional): Socket input from `CcC Krea2 - Image Advanced Settings`.
   - `edit_advanced_settings` (Optional): Socket input from `CcC Krea2 - Edit Advanced Settings`.
 
@@ -106,6 +107,7 @@ Dual-reference subject identity and clothing/outfit editing node.
   - `subject_image` (Required): Primary subject reference image.
   - `outfit_image` (Required): Reference garment or outfit image.
   - `preset`, `output_resolution`, `megapixels`
+  - `prompt_augmentation` (Optional)
 
 ---
 
@@ -120,6 +122,7 @@ Dual-reference subject identity and background scene composition node.
   - `subject_image` (Required): Primary subject reference image.
   - `scene_image` (Required): Target background scene image.
   - `preset`, `output_resolution`, `megapixels`
+  - `prompt_augmentation` (Optional)
 
 ---
 
@@ -133,6 +136,7 @@ Triple-reference composition node.
   - `model`, `clip`, `vae`, `prompt` (Required)
   - `subject_image`, `scene_image`, `outfit_image` (Required)
   - `preset`, `output_resolution`, `megapixels`
+  - `prompt_augmentation` (Optional)
 
 ---
 
@@ -148,6 +152,7 @@ Localized inpainting node using a single source image and mask.
   - `source_image` (Required): Base image to modify.
   - `inpaint_mask` (Optional): Mask defining edit region.
   - `preset`, `output_resolution`, `megapixels`
+  - `prompt_augmentation` (Optional)
 
 ---
 
@@ -163,6 +168,7 @@ Localized inpainting node for subject and outfit transfer.
   - `subject_image`, `outfit_image` (Required)
   - `inpaint_mask` (Optional)
   - `preset`, `output_resolution`, `megapixels`
+  - `prompt_augmentation` (Optional)
 
 ---
 
@@ -178,6 +184,7 @@ Dual-reference localized inpainting node for subject placement into a scene.
   - `scene_image`, `subject_image` (Required)
   - `inpaint_mask` (Optional)
   - `preset`, `output_resolution`, `megapixels`
+  - `prompt_augmentation` (Optional)
 
 ---
 
@@ -213,3 +220,38 @@ Advanced settings node for sampling parameters, attention mask modes, aspect rat
   - `prompt_instructions_mode`: `automatic` | `append`.
   - `prompt_instructions`: Custom text instructions appended to system prompt.
   - `inpaint_mask_invert`, `inpaint_mask_grow`, `inpaint_mask_blur`: Mask preprocessing controls.
+
+---
+
+### 10. CcC Krea2 - LoRA Prompt Settings
+
+Configures positive and negative prompt text augmentations associated with up to four LoRA slots.
+
+- **Category**: `CcC/Krea2`
+- **Output**: `lora_prompt_settings` (Custom Socket Type `CCC_KREA2_LORA_PROMPT_SETTINGS`)
+- **Inputs**:
+  - `enabled`: Boolean toggle to enable/disable prompt settings bundle.
+  - `lora_1_prompt_enabled` .. `lora_4_prompt_enabled`: Per-slot prompt enablement toggles.
+  - `lora_1_prompt_position` .. `lora_4_prompt_position`: Position for positive/negative text (`prepend` | `append`).
+  - `lora_1_positive_prompt` .. `lora_4_positive_prompt`: Positive prompt text fragments.
+  - `lora_1_negative_prompt` .. `lora_4_negative_prompt`: Negative prompt text fragments.
+
+---
+
+### 11. CcC Krea2 - LoRA Stack
+
+Model-only LoRA loader supporting up to 4 chained model-only LoRAs and accumulated prompt augmentations.
+
+- **Category**: `CcC/Krea2`
+- **Outputs**:
+  - `model`: Patched Krea 2 `MODEL`.
+  - `prompt_augmentation` (Custom Socket Type `CCC_KREA2_PROMPT_AUGMENTATION`): Immutable prompt augmentation object containing accumulated positive/negative prepends and appends.
+- **Inputs**:
+  - `model` (Required): Input Krea 2 `MODEL`.
+  - `enabled`: Global stack enablement toggle.
+  - `global_strength`: Global strength multiplier applied to all slot strengths.
+  - `lora_1_enabled` .. `lora_4_enabled`: Per-slot enablement toggles.
+  - `lora_1_name` .. `lora_4_name`: LoRA filenames selected from ComfyUI `loras` folder.
+  - `lora_1_strength` .. `lora_4_strength`: Per-slot strength values.
+  - `prompt_augmentation` (Optional): Incoming accumulated `prompt_augmentation` from a preceding LoRA stack.
+  - `lora_prompt_settings` (Optional): `lora_prompt_settings` bundle from `CcC Krea2 - LoRA Prompt Settings`.

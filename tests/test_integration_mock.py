@@ -224,5 +224,7 @@ def test_all_node_registrations():
         "CcCKrea2InpaintSubjectScene",
         "CcCKrea2ImageAdvancedSettings",
         "CcCKrea2EditAdvancedSettings",
+        "CcCKrea2LoRAPromptSettings",
+        "CcCKrea2LoRAStack",
     }
     assert set(NODE_CLASS_MAPPINGS.keys()) == expected
