@@ -7,6 +7,8 @@ import torch
 
 logger = logging.getLogger("CcCKrea2")
 
+VALID_ROLE_RESOLUTIONS = ("subject", "scene", "source")
+
 
 def _get_image_spatial_wh(image: torch.Tensor) -> Tuple[int, int]:
     """Extract spatial width and height from PyTorch image tensor [B, H, W, C] or [B, C, H, W] or [H, W, C]."""
@@ -29,20 +31,27 @@ def resolve_output_resolution(
     node_images: Dict[str, Optional[torch.Tensor]],
     default_auto_role: str,
     custom_aspect_source: str = "auto",
+    role_resolution_limit_mode: str = "max_megapixels",
+    role_resolution_max_megapixels: float = 2.0,
     node_name: str = ""
 ) -> Tuple[int, int]:
     """Calculate output width and height based on role-based resolution or custom megapixel aspect ratio.
 
     Rules:
-    - Role-based: Read original image spatial dimensions, preserve aspect ratio, align to /16 (min 128x128).
-      Log VRAM warning if total pixels > 2,000,000.
+    - Role-based: Read original image spatial dimensions (subject, scene, source only - outfit is never a resolution source),
+      preserve aspect ratio, align to /16 (min 128x128).
+      If role_resolution_limit_mode == "max_megapixels" and aligned area > role_resolution_max_megapixels:
+      scale width and height down proportionally, preserving aspect ratio, until output area <= limit.
+      Align result again to multiples of 16 (min 128x128). Log concise info message indicating role resolution was limited.
     - Custom: Calculate area = megapixels * 1,000,000 with aspect ratio from selected role (or auto fallback).
-      Align width & height to /16 (min 128x128).
+      Align width & height to /16 (min 128x128). Custom mode ignores role_resolution_limit_mode.
     """
     if output_resolution != "custom":
-        role_image = node_images.get(output_resolution)
-        if role_image is None:
-            # Fallback to default auto role if specified role image is missing
+        role_image = None
+        if output_resolution in VALID_ROLE_RESOLUTIONS:
+            role_image = node_images.get(output_resolution)
+
+        if role_image is None and default_auto_role in VALID_ROLE_RESOLUTIONS:
             role_image = node_images.get(default_auto_role)
 
         if role_image is None:
@@ -53,6 +62,32 @@ def resolve_output_resolution(
 
         out_w = max(128, int(round(orig_w / 16.0) * 16))
         out_h = max(128, int(round(orig_h / 16.0) * 16))
+
+        if role_resolution_limit_mode == "max_megapixels":
+            max_pixels = role_resolution_max_megapixels * 1_000_000.0
+            aligned_area = float(out_w * out_h)
+            if aligned_area > max_pixels:
+                aspect = float(orig_w) / float(orig_h)
+                raw_w = math.sqrt(max_pixels * aspect)
+                raw_h = math.sqrt(max_pixels / aspect)
+
+                scaled_w = max(128, int(round(raw_w / 16.0) * 16))
+                scaled_h = max(128, int(round(raw_h / 16.0) * 16))
+
+                while scaled_w * scaled_h > max_pixels and (scaled_w > 128 or scaled_h > 128):
+                    if scaled_w / float(orig_w) >= scaled_h / float(orig_h) and scaled_w > 128:
+                        scaled_w = max(128, scaled_w - 16)
+                    elif scaled_h > 128:
+                        scaled_h = max(128, scaled_h - 16)
+                    else:
+                        break
+
+                logger.info(
+                    f"[CcC Krea2] [{node_name}] Role-based output resolution for '{output_resolution}' "
+                    f"limited from {out_w}x{out_h} ({aligned_area / 1e6:.2f} MP) to {scaled_w}x{scaled_h} "
+                    f"({scaled_w * scaled_h / 1e6:.2f} MP, limit: {role_resolution_max_megapixels:.2f} MP)."
+                )
+                return scaled_w, scaled_h
 
         if out_w * out_h > 2_000_000:
             logger.warning(

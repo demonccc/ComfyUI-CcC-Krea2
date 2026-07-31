@@ -1,6 +1,5 @@
 """Unit tests for settings precedence, presets, and immutability."""
 
-import pytest
 from ccc_krea2.settings import (
     ImageRoleSettings,
     ImageAdvancedSettingsBundle,

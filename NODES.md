@@ -35,7 +35,8 @@ $$\text{Internal Defaults} \rightarrow \text{Selected Main Preset} \rightarrow \
 
 ### Output Resolution & Megapixel Math
 Output resolution can be selected directly on each main node:
-- **Role-based resolution** (`subject`, `scene`, `source`): Reads the original image's width and height, preserves aspect ratio, and aligns dimensions to the nearest valid multiple of 16 (min 128x128). If total area exceeds 2.0 megapixels, a VRAM warning is logged.
+- **Role-based resolution** (`subject`, `scene`, `source`): Reads the original image's width and height, preserves aspect ratio, and aligns dimensions to the nearest valid multiple of 16 (min 128x128).
+  - **Role Resolution Limiting**: Controlled via `role_resolution_limit_mode` (`max_megapixels` default, or `off`) and `role_resolution_max_megapixels` (default `2.0` MP) in `CcC Krea2 - Edit Advanced Settings`. When an original role image (e.g. 4000x3000 = 12 MP) exceeds the megapixel limit, it is scaled down proportionally to remain at or below the threshold while preserving aspect ratio and 16-pixel grid alignment. Custom resolution mode ignores role resolution limiting. `outfit` is never a resolution source.
 - **`custom` resolution**: Calculates output dimensions from `megapixels * 1,000,000` using the aspect ratio of the selected aspect source image (configured via `custom_aspect_source` in Edit Advanced Settings, or auto-selected based on active roles), aligned to 16-pixel multiples.
 
 ### Resize Modes vs Resize Methods
@@ -48,6 +49,20 @@ The system automatically formats Qwen3-VL role instructions based on active refe
 - `scene image`: "Use the scene image for composition, pose, environment, interactions and lighting."
 - `outfit image`: "Use the outfit image for the outfit and garment details. Do not use the wearer of the outfit image as the subject identity."
 - `source image`: "The source image is the base image being edited."
+
+---
+
+## Example Workflows
+
+The `workflows/` directory contains six production-ready ComfyUI workflow JSON files:
+- `subject_edit.json`: Single-reference subject identity editing workflow.
+- `subject_scene.json`: Dual-reference subject placement into a scene.
+- `subject_outfit.json`: Dual-reference subject identity and outfit transfer.
+- `subject_outfit_scene.json`: Triple-reference subject, scene, and outfit composition.
+- `subject_scene_qwen_simple.json`: Subject + scene workflow integrated with Simple Qwen-VL Vision Language Model prompt builder.
+- `subject_scene_outfit_qwen_simple.json`: Subject + scene + outfit workflow integrated with Simple Qwen-VL VLM.
+
+Each workflow is organized into distinct visual node groups (`Images`, `Models`, `Advanced Settings (disabled by default)`, `LoRA + Edit + KSampler`, `Output`, and optional `Qwen Prompt Builder`).
 
 ---
 
@@ -183,7 +198,7 @@ Advanced settings node for fine-grained per-role attention, grounding, and geome
 
 ### 9. CcC Krea2 - Edit Advanced Settings
 
-Advanced settings node for sampling parameters, attention mask modes, and aspect ratio source controls.
+Advanced settings node for sampling parameters, attention mask modes, aspect ratio source controls, and role-based resolution limits.
 
 - **Category**: `CcC/Krea2`
 - **Output**: `edit_advanced_settings` (Custom Socket Type `CCC_KREA2_EDIT_ADVANCED_SETTINGS`)
@@ -192,6 +207,8 @@ Advanced settings node for sampling parameters, attention mask modes, and aspect
   - `sampling_resize_mode`: `fit` | `crop` | `stretch`.
   - `sampling_resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
   - `attention_mask_mode`: `hard` (binary threshold) | `soft` (continuous values).
+  - `role_resolution_limit_mode`: `max_megapixels` (default) | `off`. Enables megapixel clamping for role-based output resolution.
+  - `role_resolution_max_megapixels`: Float (default `2.0`, min `0.25`, max `12.0`, step `0.25`). Maximum megapixel threshold for role-based output resolution.
   - `custom_aspect_source`: `auto` | `subject` | `scene` | `source`.
   - `prompt_instructions_mode`: `automatic` | `append`.
   - `prompt_instructions`: Custom text instructions appended to system prompt.

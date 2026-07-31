@@ -15,8 +15,9 @@ CcC Krea2 groups those editing patterns into a small set of purpose-built nodes.
 - Outfit and scene references.
 - Subject, outfit and scene combinations.
 - Localized inpainting.
-- Aspect-ratio-preserving role-based and custom megapixel output resolution.
+- Aspect-ratio-preserving role-based resolution limiting (`role_resolution_limit_mode`, `role_resolution_max_megapixels`) and custom megapixel output resolution.
 - Advanced settings socket nodes (`CcC Krea2 - Image Advanced Settings`, `CcC Krea2 - Edit Advanced Settings`).
+- Curated example workflows in `workflows/` covering single, dual, and triple references as well as Qwen-VL Vision Language Model integrations.
 - Qwen3-VL grounding controls.
 - Per-reference attention boosts and masks.
 - Empty, subject-based or scene-based sampling latents.
@@ -38,9 +39,9 @@ Reference interpretation depends on the loaded Krea 2 edit LoRA, reference order
    ```
 2. Restart ComfyUI.
 
-## Nodes
+## Nodes & Workflows
 
-See [NODES.md](NODES.md) for the complete node reference, input descriptions, latent modes, grounding controls, attention masks and inpainting behavior.
+See [NODES.md](NODES.md) for the complete node reference, input descriptions, latent modes, grounding controls, attention masks, inpainting behavior, and example workflows in `workflows/`.
 
 ## Credits
 

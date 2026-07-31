@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Experimental Alpha release of `ComfyUI-CcC-Krea2` suite.
 - 4 general editing nodes (`Subject`, `Subject + Outfit`, `Subject + Scene`, `Subject + Scene + Outfit`).
 - 3 inpainting nodes (`Inpaint`, `Inpaint Subject + Outfit`, `Inpaint Subject + Scene`).
+- 2 advanced settings nodes (`Image Advanced Settings`, `Edit Advanced Settings`).
+- `role_resolution_limit_mode` and `role_resolution_max_megapixels` controls in `Edit Advanced Settings` for clamping high-resolution role images while preserving aspect ratio.
+- 6 curated example workflows in `workflows/` covering single-, dual-, and triple-reference editing, as well as Qwen-VL Vision Language Model integrations.
 - Standard ComfyUI `DIFFUSION_MODEL` wrapper signature `(executor, x, timesteps, context, *wargs, **kwargs)` with closure transport.
 - Applied `model.model.process_latent_in(...)` to every reference VAE latent.
 - Native pixel-path reference geometry (`reference_fit_mode="fit"`) aligned to multiples of 16 without black canvas padding.
@@ -18,4 +21,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pure PyTorch mask dilation via `F.max_pool2d` removing `scipy` dependency.
 - Model-driven empty latent generation honoring `batch_size`.
 - Mandatory VAE input across all 7 custom node definitions.
-- Unit test suite in `tests/` covering mock integration, geometry, masks, dynamic prompt templates, and patch isolation.
+- Unit test suite in `tests/` covering mock integration, geometry, masks, dynamic prompt templates, resize method wiring, role resolution clamping, workflow files, and patch isolation.

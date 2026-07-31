@@ -67,6 +67,8 @@ class EditAdvancedSettings:
     sampling_resize_mode: str = "fit"
     sampling_resize_method: str = "auto"
     attention_mask_mode: str = "hard"
+    role_resolution_limit_mode: str = "max_megapixels"
+    role_resolution_max_megapixels: float = 2.0
     custom_aspect_source: str = "auto"
     prompt_instructions_mode: str = "automatic"
     prompt_instructions: str = ""
@@ -98,6 +100,8 @@ class ResolvedKrea2Settings:
     sampling_resize_mode: str
     sampling_resize_method: str
     attention_mask_mode: str
+    role_resolution_limit_mode: str
+    role_resolution_max_megapixels: float
     custom_aspect_source: str
     prompt_instructions_mode: str
     prompt_instructions: str
@@ -129,6 +133,8 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "sampling_resize_mode": "fit",
             "sampling_resize_method": "auto",
             "attention_mask_mode": "hard",
+            "role_resolution_limit_mode": "max_megapixels",
+            "role_resolution_max_megapixels": 2.0,
             "custom_aspect_source": "auto",
             "prompt_instructions_mode": "automatic",
             "prompt_instructions": "",
@@ -149,6 +155,8 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "sampling_resize_mode": "fit",
             "sampling_resize_method": "auto",
             "attention_mask_mode": "hard",
+            "role_resolution_limit_mode": "max_megapixels",
+            "role_resolution_max_megapixels": 2.0,
             "custom_aspect_source": "auto",
             "prompt_instructions_mode": "automatic",
             "prompt_instructions": "",
@@ -169,6 +177,8 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "sampling_resize_mode": "fit",
             "sampling_resize_method": "auto",
             "attention_mask_mode": "hard",
+            "role_resolution_limit_mode": "max_megapixels",
+            "role_resolution_max_megapixels": 2.0,
             "custom_aspect_source": "auto",
             "prompt_instructions_mode": "automatic",
             "prompt_instructions": "",
@@ -206,6 +216,8 @@ def resolve_krea2_settings(
         g_def["sampling_resize_mode"] = edit_settings.sampling_resize_mode
         g_def["sampling_resize_method"] = edit_settings.sampling_resize_method
         g_def["attention_mask_mode"] = edit_settings.attention_mask_mode
+        g_def["role_resolution_limit_mode"] = edit_settings.role_resolution_limit_mode
+        g_def["role_resolution_max_megapixels"] = edit_settings.role_resolution_max_megapixels
         g_def["custom_aspect_source"] = edit_settings.custom_aspect_source
         g_def["prompt_instructions_mode"] = edit_settings.prompt_instructions_mode
         g_def["prompt_instructions"] = edit_settings.prompt_instructions
@@ -263,6 +275,8 @@ def resolve_krea2_settings(
         sampling_resize_mode=str(g_def["sampling_resize_mode"]),
         sampling_resize_method=str(g_def["sampling_resize_method"]),
         attention_mask_mode=str(g_def["attention_mask_mode"]),
+        role_resolution_limit_mode=str(g_def["role_resolution_limit_mode"]),
+        role_resolution_max_megapixels=float(g_def["role_resolution_max_megapixels"]),
         custom_aspect_source=str(g_def["custom_aspect_source"]),
         prompt_instructions_mode=str(g_def["prompt_instructions_mode"]),
         prompt_instructions=str(g_def["prompt_instructions"]),

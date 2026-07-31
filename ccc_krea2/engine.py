@@ -88,6 +88,8 @@ class Krea2EditEngine:
             node_images=node_images,
             default_auto_role=default_auto_role,
             custom_aspect_source=settings.custom_aspect_source,
+            role_resolution_limit_mode=settings.role_resolution_limit_mode,
+            role_resolution_max_megapixels=settings.role_resolution_max_megapixels,
             node_name=req.node_name,
         )
 

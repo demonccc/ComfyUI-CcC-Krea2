@@ -1,6 +1,5 @@
 """Unit tests for output resolution calculation and megapixel aspect ratio math."""
 
-import pytest
 import torch
 import logging
 from ccc_krea2.resolution import resolve_output_resolution
@@ -16,6 +15,7 @@ def test_role_based_resolution_preserves_dimensions_and_aligns_16():
         megapixels=1.0,
         node_images=node_images,
         default_auto_role="subject",
+        role_resolution_limit_mode="off",
     )
     # 1920 is a multiple of 16 (120*16). 1080 / 16 = 67.5 -> round to 68 -> 68*16 = 1088.
     assert w == 1920

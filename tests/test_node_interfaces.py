@@ -1,6 +1,5 @@
 """Unit tests for node class mappings, widget signatures, settings chaining, and role instructions."""
 
-import pytest
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 from ccc_krea2.conditioning import build_role_instructions
 from ccc_krea2.constants import ReferenceRole
