@@ -2,7 +2,6 @@
 
 import torch
 import torch.nn.functional as F
-from typing import Tuple
 from .constants import LOGGER_PREFIX
 
 

@@ -1,6 +1,5 @@
 """CPU-safe unit tests for ModelPatcher patch isolation."""
 
-import pytest
 from ccc_krea2.patch import patch_krea2_model
 
 

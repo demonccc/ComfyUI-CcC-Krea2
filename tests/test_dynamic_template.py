@@ -1,6 +1,5 @@
 """CPU-safe unit tests for dynamic Qwen3-VL llama template generation."""
 
-import pytest
 from ccc_krea2.conditioning import build_krea2_qwen_template
 from ccc_krea2.constants import VISION_PAD_TOKEN
 

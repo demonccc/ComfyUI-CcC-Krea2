@@ -1,7 +1,7 @@
 """Dual-path reference image preprocessor with process_latent_in support."""
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Tuple
 import torch
 
 from .constants import ReferenceRole

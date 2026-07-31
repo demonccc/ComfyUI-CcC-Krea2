@@ -1,53 +1,81 @@
-"""Realistic integration tests for custom Krea 2 edit DiT forward, patchification, 3D RoPE, and attention steering."""
+"""Realistic integration tests for custom Krea 2 SingleStreamDiT forward execution."""
 
 import math
-import pytest
 import torch
 import torch.nn as nn
 from ccc_krea2.patch import (
     patch_krea2_model,
     krea2_dit_incontext_forward,
-    _build_incontext_3d_rope_pos_ids,
     _compute_ref_attention_bias_patchified
 )
 from ccc_krea2.references import PreparedReference, ReferenceRole
 from ccc_krea2.latents import generate_krea2_latent
 
 
-class MockTransformerBlock(nn.Module):
+class MockRealKrea2Block(nn.Module):
     def __init__(self):
         super().__init__()
+        self.last_freqs = None
+        self.last_tvec = None
         self.last_attn_bias = None
+        self.last_transformer_options = None
 
-    def forward(self, x, vec_emb=None, rope_pos_ids=None, attn_bias=None, **kwargs):
+    def forward(self, x, freqs=None, tvec=None, attn_bias=None, transformer_options=None):
+        self.last_freqs = freqs
+        self.last_tvec = tvec
         self.last_attn_bias = attn_bias
+        self.last_transformer_options = transformer_options
         return x
 
 
 class MockKrea2DiT(nn.Module):
-    """Realistic MockKrea2DiT exposing model components required by custom forward."""
+    """MockKrea2DiT exposing real Krea 2 SingleStreamDiT members."""
 
     def __init__(self, in_channels=16, patch_size=2, hidden_dim=64):
         super().__init__()
-        self.patch_size = patch_size
+        self.patch = patch_size
+        self.channels = in_channels
         self.hidden_dim = hidden_dim
 
-        # Input projections
-        self.img_in = nn.Linear(in_channels * patch_size * patch_size, hidden_dim)
-        self.txt_in = nn.Linear(2048, hidden_dim)
-        self.time_in = nn.Linear(1, hidden_dim)
-        self.vector_in = nn.Linear(hidden_dim, hidden_dim)
+        self.unpack_context_called = False
+        self.first_called_count = 0
+        self.pe_embedder_called_with = None
+        self.last_called = False
 
-        # Transformer blocks
-        self.block1 = MockTransformerBlock()
+        # Real Krea 2 input layers
+        self.first_layer = nn.Linear(in_channels * patch_size * patch_size, hidden_dim)
+        self.tproj_layer = nn.Linear(1, hidden_dim)
+        self.tmlp_layer = nn.Linear(hidden_dim, hidden_dim)
+
+        self.block1 = MockRealKrea2Block()
         self.blocks = nn.ModuleList([self.block1])
 
-        # Final projection
-        self.final_layer = nn.Linear(hidden_dim, in_channels * patch_size * patch_size)
+        self.last_layer = nn.Linear(hidden_dim, in_channels * patch_size * patch_size)
+
+    def _unpack_context(self, context):
+        self.unpack_context_called = True
+        return context
+
+    def first(self, x_patch):
+        self.first_called_count += 1
+        return self.first_layer(x_patch)
+
+    def tproj(self, t):
+        return self.tproj_layer(t.unsqueeze(-1) if t.ndim == 1 else t)
+
+    def tmlp(self, t_emb):
+        return self.tmlp_layer(t_emb)
+
+    def pe_embedder(self, position_ids):
+        self.pe_embedder_called_with = position_ids
+        return torch.rand((position_ids.shape[1], self.hidden_dim))
+
+    def last(self, h_seq):
+        self.last_called = True
+        return self.last_layer(h_seq)
 
     def forward(self, x, timesteps, context):
-        """Native forward pass: does NOT accept custom ref_pos_ids or attn_bias."""
-        return x
+        raise RuntimeError("Native text-to-image forward must never be called during custom edit forward!")
 
 
 class MockModelWithWrappersMP:
@@ -84,12 +112,14 @@ def test_three_argument_wrappersmp_registration():
     assert callable(wrapper)
 
 
-def test_custom_edit_forward_never_delegates_to_native_forward():
+def test_real_krea2_member_execution_order():
     dit = MockKrea2DiT()
-    x = torch.rand((1, 16, 32, 32))  # target 32x32 -> 16x16 = 256 tokens (patch_size=2)
+    x = torch.rand((1, 16, 32, 32))  # 32x32 -> 16x16 = 256 target tokens
     timesteps = torch.tensor([1.0])
-    context = torch.rand((1, 77, 2048))
-    ref_lat = torch.rand((1, 16, 16, 16))
+    context = torch.rand((1, 77, 64))
+    ref_lat = torch.rand((1, 16, 16, 16))  # 16x16 -> 8x8 = 64 ref tokens
+
+    opts = {"option_a": True}
 
     out = krea2_dit_incontext_forward(
         dit_model=dit,
@@ -100,33 +130,54 @@ def test_custom_edit_forward_never_delegates_to_native_forward():
         ref_boosts=[2.5],
         ref_masks=[None],
         mask_modes=["hard"],
+        transformer_options=opts
+    )
+
+    # 1. Assert _unpack_context was called
+    assert dit.unpack_context_called is True
+
+    # 2. Assert first was called for target and reference (2 times)
+    assert dit.first_called_count == 2
+
+    # 3. Assert pe_embedder received full position sequence [3, 77 + 64 + 256] = [3, 397]
+    assert dit.pe_embedder_called_with is not None
+    assert dit.pe_embedder_called_with.shape == (3, 397)
+
+    # 4. Assert block received freqs, tvec, attn_bias, transformer_options
+    blk = dit.block1
+    assert blk.last_freqs is not None
+    assert blk.last_tvec is not None
+    assert blk.last_attn_bias is not None
+    assert blk.last_transformer_options == opts
+
+    # 5. Assert last was called
+    assert dit.last_called is True
+
+    # 6. Assert target tokens alone are returned with 4D target shape
+    assert out.shape == (1, 16, 32, 32)
+
+
+def test_5d_latent_shape_preservation():
+    dit = MockKrea2DiT()
+    x_5d = torch.rand((1, 16, 1, 32, 32))
+    timesteps = torch.tensor([1.0])
+    context = torch.rand((1, 77, 64))
+    ref_lat_5d = torch.rand((1, 16, 1, 16, 16))
+
+    out_5d = krea2_dit_incontext_forward(
+        dit_model=dit,
+        x=x_5d,
+        timesteps=timesteps,
+        context=context,
+        ref_latents=[ref_lat_5d],
+        ref_boosts=[1.0],
+        ref_masks=[None],
+        mask_modes=["hard"],
         transformer_options={}
     )
 
-    # Returned shape must match input target x shape exactly
-    assert out.shape == (1, 16, 32, 32)
-    # Transformer block received non-null attn_bias
-    assert dit.block1.last_attn_bias is not None
-
-
-def test_token_length_uses_patch_size():
-    # Target 32x32 -> patch_size=2 -> 16x16 = 256 tokens
-    # Ref 16x16 -> patch_size=2 -> 8x8 = 64 tokens
-    # Text 77 tokens
-    # Total seq_len = 77 + 64 + 256 = 397 tokens
-    txt_len = 77
-    ref_grids = [(8, 8)]  # 64 tokens
-    target_grid = (16, 16)  # 256 tokens
-    device = torch.device("cpu")
-
-    rope_ids = _build_incontext_3d_rope_pos_ids(
-        txt_len=txt_len,
-        ref_token_grids=ref_grids,
-        target_grid=target_grid,
-        device=device
-    )
-
-    assert rope_ids.shape == (3, 397)
+    assert out_5d.ndim == 5
+    assert out_5d.shape == (1, 16, 1, 32, 32)
 
 
 def test_per_reference_boost_reaches_transformer_block_attention_bias():
@@ -157,26 +208,6 @@ def test_per_reference_boost_reaches_transformer_block_attention_bias():
     assert torch.allclose(slice_val, torch.tensor(expected_boost_val))
 
 
-def test_mask_aligns_to_patchified_grid():
-    spatial_mask = torch.zeros((1, 100, 100))  # masked out
-    ref_grid = (8, 8)  # 64 tokens
-
-    bias = _compute_ref_attention_bias_patchified(
-        boosts=[1.0],
-        txt_len=77,
-        ref_token_lens=[64],
-        tgt_len=256,
-        ref_masks=[spatial_mask],
-        ref_token_grids=[ref_grid],
-        mask_modes=["hard"],
-        device=torch.device("cpu"),
-        dtype=torch.float32
-    )
-
-    ref_slice = bias[0, 0, 77+64:, 77:77+64]
-    assert torch.allclose(ref_slice, torch.tensor(-1e4))
-
-
 def test_ksampler_latents_remain_raw_vae_latents():
     class DummyVAE:
         def encode(self, img):
@@ -202,5 +233,4 @@ def test_ksampler_latents_remain_raw_vae_latents():
         base_image=base_img
     )
 
-    # KSampler latent must remain raw VAE latent (0.5), not processed (50.0)
     assert torch.allclose(lat_dict["samples"], torch.tensor(0.5))

@@ -1,7 +1,6 @@
 """Qwen3-VL text/vision conditioning builder for positive and negative prompts."""
 
 from typing import List, Tuple, Any, Dict
-import torch
 
 from .constants import (
     LOGGER_PREFIX,

@@ -1,4 +1,4 @@
-"""Canonical ModelPatcher wrapper integration and custom Krea 2 edit DiT forward execution."""
+"""Canonical ModelPatcher wrapper integration and real Krea 2 SingleStreamDiT edit forward execution."""
 
 import math
 from typing import List, Dict, Any, Optional, Tuple
@@ -16,7 +16,6 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
     """
     patched_model = model.clone()
 
-    # Extract VAE latents and apply process_latent_in EXACTLY ONCE
     processed_ref_latents: List[torch.Tensor] = []
     ref_boosts: List[float] = []
     ref_masks: List[Optional[torch.Tensor]] = []
@@ -30,7 +29,6 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             ref_masks.append(ref.spatial_attention_mask)
             mask_modes.append(ref.mask_mode)
 
-    # Per-instance wrapper closure
     def krea2_edit_wrapper(executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any) -> torch.Tensor:
         """Canonical ComfyUI DIFFUSION_MODEL wrapper signature."""
         dit_model = getattr(executor, "class_obj", None)
@@ -97,6 +95,39 @@ def _fallback_options_register(patched_model: Any, wrapper: Any) -> None:
     wrappers.append(wrapper)
 
 
+def _pad_to_patch_size(tensor: torch.Tensor, patch_size: int) -> Tuple[torch.Tensor, int, int]:
+    """Pad 4D tensor spatial dimensions to multiples of patch_size."""
+    try:
+        from comfy.ldm.common_dit import pad_to_patch_size
+        return pad_to_patch_size(tensor, patch_size)
+    except (ImportError, AttributeError):
+        h, w = tensor.shape[-2], tensor.shape[-1]
+        pad_h = (patch_size - (h % patch_size)) % patch_size
+        pad_w = (patch_size - (w % patch_size)) % patch_size
+        if pad_h > 0 or pad_w > 0:
+            padded = F.pad(tensor, (0, pad_w, 0, pad_h))
+        else:
+            padded = tensor
+        return padded, h, w
+
+
+def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
+    """Repeat or trim tensor along batch dimension to match target_bs."""
+    try:
+        from comfy.utils import repeat_to_batch_size
+        return repeat_to_batch_size(tensor, target_bs)
+    except (ImportError, AttributeError):
+        curr_b = tensor.shape[0]
+        if curr_b == target_bs:
+            return tensor
+        elif curr_b > target_bs:
+            return tensor[:target_bs]
+        else:
+            repeats = (target_bs + curr_b - 1) // curr_b
+            tiled = tensor.repeat(repeats, *([1] * (tensor.ndim - 1)))
+            return tiled[:target_bs]
+
+
 def krea2_dit_incontext_forward(
     dit_model: Any,
     x: torch.Tensor,
@@ -108,7 +139,7 @@ def krea2_dit_incontext_forward(
     mask_modes: List[str],
     transformer_options: Dict[str, Any]
 ) -> torch.Tensor:
-    """Faithful custom Krea 2 edit forward pass (patchifying, 3D RoPE token offsets & attention logit steering)."""
+    """Execute Krea 2 SingleStreamDiT edit forward using exact model member API."""
     orig_ndim = x.ndim
     if orig_ndim == 5:
         x_4d = x.squeeze(2) if x.shape[2] == 1 else x[:, :, 0, :, :]
@@ -117,82 +148,68 @@ def krea2_dit_incontext_forward(
 
     bs, c, target_h, target_w = x_4d.shape
 
-    # Read patch_size from model
-    patch_size = getattr(dit_model, "patch_size", 2)
-    if hasattr(dit_model, "patch") and hasattr(dit_model.patch, "patch_size"):
-        patch_size = dit_model.patch.patch_size
+    # Read patch_size & channels from model
+    patch_size = getattr(dit_model, "patch", 2)
+    if not isinstance(patch_size, int):
+        patch_size = getattr(patch_size, "patch_size", 2)
+
+    channels = getattr(dit_model, "channels", c)
 
     # Pad target to patch_size
-    pad_h = (patch_size - (target_h % patch_size)) % patch_size
-    pad_w = (patch_size - (target_w % patch_size)) % patch_size
-    if pad_h > 0 or pad_w > 0:
-        x_padded = F.pad(x_4d, (0, pad_w, 0, pad_h))
-    else:
-        x_padded = x_4d
-
+    x_padded, orig_tgt_h, orig_tgt_w = _pad_to_patch_size(x_4d, patch_size)
     padded_h, padded_w = x_padded.shape[-2], x_padded.shape[-1]
+
     target_gh = padded_h // patch_size
     target_gw = padded_w // patch_size
     tgt_n_toks = target_gh * target_gw
 
     # Patchify target
-    x_patchified = rearrange(x_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
+    x_patch = rearrange(x_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
 
-    # Process and patchify references
-    ref_tokens_list: List[torch.Tensor] = []
+    # Patchify references
+    ref_patches: List[torch.Tensor] = []
     ref_token_grids: List[Tuple[int, int]] = []
     ref_token_lens: List[int] = []
 
     for ref_lat in ref_latents:
-        # Match batch size to target
-        ref_lat_b = _match_batch_size(ref_lat, bs)
-
-        rh, rw = ref_lat_b.shape[-2], ref_lat_b.shape[-1]
-        r_pad_h = (patch_size - (rh % patch_size)) % patch_size
-        r_pad_w = (patch_size - (rw % patch_size)) % patch_size
-        if r_pad_h > 0 or r_pad_w > 0:
-            ref_padded = F.pad(ref_lat_b, (0, r_pad_w, 0, r_pad_h))
-        else:
-            ref_padded = ref_lat_b
+        if ref_lat.ndim == 5:
+            ref_lat = ref_lat.squeeze(2) if ref_lat.shape[2] == 1 else ref_lat[:, :, 0, :, :]
+        ref_lat_b = _repeat_to_batch_size(ref_lat, bs)
+        ref_padded, _, _ = _pad_to_patch_size(ref_lat_b, patch_size)
 
         r_ph, r_pw = ref_padded.shape[-2], ref_padded.shape[-1]
         r_gh = r_ph // patch_size
         r_gw = r_pw // patch_size
 
-        ref_patch = rearrange(ref_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
-        ref_tokens_list.append(ref_patch)
+        r_patch = rearrange(ref_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
+        ref_patches.append(r_patch)
         ref_token_grids.append((r_gh, r_gw))
         ref_token_lens.append(r_gh * r_gw)
 
-    # Embed patchified target & references using model's input projection
-    if hasattr(dit_model, "img_in"):
-        target_emb = dit_model.img_in(x_patchified)
-        ref_embs = [dit_model.img_in(r) for r in ref_tokens_list]
-    elif hasattr(dit_model, "x_embedder"):
-        target_emb = dit_model.x_embedder(x_patchified)
-        ref_embs = [dit_model.x_embedder(r) for r in ref_tokens_list]
+    # Unpack context
+    if hasattr(dit_model, "_unpack_context"):
+        txt_tokens = dit_model._unpack_context(context)
+        if isinstance(txt_tokens, tuple):
+            txt_tokens = txt_tokens[0]
     else:
-        target_emb = x_patchified
-        ref_embs = ref_tokens_list
+        txt_tokens = context
 
-    # Text context embedding
-    if hasattr(dit_model, "txt_in"):
-        context_emb = dit_model.txt_in(context)
-    else:
-        context_emb = context
+    txt_len = txt_tokens.shape[1] if txt_tokens is not None else 0
 
-    txt_len = context_emb.shape[1] if context_emb is not None else 0
+    # Pass through m.first for target and references
+    target_emb = dit_model.first(x_patch)
+    ref_embs = [dit_model.first(rp) for rp in ref_patches]
 
-    # Build sequence: [text | ref_1 | ... | ref_N | target]
+    # Assemble training-compatible sequence: [text | ref_1 | ... | ref_N | target]
     seq_components = []
-    if context_emb is not None:
-        seq_components.append(context_emb)
+    if txt_tokens is not None:
+        seq_components.append(txt_tokens)
     seq_components.extend(ref_embs)
     seq_components.append(target_emb)
 
     full_seq = torch.cat(seq_components, dim=1)
 
-    # Build 3D RoPE position IDs for text (frame 0), references (frames 1..N), target (frame 0)
+    # 3D RoPE position IDs and frequencies via m.pe_embedder
     rope_pos_ids = _build_incontext_3d_rope_pos_ids(
         txt_len=txt_len,
         ref_token_grids=ref_token_grids,
@@ -200,7 +217,9 @@ def krea2_dit_incontext_forward(
         device=x.device
     )
 
-    # Build attention logit bias covering full sequence
+    freqs = dit_model.pe_embedder(rope_pos_ids) if hasattr(dit_model, "pe_embedder") else None
+
+    # Compute attention logit bias
     attn_bias = _compute_ref_attention_bias_patchified(
         boosts=ref_boosts,
         txt_len=txt_len,
@@ -213,38 +232,38 @@ def krea2_dit_incontext_forward(
         dtype=x.dtype
     )
 
-    # Timestep and text fusion projections
-    vec_emb = None
-    if hasattr(dit_model, "time_in") and timesteps is not None:
-        t_emb = dit_model.time_in(timesteps)
-        if hasattr(dit_model, "vector_in"):
-            vec_emb = dit_model.vector_in(t_emb)
+    # Compute timestep vector embedding (tvec)
+    tvec = _compute_timestep_vector(dit_model, timesteps)
 
-    # Run transformer blocks directly
+    # Pass sequence through transformer blocks
     h_seq = full_seq
-    blocks = getattr(dit_model, "blocks", getattr(dit_model, "double_blocks", getattr(dit_model, "layers", [])))
+    blocks = getattr(dit_model, "blocks", [])
 
     for block in blocks:
-        h_seq = _call_transformer_block(block, h_seq, vec_emb, rope_pos_ids, attn_bias, transformer_options)
+        h_seq = block(
+            h_seq,
+            freqs=freqs,
+            tvec=tvec,
+            attn_bias=attn_bias,
+            transformer_options=transformer_options
+        )
 
-    # Single blocks if present
-    single_blocks = getattr(dit_model, "single_blocks", [])
-    for block in single_blocks:
-        h_seq = _call_transformer_block(block, h_seq, vec_emb, rope_pos_ids, attn_bias, transformer_options)
-
-    # Final projection layer
-    if hasattr(dit_model, "final_layer"):
-        out_seq = dit_model.final_layer(h_seq)
-    elif hasattr(dit_model, "out_proj"):
-        out_seq = dit_model.out_proj(h_seq)
-    else:
-        out_seq = h_seq
+    # Final projection layer m.last
+    out_seq = dit_model.last(h_seq) if hasattr(dit_model, "last") else h_seq
 
     # Slice target tokens only
     tgt_tokens = out_seq[:, -tgt_n_toks:, :]
 
-    # Unpatchify back to 4D tensor
-    out_4d = rearrange(tgt_tokens, "b (h w) (c p1 p2) -> b c (h p1) (w p2)", h=target_gh, w=target_gw, p1=patch_size, p2=patch_size)
+    # Unpatchify using patch_size & channels
+    out_4d = rearrange(
+        tgt_tokens,
+        "b (h w) (c p1 p2) -> b c (h p1) (w p2)",
+        h=target_gh,
+        w=target_gw,
+        p1=patch_size,
+        p2=patch_size,
+        c=channels
+    )
 
     # Crop to original unpadded target dimensions
     out_cropped = out_4d[:, :, :target_h, :target_w]
@@ -265,12 +284,10 @@ def _build_incontext_3d_rope_pos_ids(
     tgt_gh, tgt_gw = target_grid
     list_pos = []
 
-    # Text tokens: frame 0, y=0, x=0
     if txt_len > 0:
         txt_pos = torch.zeros((3, txt_len), device=device, dtype=torch.float32)
         list_pos.append(txt_pos)
 
-    # Reference tokens: frame 1..N, centered relative to target grid
     for i, (r_gh, r_gw) in enumerate(ref_token_grids):
         frame_idx = i + 1
         y_off = (tgt_gh - r_gh) / 2.0
@@ -285,7 +302,6 @@ def _build_incontext_3d_rope_pos_ids(
         ref_pos = torch.stack([mesh_t.flatten(), mesh_y.flatten(), mesh_x.flatten()], dim=0)
         list_pos.append(ref_pos)
 
-    # Target tokens: frame 0, y=0..tgt_gh, x=0..tgt_gw
     tgt_y = torch.arange(tgt_gh, device=device, dtype=torch.float32)
     tgt_x = torch.arange(tgt_gw, device=device, dtype=torch.float32)
     mesh_ty, mesh_tx = torch.meshgrid(tgt_y, tgt_x, indexing="ij")
@@ -325,13 +341,11 @@ def _compute_ref_attention_bias_patchified(
     ):
         ref_end = ref_start + ref_len
 
-        # Boost applied from target queries to reference keys
         if boost != 1.0:
             safe_boost = max(1e-4, min(100.0, float(boost)))
             b_val = math.log(safe_boost)
             bias[0, 0, target_start:, ref_start:ref_end] += b_val
 
-        # Resize spatial mask directly to patchified token grid (r_gh, r_gw)
         if spatial_mask is not None:
             m_bchw = spatial_mask.float()
             if m_bchw.ndim == 2:
@@ -343,7 +357,7 @@ def _compute_ref_attention_bias_patchified(
 
             if mask_mode == "hard":
                 m_processed = (m_resized > 0.5).float()
-            else:  # soft
+            else:
                 m_processed = m_resized.clamp(0.0, 1.0)
 
             m_flat = m_processed.reshape(-1).to(device=device, dtype=dtype)
@@ -356,35 +370,15 @@ def _compute_ref_attention_bias_patchified(
     return torch.nan_to_num(bias, nan=0.0, posinf=100.0, neginf=-100.0)
 
 
-def _call_transformer_block(
-    block: Any,
-    h: torch.Tensor,
-    vec_emb: Optional[torch.Tensor],
-    rope_pos_ids: torch.Tensor,
-    attn_bias: Optional[torch.Tensor],
-    transformer_options: Dict[str, Any]
-) -> torch.Tensor:
-    """Execute a single transformer block attempting common block signatures."""
-    try:
-        return block(h, vec_emb=vec_emb, rope_pos_ids=rope_pos_ids, attn_bias=attn_bias, transformer_options=transformer_options)
-    except TypeError:
-        try:
-            return block(h, vec_emb, attn_bias=attn_bias)
-        except TypeError:
-            try:
-                return block(h, attn_bias=attn_bias)
-            except TypeError:
-                return block(h)
+def _compute_timestep_vector(dit_model: Any, timesteps: torch.Tensor) -> Optional[torch.Tensor]:
+    """Compute timestep vector embedding (tvec) using Krea 2 model members."""
+    if timesteps is None:
+        return None
 
+    if hasattr(dit_model, "tmlp"):
+        t_emb = timesteps.float()
+        if hasattr(dit_model, "tproj"):
+            t_emb = dit_model.tproj(t_emb)
+        return dit_model.tmlp(t_emb)
 
-def _match_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
-    """Repeat or trim tensor along batch dimension to match target_bs."""
-    curr_b = tensor.shape[0]
-    if curr_b == target_bs:
-        return tensor
-    elif curr_b > target_bs:
-        return tensor[:target_bs]
-    else:
-        repeats = (target_bs + curr_b - 1) // curr_b
-        tiled = tensor.repeat(repeats, *([1] * (tensor.ndim - 1)))
-        return tiled[:target_bs]
+    return None

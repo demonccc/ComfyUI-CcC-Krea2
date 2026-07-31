@@ -1,6 +1,5 @@
 """CPU-safe unit tests for Qwen3-VL grounding image preprocessor."""
 
-import pytest
 import torch
 from ccc_krea2.grounding import resize_grounding_image, resolve_grounding_px
 

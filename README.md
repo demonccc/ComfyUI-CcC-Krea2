@@ -1,5 +1,7 @@
 # ComfyUI-CcC-Krea2
 
+[![CI](https://github.com/demonccc/ComfyUI-CcC-Krea2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/demonccc/ComfyUI-CcC-Krea2/actions/workflows/ci.yml)
+
 I created CcC Krea2 after needing a simpler and more consistent way to perform advanced Krea 2 edits in ComfyUI.
 
 Existing tools made different parts of the workflow possible, but combining subject identity, outfits, scenes, attention control, latent selection and localized inpainting required large and difficult-to-maintain workflows.

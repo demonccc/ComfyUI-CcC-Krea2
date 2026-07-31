@@ -1,21 +1,20 @@
-"""Integration-style unit tests using MockKrea2DiT and current ComfyUI signatures."""
+"""Integration-style unit tests using MockKrea2DiT exposing real Krea 2 members."""
 
-import pytest
 import torch
 import torch.nn as nn
-from ccc_krea2.patch import patch_krea2_model, krea2_dit_incontext_forward
+from ccc_krea2.patch import patch_krea2_model
 from ccc_krea2.references import PreparedReference, ReferenceRole, _process_latent_in_if_available
 from ccc_krea2.latents import generate_krea2_latent
 from ccc_krea2.engine import Krea2EditEngine, NodeExecutionRequest
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 
-class MockTransformerBlock(nn.Module):
+class MockRealKrea2Block(nn.Module):
     def __init__(self):
         super().__init__()
         self.last_attn_bias = None
 
-    def forward(self, x, vec_emb=None, rope_pos_ids=None, attn_bias=None, **kwargs):
+    def forward(self, x, freqs=None, tvec=None, attn_bias=None, transformer_options=None):
         self.last_attn_bias = attn_bias
         return x
 
@@ -23,20 +22,38 @@ class MockTransformerBlock(nn.Module):
 class MockKrea2DiT(nn.Module):
     def __init__(self, in_channels=16, patch_size=2, hidden_dim=64):
         super().__init__()
-        self.patch_size = patch_size
+        self.patch = patch_size
+        self.channels = in_channels
         self.hidden_dim = hidden_dim
 
-        self.img_in = nn.Linear(in_channels * patch_size * patch_size, hidden_dim)
-        self.txt_in = nn.Linear(2048, hidden_dim)
-        self.time_in = nn.Linear(1, hidden_dim)
-        self.vector_in = nn.Linear(hidden_dim, hidden_dim)
+        self.first_layer = nn.Linear(in_channels * patch_size * patch_size, hidden_dim)
+        self.tproj_layer = nn.Linear(1, hidden_dim)
+        self.tmlp_layer = nn.Linear(hidden_dim, hidden_dim)
 
-        self.block1 = MockTransformerBlock()
+        self.block1 = MockRealKrea2Block()
         self.blocks = nn.ModuleList([self.block1])
-        self.final_layer = nn.Linear(hidden_dim, in_channels * patch_size * patch_size)
+        self.last_layer = nn.Linear(hidden_dim, in_channels * patch_size * patch_size)
+
+    def _unpack_context(self, context):
+        return context
+
+    def first(self, x_patch):
+        return self.first_layer(x_patch)
+
+    def tproj(self, t):
+        return self.tproj_layer(t.unsqueeze(-1) if t.ndim == 1 else t)
+
+    def tmlp(self, t_emb):
+        return self.tmlp_layer(t_emb)
+
+    def pe_embedder(self, position_ids):
+        return torch.rand((position_ids.shape[1], self.hidden_dim))
+
+    def last(self, h_seq):
+        return self.last_layer(h_seq)
 
     def forward(self, x, timesteps, context):
-        return x
+        raise RuntimeError("Native forward must never be called during custom edit forward!")
 
 
 class MockWrapperExecutor:
@@ -99,7 +116,7 @@ def test_diffusion_model_wrapper_execution_signature():
 
     x = torch.rand((1, 16, 32, 32))
     timesteps = torch.tensor([1.0])
-    context = torch.rand((1, 77, 2048))
+    context = torch.rand((1, 77, 64))
 
     out = wrapper(executor, x, timesteps, context)
 

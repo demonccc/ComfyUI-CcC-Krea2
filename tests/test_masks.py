@@ -1,6 +1,5 @@
 """CPU-safe unit tests for mask processing and attention boost numerical stability."""
 
-import pytest
 import torch
 import math
 from ccc_krea2.masks import process_inpaint_mask, process_attention_mask
