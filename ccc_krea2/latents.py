@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 import torch
 import torch.nn.functional as F
 
-from .geometry import apply_sampling_transform
+from . import geometry
 
 
 def generate_krea2_latent(
@@ -19,7 +19,8 @@ def generate_krea2_latent(
     inpaint_mask_invert: bool = False,
     inpaint_mask_grow: int = 0,
     inpaint_mask_blur: int = 0,
-    sampling_resize_mode: str = "fit"
+    sampling_resize_mode: str = "fit",
+    sampling_resize_method: str = "auto"
 ) -> Dict[str, Any]:
     """Generate model-driven LATENT dictionary returned to KSampler.
 
@@ -32,14 +33,15 @@ def generate_krea2_latent(
         if base_image is None:
             raise ValueError("base_image is required when latent_source is set to an image role.")
 
-        # Apply sampling geometric transformation with nearest-neighbor mask interpolation
-        trans_img, trans_mask = apply_sampling_transform(
+        # Apply sampling geometric transformation with nearest-exact mask interpolation
+        trans_img, trans_mask = geometry.apply_sampling_transform(
             image=base_image,
             target_h=height,
             target_w=width,
             mode=sampling_resize_mode,
             mask=inpaint_mask,
-            mask_interpolation="nearest"
+            mask_interpolation="nearest-exact",
+            resize_method=sampling_resize_method
         )
 
         # VAE encode base image directly (RAW VAE latent)
@@ -139,7 +141,7 @@ def _process_inpaint_mask(
         mask_bchw = 1.0 - mask_bchw
 
     if mask_bchw.shape[-2:] != (target_h, target_w):
-        mask_bchw = F.interpolate(mask_bchw, size=(target_h, target_w), mode="nearest")
+        mask_bchw = F.interpolate(mask_bchw, size=(target_h, target_w), mode="nearest-exact")
 
     if grow > 0:
         kernel_size = 2 * grow + 1

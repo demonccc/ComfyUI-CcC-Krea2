@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, Tuple
 import torch
 
 from .constants import ReferenceRole
-from .geometry import apply_reference_fit_transform
+from . import geometry
 from .grounding import resize_grounding_image
 
 
@@ -64,18 +64,20 @@ def prepare_reference(
         grounding_preset=config.grounding_preset,
         grounding_px=config.grounding_px,
         grounding_min_px=config.grounding_min_px,
-        grounding_max_px=config.grounding_max_px
+        grounding_max_px=config.grounding_max_px,
+        resize_method=config.grounding_resize_method
     )
 
     # 2. VAE Reference Latent Path
-    mask_interp = "nearest" if attention_mask_mode == "hard" else "bicubic"
-    fitted_img, fitted_mask, ref_fit_meta = apply_reference_fit_transform(
+    mask_interp = "nearest-exact" if attention_mask_mode == "hard" else "bilinear"
+    fitted_img, fitted_mask, ref_fit_meta = geometry.apply_reference_fit_transform(
         image=config.image,
         target_h=target_h,
         target_w=target_w,
         mode=fit_mode,
         mask=config.attention_mask,
-        mask_interpolation=mask_interp
+        mask_interpolation=mask_interp,
+        resize_method=config.reference_resize_method
     )
 
     # Invert spatial mask if requested

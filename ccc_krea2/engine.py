@@ -151,6 +151,7 @@ class Krea2EditEngine:
             inpaint_mask_grow=settings.inpaint_mask_grow,
             inpaint_mask_blur=settings.inpaint_mask_blur,
             sampling_resize_mode=settings.sampling_resize_mode,
+            sampling_resize_method=settings.sampling_resize_method,
         )
 
         return patched_model, positive, negative, latent_dict

@@ -1,8 +1,8 @@
 """Qwen3-VL grounding image preprocessor and preset resolution logic."""
 
 import torch
-import torch.nn.functional as F
 from .constants import LOGGER_PREFIX
+from . import geometry
 
 
 def resolve_grounding_px(preset: str, custom_px: int) -> int:
@@ -20,7 +20,8 @@ def resize_grounding_image(
     grounding_px: int = 768,
     grounding_min_px: int = 512,
     grounding_max_px: int = 1024,
-    grounding_preset: str = "balanced"
+    grounding_preset: str = "balanced",
+    resize_method: str = "auto"
 ) -> torch.Tensor:
     """Preprocesses reference images for Qwen3-VL semantic grounding.
 
@@ -84,9 +85,8 @@ def resize_grounding_image(
     new_h = max(1, int(round(h * scale)))
     new_w = max(1, int(round(w * scale)))
 
-    if scale < 1.0:
-        res = F.interpolate(img_bchw, size=(new_h, new_w), mode="area")
-    else:
-        res = F.interpolate(img_bchw, size=(new_h, new_w), mode="bicubic", antialias=True)
+    res = geometry.resize_tensor(img_bchw, target_h=new_h, target_w=new_w, method=resize_method)
+    if res.ndim == 4 and res.shape[1] in (1, 3, 4) and res.shape[-1] not in (1, 3, 4):
+        res = res.movedim(1, -1)
 
-    return res.movedim(1, -1).clamp(0.0, 1.0)
+    return res.clamp(0.0, 1.0)
