@@ -32,13 +32,14 @@ def generate_krea2_latent(
         if base_image is None:
             raise ValueError("base_image is required when latent_source is set to an image role.")
 
-        # Apply sampling geometric transformation
+        # Apply sampling geometric transformation with nearest-neighbor mask interpolation
         trans_img, trans_mask = apply_sampling_transform(
             image=base_image,
             target_h=height,
             target_w=width,
             mode=sampling_resize_mode,
-            mask=inpaint_mask
+            mask=inpaint_mask,
+            mask_interpolation="nearest"
         )
 
         # VAE encode base image directly (RAW VAE latent)
@@ -124,18 +125,21 @@ def _process_inpaint_mask(
     target_w: int
 ) -> torch.Tensor:
     """Process inpainting noise_mask tensor using pure PyTorch operations."""
-    if mask.ndim == 2:
-        mask_bchw = mask.unsqueeze(0).unsqueeze(0).float()
-    elif mask.ndim == 3:
-        mask_bchw = mask.unsqueeze(1).float()
+    if mask.is_floating_point():
+        mask_bchw = mask
     else:
         mask_bchw = mask.float()
+
+    if mask_bchw.ndim == 2:
+        mask_bchw = mask_bchw.unsqueeze(0).unsqueeze(0)
+    elif mask_bchw.ndim == 3:
+        mask_bchw = mask_bchw.unsqueeze(1)
 
     if invert:
         mask_bchw = 1.0 - mask_bchw
 
     if mask_bchw.shape[-2:] != (target_h, target_w):
-        mask_bchw = F.interpolate(mask_bchw, size=(target_h, target_w), mode="bicubic", antialias=True)
+        mask_bchw = F.interpolate(mask_bchw, size=(target_h, target_w), mode="nearest")
 
     if grow > 0:
         kernel_size = 2 * grow + 1
@@ -144,7 +148,11 @@ def _process_inpaint_mask(
     if blur > 0:
         kernel_size = 2 * blur + 1
         sigma = blur / 2.0
-        coords = torch.arange(kernel_size, dtype=torch.float32) - blur
+        coords = torch.arange(
+            kernel_size,
+            device=mask_bchw.device,
+            dtype=mask_bchw.dtype,
+        ) - blur
         g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
         kernel_1d = g / g.sum()
 
