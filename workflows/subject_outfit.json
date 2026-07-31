@@ -487,7 +487,7 @@
         "Node name for S&R": "CcCKrea2SubjectOutfit"
       },
       "widgets_values": [
-        "Dress the person from the subject image in the clothing from the outfit image.",
+        "Dress the person from the subject image in the complete clothing from the outfit image.\nUse only the clothing from the outfit image.\nPreserve the subject image identity, pose and original background.\nDo not copy the background, environment or composition from the outfit image.",
         "balanced",
         "subject",
         1.0,

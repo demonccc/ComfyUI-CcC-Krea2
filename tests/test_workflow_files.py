@@ -352,6 +352,90 @@ def test_qwen_workflows_and_non_qwen_isolation():
         assert prompt_input["link"] == qwen_text_link_id, f"Qwen text output not connected to main node prompt in {rel_path}"
 
 
+def test_workflow_prompt_content():
+    """Verify exact prompt defaults across all six workflows."""
+    expected_non_qwen_prompts = {
+        "workflows/subject_edit.json": (
+            "The subject is inside a futuristic high-rise apartment in a futuristic city.\n"
+            "Do not keep the original bedroom background.\n"
+            "Replace the environment completely."
+        ),
+        "workflows/subject_scene.json": (
+            "Replace the main person in the scene image with the person from the subject image.\n"
+            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
+            "Adapt the subject naturally to the environment and lighting of the scene image.\n"
+            "The result should look seamless and natural, as if the subject was originally part of the scene."
+        ),
+        "workflows/subject_outfit.json": (
+            "Dress the person from the subject image in the complete clothing from the outfit image.\n"
+            "Use only the clothing from the outfit image.\n"
+            "Preserve the subject image identity, pose and original background.\n"
+            "Do not copy the background, environment or composition from the outfit image."
+        ),
+        "workflows/subject_outfit_scene.json": (
+            "Replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n"
+            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
+            "Use only the clothing from the outfit image.\n"
+            "Do not copy the background, environment or composition from the outfit image.\n"
+            "Adapt the subject and clothing naturally to the scene image lighting and environment.\n"
+            "The result should look seamless and natural, as if the subject was originally part of the scene."
+        ),
+    }
+
+    for filepath, expected_prompt in expected_non_qwen_prompts.items():
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        main_node = next(n for n in data["nodes"] if n.get("type") in MAIN_NODE_TYPES)
+        actual_prompt = main_node["widgets_values"][0]
+        assert actual_prompt == expected_prompt, f"Prompt mismatch in {filepath}:\ngot: {repr(actual_prompt)}\nexpected: {repr(expected_prompt)}"
+
+    expected_qwen_prompts = {
+        "workflows/subject_scene_qwen_simple.json": (
+            "Analyze the scene image and write one complete image-editing prompt.\n\n"
+            "The output prompt must replace the main person in the scene image with the person from the subject image.\n\n"
+            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
+            "Adapt the subject naturally to the environment and lighting of the scene image.\n"
+            "The result should look seamless and natural, as if the subject was originally part of the scene.\n\n"
+            "Refer to the images using exactly these terms:\n"
+            "- subject image\n"
+            "- scene image\n\n"
+            "Do not describe incidental brand names, street names, signs, or other unnecessary scene-specific details unless they are essential to preserve the scene composition.\n\n"
+            "Return only the final transformation prompt.\n"
+            "Do not explain your analysis and do not add headings."
+        ),
+        "workflows/subject_scene_outfit_qwen_simple.json": (
+            "Analyze the scene image and write one complete image-editing prompt.\n\n"
+            "The output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n\n"
+            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
+            "Use only the clothing from the outfit image.\n"
+            "Do not copy the background, environment or composition from the outfit image.\n"
+            "Adapt the subject and clothing naturally to the scene image lighting and environment.\n"
+            "The result should look seamless and natural, as if the subject was originally part of the scene.\n\n"
+            "Refer to the images using exactly these terms:\n"
+            "- subject image\n"
+            "- scene image\n"
+            "- outfit image\n\n"
+            "Do not describe incidental brand names, street names, signs, or other unnecessary scene-specific details unless they are essential to preserve the scene composition.\n\n"
+            "Return only the final transformation prompt.\n"
+            "Do not explain your analysis and do not add headings."
+        ),
+    }
+
+    for filepath, expected_user_prompt in expected_qwen_prompts.items():
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        qwen_node = next(n for n in data["nodes"] if n.get("type") == "SimpleQwenVLggufV2")
+        actual_user_prompt = qwen_node["widgets_values"][2]
+        assert actual_user_prompt == expected_user_prompt, f"Qwen user_prompt mismatch in {filepath}:\ngot: {repr(actual_user_prompt)}\nexpected: {repr(expected_user_prompt)}"
+        assert "subject image" in actual_user_prompt
+        assert "scene image" in actual_user_prompt
+        if "outfit" in filepath:
+            assert "outfit image" in actual_user_prompt
+        assert "Return only the final transformation prompt." in actual_user_prompt
+        assert "Do not describe incidental brand names, street names, signs, or other unnecessary scene-specific details" in actual_user_prompt
+
+
+
 def test_metadata_and_graph_integrity():
     """21-22. Maxima match, unique IDs, valid links."""
     for rel_path in EXPECTED_WORKFLOW_FILES:

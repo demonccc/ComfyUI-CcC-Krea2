@@ -585,7 +585,7 @@
         "Node name for S&R": "CcCKrea2SubjectSceneOutfit"
       },
       "widgets_values": [
-        "Place the person from the subject image into the scene image, dressed in the clothing from the outfit image.",
+        "Replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\nPreserve the composition, background, camera angle, lighting and visual style of the scene image.\nUse only the clothing from the outfit image.\nDo not copy the background, environment or composition from the outfit image.\nAdapt the subject and clothing naturally to the scene image lighting and environment.\nThe result should look seamless and natural, as if the subject was originally part of the scene.",
         "balanced",
         "scene",
         1.0,

@@ -389,7 +389,7 @@
         "Node name for S&R": "CcCKrea2Subject"
       },
       "widgets_values": [
-        "A photo of the subject in a futuristic city, high quality, 8k",
+        "The subject is inside a futuristic high-rise apartment in a futuristic city.\nDo not keep the original bedroom background.\nReplace the environment completely.",
         "balanced",
         "subject",
         1.0,

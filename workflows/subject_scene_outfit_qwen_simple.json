@@ -406,7 +406,7 @@
       "widgets_values": [
         "None",
         "None",
-        "Analyze the scene image and write one complete image-editing prompt.\n\nThe output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete outfit from the outfit image.\n\nPreserve the pose, composition, camera angle, environment, interactions and lighting of the scene image.\n\nRefer to the images using exactly these terms:\n- subject image\n- scene image\n- outfit image\n\nReturn only the final transformation prompt.\nDo not explain your analysis and do not add headings.",
+        "Analyze the scene image and write one complete image-editing prompt.\n\nThe output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n\nPreserve the composition, background, camera angle, lighting and visual style of the scene image.\nUse only the clothing from the outfit image.\nDo not copy the background, environment or composition from the outfit image.\nAdapt the subject and clothing naturally to the scene image lighting and environment.\nThe result should look seamless and natural, as if the subject was originally part of the scene.\n\nRefer to the images using exactly these terms:\n- subject image\n- scene image\n- outfit image\n\nDo not describe incidental brand names, street names, signs, or other unnecessary scene-specific details unless they are essential to preserve the scene composition.\n\nReturn only the final transformation prompt.\nDo not explain your analysis and do not add headings.",
         123456789,
         "fixed",
         false,

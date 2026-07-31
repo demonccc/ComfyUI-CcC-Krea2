@@ -487,7 +487,7 @@
         "Node name for S&R": "CcCKrea2SubjectScene"
       },
       "widgets_values": [
-        "Place the person from the subject image into the scene image, preserving lighting and style.",
+        "Replace the main person in the scene image with the person from the subject image.\nPreserve the composition, background, camera angle, lighting and visual style of the scene image.\nAdapt the subject naturally to the environment and lighting of the scene image.\nThe result should look seamless and natural, as if the subject was originally part of the scene.",
         "balanced",
         "scene",
         1.0,
