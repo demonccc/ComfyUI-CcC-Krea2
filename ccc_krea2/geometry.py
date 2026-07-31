@@ -31,7 +31,7 @@ def apply_reference_fit_transform(
     target_w: int,
     mode: str = "fit",
     mask: Optional[torch.Tensor] = None,
-    crop_tolerance: float = 0.1,
+    crop_tolerance: float = 0.08,
     mask_interpolation: str = "bicubic",
     alignment: int = 16
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
@@ -40,8 +40,8 @@ def apply_reference_fit_transform(
     Key principles:
     - NO black target-sized canvas padding.
     - Preserves native fitted reference grid aligned to /16 floor dimensions.
-    - Near-matched-AR crop tolerance: if AR difference <= crop_tolerance, center-crops directly to target AR.
-    - Genuine mismatches center-crop source to exact AR mapping before resize.
+    - Near-matched-AR crop tolerance: CROP_TOL = 0.08.
+    - Genuine mismatches crop source to round(fitted_dimension / fit_scale) before resize.
     - Masks receive the exact same spatial crop and resize transformation.
     """
     if mode not in ("fit", "crop"):
@@ -72,7 +72,7 @@ def apply_reference_fit_transform(
     target_ar = target_h / float(target_w)
     image_ar = ih / float(iw)
 
-    # 1. Mode 'crop' or near-matched AR within tolerance: center-crop directly to target AR then resize to target_h x target_w
+    # 1. Mode 'crop' or near-matched AR within CROP_TOL = 0.08: center-crop directly to target AR then resize to target_h x target_w
     if mode == "crop" or abs(image_ar - target_ar) <= crop_tolerance:
         scale = max(target_h / float(ih), target_w / float(iw))
         new_h = int(round(ih * scale))
@@ -93,27 +93,22 @@ def apply_reference_fit_transform(
         ref_fit_meta = {"spatial_hw": (target_h, target_w)}
         return cropped_img.movedim(1, -1).clamp(0.0, 1.0), cropped_mask, ref_fit_meta
 
-    # 2. Genuine AR mismatch in 'fit' mode: crop source to exact AR mapping before scaling to /16 floor dimensions
-    scale = min(target_h / float(ih), target_w / float(iw))
-    raw_h = ih * scale
-    raw_w = iw * scale
+    # 2. Genuine AR mismatch in 'fit' mode: align to /16 floor dimensions and crop source
+    fit_scale = min(target_h / float(ih), target_w / float(iw))
+    raw_h = ih * fit_scale
+    raw_w = iw * fit_scale
 
     fh = max(alignment, (int(raw_h) // alignment) * alignment)
     fw = max(alignment, (int(raw_w) // alignment) * alignment)
 
-    # Crop source to mapping aspect ratio (fh / fw)
-    fit_ar = fh / float(fw)
-    if image_ar > fit_ar:
-        crop_h = int(round(iw * fit_ar))
-        crop_w = iw
-    else:
-        crop_h = ih
-        crop_w = int(round(ih / fit_ar))
+    # Calculate source crop dimensions as round(fitted_dimension / fit_scale)
+    crop_h = min(ih, int(round(fh / fit_scale)))
+    crop_w = min(iw, int(round(fw / fit_scale)))
 
     sy0 = (ih - crop_h) // 2
     sx0 = (iw - crop_w) // 2
-    cropped_src = img_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
 
+    cropped_src = img_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
     fitted_img = F.interpolate(cropped_src, size=(fh, fw), mode="bicubic", antialias=True)
 
     fitted_mask = None
