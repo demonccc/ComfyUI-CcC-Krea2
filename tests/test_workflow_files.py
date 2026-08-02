@@ -1,4 +1,4 @@
-"""Structural validation tests for example workflow JSON files."""
+"""Structural validation tests for curated workflow JSON files."""
 
 import json
 from pathlib import Path
@@ -40,7 +40,9 @@ def _is_node_inside_group(node, group):
 
 
 def test_expected_filenames_and_directory_contents():
-    """1. Exactly the expected workflow files exist."""
+    """1. Exactly the expected workflow files exist and example_workflows directory is absent."""
+    assert Path("example_workflows").exists() is False, "example_workflows directory must not exist"
+
     workflows_dir = Path("workflows")
     assert workflows_dir.exists(), "workflows directory does not exist"
 
