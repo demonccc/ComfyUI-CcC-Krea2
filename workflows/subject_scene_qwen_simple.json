@@ -1,6 +1,6 @@
 {
-  "last_node_id": 63,
-  "last_link_id": 20,
+  "last_node_id": 64,
+  "last_link_id": 21,
   "nodes": [
     {
       "id": 10,
@@ -342,7 +342,8 @@
           "name": "text",
           "type": "STRING",
           "links": [
-            17
+            17,
+            21
           ],
           "slot_index": 0
         },
@@ -411,16 +412,13 @@
       },
       "widgets_values": [
         "scene",
-        false,
         1.0,
-        false,
         false,
         "normalize",
         768,
         512,
         1024,
         "auto",
-        false,
         "fit",
         "auto"
       ]
@@ -458,16 +456,13 @@
       },
       "widgets_values": [
         "subject",
-        false,
         1.0,
-        false,
         false,
         "normalize",
         768,
         512,
         1024,
         "auto",
-        false,
         "fit",
         "auto"
       ]
@@ -874,6 +869,42 @@
         "",
         ""
       ]
+    },
+    {
+      "id": 64,
+      "type": "PreviewAny",
+      "pos": [
+        1240,
+        1020
+      ],
+      "size": [
+        350,
+        240
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "Preview as Text",
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [
+        "Plain text"
+      ]
     }
   ],
   "links": [
@@ -1036,6 +1067,14 @@
       30,
       8,
       "CCC_KREA2_PROMPT_AUGMENTATION"
+    ],
+    [
+      21,
+      60,
+      0,
+      64,
+      0,
+      "STRING"
     ]
   ],
   "groups": [
@@ -1075,7 +1114,7 @@
         440,
         480,
         1180,
-        580
+        800
       ],
       "color": "#5c2b5c"
     },

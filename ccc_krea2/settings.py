@@ -27,21 +27,13 @@ ROLE_CHOICES = ["subject", "scene", "outfit", "source"]
 class ImageRoleSettings:
     """Settings overrides for a specific image role."""
 
-    # Attention override
-    override_attention: bool = False
     boost: float = 1.0
     mask_invert: bool = False
-
-    # Grounding override
-    override_grounding: bool = False
     grounding_resize_mode: str = "normalize"
     grounding_px: int = 768
     grounding_min_px: int = 512
     grounding_max_px: int = 1024
     grounding_resize_method: str = "auto"
-
-    # Reference geometry override
-    override_reference_geometry: bool = False
     reference_fit_mode: str = "fit"
     reference_resize_method: str = "auto"
 
@@ -243,20 +235,15 @@ def resolve_krea2_settings(
 
         if role in bundled_roles:
             role_ov = bundled_roles[role]
-            if role_ov.override_attention:
-                r_preset["boost"] = role_ov.boost
-                r_preset["mask_invert"] = role_ov.mask_invert
-
-            if role_ov.override_grounding:
-                r_preset["grounding_resize_mode"] = role_ov.grounding_resize_mode
-                r_preset["grounding_px"] = role_ov.grounding_px
-                r_preset["grounding_min_px"] = role_ov.grounding_min_px
-                r_preset["grounding_max_px"] = role_ov.grounding_max_px
-                r_preset["grounding_resize_method"] = role_ov.grounding_resize_method
-
-            if role_ov.override_reference_geometry:
-                r_preset["reference_fit_mode"] = role_ov.reference_fit_mode
-                r_preset["reference_resize_method"] = role_ov.reference_resize_method
+            r_preset["boost"] = role_ov.boost
+            r_preset["mask_invert"] = role_ov.mask_invert
+            r_preset["grounding_resize_mode"] = role_ov.grounding_resize_mode
+            r_preset["grounding_px"] = role_ov.grounding_px
+            r_preset["grounding_min_px"] = role_ov.grounding_min_px
+            r_preset["grounding_max_px"] = role_ov.grounding_max_px
+            r_preset["grounding_resize_method"] = role_ov.grounding_resize_method
+            r_preset["reference_fit_mode"] = role_ov.reference_fit_mode
+            r_preset["reference_resize_method"] = role_ov.reference_resize_method
 
         resolved_roles[role] = ResolvedRoleSettings(
             boost=float(r_preset["boost"]),

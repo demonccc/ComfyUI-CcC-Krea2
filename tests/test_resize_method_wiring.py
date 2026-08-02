@@ -207,9 +207,7 @@ def test_preset_balanced_resolves_resize_methods_to_auto():
 def test_end_to_end_engine_wiring(monkeypatch):
     """9. End-to-end engine execution passes custom resize_methods to references and latents."""
     subj_setting = ImageRoleSettings(
-        override_grounding=True,
         grounding_resize_method="bilinear",
-        override_reference_geometry=True,
         reference_resize_method="lanczos",
     )
     img_bundle = ImageAdvancedSettingsBundle().with_role("subject", subj_setting)

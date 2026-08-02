@@ -12,7 +12,6 @@ from ccc_krea2.prompt_augmentation import (
 from ccc_krea2.lora import (
     CcCKrea2LoRAPromptSettings,
     CcCKrea2LoRAStack,
-    SlotLoraLoader,
 )
 
 
@@ -119,8 +118,8 @@ def test_lora_stack_disabled_stack_returns_input_model():
     input_model = FakeModel("input")
 
     # Mock loaders to detect if load is called
-    for l in node.loaders:
-        l.load = lambda m, name, strn: FakeModel("should_not_be_called")  # type: ignore
+    for loader in node.loaders:
+        loader.load = lambda m, name, strn: FakeModel("should_not_be_called")  # type: ignore
 
     out_model, out_aug = node.apply_loras(input_model, enabled=False)
     assert out_model is input_model
@@ -236,7 +235,7 @@ def test_lora_stack_duplicate_filenames_applied_independently(monkeypatch):
 def test_lora_stack_independent_loaders_per_slot():
     node = CcCKrea2LoRAStack()
     assert len(node.loaders) == 4
-    assert len(set(id(l) for l in node.loaders)) == 4
+    assert len(set(id(ldr) for ldr in node.loaders)) == 4
 
 
 def test_lora_prompt_settings_filter_prompts_for_active_loras_only(monkeypatch):

@@ -1,6 +1,6 @@
 """Qwen3-VL text/vision conditioning builder for positive and negative prompts."""
 
-from typing import List, Tuple, Any, Optional
+from typing import List, Tuple, Any
 
 from .constants import (
     LOGGER_PREFIX,

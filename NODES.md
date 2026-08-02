@@ -190,16 +190,24 @@ Dual-reference localized inpainting node for subject placement into a scene.
 
 ### 8. CcC Krea2 - Image Advanced Settings
 
-Advanced settings node for fine-grained per-role attention, grounding, and geometry overrides.
+Advanced settings node for fine-grained per-role image settings configuration.
+
+Connecting Image Advanced Settings fully overrides the selected preset for that image role. To change only one value, keep the other visible values configured as desired because the entire role configuration is applied.
 
 - **Category**: `CcC/Krea2`
 - **Output**: `image_advanced_settings` (Custom Socket Type `CCC_KREA2_IMAGE_ADVANCED_SETTINGS`)
-- **Chaining**: Connect an existing `image_advanced_settings` output into the optional `image_advanced_settings` input to chain multiple role overrides sequentially (e.g. `Subject` -> `Scene`).
+- **Chaining**: Connect an existing `image_advanced_settings` output into the optional `image_advanced_settings` input to chain multiple role overrides sequentially (e.g. `Subject` -> `Scene`). The last configuration for the same role wins.
 - **Inputs**:
   - `role`: `subject` | `scene` | `outfit` | `source`
-  - `override_attention`: Enable to override `boost` and `mask_invert`.
-  - `override_grounding`: Enable to override `grounding_resize_mode`, `grounding_px`, `grounding_min_px`, `grounding_max_px`, and `grounding_resize_method`.
-  - `override_reference_geometry`: Enable to override `reference_fit_mode` and `reference_resize_method`.
+  - `boost`: Conditioning strength multiplier for this role.
+  - `mask_invert`: Invert attention mask for this role.
+  - `grounding_resize_mode`: `normalize` | `crop` | `stretch`.
+  - `grounding_px`: Grounding target pixel dimension.
+  - `grounding_min_px`: Grounding minimum dimension floor.
+  - `grounding_max_px`: Grounding maximum dimension ceiling.
+  - `grounding_resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
+  - `reference_fit_mode`: `fit` | `crop` | `stretch`.
+  - `reference_resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
 
 ---
 

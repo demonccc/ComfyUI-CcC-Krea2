@@ -213,16 +213,13 @@
       },
       "widgets_values": [
         "outfit",
-        false,
         1.0,
-        false,
         false,
         "normalize",
         768,
         512,
         1024,
         "auto",
-        false,
         "fit",
         "auto"
       ]
@@ -260,16 +257,13 @@
       },
       "widgets_values": [
         "subject",
-        false,
         1.0,
-        false,
         false,
         "normalize",
         768,
         512,
         1024,
         "auto",
-        false,
         "fit",
         "auto"
       ]

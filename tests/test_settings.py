@@ -53,36 +53,57 @@ def test_edit_settings_override():
     assert resolved.roles["subject"].boost == 2.5
 
 
-def test_image_settings_group_overrides_and_unconfigured_inheritance():
-    # Only override_attention is True
+def test_image_settings_full_role_override_and_unconfigured_retention():
+    # Configure subject role with custom values
     subject_override = ImageRoleSettings(
-        override_attention=True,
         boost=3.8,
         mask_invert=True,
-        override_grounding=False,
-        grounding_px=1024,  # Should be ignored because override_grounding=False
+        grounding_resize_mode="crop",
+        grounding_px=1024,
+        grounding_min_px=256,
+        grounding_max_px=2048,
+        grounding_resize_method="bicubic",
+        reference_fit_mode="crop",
+        reference_resize_method="lanczos",
     )
     bundle = ImageAdvancedSettingsBundle().with_role("subject", subject_override)
 
     resolved = resolve_krea2_settings(preset_name="balanced", image_settings=bundle)
-    # Attention group is overridden
-    assert resolved.roles["subject"].boost == 3.8
-    assert resolved.roles["subject"].mask_invert is True
-    # Grounding group is NOT overridden, inherits preset
-    assert resolved.roles["subject"].grounding_px == 768
+    # Configured subject role is completely replaced
+    subj = resolved.roles["subject"]
+    assert subj.boost == 3.8
+    assert subj.mask_invert is True
+    assert subj.grounding_resize_mode == "crop"
+    assert subj.grounding_px == 1024
+    assert subj.grounding_min_px == 256
+    assert subj.grounding_max_px == 2048
+    assert subj.grounding_resize_method == "bicubic"
+    assert subj.reference_fit_mode == "crop"
+    assert subj.reference_resize_method == "lanczos"
+
+    # Unconfigured roles retain preset defaults
+    assert resolved.roles["scene"].boost == 1.0
+    assert resolved.roles["scene"].grounding_px == 768
+    assert resolved.roles["outfit"].boost == 1.0
 
 
 def test_chained_image_settings_accumulation_and_last_wins():
     b0 = ImageAdvancedSettingsBundle()
-    b1 = b0.with_role("scene", ImageRoleSettings(override_attention=True, boost=1.8))
-    b2 = b1.with_role("outfit", ImageRoleSettings(override_attention=True, boost=2.2))
-    b3 = b2.with_role("scene", ImageRoleSettings(override_attention=True, boost=3.5))  # Last occurrence of scene wins
+    b1 = b0.with_role("scene", ImageRoleSettings(boost=1.8))
+    b2 = b1.with_role("outfit", ImageRoleSettings(boost=2.2))
+    b3 = b2.with_role("scene", ImageRoleSettings(boost=3.5))  # Last occurrence of scene wins
 
     # Verify immutability: b1 and b2 are unchanged
     assert "outfit" not in b1.role_settings
     assert b1.role_settings["scene"].boost == 1.8
     assert b3.role_settings["scene"].boost == 3.5
     assert b3.role_settings["outfit"].boost == 2.2
+
+    # Resolved settings check
+    resolved = resolve_krea2_settings(preset_name="balanced", image_settings=b3)
+    assert resolved.roles["scene"].boost == 3.5
+    assert resolved.roles["outfit"].boost == 2.2
+    assert resolved.roles["subject"].boost == 2.5  # Unconfigured retains preset
 
 
 def test_runtime_regression_requirement_balanced():

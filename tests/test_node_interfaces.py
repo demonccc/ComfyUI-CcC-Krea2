@@ -87,23 +87,44 @@ def test_main_nodes_widget_signature_refactor():
         assert opt["prompt_augmentation"] == (CCC_KREA2_PROMPT_AUGMENTATION,)
 
 
-def test_image_advanced_settings_node_chaining():
+def test_image_advanced_settings_node_widgets_and_chaining():
     cls = NODE_CLASS_MAPPINGS["CcCKrea2ImageAdvancedSettings"]
+    inputs = cls.INPUT_TYPES()
+    req = inputs["required"]
+
+    # 1. Prove override widgets no longer exist
+    assert "override_attention" not in req
+    assert "override_grounding" not in req
+    assert "override_reference_geometry" not in req
+
+    # 2. Prove all remaining image settings widgets remain present
+    expected_widgets = [
+        "role",
+        "boost",
+        "mask_invert",
+        "grounding_resize_mode",
+        "grounding_px",
+        "grounding_min_px",
+        "grounding_max_px",
+        "grounding_resize_method",
+        "reference_fit_mode",
+        "reference_resize_method",
+    ]
+    for w in expected_widgets:
+        assert w in req, f"Widget '{w}' must be present in CcCKrea2ImageAdvancedSettings"
+
     node = cls()
 
     # Step 1: Configure subject
     out1 = node.process(
         role="subject",
-        override_attention=True,
         boost=3.0,
         mask_invert=False,
-        override_grounding=False,
         grounding_resize_mode="normalize",
         grounding_px=768,
         grounding_min_px=512,
         grounding_max_px=1024,
         grounding_resize_method="auto",
-        override_reference_geometry=False,
         reference_fit_mode="fit",
         reference_resize_method="auto",
         image_advanced_settings=None,
@@ -115,16 +136,13 @@ def test_image_advanced_settings_node_chaining():
     # Step 2: Chain scene configuration
     out2 = node.process(
         role="scene",
-        override_attention=True,
         boost=1.5,
         mask_invert=False,
-        override_grounding=False,
         grounding_resize_mode="normalize",
         grounding_px=768,
         grounding_min_px=512,
         grounding_max_px=1024,
         grounding_resize_method="auto",
-        override_reference_geometry=False,
         reference_fit_mode="fit",
         reference_resize_method="auto",
         image_advanced_settings=bundle1,

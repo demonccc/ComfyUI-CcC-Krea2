@@ -326,14 +326,16 @@ def test_qwen_workflows_and_non_qwen_isolation():
             f"user_prompt missing required escaped newline segment in {rel_path}"
         )
 
-        # Outputs check (4 outputs serialized, only text output linked)
+        # Outputs check (4 outputs serialized, text output linked in parallel to main node prompt and Preview as Text)
         outputs = qwen_node.get("outputs", [])
         assert len(outputs) == 4, f"SimpleQwenVLggufV2 must serialize 4 outputs in {rel_path}"
         output_names = [o["name"] for o in outputs]
         assert output_names == ["text", "conditioning", "system_prompt", "user_prompt"]
 
         text_out = next(o for o in outputs if o["name"] == "text")
-        assert text_out["links"] is not None and len(text_out["links"]) == 1
+        assert text_out["links"] is not None and len(text_out["links"]) == 2, (
+            f"SimpleQwenVLggufV2 text output must have exactly 2 outgoing links in {rel_path}"
+        )
 
         for unlinked_name in ("conditioning", "system_prompt", "user_prompt"):
             out_obj = next(o for o in outputs if o["name"] == unlinked_name)
@@ -345,11 +347,29 @@ def test_qwen_workflows_and_non_qwen_isolation():
         scene_load_img_node = next(n for n in nodes if n["type"] == "LoadImage" and n.get("widgets_values", [""])[0] == "scene.jpg")
         assert qwen_img_link[1] == scene_load_img_node["id"], f"Scene LoadImage not connected to Qwen image socket in {rel_path}"
 
-        # Qwen text output connected to CcC main node prompt input
-        qwen_text_link_id = text_out["links"][0]
+        # Qwen text output connected to CcC main node prompt input and Preview as Text node
         main_node = next(n for n in nodes if n["type"] in MAIN_NODE_TYPES)
         prompt_input = next(i for i in main_node["inputs"] if i["name"] == "prompt")
-        assert prompt_input["link"] == qwen_text_link_id, f"Qwen text output not connected to main node prompt in {rel_path}"
+        assert prompt_input["link"] in text_out["links"], f"Qwen text output not connected to main node prompt in {rel_path}"
+
+        # Verify Preview as Text node (PreviewAny)
+        preview_nodes = [n for n in nodes if n["type"] == "PreviewAny"]
+        assert len(preview_nodes) == 1, f"Exactly one Preview as Text (PreviewAny) node must exist in {rel_path}"
+        preview_node = preview_nodes[0]
+        assert preview_node["title"] == "Preview as Text"
+
+        # Verify preview node is in Qwen Prompt Builder group
+        qwen_group = next(g for g in data["groups"] if g["title"] == "Qwen Prompt Builder")
+        gx, gy, gw, gh = qwen_group["bounding"]
+        px, py = preview_node["pos"]
+        assert gx <= px <= gx + gw and gy <= py <= gy + gh, f"Preview node must be inside Qwen Prompt Builder group in {rel_path}"
+
+        # Verify input connection to SimpleQwenVLggufV2.text
+        preview_input_link = preview_node["inputs"][0]["link"]
+        assert preview_input_link in text_out["links"], f"Preview as Text source must be connected to Qwen text output in {rel_path}"
+
+        # Verify preview_mode = Plain text
+        assert preview_node["widgets_values"][0] == "Plain text", f"Preview as Text widget_values must be ['Plain text'] in {rel_path}"
 
 
 def test_workflow_prompt_content():
@@ -447,6 +467,15 @@ def test_metadata_and_graph_integrity():
 
         node_ids = [n["id"] for n in nodes]
         link_ids = [link_item[0] for link_item in links]
+
+        if "qwen" not in rel_path:
+            assert not any(n["type"] == "PreviewAny" for n in nodes), f"No PreviewAny node allowed in non-Qwen workflow {rel_path}"
+
+        for n in nodes:
+            if n["type"] == "CcCKrea2ImageAdvancedSettings":
+                assert len(n.get("widgets_values", [])) == 10, (
+                    f"CcCKrea2ImageAdvancedSettings in {rel_path} must have exactly 10 widget values after removing override switches"
+                )
 
         assert len(node_ids) == len(set(node_ids)), f"Duplicate node IDs in {rel_path}"
         assert len(link_ids) == len(set(link_ids)), f"Duplicate link IDs in {rel_path}"
