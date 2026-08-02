@@ -7,8 +7,8 @@ from ccc_krea2.prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 
 
 def test_node_mappings_count_and_keys():
-    assert len(NODE_CLASS_MAPPINGS) == 11
-    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 11
+    assert len(NODE_CLASS_MAPPINGS) == 12
+    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 12
 
     expected_keys = [
         "CcCKrea2Subject",
@@ -22,6 +22,7 @@ def test_node_mappings_count_and_keys():
         "CcCKrea2EditAdvancedSettings",
         "CcCKrea2LoRAPromptSettings",
         "CcCKrea2LoRAStack",
+        "CcCKrea2TextToImage",
     ]
     for k in expected_keys:
         assert k in NODE_CLASS_MAPPINGS
@@ -29,6 +30,44 @@ def test_node_mappings_count_and_keys():
 
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2LoRAPromptSettings"] == "CcC Krea2 - LoRA Prompt Settings"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2LoRAStack"] == "CcC Krea2 - LoRA Stack"
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2TextToImage"] == "CcC Krea2 - Text to Image"
+
+
+def test_t2i_node_interface_contract():
+    cls = NODE_CLASS_MAPPINGS["CcCKrea2TextToImage"]
+    assert cls.CATEGORY == "CcC/Krea2"
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2TextToImage"] == "CcC Krea2 - Text to Image"
+    assert cls.RETURN_NAMES == ("model", "positive", "negative", "latent")
+    assert cls.RETURN_TYPES == ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT")
+
+    inputs = cls.INPUT_TYPES()
+    req = inputs.get("required", {})
+    opt = inputs.get("optional", {})
+    all_inputs = {**req, **opt}
+
+    # Required inputs include model, clip, prompt, aspect_ratio, megapixels, batch_size
+    for req_inp in ("model", "clip", "prompt", "aspect_ratio", "megapixels", "batch_size"):
+        assert req_inp in req, f"Missing required input '{req_inp}' on CcCKrea2TextToImage"
+
+    # Optional inputs include negative_prompt, prompt_augmentation
+    assert "negative_prompt" in opt
+    assert "prompt_augmentation" in opt
+
+    # No VAE, image, mask, image_advanced_settings, edit_advanced_settings
+    for forbidden in (
+        "vae",
+        "subject_image",
+        "scene_image",
+        "outfit_image",
+        "source_image",
+        "image",
+        "mask",
+        "subject_attention_mask",
+        "image_advanced_settings",
+        "edit_advanced_settings",
+    ):
+        assert forbidden not in all_inputs, f"Forbidden input '{forbidden}' found in CcCKrea2TextToImage"
+
 
 
 def test_main_nodes_widget_signature_refactor():

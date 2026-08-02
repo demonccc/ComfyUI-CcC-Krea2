@@ -226,5 +226,6 @@ def test_all_node_registrations():
         "CcCKrea2EditAdvancedSettings",
         "CcCKrea2LoRAPromptSettings",
         "CcCKrea2LoRAStack",
+        "CcCKrea2TextToImage",
     }
     assert set(NODE_CLASS_MAPPINGS.keys()) == expected

@@ -1,83 +1,7 @@
 {
   "last_node_id": 63,
-  "last_link_id": 16,
+  "last_link_id": 12,
   "nodes": [
-    {
-      "id": 10,
-      "type": "LoadImage",
-      "pos": [
-        100,
-        150
-      ],
-      "size": [
-        315,
-        314
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            1
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "subject.jpg",
-        "image"
-      ]
-    },
-    {
-      "id": 11,
-      "type": "LoadImage",
-      "pos": [
-        100,
-        490
-      ],
-      "size": [
-        315,
-        314
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            2
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "scene.jpg",
-        "image"
-      ]
-    },
     {
       "id": 1,
       "type": "UNETLoader",
@@ -90,7 +14,7 @@
         82
       ],
       "flags": {},
-      "order": 2,
+      "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -98,7 +22,7 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            3
+            1
           ],
           "slot_index": 0
         }
@@ -123,7 +47,7 @@
         82
       ],
       "flags": {},
-      "order": 3,
+      "order": 1,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -156,7 +80,7 @@
         82
       ],
       "flags": {},
-      "order": 4,
+      "order": 2,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -164,8 +88,7 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
-            6,
-            7
+            11
           ],
           "slot_index": 0
         }
@@ -175,137 +98,6 @@
       },
       "widgets_values": [
         "qwen_vae.safetensors"
-      ]
-    },
-    {
-      "id": 20,
-      "type": "CcCKrea2ImageAdvancedSettings",
-      "pos": [
-        100,
-        850
-      ],
-      "size": [
-        340,
-        360
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 2,
-      "inputs": [
-        {
-          "name": "image_advanced_settings",
-          "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image_advanced_settings",
-          "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS",
-          "links": [
-            8
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2ImageAdvancedSettings"
-      },
-      "widgets_values": [
-        "scene",
-        1.0,
-        false,
-        "normalize",
-        768,
-        512,
-        1024,
-        "auto",
-        "fit",
-        "auto"
-      ]
-    },
-    {
-      "id": 22,
-      "type": "CcCKrea2ImageAdvancedSettings",
-      "pos": [
-        460,
-        850
-      ],
-      "size": [
-        340,
-        360
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 2,
-      "inputs": [
-        {
-          "name": "image_advanced_settings",
-          "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS",
-          "link": 8
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image_advanced_settings",
-          "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2ImageAdvancedSettings"
-      },
-      "widgets_values": [
-        "subject",
-        2.5,
-        false,
-        "normalize",
-        768,
-        512,
-        1024,
-        "auto",
-        "fit",
-        "auto"
-      ]
-    },
-    {
-      "id": 21,
-      "type": "CcCKrea2EditAdvancedSettings",
-      "pos": [
-        820,
-        850
-      ],
-      "size": [
-        340,
-        360
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 2,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "edit_advanced_settings",
-          "type": "CCC_KREA2_EDIT_ADVANCED_SETTINGS",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2EditAdvancedSettings"
-      },
-      "widgets_values": [
-        1,
-        "fit",
-        "auto",
-        "hard",
-        "max_megapixels",
-        2.0,
-        "auto",
-        "automatic",
-        "",
-        false,
-        0,
-        0
       ]
     },
     {
@@ -320,13 +112,13 @@
         340
       ],
       "flags": {},
-      "order": 8,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 3
+          "link": 1
         },
         {
           "name": "prompt_augmentation",
@@ -336,7 +128,7 @@
         {
           "name": "lora_prompt_settings",
           "type": "CCC_KREA2_LORA_PROMPT_SETTINGS",
-          "link": 15
+          "link": 2
         }
       ],
       "outputs": [
@@ -344,7 +136,7 @@
           "name": "model",
           "type": "MODEL",
           "links": [
-            4
+            3
           ],
           "slot_index": 0
         },
@@ -352,7 +144,7 @@
           "name": "prompt_augmentation",
           "type": "CCC_KREA2_PROMPT_AUGMENTATION",
           "links": [
-            16
+            4
           ],
           "slot_index": 1
         }
@@ -363,8 +155,8 @@
       "widgets_values": [
         true,
         1.0,
-        true,
-        "krea2_edit_lora.safetensors",
+        false,
+        "None",
         1.0,
         false,
         "None",
@@ -379,23 +171,23 @@
     },
     {
       "id": 30,
-      "type": "CcCKrea2SubjectScene",
+      "type": "CcCKrea2TextToImage",
       "pos": [
         1200,
         150
       ],
       "size": [
         400,
-        420
+        300
       ],
       "flags": {},
-      "order": 9,
+      "order": 4,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 4
+          "link": 3
         },
         {
           "name": "clip",
@@ -403,52 +195,17 @@
           "link": 5
         },
         {
-          "name": "vae",
-          "type": "VAE",
-          "link": 6
-        },
-        {
-          "name": "subject_image",
-          "type": "IMAGE",
-          "link": 1
-        },
-        {
-          "name": "scene_image",
-          "type": "IMAGE",
-          "link": 2
-        },
-        {
-          "name": "subject_attention_mask",
-          "type": "MASK",
-          "link": null
-        },
-        {
-          "name": "scene_attention_mask",
-          "type": "MASK",
-          "link": null
-        },
-        {
           "name": "prompt_augmentation",
           "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "link": 16
-        },
-        {
-          "name": "image_advanced_settings",
-          "type": "CCC_KREA2_IMAGE_ADVANCED_SETTINGS",
-          "link": null
-        },
-        {
-          "name": "edit_advanced_settings",
-          "type": "CCC_KREA2_EDIT_ADVANCED_SETTINGS",
-          "link": null
+          "link": 4
         }
       ],
       "outputs": [
         {
-          "name": "patched_model",
+          "name": "model",
           "type": "MODEL",
           "links": [
-            9
+            6
           ],
           "slot_index": 0
         },
@@ -456,7 +213,7 @@
           "name": "positive",
           "type": "CONDITIONING",
           "links": [
-            10
+            7
           ],
           "slot_index": 1
         },
@@ -464,7 +221,7 @@
           "name": "negative",
           "type": "CONDITIONING",
           "links": [
-            11
+            8
           ],
           "slot_index": 2
         },
@@ -472,21 +229,22 @@
           "name": "latent",
           "type": "LATENT",
           "links": [
-            12
+            9
           ],
           "slot_index": 3
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2SubjectScene"
+        "Node name for S&R": "CcCKrea2TextToImage"
       },
       "widgets_values": [
-        "Replace the main person in the scene image with the person from the subject image.\nPreserve the composition, background, camera angle, lighting and visual style of the scene image.\nAdapt the subject naturally to the environment and lighting of the scene image.\nThe result should look seamless and natural, as if the subject was originally part of the scene.",
-        "balanced",
-        "scene",
+        "A cinematic photograph of a futuristic city at golden hour, highly detailed.",
+        "1:1",
         1.0,
-        "",
-        "empty"
+        1,
+        1,
+        1,
+        ""
       ]
     },
     {
@@ -501,28 +259,28 @@
         474
       ],
       "flags": {},
-      "order": 10,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 9
+          "link": 6
         },
         {
           "name": "positive",
           "type": "CONDITIONING",
-          "link": 10
+          "link": 7
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
-          "link": 11
+          "link": 8
         },
         {
           "name": "latent_image",
           "type": "LATENT",
-          "link": 12
+          "link": 9
         }
       ],
       "outputs": [
@@ -530,7 +288,7 @@
           "name": "LATENT",
           "type": "LATENT",
           "links": [
-            13
+            10
           ],
           "slot_index": 0
         }
@@ -560,18 +318,18 @@
         46
       ],
       "flags": {},
-      "order": 11,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
           "name": "samples",
           "type": "LATENT",
-          "link": 13
+          "link": 10
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": 7
+          "link": 11
         }
       ],
       "outputs": [
@@ -579,7 +337,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            14
+            12
           ],
           "slot_index": 0
         }
@@ -601,13 +359,13 @@
         270
       ],
       "flags": {},
-      "order": 12,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 14
+          "link": 12
         }
       ],
       "outputs": [],
@@ -615,14 +373,14 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "krea2_subject_scene"
+        "krea2_text_to_image"
       ]
     },
     {
       "id": 63,
       "type": "CcCKrea2LoRAPromptSettings",
       "pos": [
-        1200,
+        850,
         680
       ],
       "size": [
@@ -630,7 +388,7 @@
         240
       ],
       "flags": {},
-      "order": 9,
+      "order": 3,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -638,7 +396,7 @@
           "name": "lora_prompt_settings",
           "type": "CCC_KREA2_LORA_PROMPT_SETTINGS",
           "links": [
-            15
+            2
           ],
           "slot_index": 0
         }
@@ -670,22 +428,6 @@
   "links": [
     [
       1,
-      10,
-      0,
-      30,
-      3,
-      "IMAGE"
-    ],
-    [
-      2,
-      11,
-      0,
-      30,
-      4,
-      "IMAGE"
-    ],
-    [
-      3,
       1,
       0,
       4,
@@ -693,12 +435,28 @@
       "MODEL"
     ],
     [
+      2,
+      63,
+      0,
       4,
+      2,
+      "CCC_KREA2_LORA_PROMPT_SETTINGS"
+    ],
+    [
+      3,
       4,
       0,
       30,
       0,
       "MODEL"
+    ],
+    [
+      4,
+      4,
+      1,
+      30,
+      2,
+      "CCC_KREA2_PROMPT_AUGMENTATION"
     ],
     [
       5,
@@ -710,30 +468,6 @@
     ],
     [
       6,
-      3,
-      0,
-      30,
-      2,
-      "VAE"
-    ],
-    [
-      7,
-      3,
-      0,
-      50,
-      1,
-      "VAE"
-    ],
-    [
-      8,
-      20,
-      0,
-      22,
-      0,
-      "CCC_KREA2_IMAGE_ADVANCED_SETTINGS"
-    ],
-    [
-      9,
       30,
       0,
       40,
@@ -741,7 +475,7 @@
       "MODEL"
     ],
     [
-      10,
+      7,
       30,
       1,
       40,
@@ -749,7 +483,7 @@
       "CONDITIONING"
     ],
     [
-      11,
+      8,
       30,
       2,
       40,
@@ -757,7 +491,7 @@
       "CONDITIONING"
     ],
     [
-      12,
+      9,
       30,
       3,
       40,
@@ -765,7 +499,7 @@
       "LATENT"
     ],
     [
-      13,
+      10,
       40,
       0,
       50,
@@ -773,51 +507,23 @@
       "LATENT"
     ],
     [
-      14,
+      11,
+      3,
+      0,
+      50,
+      1,
+      "VAE"
+    ],
+    [
+      12,
       50,
       0,
       51,
       0,
       "IMAGE"
-    ],
-    [
-      15,
-      63,
-      0,
-      4,
-      2,
-      "CCC_KREA2_LORA_PROMPT_SETTINGS"
-    ],
-    [
-      16,
-      4,
-      1,
-      30,
-      7,
-      "CCC_KREA2_PROMPT_AUGMENTATION"
     ]
   ],
   "groups": [
-    {
-      "title": "Subject Image",
-      "bounding": [
-        80,
-        90,
-        355,
-        390
-      ],
-      "color": "#2b5c2b"
-    },
-    {
-      "title": "Scene Image",
-      "bounding": [
-        80,
-        430,
-        355,
-        390
-      ],
-      "color": "#2b5c2b"
-    },
     {
       "title": "Models",
       "bounding": [
@@ -829,17 +535,7 @@
       "color": "#2b3b5c"
     },
     {
-      "title": "Advanced Settings (disabled by default)",
-      "bounding": [
-        80,
-        810,
-        1100,
-        430
-      ],
-      "color": "#5c2b2b"
-    },
-    {
-      "title": "LoRA Stack + Edit + KSampler",
+      "title": "LoRA Stack + Text to Image + KSampler",
       "bounding": [
         830,
         90,
@@ -861,7 +557,7 @@
     {
       "title": "LoRA Prompt Augmentation (disabled by default)",
       "bounding": [
-        1180,
+        830,
         650,
         355,
         290

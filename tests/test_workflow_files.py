@@ -3,13 +3,17 @@
 import json
 from pathlib import Path
 
-EXPECTED_WORKFLOW_FILES = [
+EDITING_WORKFLOW_FILES = [
     "workflows/subject_edit.json",
     "workflows/subject_scene.json",
     "workflows/subject_outfit.json",
     "workflows/subject_outfit_scene.json",
     "workflows/subject_scene_qwen_simple.json",
     "workflows/subject_scene_outfit_qwen_simple.json",
+]
+
+EXPECTED_WORKFLOW_FILES = EDITING_WORKFLOW_FILES + [
+    "workflows/text_to_image.json",
 ]
 
 EXPECTED_ROLES_PER_WORKFLOW = {
@@ -36,7 +40,7 @@ def _is_node_inside_group(node, group):
 
 
 def test_expected_filenames_and_directory_contents():
-    """1. Exactly the six expected workflow files exist."""
+    """1. Exactly the expected workflow files exist."""
     workflows_dir = Path("workflows")
     assert workflows_dir.exists(), "workflows directory does not exist"
 
@@ -99,7 +103,7 @@ def test_workflow_main_nodes_and_groups():
 
 def test_lora_stack_and_prompt_settings_wiring_and_layout():
     """Verify wiring and group layout for CcCKrea2LoRAPromptSettings and CcCKrea2LoRAStack."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
+    for rel_path in EDITING_WORKFLOW_FILES:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -505,3 +509,69 @@ def test_metadata_and_graph_integrity():
                 if out_links:
                     for lid in out_links:
                         assert lid in link_id_set, f"Node {n['id']} output references non-existent link {lid} in {rel_path}"
+
+
+def test_subject_boost_default_correction():
+    """Verify that every CcCKrea2ImageAdvancedSettings node with role 'subject' has boost == 2.5."""
+    for rel_path in EXPECTED_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        for n in data.get("nodes", []):
+            if n.get("type") == "CcCKrea2ImageAdvancedSettings":
+                widgets = n.get("widgets_values", [])
+                role = widgets[0]
+                boost = widgets[1]
+                if role == "subject":
+                    assert boost == 2.5, f"Expected subject boost == 2.5 in {rel_path}, got {boost}"
+                else:
+                    assert boost == 1.0, f"Expected non-subject role '{role}' boost == 1.0 in {rel_path}, got {boost}"
+
+
+def test_text_to_image_workflow_structure():
+    """Validate detailed structure of workflows/text_to_image.json."""
+    filepath = "workflows/text_to_image.json"
+    with open(filepath, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    nodes = data.get("nodes", [])
+    node_types = [n.get("type") for n in nodes]
+
+    assert node_types.count("CcCKrea2TextToImage") == 1
+    assert node_types.count("CcCKrea2LoRAStack") == 1
+    assert node_types.count("CcCKrea2LoRAPromptSettings") == 1
+
+    stack_node = next(n for n in nodes if n.get("type") == "CcCKrea2LoRAStack")
+    ps_node = next(n for n in nodes if n.get("type") == "CcCKrea2LoRAPromptSettings")
+    vae_loader = next(n for n in nodes if n.get("type") == "VAELoader")
+
+    # All LoRA slots disabled by default, no Identity Edit enabled
+    stack_widgets = stack_node.get("widgets_values", [])
+    assert stack_widgets[0] is True  # global enabled
+    # Slot 1 to 4 disabled
+    for slot_offset in [2, 5, 8, 11]:
+        assert stack_widgets[slot_offset] is False, f"LoRA slot at offset {slot_offset} should be disabled by default"
+
+    # Identity Edit LoRA not in stack
+    assert "krea2_edit_lora.safetensors" not in str(stack_widgets)
+
+    # LoRA prompt settings disabled by default
+    ps_widgets = ps_node.get("widgets_values", [])
+    assert ps_widgets[0] is False
+
+    # VAE connected ONLY to VAEDecode
+    vae_out_links = vae_loader["outputs"][0].get("links", [])
+    assert len(vae_out_links) == 1
+    link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
+    vae_link = link_map[vae_out_links[0]]
+    dst_node_id = vae_link[3]
+    dst_node = next(n for n in nodes if n["id"] == dst_node_id)
+    assert dst_node["type"] == "VAEDecode"
+
+    # Verify Groups
+    group_titles = [g.get("title", "") for g in data.get("groups", [])]
+    assert "Models" in group_titles
+    assert "LoRA Prompt Augmentation (disabled by default)" in group_titles
+    assert "LoRA Stack + Text to Image + KSampler" in group_titles
+    assert "Output" in group_titles
+

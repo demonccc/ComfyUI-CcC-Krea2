@@ -28,6 +28,7 @@ from .settings import (
 from .prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
 from .engine import Krea2EditEngine, NodeExecutionRequest
+from .t2i import CcCKrea2TextToImage
 
 
 class BaseKrea2Node:
@@ -532,6 +533,7 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2EditAdvancedSettings": CcCKrea2EditAdvancedSettings,
     "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
     "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
+    "CcCKrea2TextToImage": CcCKrea2TextToImage,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -546,4 +548,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2EditAdvancedSettings": "CcC Krea2 - Edit Advanced Settings",
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
     "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
+    "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
 }

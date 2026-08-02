@@ -201,12 +201,12 @@ Connecting Image Advanced Settings fully overrides the selected preset for that 
   - `role`: `subject` | `scene` | `outfit` | `source`
   - `boost`: Conditioning strength multiplier for this role.
   - `mask_invert`: Invert attention mask for this role.
-  - `grounding_resize_mode`: `normalize` | `crop` | `stretch`.
+  - `grounding_resize_mode`: `none` | `downscale_only` | `normalize` | `clamp`.
   - `grounding_px`: Grounding target pixel dimension.
   - `grounding_min_px`: Grounding minimum dimension floor.
   - `grounding_max_px`: Grounding maximum dimension ceiling.
   - `grounding_resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
-  - `reference_fit_mode`: `fit` | `crop` | `stretch`.
+  - `reference_fit_mode`: `fit` | `crop`.
   - `reference_resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
 
 ---
@@ -263,3 +263,27 @@ Model-only LoRA loader supporting up to 4 chained model-only LoRAs and accumulat
   - `lora_1_strength` .. `lora_4_strength`: Per-slot strength values.
   - `prompt_augmentation` (Optional): Incoming accumulated `prompt_augmentation` from a preceding LoRA stack.
   - `lora_prompt_settings` (Optional): `lora_prompt_settings` bundle from `CcC Krea2 - LoRA Prompt Settings`.
+
+---
+
+### 12. CcC Krea2 - Text to Image
+
+Native helper node for standard Krea 2 Text-to-Image generation using native CLIP tokenization and Empty SD3 Latent generation.
+
+- **Category**: `CcC/Krea2`
+- **Outputs**:
+  - `model`: Input `MODEL` passed through unchanged.
+  - `positive`: `CONDITIONING` generated via native CLIP text tokenization and scheduled encoding.
+  - `negative`: `CONDITIONING` generated via native CLIP text tokenization and scheduled encoding.
+  - `latent`: Empty SD3 `LATENT` dict aligned to 16-pixel multiples (min 128x128) for the selected aspect ratio and megapixel count.
+- **Inputs**:
+  - `model` (Required): Krea 2 `MODEL`.
+  - `clip` (Required): Krea 2 `CLIP` text encoder.
+  - `prompt` (Required): Multiline positive generation prompt.
+  - `aspect_ratio` (Required): Output aspect ratio (`1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, `custom`).
+  - `megapixels` (Required): Target megapixel area (0.25 to 2.0 MP).
+  - `batch_size` (Required): Batch size for empty latent creation (1 to 64).
+  - `custom_aspect_width` / `custom_aspect_height` (Required): Ratio numerator and denominator used when `aspect_ratio` is set to `custom`.
+  - `negative_prompt` (Optional): Multiline negative generation prompt.
+  - `prompt_augmentation` (Optional): Incoming `CCC_KREA2_PROMPT_AUGMENTATION` socket from `CcC Krea2 - LoRA Stack`.
+

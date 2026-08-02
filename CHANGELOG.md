@@ -8,12 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `CcC Krea2 - Text to Image` node (`CcCKrea2TextToImage`) for native text-to-image generation using CLIP tokenization, scheduled text encoding, and Empty SD3 Latent generation.
+- Curated text-to-image example workflow `workflows/text_to_image.json`.
 - `CcC Krea2 - LoRA Stack` node (`CcCKrea2LoRAStack`) for model-only LoRA stacking (up to 4 slots) with global/slot strengths, persistent slot loader instances, and prompt augmentation accumulators.
 - `CcC Krea2 - LoRA Prompt Settings` node (`CcCKrea2LoRAPromptSettings`) for slot-level positive and negative prompt fragment configuration with `prepend` and `append` positioning.
 - Immutable prompt augmentation module (`ccc_krea2/prompt_augmentation.py`) supporting deterministic text merging via double newline `\n\n` separators without mutating input strings.
 - Optional `prompt_augmentation` socket on all 7 Krea 2 main nodes.
-- Full LoRA Stack integration across all 6 production example workflow JSON files in `workflows/`.
-- Unit test suites `tests/test_prompt_augmentation.py` and `tests/test_lora_nodes.py`, as well as updated interface and workflow tests.
+- Full LoRA Stack integration across production example workflow JSON files in `workflows/`.
+- Unit test suites `tests/test_t2i_node.py`, `tests/test_prompt_augmentation.py`, and `tests/test_lora_nodes.py`, as well as updated interface and workflow tests.
+
+### Fixed
+- Standardized default `boost` widget value to `2.5` for `subject` role in `CcCKrea2ImageAdvancedSettings` across example workflows.
+- Corrected documentation option lists for `grounding_resize_mode` and `reference_fit_mode` in `NODES.md`.
 
 ## [0.1.0-alpha] - 2026-07-30
 
