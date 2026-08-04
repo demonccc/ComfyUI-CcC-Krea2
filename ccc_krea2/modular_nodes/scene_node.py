@@ -32,11 +32,11 @@ class CcCKrea2SceneImage:
         return {
             "required": {
                 "prepared_image": ("PREPARED_VISION_IMAGE",),
-                "visual_fit_mode": (["auto", "exact", "crop", "fit", "stretch"], {"default": "auto"}),
+                "visual_fit_mode": (["auto", "fit", "crop"], {"default": "auto"}),
                 "attention_boost": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.05}),
                 "masked_attention_boost": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.05}),
-                "scene_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 10.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
-                "masked_region_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 10.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
+                "scene_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
+                "masked_region_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
                 "extra_vision_directive": ("STRING", {"default": "", "multiline": True}),
                 "vision_slot": ("INT", {"default": 0, "min": 0, "max": 16, "step": 1}),
                 "aliases": ("STRING", {"default": ""}),
@@ -65,6 +65,12 @@ class CcCKrea2SceneImage:
         chain = reference_chain or kwargs.get("previous_references")
         if chain is None:
             chain = ReferenceChain()
+
+        # Handle legacy serialized fit modes
+        if visual_fit_mode == "exact":
+            visual_fit_mode = "auto"
+        elif visual_fit_mode == "stretch":
+            visual_fit_mode = "crop"
 
         alias_str = aliases.strip() if aliases.strip() else "scene_image, Image {slot}"
 

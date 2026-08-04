@@ -112,11 +112,35 @@ def run_krea2_edit_orchestrator(
             })
 
             # Non-style images enter both positive and negative Qwen lists
+            pos_idx = len(pos_qwen_images) + 1
             pos_qwen_images.append(spec.prepared_image.vision_image)
-            pos_qwen_image_map.append({"role": ref_role, "slot": slot, "image": spec.prepared_image.vision_image, "spec": spec})
+            pos_qwen_image_map.append({
+                "role": ref_role,
+                "slot": slot,
+                "logical_reference_id": slot,
+                "logical_role": ref_role,
+                "logical_vision_slot": slot,
+                "physical_qwen_image_index": pos_idx,
+                "style_group_id": None,
+                "crop_tile_index": None,
+                "image": spec.prepared_image.vision_image,
+                "spec": spec
+            })
 
+            neg_idx = len(neg_qwen_images) + 1
             neg_qwen_images.append(spec.prepared_image.vision_image)
-            neg_qwen_image_map.append({"role": ref_role, "slot": slot, "image": spec.prepared_image.vision_image, "spec": spec})
+            neg_qwen_image_map.append({
+                "role": ref_role,
+                "slot": slot,
+                "logical_reference_id": slot,
+                "logical_role": ref_role,
+                "logical_vision_slot": slot,
+                "physical_qwen_image_index": neg_idx,
+                "style_group_id": None,
+                "crop_tile_index": None,
+                "image": spec.prepared_image.vision_image,
+                "spec": spec
+            })
 
         elif ref_role == "style":
             assert isinstance(spec, StyleReferenceSpec)
@@ -125,14 +149,27 @@ def run_krea2_edit_orchestrator(
                 # Style directives excluded from negative context!
 
             prep_crops, s_start, s_end = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
-            for crop_prep in prep_crops:
+            phys_range = ref_item["physical_qwen_range"]
+            for crop_idx, crop_prep in enumerate(prep_crops):
+                pos_idx = len(pos_qwen_images) + 1
                 pos_qwen_images.append(crop_prep.vision_image)
-                pos_qwen_image_map.append({"role": "style", "slot": slot, "image": crop_prep.vision_image, "spec": spec})
+                pos_qwen_image_map.append({
+                    "role": "style",
+                    "slot": slot,
+                    "logical_reference_id": slot,
+                    "logical_role": "style",
+                    "logical_vision_slot": slot,
+                    "physical_qwen_image_index": pos_idx,
+                    "style_group_id": slot,
+                    "crop_tile_index": crop_idx,
+                    "image": crop_prep.vision_image,
+                    "spec": spec
+                })
 
             style_ref_specs.append({
                 "role": "style",
                 "slot": slot,
-                "spans": (s_start, s_end),
+                "spans": phys_range,  # Section 8: draw physical range directly from ref_item
                 "spec": spec,
                 "ref_item": ref_item
             })
@@ -221,11 +258,12 @@ def run_krea2_edit_orchestrator(
         sp = st["spec"]
         ref_item = st["ref_item"]
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
+        phys_range = ref_item.get("physical_qwen_range", st["spans"])
         info_lines.extend([
             f"Style [Slot {st['slot']}]:",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             f"  Processing: {sp.style_processing}",
-            f"  Physical Qwen Spans: {st['spans'][0]}-{st['spans'][1]}",
+            f"  Physical Qwen Spans: {phys_range[0]}-{phys_range[1]}",
             f"  Style Fidelity: {sp.style_fidelity:.2f}",
             f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
             f"  Style Vision Directive Enabled: {sp.style_directive}",
@@ -240,10 +278,11 @@ def run_krea2_edit_orchestrator(
         f"  Prompt Augmentation Active: {'yes' if prompt_augmentation is not None else 'no'}",
     ])
 
-    if slot_warnings:
+    all_warnings = list(slot_warnings) + pos_qwen_context.warnings + neg_qwen_context.warnings
+    if all_warnings:
         info_lines.append("")
         info_lines.append("Warnings:")
-        for w in slot_warnings:
+        for w in all_warnings:
             info_lines.append(f"  - {w}")
 
     edit_info = "\n".join(info_lines)

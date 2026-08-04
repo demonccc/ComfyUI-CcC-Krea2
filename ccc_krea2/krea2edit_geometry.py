@@ -4,7 +4,6 @@ Ported and attributed from ComfyUI-Krea2Edit by lbouaraba (GPL-3.0 / MIT).
 https://github.com/lbouaraba/comfyui-krea2edit
 """
 
-import math
 import torch
 import torch.nn.functional as F
 from dataclasses import dataclass
@@ -43,12 +42,18 @@ def resolve_krea2edit_geometry(
     src_ar = src_w / float(src_h)
     tgt_ar = tgt_w / float(tgt_h)
 
-    # Step 1: Auto-mode decision logic
-    if fit_mode in ("auto", "fit"):
+    # Handle legacy fit mode aliases
+    if fit_mode == "exact":
+        fit_mode = "auto"
+    elif fit_mode == "stretch":
+        fit_mode = "crop"
+
+    # Step 1: Resolve mode
+    if fit_mode == "auto":
         if (src_w, src_h) == (tgt_w, tgt_h):
             resolved_mode = "exact"
         elif src_w >= tgt_w and src_h >= tgt_h:
-            # Check crop_only criteria (max 5% per dim crop, max 10% area discarded)
+            # Custom crop_only optimization applies strictly when Visual Reference Fit = auto
             crop_w = tgt_w
             crop_h = tgt_h
             dw_pct = (src_w - crop_w) / float(src_w)
@@ -73,12 +78,24 @@ def resolve_krea2edit_geometry(
                 resolved_mode = "crop_and_resize"
             else:
                 resolved_mode = "fit"
+    elif fit_mode == "fit":
+        # Section 6.2: Manual "fit" mode uses upstream resolver directly (does NOT run custom crop_only optimization)
+        if (src_w, src_h) == (tgt_w, tgt_h):
+            resolved_mode = "exact"
+        else:
+            sc = min(tgt_h / float(src_h), tgt_w / float(src_w))
+            coverage_h = (src_h * sc) / float(tgt_h)
+            coverage_w = (src_w * sc) / float(tgt_w)
+            if coverage_h >= 0.92 and coverage_w >= 0.92:
+                resolved_mode = "crop_and_resize"
+            else:
+                resolved_mode = "fit"
     elif fit_mode == "crop":
         resolved_mode = "crop_and_resize"
     else:
         resolved_mode = fit_mode
 
-    # Step 2: Calculate crop rectangle and VAE input dimensions according to mode
+    # Step 2: Calculate crop rectangle and VAE input dimensions according to resolved mode
     if resolved_mode in ("exact", "crop_only"):
         crop_w = tgt_w
         crop_h = tgt_h
@@ -93,10 +110,10 @@ def resolve_krea2edit_geometry(
         # Minimal center crop to match target aspect ratio, then resize to exact target dimensions
         if src_ar > tgt_ar:
             crop_h = src_h
-            crop_w = int(round(src_h * tgt_ar))
+            crop_w = int(src_h * tgt_ar)
         else:
             crop_w = src_w
-            crop_h = int(round(src_w / tgt_ar))
+            crop_h = int(src_w / tgt_ar)
 
         left = (src_w - crop_w) // 2
         top = (src_h - crop_h) // 2
@@ -107,11 +124,12 @@ def resolve_krea2edit_geometry(
 
     else:  # "fit" - Genuine aspect-ratio mismatch
         sc = min(tgt_h / float(src_h), tgt_w / float(src_w))
-        fitted_h = min(tgt_h, max(16, (int(round(src_h * sc)) // 16) * 16))
-        fitted_w = min(tgt_w, max(16, (int(round(src_w * sc)) // 16) * 16))
+        # Section 6.1: Exact upstream behavior uses int(src * sc) // 16 * 16 (no round() before // 16)
+        fitted_h = min(tgt_h, max(16, (int(src_h * sc) // 16) * 16))
+        fitted_w = min(tgt_w, max(16, (int(src_w * sc) // 16) * 16))
 
-        crop_h = min(src_h, max(1, int(round(fitted_h / sc))))
-        crop_w = min(src_w, max(1, int(round(fitted_w / sc))))
+        crop_h = min(src_h, max(1, int(fitted_h / sc)))
+        crop_w = min(src_w, max(1, int(fitted_w / sc)))
 
         left = (src_w - crop_w) // 2
         top = (src_h - crop_h) // 2

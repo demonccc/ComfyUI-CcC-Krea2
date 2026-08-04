@@ -75,14 +75,52 @@ def test_expand_style_reference_spans():
 def test_apply_statistical_style_fidelity_and_indirect():
     from ccc_krea2.style_processing import apply_statistical_style_fidelity
     cond = torch.randn(1, 100, 768)
-    spans = [(10, 30)]
 
     # Test fidelity blending
-    blended, ind = apply_statistical_style_fidelity(cond, spans=spans, fidelity=0.5, indirect=False)
+    spans_info_blend = [((10, 30), 0.5, False)]
+    blended, ind, removed = apply_statistical_style_fidelity(cond, spans_info=spans_info_blend)
     assert blended.shape == cond.shape
     assert ind is False
+    assert removed == []
 
-    # Test indirect style transfer
-    sliced, ind = apply_statistical_style_fidelity(cond, spans=spans, fidelity=0.5, indirect=True)
+    # Test indirect style transfer single span
+    spans_info_ind = [((10, 30), 0.5, True)]
+    sliced, ind, removed = apply_statistical_style_fidelity(cond, spans_info=spans_info_ind)
     assert sliced.shape == (1, 80, 768)
     assert ind is True
+    assert len(removed) == 20
+
+    # Test multi-span indirect style transfer in single pass
+    spans_info_multi = [
+        ((10, 20), 0.5, True),
+        ((40, 50), 0.8, True)
+    ]
+    sliced_multi, ind_m, removed_m = apply_statistical_style_fidelity(cond, spans_info=spans_info_multi)
+    assert sliced_multi.shape == (1, 80, 768)
+    assert ind_m is True
+    assert len(removed_m) == 20
+    assert set(removed_m) == set(range(10, 20)).union(set(range(40, 50)))
+
+
+def test_geometry_parity_floor_vs_round():
+    from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
+    # Test genuine aspect ratio mismatch (src_ar = 2.0 vs tgt_ar = 1.0)
+    # src = 200x100 (W=200, H=100), tgt = 500x500 (W=500, H=500)
+    # sc = min(500/100, 500/200) = 2.5
+    # fitted_h = min(500, max(16, int(100 * 2.5) // 16 * 16)) = 240
+    # fitted_w = min(500, max(16, int(200 * 2.5) // 16 * 16)) = 500
+    geom_fit_mismatch = resolve_krea2edit_geometry(src_h=100, src_w=200, tgt_h=500, tgt_w=500, fit_mode="fit")
+    assert geom_fit_mismatch.mode_resolved == "fit"
+    assert geom_fit_mismatch.vae_input_pixel_size == (496, 240)
+    assert geom_fit_mismatch.vae_input_pixel_size[0] % 16 == 0
+    assert geom_fit_mismatch.vae_input_pixel_size[1] % 16 == 0
+
+    # Test manual fit mode with near-matched aspect ratio does not apply crop_only
+    geom_fit = resolve_krea2edit_geometry(src_h=520, src_w=520, tgt_h=512, tgt_w=512, fit_mode="fit")
+    assert geom_fit.mode_resolved == "crop_and_resize"  # Coverage >= 0.92 -> crop_and_resize, not crop_only
+
+    # Test manual crop mode
+    geom_crop = resolve_krea2edit_geometry(src_h=600, src_w=800, tgt_h=512, tgt_w=512, fit_mode="crop")
+    assert geom_crop.mode_resolved == "crop_and_resize"
+    assert geom_crop.vae_input_pixel_size == (512, 512)
+

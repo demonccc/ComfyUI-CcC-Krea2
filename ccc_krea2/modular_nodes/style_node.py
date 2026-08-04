@@ -62,7 +62,7 @@ class CcCKrea2StyleImage:
         if chain is None:
             chain = ReferenceChain()
 
-        alias_str = aliases.strip() if aliases.strip() else "style_image, Image {slot}"
+        alias_str = aliases.strip() if aliases.strip() else "style_image"
 
         spec = StyleReferenceSpec(
             role="style",

@@ -55,6 +55,19 @@ def test_qwen_vision_prep_info_formatting():
     assert "Vision Encoder:" in info
     assert "Mode: native" in info
     assert "Prepared Size:" in info
+    assert "Introspection Status:" in info
+    assert "Introspection Warnings:" in info
+    assert "Native Interpolation: bilinear" in info
+
+
+def test_qwen_vision_prep_introspection_tracking():
+    from ccc_krea2.vision_prep import resolve_qwen_encoder_config
+    class DummyCLIP:
+        pass
+    cfg = resolve_qwen_encoder_config(DummyCLIP())
+    assert cfg.introspection_status == "fallback_only"
+    assert len(cfg.introspection_warnings) > 0
+    assert cfg.interpolation == "bilinear"
 
 
 def test_qwen_vision_prep_node_execution():

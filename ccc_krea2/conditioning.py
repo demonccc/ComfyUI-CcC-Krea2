@@ -19,6 +19,7 @@ class EncodedQwenContext:
     physical_images: List[Any]
     physical_image_map: List[Dict[str, Any]]
     vision_row_spans: List[Tuple[int, int]]
+    warnings: List[str]
 
 
 def build_role_instructions(role_order: List[ReferenceRole]) -> str:
@@ -74,53 +75,107 @@ def build_krea2_qwen_template(num_images: int, system_prompt: str = DEFAULT_SYST
 IM_START, USER, NEWLINE = 151644, 872, 198
 
 
-def extract_vision_spans_from_tokens(tokens: Any) -> List[Tuple[int, int]]:
-    """Extract vision row spans after Krea2 system+user template prefix stripping."""
+def extract_vision_spans_from_tokens(
+    tokens: Any,
+    physical_image_map: List[Dict[str, Any]],
+    factor: int = 32
+) -> Tuple[List[Tuple[int, int]], List[str]]:
+    """Extract vision row spans from Qwen token stream using real Qwen grid geometry after template prefix stripping."""
+    warnings: List[str] = []
     tok_pairs = []
-    if isinstance(tokens, dict) and "qwen3vl_4b" in tokens and tokens["qwen3vl_4b"]:
-        tok_pairs = tokens["qwen3vl_4b"][0]
+
+    if isinstance(tokens, dict):
+        # Resolve active token stream robustly
+        found_key = None
+        for k in ("qwen3vl_4b", "qwen_vl", "qwen3vl"):
+            if k in tokens and tokens[k]:
+                found_key = k
+                tok_pairs = tokens[k][0] if isinstance(tokens[k], list) and len(tokens[k]) > 0 else tokens[k]
+                break
+
+        if not found_key and physical_image_map:
+            # Check for any dictionary entry containing token list
+            for k, v in tokens.items():
+                if isinstance(v, list) and len(v) > 0 and isinstance(v[0], list):
+                    found_key = k
+                    tok_pairs = v[0]
+                    break
+
+        if not found_key and physical_image_map:
+            raise ValueError(
+                f"{LOGGER_PREFIX} Incompatible CLIP token structure. Available token keys: {list(tokens.keys())}"
+            )
     elif isinstance(tokens, list):
         tok_pairs = tokens
 
+    # Calculate real Qwen output rows per physical image based on prepared dimensions and encoder factor
+    expected_rows: List[int] = []
+    for item in physical_image_map:
+        img = item.get("image")
+        if img is not None and hasattr(img, "shape") and len(img.shape) >= 2:
+            ph, pw = img.shape[-2], img.shape[-1]
+            rows = max(1, (ph // factor) * (pw // factor))
+        else:
+            rows = 256
+        expected_rows.append(rows)
+
     if not tok_pairs:
-        return []
+        # Fallback when CLIP is a mock object without token pairs
+        warnings.append("Token pair stream empty; using prepared image grid dimensions for vision spans.")
+        spans = []
+        curr_idx = 0
+        for r in expected_rows:
+            spans.append((curr_idx, curr_idx + r))
+            curr_idx += r
+        return spans, warnings
 
     spans = []
-    rows = 0
+    rows_counter = 0
     template_end = -1
     count_im_start = 0
     ids = []
+    img_idx = 0
 
     for v in tok_pairs:
         elem = v[0] if isinstance(v, (list, tuple)) else v
         if isinstance(elem, dict):
-            # Same token row math as Qwen3-VL TE
-            data = elem.get("data", elem.get("image", elem))
-            if isinstance(data, torch.Tensor):
-                h, w = (data.shape[-2], data.shape[-1]) if data.ndim >= 2 else (256, 256)
-                n = max(1, (h // 32) * (w // 32))
-            else:
-                n = 256
-            spans.append((rows, rows + n))
+            # embedded image dictionary
+            n = expected_rows[img_idx] if img_idx < len(expected_rows) else 256
+            spans.append((rows_counter, rows_counter + n))
             ids.append(None)
-            rows += n
+            rows_counter += n
+            img_idx += 1
         else:
             try:
                 tid = int(elem) if not torch.is_tensor(elem) else -1
             except (ValueError, TypeError):
                 tid = -1
             if tid == IM_START and count_im_start < 2:
-                template_end = rows
+                template_end = rows_counter
                 count_im_start += 1
             ids.append(tid)
-            rows += 1
+            rows_counter += 1
 
     if template_end >= 0 and len(ids) > (template_end + 3):
         if ids[template_end + 1] == USER and ids[template_end + 2] == NEWLINE:
             template_end += 3
 
     template_end = max(template_end, 0)
-    return [(max(s - template_end, 0), e - template_end) for s, e in spans if e > template_end]
+    adjusted_spans = [(max(s - template_end, 0), e - template_end) for s, e in spans if e > template_end]
+
+    # Validate spans
+    if physical_image_map and len(adjusted_spans) != len(physical_image_map):
+        warnings.append(
+            f"Mapped vision spans count ({len(adjusted_spans)}) differs from physical images ({len(physical_image_map)})."
+        )
+
+    for i in range(len(adjusted_spans) - 1):
+        s1, e1 = adjusted_spans[i]
+        s2, e2 = adjusted_spans[i + 1]
+        if s2 < e1:
+            raise ValueError(f"{LOGGER_PREFIX} Overlapping vision row spans detected: {adjusted_spans}.")
+
+    return adjusted_spans, warnings
 
 
 def encode_krea2_qwen_context(
@@ -135,6 +190,7 @@ def encode_krea2_qwen_context(
     if clip is None:
         raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
 
+    warnings_list: List[str] = []
     num_images = len(physical_images)
     dynamic_template = build_krea2_qwen_template(num_images=num_images, system_prompt=system_prompt)
 
@@ -149,32 +205,25 @@ def encode_krea2_qwen_context(
 
     conditioning = clip.encode_from_tokens_scheduled(tokens)
 
-    # Extract vision row spans after template stripping
-    vision_row_spans = extract_vision_spans_from_tokens(tokens)
-    if not vision_row_spans and physical_image_map:
-        # Fallback for mock environment CLIP objects where token pairs are not present
-        curr_idx = 0
-        for item in physical_image_map:
-            img = item.get("image")
-            if img is not None and hasattr(img, "shape") and len(img.shape) >= 3:
-                h, w = img.shape[-3], img.shape[-2]
-                tokens_count = max(1, (h // 32) * (w // 32))
-            else:
-                tokens_count = 256
-            vision_row_spans.append((curr_idx, curr_idx + tokens_count))
-            curr_idx += tokens_count
+    # Extract vision row spans using real Qwen image grid geometry
+    vision_row_spans, span_warnings = extract_vision_spans_from_tokens(
+        tokens=tokens,
+        physical_image_map=physical_image_map,
+        factor=32
+    )
+    warnings_list.extend(span_warnings)
 
     # Apply Moodboard style processing (Fidelity & Indirect Transfer) for positive conditioning
     if is_positive and conditioning and physical_image_map:
-        style_spans_info = []
+        spans_info: List[Tuple[Tuple[int, int], float, bool]] = []
         for idx, item in enumerate(physical_image_map):
             if item.get("role") == "style" and idx < len(vision_row_spans):
                 spec = item.get("spec")
                 fidelity = getattr(spec, "style_fidelity", 1.0)
                 indirect = getattr(spec, "indirect_style_transfer", False)
-                style_spans_info.append((vision_row_spans[idx], fidelity, indirect))
+                spans_info.append((vision_row_spans[idx], fidelity, indirect))
 
-        if style_spans_info:
+        if spans_info:
             new_conditioning = []
             for cond_entry in conditioning:
                 if isinstance(cond_entry, (list, tuple)) and len(cond_entry) > 0:
@@ -183,25 +232,24 @@ def encode_krea2_qwen_context(
                     new_extras = extras.copy() if isinstance(extras, dict) else extras
 
                     if isinstance(cond_tensor, torch.Tensor):
-                        transformed_tensor = cond_tensor
-                        indirect_occurred = False
+                        transformed_tensor, indirect_applied, removed_indices = apply_statistical_style_fidelity(
+                            cond_tensor=cond_tensor,
+                            spans_info=spans_info
+                        )
 
-                        for (span_range, fidelity, indirect) in style_spans_info:
-                            transformed_tensor, ind_applied = apply_statistical_style_fidelity(
-                                cond_tensor=transformed_tensor,
-                                spans=[span_range],
-                                fidelity=fidelity,
-                                indirect=indirect
-                            )
-                            if ind_applied:
-                                indirect_occurred = True
-
-                        if indirect_occurred and isinstance(new_extras, dict):
-                            new_extras.pop("attention_mask", None)
+                        # Metadata repair for attention_mask if indirect rows were removed
+                        if indirect_applied and isinstance(new_extras, dict):
+                            att_mask = new_extras.get("attention_mask")
+                            if isinstance(att_mask, torch.Tensor) and att_mask.shape[-1] == cond_tensor.shape[1]:
+                                keep = torch.ones(cond_tensor.shape[1], dtype=torch.bool, device=att_mask.device)
+                                keep[removed_indices] = False
+                                new_extras["attention_mask"] = att_mask[..., keep]
+                            else:
+                                new_extras.pop("attention_mask", None)
 
                         new_conditioning.append([transformed_tensor, new_extras])
                     else:
-                        new_conditioning.append(cond_entry)
+                        new_conditioning.append(list(cond_entry))
                 else:
                     new_conditioning.append(cond_entry)
             conditioning = new_conditioning
@@ -212,6 +260,7 @@ def encode_krea2_qwen_context(
         physical_images=physical_images,
         physical_image_map=physical_image_map,
         vision_row_spans=vision_row_spans,
+        warnings=warnings_list,
     )
 
 

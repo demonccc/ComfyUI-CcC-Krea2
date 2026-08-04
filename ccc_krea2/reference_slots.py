@@ -117,6 +117,9 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
         resolved.append({
             "spec": spec,
             "resolved_slot": slot,
+            "logical_reference_id": slot,
+            "logical_role": role,
+            "logical_vision_slot": slot,
             "expanded_aliases": tuple(expanded_aliases),
             "vae_reference_frame": vae_frame,
             "physical_qwen_range": physical_qwen_range,

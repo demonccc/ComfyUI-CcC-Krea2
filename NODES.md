@@ -12,7 +12,7 @@ CcC Krea2 provides a modern, 5-layer decoupled architecture for precise image ed
    Processes input images via Qwen-VL tokenization, yielding reusable, pre-computed `CCC_KREA2_PREPARED_IMAGE` tokens and dual-path geometry bounds.
 
 2. **Layer 2: Declarative Reference Chain (`CcCKrea2SubjectImage`, `CcCKrea2SceneImage`, `CcCKrea2OutfitImage`, `CcCKrea2StyleImage`)**
-   Defines atomic reference roles with specific weights, fit strategies (`auto`, `fit`, `crop`, `stretch`), prompt alias templates, and attention masks, chaining them into an immutable `CCC_KREA2_REFERENCE_CHAIN`.
+   Defines atomic reference roles with specific weights, fit strategies (`auto`, `fit`, `crop`), prompt alias templates, anchor ranges (0.0–1.0), and attention masks, chaining them into an immutable `CCC_KREA2_REFERENCE_CHAIN`.
 
 3. **Layer 3: Target Latent (`CcCKrea2TargetLatent`)**
    Computes or extracts the target latent canvas (`empty`, `subject`, `scene`, `inpaint`, `custom`) using an automated 4-way visual reference fit resolver (`fixed`, `fit_subject`, `fit_scene`, `crop_subject`).

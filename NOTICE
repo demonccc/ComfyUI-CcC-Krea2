@@ -5,22 +5,22 @@ This project incorporates architectural concepts, reference implementations, and
 
 1. ComfyUI by the ComfyUI project (comfyanonymous)
    https://github.com/comfyanonymous/ComfyUI
+   Commit reference: main (comfy/text_encoders/qwen3vl.py, comfy/text_encoders/qwen_vl.py)
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
 
 2. ComfyUI-Krea2Edit by lbouaraba
    https://github.com/lbouaraba/comfyui-krea2edit
+   Commit reference: main (_fit_encode_image pixel-space reference fitting, floor /16 grid alignment, RoPE 3D frame positioning)
    Licensed under the Apache License, Version 2.0 (Apache-2.0).
-   Included logic for model patch wrappers, SingleStreamDiT in-context forward sequences, RoPE 3D frame positioning, reference attention logit bias, and pixel-space reference fitting.
 
 3. ComfyUI-EditUtils by lrzjason
    https://github.com/lrzjason/ComfyUI-EditUtils
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
-   Included logic for reference image processing, spatial dimension alignment, and masked image latents.
 
 4. ComfyUI-Krea2Moodboard by RedNodeAI
    https://github.com/RedNodeAI/ComfyUI-Krea2Moodboard
+   Commit reference: main (token-span mapping, statistical style fidelity, multi-span indirect style transfer)
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
-   Included UX concepts for semantic role ordering and positive/negative grounding consistency.
 
 This package is licensed under the GNU General Public License v3.0 (GPL-3.0).
 Model weights (Krea 2 checkpoints, Qwen3-VL text encoder, VAE, edit LoRAs) are separate works with their own respective licenses and are not distributed as part of this software package.

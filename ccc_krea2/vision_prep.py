@@ -1,9 +1,7 @@
-"""Qwen Vision image preparation logic, encoder introspection, and formatting helpers."""
-
 import torch
 import math
 from dataclasses import dataclass
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, List
 from ccc_krea2.reference_specs import VisionPrepSpec, PreparedVisionImage
 from ccc_krea2.geometry import resize_tensor
 
@@ -17,15 +15,15 @@ class QwenVisionEncoderConfig:
     min_pixels: int
     max_pixels: int
     interpolation: str
+    introspection_status: str
+    introspection_warnings: Tuple[str, ...]
     value_sources: Dict[str, str]
 
 
 def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
-    """Resolve Qwen Vision encoder configuration with strict fallback hierarchy."""
-    # Standard Krea 2 / Qwen3-VL fallback defaults
+    """Resolve Qwen Vision encoder configuration with strict fallback hierarchy and explicit introspection warning tracking."""
     fallback_patch_size = 16
     fallback_merge_size = 2
-    fallback_factor = 32
     fallback_min_pixels = 3136
     fallback_max_pixels = 12845056
 
@@ -44,9 +42,14 @@ def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
     m_size = fallback_merge_size
     min_px = fallback_min_pixels
     max_px = fallback_max_pixels
-    interp = "bicubic"
+    interp = "bilinear"  # Section 5.1: Native Qwen fallback interpolation is bilinear
+
+    warnings: List[str] = []
+    introspection_attempted = False
+    introspection_succeeded = False
 
     if clip is not None:
+        introspection_attempted = True
         try:
             cond_stage = getattr(clip, "cond_stage_model", None) or getattr(clip, "patcher", None)
             if cond_stage is not None:
@@ -59,6 +62,7 @@ def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
                 if visual is not None:
                     sig = type(visual).__name__
                     sources["encoder_signature"] = "introspected"
+                    introspection_succeeded = True
 
                     found_p = getattr(visual, "patch_size", None)
                     if isinstance(found_p, int) and found_p > 0:
@@ -79,11 +83,22 @@ def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
                     if isinstance(found_max, (int, float)) and found_max > 0:
                         max_px = int(found_max)
                         sources["max_pixels"] = "introspected"
-        except Exception:
-            pass
+                else:
+                    warnings.append("CLIP model object has no visual / image_encoder attribute.")
+            else:
+                warnings.append("CLIP object has no cond_stage_model or patcher attribute.")
+        except Exception as e:
+            warnings.append(f"CLIP vision encoder introspection failed ({type(e).__name__}): {e}")
 
     factor = p_size * m_size
     sources["factor"] = "derived" if (sources["patch_size"] == "introspected" or sources["merge_size"] == "introspected") else "fallback"
+
+    if introspection_succeeded:
+        status = "succeeded" if not warnings else "partial"
+    elif introspection_attempted:
+        status = "fallback_only"
+    else:
+        status = "none"
 
     return QwenVisionEncoderConfig(
         encoder_signature=sig,
@@ -93,6 +108,8 @@ def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
         min_pixels=min_px,
         max_pixels=max_px,
         interpolation=interp,
+        introspection_status=status,
+        introspection_warnings=tuple(warnings),
         value_sources=sources,
     )
 
@@ -130,11 +147,7 @@ def calculate_qwen_vision_resolution(
     fixed_mp: float,
     config: QwenVisionEncoderConfig
 ) -> Tuple[int, int, int, int, str, str, str]:
-    """Calculate prepared vision image dimensions based on mode and Qwen encoder constraints.
-
-    Returns:
-        (native_h, native_w, prep_h, prep_w, direction, resolved_method, additional_adjustment)
-    """
+    """Calculate prepared vision image dimensions based on mode and Qwen encoder constraints."""
     native_h, native_w = calculate_native_qwen_geometry(image_h, image_w, config)
     factor = config.factor
 
@@ -218,7 +231,7 @@ def prepare_vision_image(
 
     resolved_method = auto_method
     if mode == "native":
-        resolved_method = config.interpolation
+        resolved_method = config.interpolation  # Section 5.1: native mode uses config.interpolation ("bilinear")
     elif direction == "downscale" and downscale_method != "auto":
         resolved_method = downscale_method
     elif direction == "upscale" and upscale_method != "auto":
@@ -263,7 +276,7 @@ def prepare_vision_image(
 
 
 def format_vision_info(prep_img: PreparedVisionImage) -> str:
-    """Format human-readable vision_info string following exact Section 3 key names."""
+    """Format human-readable vision_info string following exact Section 5.2 required key names."""
     meta = prep_img.debug_metadata
     spec = prep_img.prep_spec
     config: QwenVisionEncoderConfig = meta["config"]
@@ -282,6 +295,7 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
     )
 
     config_source_str = f"{config.value_sources.get('encoder_signature', 'fallback')} (patch: {config.value_sources.get('patch_size', 'fallback')}, limits: {config.value_sources.get('min_pixels', 'fallback')})"
+    warnings_str = "; ".join(config.introspection_warnings) if config.introspection_warnings else "none"
 
     lines = [
         f"Vision Encoder: {config.encoder_signature}",
@@ -291,6 +305,9 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
         f"Encoder Factor: {config.factor}",
         f"Native Minimum Pixels: {config.min_pixels}",
         f"Native Maximum Pixels: {config.max_pixels}",
+        f"Native Interpolation: {config.interpolation}",
+        f"Introspection Status: {config.introspection_status}",
+        f"Introspection Warnings: {warnings_str}",
         f"Mode: {spec.mode}",
         f"Source Size: {iw} x {ih}",
         f"Source Area: {src_area:.3f} MP",
@@ -309,3 +326,4 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
     ]
 
     return "\n".join(lines)
+
