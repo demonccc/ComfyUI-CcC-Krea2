@@ -1,6 +1,27 @@
 # CcC Krea2 Node Reference
 
-Complete user-facing documentation for all 11 nodes in the **CcC Krea2** suite.
+Complete user-facing documentation for all nodes in the **CcC Krea2** suite, including both classic single-node workflows and the decoupled 5-Layer Modular Pipeline.
+
+---
+
+## 5-Layer Decoupled Modular Architecture
+
+CcC Krea2 provides a modern, 5-layer decoupled architecture for precise image editing and reference composition:
+
+1. **Layer 1: Input & Vision Preparation (`CcCKrea2QwenVisionImagePrep`)**
+   Processes input images via Qwen-VL tokenization, yielding reusable, pre-computed `CCC_KREA2_PREPARED_IMAGE` tokens and dual-path geometry bounds.
+
+2. **Layer 2: Declarative Reference Chain (`CcCKrea2SubjectImage`, `CcCKrea2SceneImage`, `CcCKrea2OutfitImage`, `CcCKrea2StyleImage`)**
+   Defines atomic reference roles with specific weights, fit strategies (`auto`, `fit`, `crop`, `stretch`), prompt alias templates, and attention masks, chaining them into an immutable `CCC_KREA2_REFERENCE_CHAIN`.
+
+3. **Layer 3: Target Latent (`CcCKrea2TargetLatent`)**
+   Computes or extracts the target latent canvas (`empty`, `subject`, `scene`, `inpaint`, `custom`) using an automated 4-way visual reference fit resolver (`fixed`, `fit_subject`, `fit_scene`, `crop_subject`).
+
+4. **Layer 4: Styling & LoRA Stack (`CcCKrea2LoRAStack`, `CcCKrea2LoRAPromptSettings`)**
+   Applies model-only LoRAs and prompt augmentations cleanly decoupled from reference role declarations.
+
+5. **Layer 5: Orchestration Engine (`CcCKrea2Edit`)**
+   Consolidates the reference chain, target latent, and styling inputs, executing model patching and conditioning generation in a single atomic step.
 
 ---
 
@@ -285,5 +306,143 @@ Native helper node for standard Krea 2 Text-to-Image generation using native CLI
   - `batch_size` (Required): Batch size for empty latent creation (1 to 64).
   - `custom_aspect_width` / `custom_aspect_height` (Required): Ratio numerator and denominator used when `aspect_ratio` is set to `custom`.
   - `negative_prompt` (Optional): Multiline negative generation prompt.
-  - `prompt_augmentation` (Optional): Incoming `CCC_KREA2_PROMPT_AUGMENTATION` socket from `CcC Krea2 - LoRA Stack`.
+---
+
+## Modular Pipeline Node Reference
+
+### 13. CcC Krea2 - Qwen Vision Image Prep
+
+Vision preparation layer node for processing input images into reusable vision embeddings via Qwen-VL.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `prepared_image`: `CCC_KREA2_PREPARED_IMAGE` socket containing VAE latents and Qwen vision tokens.
+  - `vision_image`: `IMAGE` tensor after vision resize processing.
+  - `vision_info`: Human-readable `STRING` summary of preparation parameters.
+- **Inputs**:
+  - `clip` (Required): `CLIP` text/vision encoder.
+  - `image` (Required): `IMAGE` input tensor.
+  - `preset`: `native` | `balanced` | `max_identity` | `flexible`.
+  - `target_megapixels`: Target area scaling factor (float, default `1.0`).
+  - `fit_mode`: `auto` | `fit` | `crop` | `stretch`.
+  - `resize_method`: Resampling algorithm (`auto`, `nearest-exact`, `bilinear`, `bicubic`, `area`, `lanczos`).
+
+---
+
+### 14. CcC Krea2 - Subject Image Reference
+
+Declarative reference node for defining subject identity inputs in the reference chain.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `references`: `CCC_KREA2_REFERENCE_CHAIN` immutable reference stack output.
+- **Inputs**:
+  - `prepared_image` (Required): Input `CCC_KREA2_PREPARED_IMAGE` from Vision Prep.
+  - `attention_mask` (Optional): Spatial `MASK` for subject isolating attention.
+  - `previous_references` (Optional): Incoming `CCC_KREA2_REFERENCE_CHAIN` to append onto.
+  - `subject_preset`: `auto` | `balanced` | `max_identity` | `flexible`.
+  - `aliases`: Prompt replacement tokens (e.g. `subject_image, Image {slot}`).
+  - `vision_directive`: Optional text instruction for Qwen vision reasoning.
+  - `subject_boost`, `grounding_boost`, `reference_boost`: Fine-grained attention multipliers.
+  - `fit_mode`: `auto` | `fit` | `crop` | `stretch`.
+
+---
+
+### 15. CcC Krea2 - Scene Image Reference
+
+Declarative reference node for scene composition, environment, and lighting inputs.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `references`: `CCC_KREA2_REFERENCE_CHAIN` immutable reference stack output.
+- **Inputs**:
+  - `prepared_image` (Required): Input `CCC_KREA2_PREPARED_IMAGE` from Vision Prep.
+  - `attention_mask` (Optional): Spatial `MASK` for scene masking.
+  - `previous_references` (Optional): Incoming `CCC_KREA2_REFERENCE_CHAIN`.
+  - `scene_preset`: `auto` | `balanced` | `max_identity` | `flexible`.
+  - `aliases`: Prompt replacement tokens (e.g. `scene_image, Image {slot}`).
+  - `vision_directive`: Text instruction for scene reasoning.
+  - `scene_boost`, `grounding_boost`, `reference_boost`: Attention multipliers.
+  - `fit_mode`: `auto` | `fit` | `crop` | `stretch`.
+
+---
+
+### 16. CcC Krea2 - Outfit Image Reference
+
+Declarative reference node for outfit and garment details.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `references`: `CCC_KREA2_REFERENCE_CHAIN` immutable reference stack output.
+- **Inputs**:
+  - `prepared_image` (Required): Input `CCC_KREA2_PREPARED_IMAGE` from Vision Prep.
+  - `attention_mask` (Optional): Garment spatial `MASK`.
+  - `previous_references` (Optional): Incoming `CCC_KREA2_REFERENCE_CHAIN`.
+  - `outfit_preset`: `auto` | `balanced` | `max_identity` | `flexible`.
+  - `aliases`: Prompt replacement tokens (e.g. `outfit_image, Image {slot}`).
+  - `vision_directive`: Text instruction for garment details.
+  - `outfit_boost`, `grounding_boost`, `reference_boost`: Attention multipliers.
+  - `fit_mode`: `auto` | `fit` | `crop` | `stretch`.
+
+---
+
+### 17. CcC Krea2 - Style Image Reference
+
+Declarative reference node for artistic style, color grade, or moodboard transfer.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `references`: `CCC_KREA2_REFERENCE_CHAIN` immutable reference stack output.
+- **Inputs**:
+  - `prepared_image` (Required): Input `CCC_KREA2_PREPARED_IMAGE` from Vision Prep.
+  - `previous_references` (Optional): Incoming `CCC_KREA2_REFERENCE_CHAIN`.
+  - `aliases`: Prompt replacement tokens (`style_image`).
+  - `vision_directive`: Style directive prompt.
+  - `style_boost`: Global style strength multiplier.
+  - `moodboard_layout`: Grid placement layout (`single`, `2x2`, `3x3`).
+  - `enable_color_transfer`, `enable_texture_transfer`: Stylization toggles.
+
+---
+
+### 18. CcC Krea2 - Target Latent
+
+Target latent canvas creation and reference geometry resolver node.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `target_latent`: Formatted target `LATENT` dict.
+  - `latent_info`: Human-readable `STRING` summary of latent dimensions.
+- **Inputs**:
+  - `vae` (Required): `VAE` encoder/decoder.
+  - `subject_image` / `scene_image` (Optional): Prepared image reference sources for automatic aspect ratio and geometry extraction.
+  - `target_content`: `empty` | `subject` | `scene` | `inpaint` | `custom`.
+  - `geometry_mode`: `fixed` | `fit_subject` | `fit_scene` | `crop_subject`.
+  - `target_megapixels`: Output canvas megapixels (float, default `1.0`).
+  - `aspect_ratio`: Target aspect ratio string (`1:1`, `4:3`, `16:9`, etc.).
+  - `batch_size`: Latent batch count.
+
+---
+
+### 19. CcC Krea2 - Edit (Modular Orchestrator)
+
+Modular edit orchestrator node that combines reference chains, target latents, and model patches to produce sampling conditioning and latents.
+
+- **Category**: `CcC/Krea2/Modular`
+- **Outputs**:
+  - `model`: Patched Krea 2 `MODEL`.
+  - `positive`: Target positive `CONDITIONING` with Qwen vision tokens.
+  - `negative`: Target negative `CONDITIONING`.
+  - `latent`: Target `LATENT` passed through to KSampler.
+  - `edit_info`: `STRING` execution report.
+- **Inputs**:
+  - `model` (Required): Krea 2 `MODEL`.
+  - `clip` (Required): Krea 2 `CLIP` text encoder.
+  - `vae` (Required): Krea 2 `VAE`.
+  - `references` (Optional): `CCC_KREA2_REFERENCE_CHAIN` from Layer 2.
+  - `target_latent` (Optional): Target `LATENT` from Layer 3 (`CcCKrea2TargetLatent`).
+  - `prompt` (Required): Text prompt describing the target edit.
+  - `negative_prompt` (Optional): Negative prompt text.
+  - `global_vision_directive` (Optional): Multiline global vision directive text.
+  - `prompt_augmentation` (Optional): Socket input from `CcC Krea2 - LoRA Stack`.
+
 

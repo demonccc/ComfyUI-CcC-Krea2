@@ -12,9 +12,24 @@ EDITING_WORKFLOW_FILES = [
     "workflows/subject_scene_outfit_qwen_simple.json",
 ]
 
+MODULAR_WORKFLOW_FILES = [
+    "workflows/01_t2i_basic.json",
+    "workflows/02_t2i_lora_stack.json",
+    "workflows/03_subject_edit.json",
+    "workflows/04_subject_scene_edit.json",
+    "workflows/05_subject_outfit_edit.json",
+    "workflows/06_subject_scene_outfit_edit.json",
+    "workflows/07_style_moodboard_edit.json",
+    "workflows/08_inpaint_subject_edit.json",
+    "workflows/09_inpaint_scene_edit.json",
+    "workflows/10_multi_subject_chasing_slots.json",
+    "workflows/11_advanced_directives_fit_modes.json",
+    "workflows/12_full_pipeline_composition.json",
+]
+
 EXPECTED_WORKFLOW_FILES = EDITING_WORKFLOW_FILES + [
     "workflows/text_to_image.json",
-]
+] + MODULAR_WORKFLOW_FILES
 
 EXPECTED_ROLES_PER_WORKFLOW = {
     "workflows/subject_edit.json": (["subject"], "CcCKrea2Subject"),
@@ -65,10 +80,11 @@ def test_workflow_json_parsing_and_loaders():
         assert "CLIPLoader" in node_types, f"Missing CLIPLoader in {rel_path}"
         assert "VAELoader" in node_types, f"Missing VAELoader in {rel_path}"
 
-        stack_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAStack"]
-        ps_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAPromptSettings"]
-        assert len(stack_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAStack in {rel_path}"
-        assert len(ps_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAPromptSettings in {rel_path}"
+        if rel_path in EDITING_WORKFLOW_FILES or "lora" in rel_path or rel_path == "workflows/text_to_image.json":
+            stack_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAStack"]
+            ps_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAPromptSettings"]
+            assert len(stack_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAStack in {rel_path}"
+            assert len(ps_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAPromptSettings in {rel_path}"
 
         assert "LoraLoaderModelOnly" not in node_types, f"LoraLoaderModelOnly found in {rel_path}"
         assert "CheckpointLoaderSimple" not in node_types, f"CheckpointLoaderSimple found in {rel_path}"
@@ -238,7 +254,7 @@ def test_qwen_workflows_and_non_qwen_isolation():
         "workflows/subject_scene_qwen_simple.json",
         "workflows/subject_scene_outfit_qwen_simple.json",
     ]
-    non_qwen_files = [f for f in EXPECTED_WORKFLOW_FILES if f not in qwen_files]
+    non_qwen_files = [f for f in EDITING_WORKFLOW_FILES if f not in qwen_files] + ["workflows/text_to_image.json"]
 
     for rel_path in non_qwen_files:
         with open(rel_path, "r", encoding="utf-8") as f:
@@ -576,4 +592,21 @@ def test_text_to_image_workflow_structure():
     assert "LoRA Prompt Augmentation (disabled by default)" in group_titles
     assert "LoRA Stack + Text to Image + KSampler" in group_titles
     assert "Output" in group_titles
+
+
+def test_modular_workflow_files_structure():
+    """Validate that all 12 modular example workflows parse cleanly and use new node types."""
+    for rel_path in MODULAR_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert isinstance(data, dict)
+        nodes = data.get("nodes", [])
+        node_types = [n.get("type") for n in nodes]
+
+        assert "UNETLoader" in node_types
+        assert "CLIPLoader" in node_types
+        assert "VAELoader" in node_types
+        assert any(t in node_types for t in ("CcCKrea2TextToImage", "CcCKrea2Edit"))
+
 

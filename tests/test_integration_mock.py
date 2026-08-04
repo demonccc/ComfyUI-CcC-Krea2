@@ -215,6 +215,13 @@ def test_image_latent_batching_repetition():
 
 def test_all_node_registrations():
     expected = {
+        "CcCKrea2QwenVisionImagePrep",
+        "CcCKrea2TargetLatent",
+        "CcCKrea2SubjectImage",
+        "CcCKrea2SceneImage",
+        "CcCKrea2OutfitImage",
+        "CcCKrea2StyleImage",
+        "CcCKrea2Edit",
         "CcCKrea2Subject",
         "CcCKrea2SubjectOutfit",
         "CcCKrea2SubjectScene",

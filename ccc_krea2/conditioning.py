@@ -1,6 +1,6 @@
 """Qwen3-VL text/vision conditioning builder for positive and negative prompts."""
 
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Optional
 
 from .constants import (
     LOGGER_PREFIX,
@@ -100,3 +100,30 @@ def encode_krea2_conditioning(
     neg_conditioning = _encode_text(negative_prompt or "")
 
     return pos_conditioning, neg_conditioning
+
+
+def encode_prompt_with_qwen(
+    clip: Any,
+    prompt: str,
+    images: Optional[List[Any]] = None,
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+) -> List[Any]:
+    """Helper to encode a single prompt (positive or negative) with Qwen3-VL CLIP text encoder."""
+    if clip is None:
+        return []
+
+    imgs = images if images is not None else []
+    num_images = len(imgs)
+    dynamic_template = build_krea2_qwen_template(num_images=num_images, system_prompt=system_prompt)
+
+    try:
+        tokens = clip.tokenize(prompt or "", images=imgs, llama_template=dynamic_template)
+    except TypeError:
+        tokens = clip.tokenize(prompt or "", images=imgs)
+    except Exception:
+        try:
+            tokens = clip.tokenize(prompt or "")
+        except Exception:
+            return []
+
+    return clip.encode_from_tokens_scheduled(tokens)

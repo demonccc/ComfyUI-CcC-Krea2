@@ -29,6 +29,13 @@ from .prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
 from .engine import Krea2EditEngine, NodeExecutionRequest
 from .t2i import CcCKrea2TextToImage
+from .modular_nodes.vision_prep_node import CcCKrea2QwenVisionImagePrep
+from .modular_nodes.target_latent_node import CcCKrea2TargetLatent
+from .modular_nodes.subject_node import CcCKrea2SubjectImage
+from .modular_nodes.scene_node import CcCKrea2SceneImage
+from .modular_nodes.outfit_node import CcCKrea2OutfitImage
+from .modular_nodes.style_node import CcCKrea2StyleImage
+from .modular_nodes.edit_node import CcCKrea2Edit
 
 
 class BaseKrea2Node:
@@ -522,6 +529,21 @@ class CcCKrea2InpaintSubjectScene(BaseKrea2Node):
 
 
 NODE_CLASS_MAPPINGS = {
+    # Modular Reference Pipeline Nodes
+    "CcCKrea2QwenVisionImagePrep": CcCKrea2QwenVisionImagePrep,
+    "CcCKrea2TargetLatent": CcCKrea2TargetLatent,
+    "CcCKrea2SubjectImage": CcCKrea2SubjectImage,
+    "CcCKrea2SceneImage": CcCKrea2SceneImage,
+    "CcCKrea2OutfitImage": CcCKrea2OutfitImage,
+    "CcCKrea2StyleImage": CcCKrea2StyleImage,
+    "CcCKrea2Edit": CcCKrea2Edit,
+
+    # Existing & Utility Nodes
+    "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
+    "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
+    "CcCKrea2TextToImage": CcCKrea2TextToImage,
+
+    # Legacy Combined Nodes
     "CcCKrea2Subject": CcCKrea2Subject,
     "CcCKrea2SubjectOutfit": CcCKrea2SubjectOutfit,
     "CcCKrea2SubjectScene": CcCKrea2SubjectScene,
@@ -531,22 +553,31 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2InpaintSubjectScene": CcCKrea2InpaintSubjectScene,
     "CcCKrea2ImageAdvancedSettings": CcCKrea2ImageAdvancedSettings,
     "CcCKrea2EditAdvancedSettings": CcCKrea2EditAdvancedSettings,
-    "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
-    "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
-    "CcCKrea2TextToImage": CcCKrea2TextToImage,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "CcCKrea2Subject": "CcC Krea2 - Subject",
-    "CcCKrea2SubjectOutfit": "CcC Krea2 - Subject + Outfit",
-    "CcCKrea2SubjectScene": "CcC Krea2 - Subject + Scene",
-    "CcCKrea2SubjectSceneOutfit": "CcC Krea2 - Subject + Scene + Outfit",
-    "CcCKrea2Inpaint": "CcC Krea2 - Inpaint",
-    "CcCKrea2InpaintSubjectOutfit": "CcC Krea2 - Inpaint Subject + Outfit",
-    "CcCKrea2InpaintSubjectScene": "CcC Krea2 - Inpaint Subject + Scene",
-    "CcCKrea2ImageAdvancedSettings": "CcC Krea2 - Image Advanced Settings",
-    "CcCKrea2EditAdvancedSettings": "CcC Krea2 - Edit Advanced Settings",
+    # Modular Reference Pipeline Nodes
+    "CcCKrea2QwenVisionImagePrep": "CcC Krea2 - Qwen Vision Image Prep",
+    "CcCKrea2TargetLatent": "CcC Krea2 - Target Latent",
+    "CcCKrea2SubjectImage": "CcC Krea2 - Subject Image",
+    "CcCKrea2SceneImage": "CcC Krea2 - Scene Image",
+    "CcCKrea2OutfitImage": "CcC Krea2 - Outfit Image",
+    "CcCKrea2StyleImage": "CcC Krea2 - Style Image",
+    "CcCKrea2Edit": "CcC Krea2 - Edit",
+
+    # Existing & Utility Nodes
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
     "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
+
+    # Legacy Combined Nodes
+    "CcCKrea2Subject": "CcC Krea2 - Subject (Legacy)",
+    "CcCKrea2SubjectOutfit": "CcC Krea2 - Subject + Outfit (Legacy)",
+    "CcCKrea2SubjectScene": "CcC Krea2 - Subject + Scene (Legacy)",
+    "CcCKrea2SubjectSceneOutfit": "CcC Krea2 - Subject + Scene + Outfit (Legacy)",
+    "CcCKrea2Inpaint": "CcC Krea2 - Inpaint (Legacy)",
+    "CcCKrea2InpaintSubjectOutfit": "CcC Krea2 - Inpaint Subject + Outfit (Legacy)",
+    "CcCKrea2InpaintSubjectScene": "CcC Krea2 - Inpaint Subject + Scene (Legacy)",
+    "CcCKrea2ImageAdvancedSettings": "CcC Krea2 - Image Advanced Settings (Legacy)",
+    "CcCKrea2EditAdvancedSettings": "CcC Krea2 - Edit Advanced Settings (Legacy)",
 }

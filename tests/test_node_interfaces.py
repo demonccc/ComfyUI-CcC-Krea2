@@ -7,10 +7,19 @@ from ccc_krea2.prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 
 
 def test_node_mappings_count_and_keys():
-    assert len(NODE_CLASS_MAPPINGS) == 12
-    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 12
+    assert len(NODE_CLASS_MAPPINGS) == 19
+    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 19
 
     expected_keys = [
+        # Modular Reference Pipeline Nodes
+        "CcCKrea2QwenVisionImagePrep",
+        "CcCKrea2TargetLatent",
+        "CcCKrea2SubjectImage",
+        "CcCKrea2SceneImage",
+        "CcCKrea2OutfitImage",
+        "CcCKrea2StyleImage",
+        "CcCKrea2Edit",
+        # Existing Nodes
         "CcCKrea2Subject",
         "CcCKrea2SubjectOutfit",
         "CcCKrea2SubjectScene",

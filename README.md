@@ -10,14 +10,15 @@ CcC Krea2 groups those editing patterns into a small set of purpose-built nodes.
 
 ## Features
 
+- **5-Layer Modular Architecture**: Decoupled Input Prep, Declarative Reference Chains (`Subject`, `Scene`, `Outfit`, `Style`), Target Latent Resolution, LoRA Styling, and Orchestration (`CcCKrea2Edit`).
 - Preset-driven workflow (`balanced`, `max_identity`, `flexible`) with simplified main node controls.
 - Subject identity editing.
-- Outfit and scene references.
-- Subject, outfit and scene combinations.
+- Outfit, scene, and style moodboard references.
+- Subject, outfit, scene, and style combinations.
 - Localized inpainting.
 - Aspect-ratio-preserving role-based resolution limiting (`role_resolution_limit_mode`, `role_resolution_max_megapixels`) and custom megapixel output resolution.
 - Advanced settings socket nodes (`CcC Krea2 - Image Advanced Settings`, `CcC Krea2 - Edit Advanced Settings`).
-- Curated example workflows in `workflows/` covering single, dual, and triple references as well as Qwen-VL Vision Language Model integrations.
+- 12 curated example workflows in `workflows/` covering basic T2I, LoRA stacks, single/dual/triple/style references, inpainting, and full 5-layer composition.
 - Qwen3-VL grounding controls.
 - Per-reference attention boosts and masks.
 - Empty, subject-based or scene-based sampling latents.
