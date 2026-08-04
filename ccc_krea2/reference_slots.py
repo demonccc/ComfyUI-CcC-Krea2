@@ -59,6 +59,8 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
 
     # Phase 3: Expand aliases and validate uniqueness
     global_aliases = set()
+    vae_frame_counter = 1
+    physical_qwen_index = 1
 
     for idx, spec in enumerate(chain.references):
         slot = slot_assignments[idx]
@@ -67,18 +69,38 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
         for alias in spec.parsed_aliases:
             exp_alias = alias.replace("{slot}", str(slot))
             if exp_alias in global_aliases:
-                warnings.append(f"Duplicate alias '{exp_alias}' resolved across references.")
+                raise ValueError(f"Duplicate alias '{exp_alias}' specified across references in chain.")
             global_aliases.add(exp_alias)
             expanded_aliases.append(exp_alias)
 
-            # Check positional alias mismatch
-            if alias != exp_alias and f"Image {slot}" not in expanded_aliases:
-                warnings.append(f"Reference in slot {slot} has custom alias '{alias}' expanded to '{exp_alias}'.")
+            # Check literal Image N alias vs physical Qwen index mismatch
+            if exp_alias.startswith("Image ") and exp_alias[6:].isdigit():
+                lit_num = int(exp_alias[6:])
+                if lit_num != physical_qwen_index:
+                    warnings.append(
+                        f"Literal alias '{exp_alias}' mismatch: physical Qwen index is {physical_qwen_index}."
+                    )
+
+        role = spec.role.lower()
+        if role == "style":
+            vae_frame = None
+            # Style physical span length depends on style_processing mode
+            style_proc = getattr(spec, "style_processing", "2x2")
+            span_len = 1 if style_proc == "full" else (4 if style_proc == "2x2" else 16)
+            physical_qwen_range = (physical_qwen_index, physical_qwen_index + span_len - 1)
+            physical_qwen_index += span_len
+        else:
+            vae_frame = vae_frame_counter
+            vae_frame_counter += 1
+            physical_qwen_range = (physical_qwen_index, physical_qwen_index)
+            physical_qwen_index += 1
 
         resolved.append({
             "spec": spec,
             "resolved_slot": slot,
-            "expanded_aliases": tuple(expanded_aliases)
+            "expanded_aliases": tuple(expanded_aliases),
+            "vae_reference_frame": vae_frame,
+            "physical_qwen_range": physical_qwen_range,
         })
 
     return resolved, warnings

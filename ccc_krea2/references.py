@@ -32,9 +32,10 @@ class PreparedReference:
     grounding_image: Optional[torch.Tensor]
     vae_latent: Optional[torch.Tensor]
     spatial_attention_mask: Optional[torch.Tensor]
-    boost: float
-    spatial_hw: Tuple[int, int]
-    lat_hw: Tuple[int, int]
+    boost: float = 1.0
+    masked_boost: float = 1.0
+    spatial_hw: Tuple[int, int] = (512, 512)
+    lat_hw: Tuple[int, int] = (64, 64)
     mask_mode: str = "hard"
     ref_fit_meta: Optional[Dict[str, Any]] = None
 

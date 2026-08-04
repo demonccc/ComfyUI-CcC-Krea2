@@ -10,9 +10,13 @@ from ccc_krea2.reference_specs import (
 )
 from ccc_krea2.reference_slots import resolve_reference_slots_and_aliases
 from ccc_krea2.reference_directives import build_automatic_role_directive
-from ccc_krea2.krea2edit_geometry import resolve_visual_reference_fit
+from ccc_krea2.krea2edit_geometry import (
+    resolve_krea2edit_geometry,
+    process_image_and_mask_geometry
+)
 from ccc_krea2.style_processing import expand_style_reference_spans
-from ccc_krea2.conditioning import encode_prompt_with_qwen
+from ccc_krea2.prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
+from ccc_krea2.conditioning import encode_krea2_qwen_context
 from ccc_krea2.patch import patch_krea2_model
 
 
@@ -24,52 +28,70 @@ def run_krea2_edit_orchestrator(
     target_latent: Dict[str, torch.Tensor],
     positive_prompt: str,
     negative_prompt: str,
-    prompt_augmentation: Optional[Any] = None,
+    prompt_augmentation: Optional[PromptAugmentation] = None,
     global_vision_directive: str = ""
 ) -> Tuple[Any, Any, Any, Dict[str, torch.Tensor], str]:
-    """Execute the full modular Krea 2 Edit pipeline."""
-    # 1. Inspect target latent geometry
+    """Execute the full 19-step modular Krea 2 Edit orchestrator pipeline."""
+    # Step 1: Target latent geometry inspection
     samples = target_latent["samples"]
     bs, c, lh, lw = samples.shape
     target_h = lh * 8
     target_w = lw * 8
 
-    # 2. Resolve slots and parse aliases
+    # Step 2: Resolve reference slots, aliases, VAE frames, and physical Qwen indices
     resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(references)
-
-    # Sort resolved references by physical vision slot
     resolved_refs.sort(key=lambda r: r["resolved_slot"])
 
-    # 3. Process visual references and prepare Qwen vision image list
-    qwen_vision_images: List[torch.Tensor] = []
+    # Step 3: Prompt augmentation layering
+    pos_base, neg_base = apply_prompt_augmentation(
+        positive_prompt=positive_prompt,
+        negative_prompt=negative_prompt,
+        augmentation=prompt_augmentation
+    )
+
+    # Step 4: Build role directives and Qwen vision image maps
+    pos_qwen_images: List[torch.Tensor] = []
+    neg_qwen_images: List[torch.Tensor] = []
+    pos_qwen_image_map: List[Dict[str, Any]] = []
+    neg_qwen_image_map: List[Dict[str, Any]] = []
+
     vae_ref_specs: List[Dict[str, Any]] = []
     style_ref_specs: List[Dict[str, Any]] = []
 
-    directives: List[str] = []
+    role_directives: List[str] = []
     if global_vision_directive.strip():
-        directives.append(global_vision_directive.strip())
+        role_directives.append(f"Global Vision Directive:\n{global_vision_directive.strip()}")
 
     for ref_item in resolved_refs:
         spec = ref_item["spec"]
         slot = ref_item["resolved_slot"]
         ref_role = spec.role.lower()
 
-        # Build automatic vision directive
+        # Automatic & extra vision directives
         auto_dir = build_automatic_role_directive(ref_item)
         if auto_dir:
-            directives.append(auto_dir)
+            role_directives.append(auto_dir)
 
         if ref_role in ("subject", "scene", "outfit"):
-            # Transform reference image and mask against target latent geometry
-            fit_img, fit_mask, fit_meta = resolve_visual_reference_fit(
-                image=spec.prepared_image.original_image,
-                target_h=target_h,
-                target_w=target_w,
-                mode=getattr(spec, "visual_fit_mode", "auto"),
-                mask=getattr(spec, "attention_mask", None)
+            src_img = spec.prepared_image.original_image
+            src_h, src_w = src_img.shape[1], src_img.shape[2]
+
+            fit_mode = getattr(spec, "visual_fit_mode", "auto")
+            geom = resolve_krea2edit_geometry(
+                src_h=src_h,
+                src_w=src_w,
+                tgt_h=target_h,
+                tgt_w=target_w,
+                fit_mode=fit_mode
             )
 
-            # Encode VAE reference
+            fit_img, fit_mask = process_image_and_mask_geometry(
+                image=src_img,
+                mask=getattr(spec, "attention_mask", None),
+                geom=geom
+            )
+
+            # VAE encode reference latent
             encoded = vae.encode(fit_img)
             lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
 
@@ -78,17 +100,23 @@ def run_krea2_edit_orchestrator(
                 "slot": slot,
                 "latent_tokens": lat_tokens,
                 "mask": fit_mask,
-                "fit_meta": fit_meta,
+                "geom": geom,
                 "spec": spec
             })
 
-            qwen_vision_images.append(spec.prepared_image.vision_image)
+            # Non-style images enter both positive and negative Qwen lists
+            pos_qwen_images.append(spec.prepared_image.vision_image)
+            pos_qwen_image_map.append({"role": ref_role, "slot": slot, "image": spec.prepared_image.vision_image, "spec": spec})
+
+            neg_qwen_images.append(spec.prepared_image.vision_image)
+            neg_qwen_image_map.append({"role": ref_role, "slot": slot, "image": spec.prepared_image.vision_image, "spec": spec})
 
         elif ref_role == "style":
             assert isinstance(spec, StyleReferenceSpec)
             prep_crops, s_start, s_end = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
             for crop_prep in prep_crops:
-                qwen_vision_images.append(crop_prep.vision_image)
+                pos_qwen_images.append(crop_prep.vision_image)
+                pos_qwen_image_map.append({"role": "style", "slot": slot, "image": crop_prep.vision_image, "spec": spec})
 
             style_ref_specs.append({
                 "role": "style",
@@ -97,102 +125,101 @@ def run_krea2_edit_orchestrator(
                 "spec": spec
             })
 
-    combined_directives_text = "\n\n".join(directives)
+    directives_block = "\n\n".join(role_directives)
+    full_positive_prompt = f"{directives_block}\n\n{pos_base}".strip() if directives_block else pos_base
 
-    # 4. Prompt Augmentation Layering
-    pos_text = positive_prompt
-    neg_text = negative_prompt
-    if prompt_augmentation is not None and hasattr(prompt_augmentation, "augment_prompt"):
-        pos_text = prompt_augmentation.augment_prompt(pos_text)
-        if neg_text.strip():
-            neg_text = prompt_augmentation.augment_prompt(neg_text)
-
-    # Append combined directives text to positive prompt context
-    full_positive_prompt = f"{combined_directives_text}\n\n{pos_text}".strip() if combined_directives_text else pos_text
-
-    # 5. Encode Positive & Negative Conditioning
-    pos_cond = encode_prompt_with_qwen(
+    # Step 5: Encode Qwen Contexts for positive and negative
+    pos_qwen_context = encode_krea2_qwen_context(
         clip=clip,
         prompt=full_positive_prompt,
-        images=qwen_vision_images
-    )
-    neg_cond = encode_prompt_with_qwen(
-        clip=clip,
-        prompt=neg_text,
-        images=qwen_vision_images if qwen_vision_images else None
+        physical_images=pos_qwen_images,
+        physical_image_map=pos_qwen_image_map,
+        is_positive=True
     )
 
-    # 6. Patch Model
+    neg_qwen_context = encode_krea2_qwen_context(
+        clip=clip,
+        prompt=neg_base,
+        physical_images=neg_qwen_images,
+        physical_image_map=neg_qwen_image_map,
+        is_positive=False
+    )
+
+    # Step 6: Prepare model patching references
     prepared_refs: List[PreparedReference] = []
     for ref_dict in vae_ref_specs:
         sp = ref_dict["spec"]
         r_role = ReferenceRole(ref_dict["role"]) if ref_dict["role"] in [r.value for r in ReferenceRole] else ReferenceRole.SUBJECT
+        base_boost = getattr(sp, "attention_boost", 1.0)
+        masked_boost = getattr(sp, "masked_attention_boost", 1.0)
+
         pr = PreparedReference(
             role=r_role,
             grounding_image=sp.prepared_image.vision_image,
             vae_latent=ref_dict["latent_tokens"],
             spatial_attention_mask=ref_dict["mask"],
-            boost=getattr(sp, "attention_boost", 1.0),
-            spatial_hw=ref_dict["fit_meta"]["spatial_hw"],
-            lat_hw=(ref_dict["latent_tokens"].shape[-2], ref_dict["latent_tokens"].shape[-1]),
+            boost=base_boost,
+            masked_boost=masked_boost,
+            spatial_hw=ref_dict["geom"].vae_input_pixel_size,
+            lat_hw=ref_dict["geom"].vae_latent_grid_size,
             mask_mode="hard",
-            ref_fit_meta=ref_dict["fit_meta"]
+            ref_fit_meta={"geom": ref_dict["geom"]}
         )
         prepared_refs.append(pr)
 
-    patched_model = patch_krea2_model(
-        model=model,
-        prepared_refs=prepared_refs
-    )
+    # Step 7: Apply model patches
+    patched_model = patch_krea2_model(model=model, prepared_refs=prepared_refs)
 
-    # 7. Generate edit_info
+    # Step 8: Build edit_info report
     info_lines = [
-        "Target",
-        f"Pixel Geometry: {target_w} x {target_h}",
-        f"Latent Geometry: {lw} x {lh}",
-        f"Target MP: {(target_h * target_w) / 1_000_000.0:.3f}",
+        "=== CcC Krea2 Edit Pipeline Report ===",
+        f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
+        f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
         ""
     ]
 
     for ref in vae_ref_specs:
         sp = ref["spec"]
-        fit_m = ref["fit_meta"]
+        geom = ref["geom"]
+        b_boost = getattr(sp, "attention_boost", 1.0)
+        m_boost = getattr(sp, "masked_attention_boost", 1.0)
         info_lines.extend([
-            "Reference",
-            f"Logical Role: {ref['role'].capitalize()}",
-            f"Resolved Vision Slot: {ref['slot']}",
-            f"Visual Fit Requested: {getattr(sp, 'visual_fit_mode', 'auto')}",
-            f"Visual Fit Resolved: {fit_m['mode_resolved']}",
-            f"VAE Input Size: {fit_m['spatial_hw'][1]} x {fit_m['spatial_hw'][0]}",
-            f"Attention Boost: {getattr(sp, 'attention_boost', 1.0):.2f}",
+            f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
+            f"  Requested Fit: {geom.mode_requested} | Resolved Fit: {geom.mode_resolved}",
+            f"  Source Size: {geom.source_size[0]} x {geom.source_size[1]}",
+            f"  VAE Input Size: {geom.vae_input_pixel_size[0]} x {geom.vae_input_pixel_size[1]}",
+            f"  RoPE Centered Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
+            f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
+            f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
             ""
         ])
 
     for st in style_ref_specs:
         sp = st["spec"]
         info_lines.extend([
-            "Style",
-            f"Logical Slot: {st['slot']}",
-            f"Processing: {sp.style_processing}",
-            f"Physical Vision Spans: {st['spans'][0]}-{st['spans'][1]}",
-            f"Style Fidelity: {sp.style_fidelity:.2f}",
-            f"Indirect Style Transfer: {sp.indirect_style_transfer}",
+            f"Style [Slot {st['slot']}]:",
+            f"  Processing: {sp.style_processing}",
+            f"  Physical Qwen Spans: {st['spans'][0]}-{st['spans'][1]}",
+            f"  Style Fidelity: {sp.style_fidelity:.2f}",
+            f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
+            f"  Style Vision Directive Enabled: {sp.style_directive}",
             ""
         ])
 
     info_lines.extend([
-        "Conditioning",
-        f"Positive Prompt Length: {len(full_positive_prompt)}",
-        f"Negative Prompt Length: {len(neg_text)}",
-        f"Global Vision Directive: {'yes' if global_vision_directive.strip() else 'no'}",
-        f"Qwen Vision Physical Images: {len(qwen_vision_images)}",
-        f"VAE Patch References: {len(vae_ref_specs)}"
+        "Conditioning Summary:",
+        f"  Positive Qwen Physical Images: {len(pos_qwen_images)}",
+        f"  Negative Qwen Physical Images: {len(neg_qwen_images)}",
+        f"  Global Vision Directive Active: {'yes' if global_vision_directive.strip() else 'no'}",
+        f"  Prompt Augmentation Active: {'yes' if prompt_augmentation is not None else 'no'}",
     ])
 
     if slot_warnings:
         info_lines.append("")
-        info_lines.append("Warnings")
+        info_lines.append("Warnings:")
         for w in slot_warnings:
-            info_lines.append(f"- {w}")
+            info_lines.append(f"  - {w}")
 
-    return patched_model, pos_cond, neg_cond, target_latent, "\n".join(info_lines)
+    edit_info = "\n".join(info_lines)
+
+    return patched_model, pos_qwen_context.conditioning, neg_qwen_context.conditioning, target_latent, edit_info

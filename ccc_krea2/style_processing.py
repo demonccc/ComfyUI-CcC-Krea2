@@ -6,11 +6,15 @@ from ccc_krea2.reference_specs import StyleReferenceSpec, PreparedVisionImage
 from ccc_krea2.vision_prep import prepare_vision_image
 
 
+SHUFFLE_2X2 = (2, 0, 3, 1)
+SHUFFLE_4X4 = (10, 3, 12, 5, 0, 15, 6, 9, 2, 13, 4, 11, 8, 1, 14, 7)
+
+
 def slice_style_image(
     image: torch.Tensor,
     mode: str = "2x2"
 ) -> List[torch.Tensor]:
-    """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles."""
+    """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using upstream Moodboard shuffled orders."""
     if image.ndim == 3:
         image = image.unsqueeze(0)
 
@@ -33,7 +37,43 @@ def slice_style_image(
             crop = image[:, y0:y1, x0:x1, :]
             crops.append(crop)
 
-    return crops
+    # Reorder according to upstream Moodboard shuffle arrays
+    if mode == "2x2":
+        shuffled = [crops[i] for i in SHUFFLE_2X2]
+    elif mode == "4x4":
+        shuffled = [crops[i] for i in SHUFFLE_4X4]
+    else:
+        shuffled = crops
+
+    return shuffled
+
+
+def apply_statistical_style_fidelity(
+    conditioning_tensor: torch.Tensor,
+    style_fidelity: float
+) -> torch.Tensor:
+    """Apply Krea2 Moodboard statistical style fidelity transform to conditioning tensor.
+
+    Transform: output = fidelity * orig + (1 - fidelity) * statistical_target
+    where statistical_target repeats (mean, mean + std, mean - std) across feature channels.
+    """
+    if style_fidelity >= 1.0:
+        return conditioning_tensor
+
+    orig = conditioning_tensor.clone()
+    mean = torch.mean(orig, dim=-1, keepdim=True)
+    std = torch.std(orig, dim=-1, keepdim=True)
+
+    # Construct repeating target stats
+    target_stats = torch.cat([mean, mean + std, mean - std], dim=-1)
+    if target_stats.shape[-1] < orig.shape[-1]:
+        repeats = (orig.shape[-1] // target_stats.shape[-1]) + 1
+        target_stats = target_stats.repeat(1, 1, repeats)[:, :, : orig.shape[-1]]
+    else:
+        target_stats = target_stats[:, :, : orig.shape[-1]]
+
+    blended = style_fidelity * orig + (1.0 - style_fidelity) * target_stats
+    return blended
 
 
 def expand_style_reference_spans(

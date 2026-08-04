@@ -2,13 +2,14 @@
 
 import torch
 import pytest
+from unittest.mock import MagicMock
 from ccc_krea2.vision_prep import prepare_vision_image
 from ccc_krea2.target_latent import create_target_latent, resolve_target_geometry
 from ccc_krea2.modular_nodes.target_latent_node import CcCKrea2TargetLatent
 
 
 def test_target_geometry_fixed():
-    th, tw, warn = resolve_target_geometry(
+    th, tw, geom_src, active_mp, src_dims, warnings = resolve_target_geometry(
         target_geometry="fixed",
         fixed_mp=1.0,
         fixed_aspect_ratio="16:9"
@@ -16,13 +17,13 @@ def test_target_geometry_fixed():
     assert th % 16 == 0
     assert tw % 16 == 0
     assert abs((tw / float(th)) - (16.0 / 9.0)) < 0.1
-    assert warn == ""
+    assert len(warnings) == 0
 
 
 def test_target_geometry_favor_subject():
     img = torch.rand(1, 1200, 800, 3)
     subj_prep = prepare_vision_image(image=img, clip=None, mode="native")
-    th, tw, _ = resolve_target_geometry(
+    th, tw, geom_src, active_mp, src_dims, warnings = resolve_target_geometry(
         target_geometry="favor_subject",
         subject_image=subj_prep,
         maximum_mp=2.0
@@ -33,8 +34,9 @@ def test_target_geometry_favor_subject():
 
 
 def test_target_latent_empty_content():
+    mock_vae = MagicMock()
     lat_dict, info = create_target_latent(
-        vae=None,
+        vae=mock_vae,
         target_latent_content="empty",
         target_geometry="fixed",
         fixed_mp=1.0,
@@ -42,7 +44,7 @@ def test_target_latent_empty_content():
     )
     assert "samples" in lat_dict
     assert lat_dict["samples"].shape == (1, 16, 124, 124)
-    assert "Latent Content: Empty" in info
+    assert "Latent Content: empty" in info
 
 
 def test_target_latent_missing_vae_raises():
@@ -58,7 +60,9 @@ def test_target_latent_missing_vae_raises():
 
 def test_target_latent_node_execution():
     node = CcCKrea2TargetLatent()
+    mock_vae = MagicMock()
     lat_dict, info = node.process(
+        vae=mock_vae,
         target_latent_content="empty",
         target_geometry="fixed",
         maximum_mp=2.0,
@@ -66,4 +70,4 @@ def test_target_latent_node_execution():
         fixed_aspect_ratio="1:1"
     )
     assert lat_dict["samples"].shape[1] == 16
-    assert "Geometry Strategy: Fixed" in info
+    assert "Geometry Strategy: fixed" in info

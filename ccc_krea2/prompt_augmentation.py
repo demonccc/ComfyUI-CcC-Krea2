@@ -57,6 +57,9 @@ def apply_prompt_augmentation(
     if augmentation is None:
         return positive_prompt, negative_prompt
 
+    if not isinstance(augmentation, PromptAugmentation):
+        raise TypeError(f"Invalid prompt augmentation socket object of type {type(augmentation)}. Expected PromptAugmentation.")
+
     # Build positive prompt parts
     pos_parts: List[str] = []
     for entry in augmentation.positive_prepend:

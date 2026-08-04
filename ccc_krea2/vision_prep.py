@@ -2,48 +2,122 @@
 
 import torch
 import math
-from typing import Tuple, Dict, Any
+from dataclasses import dataclass
+from typing import Tuple, Dict, Any, Optional
 from ccc_krea2.reference_specs import VisionPrepSpec, PreparedVisionImage
 from ccc_krea2.geometry import resize_tensor
 
 
-def introspect_qwen_clip(clip: Any) -> Dict[str, Any]:
-    """Extract Qwen Vision encoder parameters from a ComfyUI CLIP instance if available."""
-    info: Dict[str, Any] = {
-        "encoder_signature": "Qwen-VL",
-        "alignment": 28,
-        "patch_size": 14,
-        "merge_size": 2,
-        "min_pixels": 256 * 28 * 28,   # Default ~200k px
-        "max_pixels": 1280 * 28 * 28,  # Default ~1M px
+@dataclass(frozen=True)
+class QwenVisionEncoderConfig:
+    encoder_signature: str
+    patch_size: int
+    merge_size: int
+    factor: int
+    min_pixels: int
+    max_pixels: int
+    interpolation: str
+    value_sources: Dict[str, str]
+
+
+def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
+    """Resolve Qwen Vision encoder configuration with strict fallback hierarchy."""
+    # Standard Krea 2 / Qwen3-VL fallback defaults
+    fallback_patch_size = 16
+    fallback_merge_size = 2
+    fallback_factor = 32
+    fallback_min_pixels = 3136
+    fallback_max_pixels = 12845056
+
+    sources = {
+        "encoder_signature": "fallback",
+        "patch_size": "fallback",
+        "merge_size": "fallback",
+        "factor": "fallback",
+        "min_pixels": "fallback",
+        "max_pixels": "fallback",
+        "interpolation": "fallback",
     }
 
-    if clip is None:
-        return info
+    sig = "Qwen3-VL"
+    p_size = fallback_patch_size
+    m_size = fallback_merge_size
+    min_px = fallback_min_pixels
+    max_px = fallback_max_pixels
+    interp = "bicubic"
 
-    try:
-        # Check underlying clip_model or patcher
-        cond_stage = getattr(clip, "cond_stage_model", None) or getattr(clip, "patcher", None)
-        if cond_stage is not None:
-            model = getattr(cond_stage, "model", cond_stage)
-            visual = getattr(model, "visual", None) or getattr(model, "image_encoder", None)
-            if visual is not None:
-                patch_size = getattr(visual, "patch_size", 14)
-                merge_size = getattr(visual, "merge_size", 2)
-                if isinstance(patch_size, int) and isinstance(merge_size, int):
-                    alignment = patch_size * merge_size
-                    info["patch_size"] = patch_size
-                    info["merge_size"] = merge_size
-                    info["alignment"] = alignment
-                    if hasattr(visual, "min_pixels") and isinstance(visual.min_pixels, (int, float)):
-                        info["min_pixels"] = int(visual.min_pixels)
-                    if hasattr(visual, "max_pixels") and isinstance(visual.max_pixels, (int, float)):
-                        info["max_pixels"] = int(visual.max_pixels)
-                    info["encoder_signature"] = type(visual).__name__
-    except Exception:
-        pass
+    if clip is not None:
+        try:
+            cond_stage = getattr(clip, "cond_stage_model", None) or getattr(clip, "patcher", None)
+            if cond_stage is not None:
+                model = getattr(cond_stage, "model", cond_stage)
+                visual = (
+                    getattr(model, "visual", None)
+                    or getattr(model, "image_encoder", None)
+                    or getattr(model, "vision_model", None)
+                )
+                if visual is not None:
+                    sig = type(visual).__name__
+                    sources["encoder_signature"] = "introspected"
 
-    return info
+                    found_p = getattr(visual, "patch_size", None)
+                    if isinstance(found_p, int) and found_p > 0:
+                        p_size = found_p
+                        sources["patch_size"] = "introspected"
+
+                    found_m = getattr(visual, "spatial_merge_size", None) or getattr(visual, "merge_size", None)
+                    if isinstance(found_m, int) and found_m > 0:
+                        m_size = found_m
+                        sources["merge_size"] = "introspected"
+
+                    found_min = getattr(visual, "min_pixels", None)
+                    if isinstance(found_min, (int, float)) and found_min > 0:
+                        min_px = int(found_min)
+                        sources["min_pixels"] = "introspected"
+
+                    found_max = getattr(visual, "max_pixels", None)
+                    if isinstance(found_max, (int, float)) and found_max > 0:
+                        max_px = int(found_max)
+                        sources["max_pixels"] = "introspected"
+        except Exception:
+            pass
+
+    factor = p_size * m_size
+    sources["factor"] = "derived" if (sources["patch_size"] == "introspected" or sources["merge_size"] == "introspected") else "fallback"
+
+    return QwenVisionEncoderConfig(
+        encoder_signature=sig,
+        patch_size=p_size,
+        merge_size=m_size,
+        factor=factor,
+        min_pixels=min_px,
+        max_pixels=max_px,
+        interpolation=interp,
+        value_sources=sources,
+    )
+
+
+def calculate_native_qwen_geometry(height: int, width: int, config: QwenVisionEncoderConfig) -> Tuple[int, int]:
+    """Exact process_qwen2vl_images geometry calculation."""
+    factor = config.factor
+    h_bar = max(factor, int(round(height / factor)) * factor)
+    w_bar = max(factor, int(round(width / factor)) * factor)
+
+    current_pixels = h_bar * w_bar
+
+    if current_pixels > config.max_pixels:
+        beta = math.sqrt(current_pixels / config.max_pixels)
+        target_h = max(factor, int(math.floor(h_bar / beta / factor)) * factor)
+        target_w = max(factor, int(math.floor(w_bar / beta / factor)) * factor)
+    elif current_pixels < config.min_pixels:
+        beta = math.sqrt(config.min_pixels / current_pixels)
+        target_h = max(factor, int(math.ceil(h_bar * beta / factor)) * factor)
+        target_w = max(factor, int(math.ceil(w_bar * beta / factor)) * factor)
+    else:
+        target_h = h_bar
+        target_w = w_bar
+
+    return target_h, target_w
 
 
 def calculate_qwen_vision_resolution(
@@ -53,53 +127,65 @@ def calculate_qwen_vision_resolution(
     min_mp: float,
     max_mp: float,
     fixed_mp: float,
-    alignment: int = 28
-) -> Tuple[int, int, str, str]:
+    config: QwenVisionEncoderConfig
+) -> Tuple[int, int, int, int, str, str, str]:
     """Calculate prepared vision image dimensions based on mode and Qwen encoder constraints.
 
     Returns:
-        (target_h, target_w, resize_direction, resolved_method)
+        (native_h, native_w, prep_h, prep_w, direction, resolved_method, additional_adjustment)
     """
-    src_pixels = image_h * image_w
-    src_ar = image_w / float(image_h)
-
-    # Calculate native Qwen target area
-    native_min_px = 256 * alignment * alignment
-    native_max_px = 1280 * alignment * alignment
-    target_pixels = max(native_min_px, min(src_pixels, native_max_px))
+    native_h, native_w = calculate_native_qwen_geometry(image_h, image_w, config)
+    factor = config.factor
 
     if mode == "native":
-        # Native Qwen behavior
-        target_pixels = max(native_min_px, min(src_pixels, native_max_px))
-
+        prep_h, prep_w = native_h, native_w
     elif mode == "adaptive":
-        # Constrain native target to user-defined MP range
-        user_max_px = max(100_000, int(max_mp * 1_000_000))
-        target_pixels = min(target_pixels, user_max_px)
-
+        target_pixels = native_h * native_w
+        if max_mp > 0.0:
+            user_max_px = int(max_mp * 1_000_000)
+            target_pixels = min(target_pixels, user_max_px)
         if min_mp > 0.0:
             user_min_px = int(min_mp * 1_000_000)
             target_pixels = max(target_pixels, user_min_px)
 
+        src_ar = image_w / float(image_h)
+        raw_h = math.sqrt(target_pixels / src_ar)
+        raw_w = raw_h * src_ar
+
+        prep_h = max(factor, int(round(raw_h / factor)) * factor)
+        prep_w = max(factor, int(round(raw_w / factor)) * factor)
     elif mode == "fixed":
         target_pixels = int(fixed_mp * 1_000_000)
+        src_ar = image_w / float(image_h)
+        raw_h = math.sqrt(target_pixels / src_ar)
+        raw_w = raw_h * src_ar
 
-    # Compute height and width preserving aspect ratio
-    raw_h = math.sqrt(target_pixels / src_ar)
-    raw_w = raw_h * src_ar
+        prep_h = max(factor, int(round(raw_h / factor)) * factor)
+        prep_w = max(factor, int(round(raw_w / factor)) * factor)
+    else:
+        prep_h, prep_w = native_h, native_w
 
-    # Align to encoder alignment
-    target_h = max(alignment, int(round(raw_h / alignment)) * alignment)
-    target_w = max(alignment, int(round(raw_w / alignment)) * alignment)
+    src_pixels = image_h * image_w
+    prep_pixels = prep_h * prep_w
 
-    if (target_h, target_w) == (image_h, image_w):
+    if (prep_h, prep_w) == (image_h, image_w):
         direction = "none"
-    elif (target_h * target_w) < src_pixels:
+        auto_method = "none"
+    elif prep_pixels < src_pixels:
         direction = "downscale"
+        auto_method = "area"
     else:
         direction = "upscale"
+        auto_method = "bicubic"
 
-    return target_h, target_w, direction, ("area" if direction == "downscale" else "bicubic")
+    # Check if Qwen vision processing on prep_h, prep_w will produce identical dimensions
+    qwen_re_h, qwen_re_w = calculate_native_qwen_geometry(prep_h, prep_w, config)
+    if (qwen_re_h, qwen_re_w) == (prep_h, prep_w):
+        add_adj = "no"
+    else:
+        add_adj = f"yes ({qwen_re_w} x {qwen_re_h})"
+
+    return native_h, native_w, prep_h, prep_w, direction, auto_method, add_adj
 
 
 def prepare_vision_image(
@@ -116,20 +202,17 @@ def prepare_vision_image(
     if image.ndim == 3:
         image = image.unsqueeze(0)
 
-    # Input format [B, H, W, C]
     bs, ih, iw, c = image.shape
+    config = resolve_qwen_encoder_config(clip)
 
-    encoder_info = introspect_qwen_clip(clip)
-    alignment = encoder_info["alignment"]
-
-    target_h, target_w, direction, auto_method = calculate_qwen_vision_resolution(
+    native_h, native_w, prep_h, prep_w, direction, auto_method, add_adj = calculate_qwen_vision_resolution(
         image_h=ih,
         image_w=iw,
         mode=mode,
         min_mp=min_mp,
         max_mp=max_mp,
         fixed_mp=fixed_mp,
-        alignment=alignment
+        config=config
     )
 
     resolved_method = auto_method
@@ -138,10 +221,10 @@ def prepare_vision_image(
     elif direction == "upscale" and upscale_method != "auto":
         resolved_method = upscale_method
 
-    if (ih, iw) == (target_h, target_w):
+    if (ih, iw) == (prep_h, prep_w):
         vision_image = image
     else:
-        vision_image = resize_tensor(image, target_h=target_h, target_w=target_w, method=resolved_method)
+        vision_image = resize_tensor(image, target_h=prep_h, target_w=prep_w, method=resolved_method)
 
     prep_spec = VisionPrepSpec(
         mode=mode,
@@ -150,17 +233,22 @@ def prepare_vision_image(
         semantic_fixed_mp=fixed_mp,
         downscale_method_requested=downscale_method,
         upscale_method_requested=upscale_method,
-        encoder_signature=encoder_info["encoder_signature"],
-        resolved_alignment=alignment,
-        resolved_native_limits={"min_pixels": encoder_info["min_pixels"], "max_pixels": encoder_info["max_pixels"]}
+        encoder_signature=config.encoder_signature,
+        resolved_alignment=config.factor,
+        resolved_native_limits={"min_pixels": config.min_pixels, "max_pixels": config.max_pixels}
     )
 
     debug_meta = {
         "src_hw": (ih, iw),
-        "target_hw": (target_h, target_w),
+        "native_hw": (native_h, native_w),
+        "target_hw": (prep_h, prep_w),
+        "prep_hw": (prep_h, prep_w),
         "direction": direction,
         "resolved_method": resolved_method,
-        "encoder_info": encoder_info
+        "additional_adjustment": add_adj,
+        "config": config,
+        "downscale_method_requested": downscale_method,
+        "upscale_method_requested": upscale_method,
     }
 
     return PreparedVisionImage(
@@ -172,31 +260,49 @@ def prepare_vision_image(
 
 
 def format_vision_info(prep_img: PreparedVisionImage) -> str:
-    """Format human-readable vision_info string."""
+    """Format human-readable vision_info string following exact Section 3 key names."""
     meta = prep_img.debug_metadata
     spec = prep_img.prep_spec
-    enc = meta.get("encoder_info", {})
+    config: QwenVisionEncoderConfig = meta["config"]
 
     ih, iw = meta["src_hw"]
-    th, tw = meta["target_hw"]
-    src_mp = (ih * iw) / 1_000_000.0
-    prep_mp = (th * tw) / 1_000_000.0
+    nh, nw = meta["native_hw"]
+    ph, pw = meta["prep_hw"]
+
+    src_area = (ih * iw) / 1_000_000.0
+    native_area = (nh * nw) / 1_000_000.0
+    prep_area = (ph * pw) / 1_000_000.0
+
+    req_method = (
+        spec.downscale_method_requested if meta["direction"] == "downscale"
+        else (spec.upscale_method_requested if meta["direction"] == "upscale" else "auto")
+    )
+
+    config_source_str = f"{config.value_sources.get('encoder_signature', 'fallback')} (patch: {config.value_sources.get('patch_size', 'fallback')}, limits: {config.value_sources.get('min_pixels', 'fallback')})"
 
     lines = [
-        f"Vision Encoder: {enc.get('encoder_signature', 'Qwen-VL')}",
+        f"Vision Encoder: {config.encoder_signature}",
+        f"Configuration Source: {config_source_str}",
+        f"Patch Size: {config.patch_size}",
+        f"Merge Size: {config.merge_size}",
+        f"Encoder Factor: {config.factor}",
+        f"Native Minimum Pixels: {config.min_pixels}",
+        f"Native Maximum Pixels: {config.max_pixels}",
         f"Mode: {spec.mode}",
         f"Source Size: {iw} x {ih}",
-        f"Source Area: {src_mp:.3f} MP",
-        f"Configured Minimum: {spec.semantic_min_mp:.3f} MP",
-        f"Configured Maximum: {spec.semantic_max_mp:.3f} MP",
-        f"Prepared Size: {tw} x {th}",
-        f"Prepared Area: {prep_mp:.3f} MP",
-        f"Encoder Alignment: {spec.resolved_alignment}",
+        f"Source Area: {src_area:.3f} MP",
+        f"Native Target Size: {nw} x {nh}",
+        f"Native Target Area: {native_area:.3f} MP",
+        f"Configured Minimum MP: {spec.semantic_min_mp:.3f} MP",
+        f"Configured Maximum MP: {spec.semantic_max_mp:.3f} MP",
+        f"Configured Fixed MP: {spec.semantic_fixed_mp:.3f} MP",
+        f"Prepared Size: {pw} x {ph}",
+        f"Prepared Area: {prep_area:.3f} MP",
         f"Resize Applied: {'yes' if meta['direction'] != 'none' else 'no'}",
         f"Resize Direction: {meta['direction']}",
-        f"Resize Method Requested: {spec.downscale_method_requested if meta['direction'] == 'downscale' else spec.upscale_method_requested}",
+        f"Resize Method Requested: {req_method}",
         f"Resize Method Resolved: {meta['resolved_method']}",
-        "Expected Additional Geometry Adjustment: no"
+        f"Expected Additional Geometry Adjustment: {meta['additional_adjustment']}"
     ]
 
     return "\n".join(lines)

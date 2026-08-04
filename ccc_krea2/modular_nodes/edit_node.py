@@ -1,16 +1,16 @@
-"""CcC Krea2 - Edit orchestrator node."""
+"""CcC Krea2 - Edit node."""
 
 from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
-from ccc_krea2.reference_specs import ReferenceChain
+from ccc_krea2.prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 
 
 class CcCKrea2Edit:
-    """Final Krea 2 Edit orchestrator node performing visual reference encoding, conditioning, and patching."""
+    """Core 5-layer modular orchestrator node executing Krea 2 Edit pipeline."""
 
     CATEGORY = "CcC/Krea2"
     RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING")
-    RETURN_NAMES = ("model", "positive", "negative", "latent", "edit_info")
-    FUNCTION = "process"
+    RETURN_NAMES = ("patched_model", "positive", "negative", "latent", "edit_info")
+    FUNCTION = "edit"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -19,41 +19,40 @@ class CcCKrea2Edit:
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
                 "vae": ("VAE",),
-                "references": ("CCC_KREA2_REFERENCE_CHAIN",),
+                "references": ("REFERENCE_CHAIN",),
                 "target_latent": ("LATENT",),
-                "positive_prompt": ("STRING", {"default": "", "multiline": True}),
-                "negative_prompt": ("STRING", {"default": "", "multiline": True}),
+                "positive_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
+                "negative_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
             },
             "optional": {
-                "prompt_augmentation": ("CCC_KREA2_PROMPT_AUGMENTATION",),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "global_vision_directive": ("STRING", {"default": "", "multiline": True}),
             }
         }
 
-    def process(
+    def edit(
         self,
         model,
         clip,
         vae,
         references,
         target_latent,
-        positive_prompt,
-        negative_prompt,
+        positive_prompt="",
+        negative_prompt="",
         prompt_augmentation=None,
         global_vision_directive=""
     ):
-        ref_chain = references if isinstance(references, ReferenceChain) else ReferenceChain()
-
-        patched_model, positive, negative, latent_out, edit_info = run_krea2_edit_orchestrator(
+        patched_model, pos_cond, neg_cond, out_latent, edit_info = run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
             vae=vae,
-            references=ref_chain,
+            references=references,
             target_latent=target_latent,
             positive_prompt=positive_prompt,
             negative_prompt=negative_prompt,
             prompt_augmentation=prompt_augmentation,
             global_vision_directive=global_vision_directive
         )
+        return (patched_model, pos_cond, neg_cond, out_latent, edit_info)
 
-        return (patched_model, positive, negative, latent_out, edit_info)
+    process = edit

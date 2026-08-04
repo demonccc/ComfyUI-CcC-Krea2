@@ -1,9 +1,214 @@
-"""Pixel-space visual reference fit resolver matching Krea2Edit geometry principles."""
+"""Krea2Edit pixel-space geometry processing, cropped/fitted VAE reference calculations, and mask alignment.
 
+Ported and attributed from ComfyUI-Krea2Edit by lbouaraba (GPL-3.0 / MIT).
+https://github.com/lbouaraba/comfyui-krea2edit
+"""
+
+import math
 import torch
 import torch.nn.functional as F
-from typing import Tuple, Optional, Dict, Any
+from dataclasses import dataclass
+from typing import Tuple, Dict, Any, Optional
 from ccc_krea2.geometry import resize_tensor
+
+
+@dataclass
+class ResolvedGeometry:
+    mode_requested: str
+    mode_resolved: str
+    source_size: Tuple[int, int]          # (W, H)
+    crop_rectangle: Tuple[int, int, int, int] # (left, top, crop_w, crop_h)
+    vae_input_pixel_size: Tuple[int, int] # (W, H)
+    vae_latent_grid_size: Tuple[int, int] # (lat_w, lat_h)
+    target_grid_size: Tuple[int, int]     # (tgt_lat_w, tgt_lat_h)
+    centered_fractional_offset: Tuple[float, float] # (offset_y, offset_x)
+    interpolation_method: str
+    whether_interpolation_occurred: bool
+
+
+CROP_TOL = 0.08  # Krea2Edit upstream near-matched aspect ratio tolerance
+
+
+def resolve_krea2edit_geometry(
+    src_h: int,
+    src_w: int,
+    tgt_h: int,
+    tgt_w: int,
+    fit_mode: str = "auto"
+) -> ResolvedGeometry:
+    """Resolve Krea2Edit pixel-space geometry and RoPE offsets matching upstream _fit_encode_image logic."""
+    tgt_lat_h = tgt_h // 8
+    tgt_lat_w = tgt_w // 8
+
+    src_ar = src_w / float(src_h)
+    tgt_ar = tgt_w / float(tgt_h)
+
+    ar_diff = abs(src_ar - tgt_ar) / tgt_ar
+
+    # Step 1: Auto-mode decision logic
+    if fit_mode == "auto":
+        if (src_w, src_h) == (tgt_w, tgt_h):
+            resolved_mode = "exact"
+        else:
+            # Check crop_only criteria (max 5% per dim crop, max 10% area discarded)
+            if src_ar > tgt_ar:
+                crop_h = src_h
+                crop_w = int(round(src_h * tgt_ar))
+            else:
+                crop_w = src_w
+                crop_h = int(round(src_w / tgt_ar))
+
+            dw_pct = abs(src_w - crop_w) / float(src_w)
+            dh_pct = abs(src_h - crop_h) / float(src_h)
+            area_discarded = (src_w * src_h - crop_w * crop_h) / float(src_w * src_h)
+
+            if dw_pct <= 0.05 and dh_pct <= 0.05 and area_discarded <= 0.10 and (crop_w, crop_h) == (tgt_w, tgt_h):
+                resolved_mode = "crop_only"
+            elif ar_diff <= CROP_TOL:
+                resolved_mode = "crop_and_resize"
+            else:
+                resolved_mode = "fit"
+    else:
+        resolved_mode = fit_mode
+
+    # Step 2: Calculate crop rectangle and VAE input dimensions according to mode
+    if resolved_mode in ("exact", "crop_only"):
+        crop_w = min(src_w, tgt_w)
+        crop_h = min(src_h, tgt_h)
+        left = (src_w - crop_w) // 2
+        top = (src_h - crop_h) // 2
+        vae_input_w = tgt_w
+        vae_input_h = tgt_h
+        interp_occurred = False
+        interp_method = "none"
+
+    elif resolved_mode in ("crop", "crop_and_resize"):
+        # Minimal center crop to match target aspect ratio, then resize to exact target dimensions
+        if src_ar > tgt_ar:
+            crop_h = src_h
+            crop_w = int(round(src_h * tgt_ar))
+        else:
+            crop_w = src_w
+            crop_h = int(round(src_w / tgt_ar))
+
+        left = (src_w - crop_w) // 2
+        top = (src_h - crop_h) // 2
+        vae_input_w = tgt_w
+        vae_input_h = tgt_h
+        interp_occurred = (crop_w, crop_h) != (tgt_w, tgt_h)
+        interp_method = "bicubic"
+
+    elif resolved_mode == "stretch":
+        crop_w = src_w
+        crop_h = src_h
+        left = 0
+        top = 0
+        vae_input_w = tgt_w
+        vae_input_h = tgt_h
+        interp_occurred = (src_w, src_h) != (tgt_w, tgt_h)
+        interp_method = "bicubic"
+
+    else:  # "fit" - Genuine aspect-ratio mismatch / Krea2Edit upstream fit
+        if ar_diff <= CROP_TOL:
+            # Upstream near-match branch inside fit
+            if src_ar > tgt_ar:
+                crop_h = src_h
+                crop_w = int(round(src_h * tgt_ar))
+            else:
+                crop_w = src_w
+                crop_h = int(round(src_w / tgt_ar))
+
+            left = (src_w - crop_w) // 2
+            top = (src_h - crop_h) // 2
+            vae_input_w = tgt_w
+            vae_input_h = tgt_h
+            interp_occurred = True
+            interp_method = "bicubic"
+            if fit_mode == "auto":
+                resolved_mode = "crop_and_resize"
+        else:
+            # Genuine mismatch: fit inside target canvas, align to /16 floor
+            if src_ar > tgt_ar:
+                raw_fit_w = tgt_w
+                raw_fit_h = tgt_w / src_ar
+            else:
+                raw_fit_h = tgt_h
+                raw_fit_w = tgt_h * src_ar
+
+            # Floor to /16 multiple, capped to target /16 floor
+            fit_w = min(tgt_w, max(16, (int(raw_fit_w) // 16) * 16))
+            fit_h = min(tgt_h, max(16, (int(raw_fit_h) // 16) * 16))
+
+            crop_w = src_w
+            crop_h = src_h
+            left = 0
+            top = 0
+            vae_input_w = fit_w
+            vae_input_h = fit_h
+            interp_occurred = (src_w, src_h) != (fit_w, fit_h)
+            interp_method = "bicubic"
+
+    vae_lat_w = vae_input_w // 8
+    vae_lat_h = vae_input_h // 8
+
+    # Calculate centered fractional RoPE offset
+    offset_y = (tgt_lat_h - vae_lat_h) / 2.0
+    offset_x = (tgt_lat_w - vae_lat_w) / 2.0
+
+    return ResolvedGeometry(
+        mode_requested=fit_mode,
+        mode_resolved=resolved_mode,
+        source_size=(src_w, src_h),
+        crop_rectangle=(left, top, crop_w, crop_h),
+        vae_input_pixel_size=(vae_input_w, vae_input_h),
+        vae_latent_grid_size=(vae_lat_w, vae_lat_h),
+        target_grid_size=(tgt_lat_w, tgt_lat_h),
+        centered_fractional_offset=(offset_y, offset_x),
+        interpolation_method=interp_method,
+        whether_interpolation_occurred=interp_occurred,
+    )
+
+
+def process_image_and_mask_geometry(
+    image: torch.Tensor,
+    mask: Optional[torch.Tensor],
+    geom: ResolvedGeometry
+) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    """Apply exact crop and resize geometry to both image tensor and attention mask tensor in lockstep."""
+    if image.ndim == 3:
+        image = image.unsqueeze(0)
+
+    left, top, crop_w, crop_h = geom.crop_rectangle
+    vae_w, vae_h = geom.vae_input_pixel_size
+
+    # 1. Crop image [B, H, W, C]
+    cropped_img = image[:, top : top + crop_h, left : left + crop_w, :]
+
+    # 2. Resize image if required
+    if (cropped_img.shape[1], cropped_img.shape[2]) != (vae_h, vae_w):
+        processed_img = resize_tensor(cropped_img, target_h=vae_h, target_w=vae_w, method=geom.interpolation_method)
+    else:
+        processed_img = cropped_img
+
+    processed_mask = None
+    if mask is not None:
+        # Handle mask format [B, H, W] or [H, W]
+        if mask.ndim == 2:
+            mask = mask.unsqueeze(0)
+
+        # Crop mask [B, H, W]
+        cropped_mask = mask[:, top : top + crop_h, left : left + crop_w]
+
+        # Resize mask using nearest-exact for binary integrity or bilinear if smooth
+        if (cropped_mask.shape[1], cropped_mask.shape[2]) != (vae_h, vae_w):
+            # Convert to [B, 1, H, W] for interpolation
+            m_4d = cropped_mask.unsqueeze(1)
+            resized_m = F.interpolate(m_4d, size=(vae_h, vae_w), mode="nearest-exact")
+            processed_mask = resized_m.squeeze(1)
+        else:
+            processed_mask = cropped_mask
+
+    return processed_img, processed_mask
 
 
 def resolve_visual_reference_fit(
@@ -11,121 +216,28 @@ def resolve_visual_reference_fit(
     target_h: int,
     target_w: int,
     mode: str = "auto",
-    mask: Optional[torch.Tensor] = None,
-    alignment: int = 16
+    mask: Optional[torch.Tensor] = None
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
-    """Transform a reference image and optional mask according to target latent geometry.
-
-    Modes:
-    - 'auto': Resolves to 'exact', 'crop_only', 'crop_and_resize', or 'fit'.
-    - 'fit': Training-matched /16 floor dimension alignment without black canvas padding.
-    - 'crop': Center crop to target aspect ratio and resize to target_h x target_w.
-    """
+    """Backward compatibility wrapper around resolve_krea2edit_geometry and process_image_and_mask_geometry."""
     if image.ndim == 3:
         image = image.unsqueeze(0)
 
-    if image.shape[-1] in (1, 3, 4):
-        img_bchw = image.movedim(-1, 1).float()
-        is_channels_last = True
-    else:
-        img_bchw = image.float()
-        is_channels_last = False
+    src_h, src_w = image.shape[1], image.shape[2]
+    geom = resolve_krea2edit_geometry(src_h=src_h, src_w=src_w, tgt_h=target_h, tgt_w=target_w, fit_mode=mode)
+    fit_img, fit_mask = process_image_and_mask_geometry(image=image, mask=mask, geom=geom)
 
-    bs, c, ih, iw = img_bchw.shape
-    src_ar = iw / float(ih)
-    target_ar = target_w / float(target_h)
+    fit_meta = {
+        "mode_requested": geom.mode_requested,
+        "mode_resolved": geom.mode_resolved,
+        "source_size": geom.source_size,
+        "crop_rectangle": geom.crop_rectangle,
+        "spatial_hw": (geom.vae_input_pixel_size[1], geom.vae_input_pixel_size[0]),
+        "vae_latent_grid_size": geom.vae_latent_grid_size,
+        "target_grid_size": geom.target_grid_size,
+        "centered_fractional_offset": geom.centered_fractional_offset,
+        "interpolation_method": geom.interpolation_method,
+        "whether_interpolation_occurred": geom.whether_interpolation_occurred,
+        "geom": geom
+    }
 
-    mask_bchw = None
-    if mask is not None:
-        mask_float = mask.float()
-        if mask_float.ndim == 2:
-            mask_bchw = mask_float.unsqueeze(0).unsqueeze(0)
-        elif mask_float.ndim == 3:
-            mask_bchw = mask_float.unsqueeze(1)
-        elif mask_float.ndim == 4:
-            mask_bchw = mask_float
-        if mask_bchw.shape[0] != bs:
-            mask_bchw = mask_bchw[:1].repeat(bs, 1, 1, 1)
-
-    resolved_mode = mode
-
-    if mode == "auto":
-        # 1. Exact match check
-        if (ih, iw) == (target_h, target_w):
-            resolved_mode = "exact"
-        else:
-            # 2. Crop-only check (dim diff <= 5%, area diff <= 10%)
-            h_diff = (ih - target_h) / float(target_h)
-            w_diff = (iw - target_w) / float(target_w)
-            area_diff = (ih * iw - target_h * target_w) / float(target_h * target_w)
-
-            if 0.0 <= h_diff <= 0.05 and 0.0 <= w_diff <= 0.05 and 0.0 <= area_diff <= 0.10:
-                resolved_mode = "crop_only"
-            else:
-                # 3. Crop-and-resize check (AR diff <= 8%)
-                ar_diff = abs(src_ar - target_ar) / target_ar
-                if ar_diff <= 0.08:
-                    resolved_mode = "crop_and_resize"
-                else:
-                    resolved_mode = "fit"
-
-    # Execution of resolved mode
-    if resolved_mode == "exact":
-        out_img = img_bchw.movedim(1, -1) if is_channels_last else img_bchw
-        out_mask = mask_bchw.squeeze(1).clamp(0.0, 1.0) if mask_bchw is not None else None
-        return out_img.clamp(0.0, 1.0), out_mask, {"mode_requested": mode, "mode_resolved": "exact", "spatial_hw": (target_h, target_w)}
-
-    elif resolved_mode in ("crop_only", "crop", "crop_and_resize"):
-        if resolved_mode == "crop_only":
-            y0 = (ih - target_h) // 2
-            x0 = (iw - target_w) // 2
-            cropped_img = img_bchw[..., y0:y0 + target_h, x0:x0 + target_w]
-            out_img = cropped_img.movedim(1, -1) if is_channels_last else cropped_img
-            out_mask = mask_bchw[..., y0:y0 + target_h, x0:x0 + target_w].squeeze(1).clamp(0.0, 1.0) if mask_bchw is not None else None
-            return out_img.clamp(0.0, 1.0), out_mask, {"mode_requested": mode, "mode_resolved": "crop_only", "spatial_hw": (target_h, target_w)}
-
-        # crop / crop_and_resize
-        scale = max(target_h / float(ih), target_w / float(iw))
-        crop_h = min(ih, int(round(target_h / scale)))
-        crop_w = min(iw, int(round(target_w / scale)))
-
-        y0 = (ih - crop_h) // 2
-        x0 = (iw - crop_w) // 2
-        cropped = img_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
-        resized = resize_tensor(cropped.movedim(1, -1) if is_channels_last else cropped, target_h=target_h, target_w=target_w)
-        resized_bchw = resized.movedim(-1, 1) if is_channels_last else resized
-
-        out_mask = None
-        if mask_bchw is not None:
-            cropped_mask = mask_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
-            out_mask = F.interpolate(cropped_mask, size=(target_h, target_w), mode="bilinear", antialias=True).squeeze(1).clamp(0.0, 1.0)
-
-        out_img = resized_bchw.movedim(1, -1) if is_channels_last else resized_bchw
-        return out_img.clamp(0.0, 1.0), out_mask, {"mode_requested": mode, "mode_resolved": resolved_mode, "spatial_hw": (target_h, target_w)}
-
-    elif resolved_mode == "fit":
-        scale = min(target_h / float(ih), target_w / float(iw))
-        raw_h = ih * scale
-        raw_w = iw * scale
-
-        fh = max(alignment, (int(raw_h) // alignment) * alignment)
-        fw = max(alignment, (int(raw_w) // alignment) * alignment)
-
-        crop_h = min(ih, int(round(fh / scale)))
-        crop_w = min(iw, int(round(fw / scale)))
-
-        y0 = (ih - crop_h) // 2
-        x0 = (iw - crop_w) // 2
-        cropped = img_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
-        resized = resize_tensor(cropped.movedim(1, -1) if is_channels_last else cropped, target_h=fh, target_w=fw)
-        resized_bchw = resized.movedim(-1, 1) if is_channels_last else resized
-
-        out_mask = None
-        if mask_bchw is not None:
-            cropped_mask = mask_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
-            out_mask = F.interpolate(cropped_mask, size=(fh, fw), mode="bilinear", antialias=True).squeeze(1).clamp(0.0, 1.0)
-
-        out_img = resized_bchw.movedim(1, -1) if is_channels_last else resized_bchw
-        return out_img.clamp(0.0, 1.0), out_mask, {"mode_requested": mode, "mode_resolved": "fit", "spatial_hw": (fh, fw)}
-
-    raise RuntimeError(f"Unreachable mode state '{resolved_mode}' in resolve_visual_reference_fit")
+    return fit_img, fit_mask, fit_meta

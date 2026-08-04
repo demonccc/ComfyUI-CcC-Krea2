@@ -18,6 +18,7 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
 
     processed_ref_latents: List[torch.Tensor] = []
     ref_boosts: List[float] = []
+    ref_masked_boosts: List[float] = []
     ref_masks: List[Optional[torch.Tensor]] = []
     mask_modes: List[str] = []
 
@@ -26,6 +27,7 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             proc_lat = _process_latent_in_if_available(patched_model, ref.vae_latent)
             processed_ref_latents.append(proc_lat)
             ref_boosts.append(ref.boost)
+            ref_masked_boosts.append(getattr(ref, "masked_boost", 1.0))
             ref_masks.append(ref.spatial_attention_mask)
             mask_modes.append(ref.mask_mode)
 
@@ -49,6 +51,7 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             context=context,
             ref_latents=processed_ref_latents,
             ref_boosts=ref_boosts,
+            ref_masked_boosts=ref_masked_boosts,
             ref_masks=ref_masks,
             mask_modes=mask_modes,
             transformer_options=transformer_options,
@@ -169,7 +172,8 @@ def krea2_dit_incontext_forward(
     ref_boosts: List[float],
     ref_masks: List[Optional[torch.Tensor]],
     mask_modes: List[str],
-    transformer_options: Dict[str, Any]
+    transformer_options: Dict[str, Any],
+    ref_masked_boosts: Optional[List[float]] = None
 ) -> torch.Tensor:
     """Execute Krea 2 SingleStreamDiT edit forward using exact model member API and signatures."""
     orig_ndim = x.ndim
@@ -259,6 +263,7 @@ def krea2_dit_incontext_forward(
     # Compute attention logit bias (mask limits boost application; unmasked regions retain 0 bias)
     attn_bias = _compute_ref_attention_bias_patchified(
         boosts=ref_boosts,
+        masked_boosts=ref_masked_boosts or [1.0] * len(ref_boosts),
         txt_len=txt_len,
         ref_token_lens=ref_token_lens,
         tgt_len=tgt_n_toks,
@@ -372,14 +377,39 @@ def _compute_ref_attention_bias_patchified(
     ref_token_grids: List[Tuple[int, int]],
     mask_modes: List[str],
     device: torch.device,
-    dtype: torch.dtype
+    dtype: torch.dtype,
+    masked_boosts: Optional[List[float]] = None
 ) -> Optional[torch.Tensor]:
     """Compute additive attention logit bias covering full sequence.
 
-    Semantics: Attention masks limit where the reference boost is applied (log(boost) * mask_value).
-    Outside the mask (or when unmasked), bias remains 0.0 (NO -1e4 penalty).
+    Effective boost = base_boost * (masked_boost if inside mask else 1.0)
+    Logit bias: base_bias = log(base_boost), masked_extra_bias = mask * log(masked_boost)
+    Inside mask, biases add: log(base_boost) + log(masked_boost) = log(base_boost * masked_boost).
     """
-    if not boosts or all(b == 1.0 and m is None for b, m in zip(boosts, ref_masks)):
+    resolved_base_boosts = []
+    resolved_masked_boosts = []
+
+    for i in range(len(boosts)):
+        b = boosts[i]
+        m = ref_masks[i] if i < len(ref_masks) else None
+
+        if masked_boosts is not None and i < len(masked_boosts):
+            resolved_base_boosts.append(b)
+            resolved_masked_boosts.append(masked_boosts[i])
+        else:
+            if m is not None:
+                # Legacy single-boost with mask: boost applies inside mask
+                resolved_base_boosts.append(1.0)
+                resolved_masked_boosts.append(b)
+            else:
+                # Legacy single-boost without mask: boost applies across whole reference
+                resolved_base_boosts.append(b)
+                resolved_masked_boosts.append(1.0)
+
+    if not boosts or all(
+        b == 1.0 and mb == 1.0 and m is None
+        for b, mb, m in zip(resolved_base_boosts, resolved_masked_boosts, ref_masks)
+    ):
         return None
 
     total_ref_len = sum(ref_token_lens)
@@ -390,22 +420,30 @@ def _compute_ref_attention_bias_patchified(
     ref_start = txt_len
     target_start = txt_len + total_ref_len
 
-    for boost, ref_len, spatial_mask, (r_gh, r_gw), mask_mode in zip(
-        boosts, ref_token_lens, ref_masks, ref_token_grids, mask_modes
+    for boost, masked_boost, ref_len, spatial_mask, (r_gh, r_gw), mask_mode in zip(
+        resolved_base_boosts, resolved_masked_boosts, ref_token_lens, ref_masks, ref_token_grids, mask_modes
     ):
         ref_end = ref_start + ref_len
 
-        safe_boost = max(1e-4, min(100.0, float(boost)))
-        b_val = math.log(safe_boost)
+        safe_base_boost = max(1e-4, min(100.0, float(boost)))
+        base_bias = math.log(safe_base_boost)
 
-        if spatial_mask is not None:
+        safe_masked_boost = max(1e-4, min(100.0, float(masked_boost)))
+        masked_extra_bias = math.log(safe_masked_boost)
+
+        # Base bias applies across entire reference
+        if base_bias != 0.0:
+            bias[0, 0, target_start:, ref_start:ref_end] += base_bias
+
+        # Masked extra bias applies inside spatial mask
+        if spatial_mask is not None and masked_extra_bias != 0.0:
             m_bchw = spatial_mask[:1].float()
             if m_bchw.ndim == 2:
                 m_bchw = m_bchw.unsqueeze(0).unsqueeze(0)
             elif m_bchw.ndim == 3:
                 m_bchw = m_bchw.unsqueeze(0)
 
-            m_resized = F.interpolate(m_bchw, size=(r_gh, r_gw), mode="bicubic", antialias=True)
+            m_resized = F.interpolate(m_bchw, size=(r_gh, r_gw), mode="nearest")
             m_2d = m_resized[0, 0]
 
             if mask_mode == "hard":
@@ -415,10 +453,8 @@ def _compute_ref_attention_bias_patchified(
 
             m_flat = m_processed.reshape(-1).to(device=device, dtype=dtype)
             if m_flat.numel() == ref_len:
-                selected_bias = b_val * m_flat
+                selected_bias = masked_extra_bias * m_flat
                 bias[0, 0, target_start:, ref_start:ref_end] += selected_bias.unsqueeze(0)
-        elif boost != 1.0:
-            bias[0, 0, target_start:, ref_start:ref_end] += b_val
 
         ref_start = ref_end
 

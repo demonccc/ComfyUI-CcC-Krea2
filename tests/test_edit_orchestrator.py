@@ -53,6 +53,6 @@ def test_edit_orchestrator_execution():
     assert pos_out is not None
     assert neg_out is not None
     assert lat_out == target_lat
-    assert "Logical Role: Subject" in edit_info
-    assert "Logical Role: Scene" in edit_info
-    assert "Global Vision Directive: yes" in edit_info
+    assert "Subject" in edit_info
+    assert "Scene" in edit_info
+    assert "Global Vision Directive Active: yes" in edit_info

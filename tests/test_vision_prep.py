@@ -16,10 +16,10 @@ def test_qwen_vision_prep_native_mode():
     assert torch.equal(prep.original_image, img)
     assert prep.prep_spec.mode == "native"
     assert prep.vision_image.shape[-1] == 3
-    # Check alignment
+    # Check alignment (factor 32 for Qwen3-VL)
     _, vh, vw, _ = prep.vision_image.shape
-    assert vh % 28 == 0
-    assert vw % 28 == 0
+    assert vh % 32 == 0
+    assert vw % 32 == 0
 
 
 def test_qwen_vision_prep_adaptive_mode():

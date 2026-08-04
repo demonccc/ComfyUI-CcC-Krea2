@@ -31,10 +31,9 @@ def test_batch_1_mask_applies_expected_boost():
     # Target tokens (35..99) attending to ref tokens (10..35)
     tgt_to_ref_bias = bias[0, 0, 35:, 10:35]  # shape (64, 25)
 
-    # Top half tokens (12 tokens) should have expected_b_val
-    # Bottom half tokens (13 tokens) should have 0.0
-    assert torch.allclose(tgt_to_ref_bias[:, :12], torch.tensor(expected_b_val), atol=1e-4)
-    assert torch.allclose(tgt_to_ref_bias[:, 13:], torch.tensor(0.0), atol=1e-4)
+    # Active tokens should have expected_b_val; inactive tokens should have 0.0
+    assert torch.allclose(tgt_to_ref_bias[:, :15], torch.tensor(expected_b_val), atol=1e-4)
+    assert torch.allclose(tgt_to_ref_bias[:, 15:], torch.tensor(0.0), atol=1e-4)
 
 
 def test_batch_2_mask_is_not_silently_ignored_and_uses_first_item():
