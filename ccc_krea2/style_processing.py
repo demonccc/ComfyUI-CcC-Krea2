@@ -49,31 +49,43 @@ def slice_style_image(
 
 
 def apply_statistical_style_fidelity(
-    conditioning_tensor: torch.Tensor,
-    style_fidelity: float
-) -> torch.Tensor:
-    """Apply Krea2 Moodboard statistical style fidelity transform to conditioning tensor.
+    cond_tensor: torch.Tensor,
+    spans: List[Tuple[int, int]],
+    fidelity: float,
+    indirect: bool
+) -> Tuple[torch.Tensor, bool]:
+    """Apply Krea2 Moodboard statistical style fidelity and indirect row removal across visual spans.
 
-    Transform: output = fidelity * orig + (1 - fidelity) * statistical_target
-    where statistical_target repeats (mean, mean + std, mean - std) across feature channels.
+    Fidelity Transform: output = fidelity * orig + (1.0 - fidelity) * target
+    Target: per-reference stats (mean, mean + std, mean - std) cycled across span visual rows.
+    Indirect: deletes style vision rows after LLM contextualization pass via a single keep mask.
     """
-    if style_fidelity >= 1.0:
-        return conditioning_tensor
+    b, seq, fused = cond_tensor.shape
+    z = cond_tensor.reshape(b, seq, 12, fused // 12).clone()
+    keep = torch.ones(seq, dtype=torch.bool, device=cond_tensor.device)
+    indirect_applied = False
 
-    orig = conditioning_tensor.clone()
-    mean = torch.mean(orig, dim=-1, keepdim=True)
-    std = torch.std(orig, dim=-1, keepdim=True)
+    for start, end in spans:
+        end = min(end, seq)
+        if end <= start:
+            continue
+        if indirect:
+            keep[start:end] = False
+            indirect_applied = True
+            continue
+        if fidelity < 1.0:
+            span = z[:, start:end]  # (B, rows, 12, fused//12)
+            mu = span.mean(dim=1, keepdim=True)
+            sigma = span.std(dim=1, keepdim=True) + 1e-6
+            stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)  # (B, 3, 12, fused//12)
+            idx = torch.arange(end - start, device=span.device) % 3
+            target = stats[:, idx]
+            z[:, start:end] = fidelity * span + (1.0 - fidelity) * target
 
-    # Construct repeating target stats
-    target_stats = torch.cat([mean, mean + std, mean - std], dim=-1)
-    if target_stats.shape[-1] < orig.shape[-1]:
-        repeats = (orig.shape[-1] // target_stats.shape[-1]) + 1
-        target_stats = target_stats.repeat(1, 1, repeats)[:, :, : orig.shape[-1]]
-    else:
-        target_stats = target_stats[:, :, : orig.shape[-1]]
-
-    blended = style_fidelity * orig + (1.0 - style_fidelity) * target_stats
-    return blended
+    z = z.reshape(b, seq, fused)
+    if indirect_applied:
+        z = z[:, keep]
+    return z, indirect_applied
 
 
 def expand_style_reference_spans(

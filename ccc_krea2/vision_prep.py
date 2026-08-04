@@ -104,15 +104,16 @@ def calculate_native_qwen_geometry(height: int, width: int, config: QwenVisionEn
     w_bar = max(factor, int(round(width / factor)) * factor)
 
     current_pixels = h_bar * w_bar
+    original_pixels = height * width
 
     if current_pixels > config.max_pixels:
-        beta = math.sqrt(current_pixels / config.max_pixels)
-        target_h = max(factor, int(math.floor(h_bar / beta / factor)) * factor)
-        target_w = max(factor, int(math.floor(w_bar / beta / factor)) * factor)
+        beta = math.sqrt(original_pixels / float(config.max_pixels))
+        target_h = max(factor, int(math.floor(height / beta / factor)) * factor)
+        target_w = max(factor, int(math.floor(width / beta / factor)) * factor)
     elif current_pixels < config.min_pixels:
-        beta = math.sqrt(config.min_pixels / current_pixels)
-        target_h = max(factor, int(math.ceil(h_bar * beta / factor)) * factor)
-        target_w = max(factor, int(math.ceil(w_bar * beta / factor)) * factor)
+        beta = math.sqrt(float(config.min_pixels) / original_pixels)
+        target_h = max(factor, int(math.ceil(height * beta / factor)) * factor)
+        target_w = max(factor, int(math.ceil(width * beta / factor)) * factor)
     else:
         target_h = h_bar
         target_w = w_bar
@@ -216,7 +217,9 @@ def prepare_vision_image(
     )
 
     resolved_method = auto_method
-    if direction == "downscale" and downscale_method != "auto":
+    if mode == "native":
+        resolved_method = config.interpolation
+    elif direction == "downscale" and downscale_method != "auto":
         resolved_method = downscale_method
     elif direction == "upscale" and upscale_method != "auto":
         resolved_method = upscale_method

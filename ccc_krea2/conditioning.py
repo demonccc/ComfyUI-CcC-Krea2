@@ -71,6 +71,58 @@ def build_krea2_qwen_template(num_images: int, system_prompt: str = DEFAULT_SYST
     )
 
 
+IM_START, USER, NEWLINE = 151644, 872, 198
+
+
+def extract_vision_spans_from_tokens(tokens: Any) -> List[Tuple[int, int]]:
+    """Extract vision row spans after Krea2 system+user template prefix stripping."""
+    tok_pairs = []
+    if isinstance(tokens, dict) and "qwen3vl_4b" in tokens and tokens["qwen3vl_4b"]:
+        tok_pairs = tokens["qwen3vl_4b"][0]
+    elif isinstance(tokens, list):
+        tok_pairs = tokens
+
+    if not tok_pairs:
+        return []
+
+    spans = []
+    rows = 0
+    template_end = -1
+    count_im_start = 0
+    ids = []
+
+    for v in tok_pairs:
+        elem = v[0] if isinstance(v, (list, tuple)) else v
+        if isinstance(elem, dict):
+            # Same token row math as Qwen3-VL TE
+            data = elem.get("data", elem.get("image", elem))
+            if isinstance(data, torch.Tensor):
+                h, w = (data.shape[-2], data.shape[-1]) if data.ndim >= 2 else (256, 256)
+                n = max(1, (h // 32) * (w // 32))
+            else:
+                n = 256
+            spans.append((rows, rows + n))
+            ids.append(None)
+            rows += n
+        else:
+            try:
+                tid = int(elem) if not torch.is_tensor(elem) else -1
+            except (ValueError, TypeError):
+                tid = -1
+            if tid == IM_START and count_im_start < 2:
+                template_end = rows
+                count_im_start += 1
+            ids.append(tid)
+            rows += 1
+
+    if template_end >= 0 and len(ids) > (template_end + 3):
+        if ids[template_end + 1] == USER and ids[template_end + 2] == NEWLINE:
+            template_end += 3
+
+    template_end = max(template_end, 0)
+    return [(max(s - template_end, 0), e - template_end) for s, e in spans if e > template_end]
+
+
 def encode_krea2_qwen_context(
     clip: Any,
     prompt: str,
@@ -97,49 +149,62 @@ def encode_krea2_qwen_context(
 
     conditioning = clip.encode_from_tokens_scheduled(tokens)
 
-    # Calculate row spans per image in conditioning
-    vision_row_spans: List[Tuple[int, int]] = []
-    curr_idx = 0
-    for item in physical_image_map:
-        # Check image tensor size to calculate vision token count
-        img = item.get("image")
-        if img is not None and hasattr(img, "shape") and len(img.shape) >= 3:
-            h, w = img.shape[-3], img.shape[-2]
-            # Standard Qwen3-VL factor 32
-            tokens_count = (h // 32) * (w // 32)
-        else:
-            tokens_count = 256  # standard default grid
-
-        vision_row_spans.append((curr_idx, curr_idx + tokens_count - 1))
-        curr_idx += tokens_count
+    # Extract vision row spans after template stripping
+    vision_row_spans = extract_vision_spans_from_tokens(tokens)
+    if not vision_row_spans and physical_image_map:
+        # Fallback for mock environment CLIP objects where token pairs are not present
+        curr_idx = 0
+        for item in physical_image_map:
+            img = item.get("image")
+            if img is not None and hasattr(img, "shape") and len(img.shape) >= 3:
+                h, w = img.shape[-3], img.shape[-2]
+                tokens_count = max(1, (h // 32) * (w // 32))
+            else:
+                tokens_count = 256
+            vision_row_spans.append((curr_idx, curr_idx + tokens_count))
+            curr_idx += tokens_count
 
     # Apply Moodboard style processing (Fidelity & Indirect Transfer) for positive conditioning
-    if is_positive and conditioning:
+    if is_positive and conditioning and physical_image_map:
+        style_spans_info = []
         for idx, item in enumerate(physical_image_map):
-            if item.get("role") == "style":
+            if item.get("role") == "style" and idx < len(vision_row_spans):
                 spec = item.get("spec")
                 fidelity = getattr(spec, "style_fidelity", 1.0)
                 indirect = getattr(spec, "indirect_style_transfer", False)
+                style_spans_info.append((vision_row_spans[idx], fidelity, indirect))
 
-                if fidelity < 1.0:
-                    for cond_entry in conditioning:
-                        if isinstance(cond_entry, (list, tuple)) and len(cond_entry) > 0:
-                            cond_tensor = cond_entry[0]
-                            if isinstance(cond_tensor, torch.Tensor):
-                                # Transform conditioning tensor
-                                cond_entry[0] = apply_statistical_style_fidelity(cond_tensor, fidelity)
+        if style_spans_info:
+            new_conditioning = []
+            for cond_entry in conditioning:
+                if isinstance(cond_entry, (list, tuple)) and len(cond_entry) > 0:
+                    cond_tensor = cond_entry[0]
+                    extras = cond_entry[1] if len(cond_entry) > 1 else {}
+                    new_extras = extras.copy() if isinstance(extras, dict) else extras
 
-                if indirect:
-                    # Remove style visual rows for indirect style transfer
-                    span_start, span_end = vision_row_spans[idx]
-                    for cond_entry in conditioning:
-                        if isinstance(cond_entry, (list, tuple)) and len(cond_entry) > 0:
-                            cond_tensor = cond_entry[0]
-                            if isinstance(cond_tensor, torch.Tensor) and cond_tensor.shape[1] > span_end:
-                                # Slice out style tokens from sequence dimension
-                                pre = cond_tensor[:, :span_start, :]
-                                post = cond_tensor[:, span_end + 1 :, :]
-                                cond_entry[0] = torch.cat([pre, post], dim=1)
+                    if isinstance(cond_tensor, torch.Tensor):
+                        transformed_tensor = cond_tensor
+                        indirect_occurred = False
+
+                        for (span_range, fidelity, indirect) in style_spans_info:
+                            transformed_tensor, ind_applied = apply_statistical_style_fidelity(
+                                cond_tensor=transformed_tensor,
+                                spans=[span_range],
+                                fidelity=fidelity,
+                                indirect=indirect
+                            )
+                            if ind_applied:
+                                indirect_occurred = True
+
+                        if indirect_occurred and isinstance(new_extras, dict):
+                            new_extras.pop("attention_mask", None)
+
+                        new_conditioning.append([transformed_tensor, new_extras])
+                    else:
+                        new_conditioning.append(cond_entry)
+                else:
+                    new_conditioning.append(cond_entry)
+            conditioning = new_conditioning
 
     return EncodedQwenContext(
         tokens=tokens,

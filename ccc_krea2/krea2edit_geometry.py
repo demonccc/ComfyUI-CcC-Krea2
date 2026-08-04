@@ -43,38 +43,45 @@ def resolve_krea2edit_geometry(
     src_ar = src_w / float(src_h)
     tgt_ar = tgt_w / float(tgt_h)
 
-    ar_diff = abs(src_ar - tgt_ar) / tgt_ar
-
     # Step 1: Auto-mode decision logic
-    if fit_mode == "auto":
+    if fit_mode in ("auto", "fit"):
         if (src_w, src_h) == (tgt_w, tgt_h):
             resolved_mode = "exact"
-        else:
+        elif src_w >= tgt_w and src_h >= tgt_h:
             # Check crop_only criteria (max 5% per dim crop, max 10% area discarded)
-            if src_ar > tgt_ar:
-                crop_h = src_h
-                crop_w = int(round(src_h * tgt_ar))
-            else:
-                crop_w = src_w
-                crop_h = int(round(src_w / tgt_ar))
-
-            dw_pct = abs(src_w - crop_w) / float(src_w)
-            dh_pct = abs(src_h - crop_h) / float(src_h)
+            crop_w = tgt_w
+            crop_h = tgt_h
+            dw_pct = (src_w - crop_w) / float(src_w)
+            dh_pct = (src_h - crop_h) / float(src_h)
             area_discarded = (src_w * src_h - crop_w * crop_h) / float(src_w * src_h)
 
-            if dw_pct <= 0.05 and dh_pct <= 0.05 and area_discarded <= 0.10 and (crop_w, crop_h) == (tgt_w, tgt_h):
+            if dw_pct <= 0.05 and dh_pct <= 0.05 and area_discarded <= 0.10:
                 resolved_mode = "crop_only"
-            elif ar_diff <= CROP_TOL:
+            else:
+                sc = min(tgt_h / float(src_h), tgt_w / float(src_w))
+                coverage_h = (src_h * sc) / float(tgt_h)
+                coverage_w = (src_w * sc) / float(tgt_w)
+                if coverage_h >= 0.92 and coverage_w >= 0.92:
+                    resolved_mode = "crop_and_resize"
+                else:
+                    resolved_mode = "fit"
+        else:
+            sc = min(tgt_h / float(src_h), tgt_w / float(src_w))
+            coverage_h = (src_h * sc) / float(tgt_h)
+            coverage_w = (src_w * sc) / float(tgt_w)
+            if coverage_h >= 0.92 and coverage_w >= 0.92:
                 resolved_mode = "crop_and_resize"
             else:
                 resolved_mode = "fit"
+    elif fit_mode == "crop":
+        resolved_mode = "crop_and_resize"
     else:
         resolved_mode = fit_mode
 
     # Step 2: Calculate crop rectangle and VAE input dimensions according to mode
     if resolved_mode in ("exact", "crop_only"):
-        crop_w = min(src_w, tgt_w)
-        crop_h = min(src_h, tgt_h)
+        crop_w = tgt_w
+        crop_h = tgt_h
         left = (src_w - crop_w) // 2
         top = (src_h - crop_h) // 2
         vae_input_w = tgt_w
@@ -98,55 +105,20 @@ def resolve_krea2edit_geometry(
         interp_occurred = (crop_w, crop_h) != (tgt_w, tgt_h)
         interp_method = "bicubic"
 
-    elif resolved_mode == "stretch":
-        crop_w = src_w
-        crop_h = src_h
-        left = 0
-        top = 0
-        vae_input_w = tgt_w
-        vae_input_h = tgt_h
-        interp_occurred = (src_w, src_h) != (tgt_w, tgt_h)
+    else:  # "fit" - Genuine aspect-ratio mismatch
+        sc = min(tgt_h / float(src_h), tgt_w / float(src_w))
+        fitted_h = min(tgt_h, max(16, (int(round(src_h * sc)) // 16) * 16))
+        fitted_w = min(tgt_w, max(16, (int(round(src_w * sc)) // 16) * 16))
+
+        crop_h = min(src_h, max(1, int(round(fitted_h / sc))))
+        crop_w = min(src_w, max(1, int(round(fitted_w / sc))))
+
+        left = (src_w - crop_w) // 2
+        top = (src_h - crop_h) // 2
+        vae_input_w = fitted_w
+        vae_input_h = fitted_h
+        interp_occurred = (crop_w, crop_h) != (fitted_w, fitted_h)
         interp_method = "bicubic"
-
-    else:  # "fit" - Genuine aspect-ratio mismatch / Krea2Edit upstream fit
-        if ar_diff <= CROP_TOL:
-            # Upstream near-match branch inside fit
-            if src_ar > tgt_ar:
-                crop_h = src_h
-                crop_w = int(round(src_h * tgt_ar))
-            else:
-                crop_w = src_w
-                crop_h = int(round(src_w / tgt_ar))
-
-            left = (src_w - crop_w) // 2
-            top = (src_h - crop_h) // 2
-            vae_input_w = tgt_w
-            vae_input_h = tgt_h
-            interp_occurred = True
-            interp_method = "bicubic"
-            if fit_mode == "auto":
-                resolved_mode = "crop_and_resize"
-        else:
-            # Genuine mismatch: fit inside target canvas, align to /16 floor
-            if src_ar > tgt_ar:
-                raw_fit_w = tgt_w
-                raw_fit_h = tgt_w / src_ar
-            else:
-                raw_fit_h = tgt_h
-                raw_fit_w = tgt_h * src_ar
-
-            # Floor to /16 multiple, capped to target /16 floor
-            fit_w = min(tgt_w, max(16, (int(raw_fit_w) // 16) * 16))
-            fit_h = min(tgt_h, max(16, (int(raw_fit_h) // 16) * 16))
-
-            crop_w = src_w
-            crop_h = src_h
-            left = 0
-            top = 0
-            vae_input_w = fit_w
-            vae_input_h = fit_h
-            interp_occurred = (src_w, src_h) != (fit_w, fit_h)
-            interp_method = "bicubic"
 
     vae_lat_w = vae_input_w // 8
     vae_lat_h = vae_input_h // 8

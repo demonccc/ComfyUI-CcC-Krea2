@@ -15,15 +15,15 @@ class CcCKrea2TargetLatent:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "vae": ("VAE",),
                 "target_content": (["empty", "subject", "scene"], {"default": "empty"}),
                 "geometry_mode": (["favor_subject", "favor_scene", "fixed"], {"default": "fixed"}),
-                "target_megapixels": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 12.0, "step": 0.01}),
+                "target_megapixels": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 12.0, "step": 0.01}),
                 "fixed_megapixels": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 12.0, "step": 0.01}),
                 "aspect_ratio": (["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"], {"default": "1:1"}),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
+                "vae": ("VAE",),
                 "subject_image": ("PREPARED_VISION_IMAGE",),
                 "scene_image": ("PREPARED_VISION_IMAGE",),
             }
@@ -34,7 +34,7 @@ class CcCKrea2TargetLatent:
         vae=None,
         target_content="empty",
         geometry_mode="fixed",
-        target_megapixels=1.0,
+        target_megapixels=2.0,
         fixed_megapixels=2.0,
         aspect_ratio="1:1",
         batch_size=1,

@@ -17,8 +17,10 @@ def test_visual_fit_exact():
 def test_visual_fit_crop_only():
     img = torch.rand(1, 520, 520, 3)
     out_img, _, meta = resolve_visual_reference_fit(img, target_h=512, target_w=512, mode="auto")
-    assert meta["mode_resolved"] in ("crop_only", "crop_and_resize")
+    assert meta["mode_resolved"] == "crop_only"
     assert out_img.shape == (1, 512, 512, 3)
+    assert meta["whether_interpolation_occurred"] is False
+    assert meta["interpolation_method"] == "none"
 
 
 def test_visual_fit_crop_and_resize():
@@ -68,3 +70,19 @@ def test_expand_style_reference_spans():
     assert len(crops) == 4
     assert s_start == 3
     assert s_end == 6
+
+
+def test_apply_statistical_style_fidelity_and_indirect():
+    from ccc_krea2.style_processing import apply_statistical_style_fidelity
+    cond = torch.randn(1, 100, 768)
+    spans = [(10, 30)]
+
+    # Test fidelity blending
+    blended, ind = apply_statistical_style_fidelity(cond, spans=spans, fidelity=0.5, indirect=False)
+    assert blended.shape == cond.shape
+    assert ind is False
+
+    # Test indirect style transfer
+    sliced, ind = apply_statistical_style_fidelity(cond, spans=spans, fidelity=0.5, indirect=True)
+    assert sliced.shape == (1, 80, 768)
+    assert ind is True

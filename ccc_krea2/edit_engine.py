@@ -58,9 +58,13 @@ def run_krea2_edit_orchestrator(
     vae_ref_specs: List[Dict[str, Any]] = []
     style_ref_specs: List[Dict[str, Any]] = []
 
-    role_directives: List[str] = []
+    role_directives_pos: List[str] = []
+    role_directives_neg: List[str] = []
+
     if global_vision_directive.strip():
-        role_directives.append(f"Global Vision Directive:\n{global_vision_directive.strip()}")
+        pos_dir_str = f"Global Vision Directive:\n{global_vision_directive.strip()}"
+        role_directives_pos.append(pos_dir_str)
+        role_directives_neg.append(pos_dir_str)
 
     for ref_item in resolved_refs:
         spec = ref_item["spec"]
@@ -69,10 +73,12 @@ def run_krea2_edit_orchestrator(
 
         # Automatic & extra vision directives
         auto_dir = build_automatic_role_directive(ref_item)
-        if auto_dir:
-            role_directives.append(auto_dir)
 
         if ref_role in ("subject", "scene", "outfit"):
+            if auto_dir:
+                role_directives_pos.append(auto_dir)
+                role_directives_neg.append(auto_dir)
+
             src_img = spec.prepared_image.original_image
             src_h, src_w = src_img.shape[1], src_img.shape[2]
 
@@ -101,7 +107,8 @@ def run_krea2_edit_orchestrator(
                 "latent_tokens": lat_tokens,
                 "mask": fit_mask,
                 "geom": geom,
-                "spec": spec
+                "spec": spec,
+                "ref_item": ref_item
             })
 
             # Non-style images enter both positive and negative Qwen lists
@@ -113,6 +120,10 @@ def run_krea2_edit_orchestrator(
 
         elif ref_role == "style":
             assert isinstance(spec, StyleReferenceSpec)
+            if auto_dir:
+                role_directives_pos.append(auto_dir)
+                # Style directives excluded from negative context!
+
             prep_crops, s_start, s_end = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
             for crop_prep in prep_crops:
                 pos_qwen_images.append(crop_prep.vision_image)
@@ -122,11 +133,15 @@ def run_krea2_edit_orchestrator(
                 "role": "style",
                 "slot": slot,
                 "spans": (s_start, s_end),
-                "spec": spec
+                "spec": spec,
+                "ref_item": ref_item
             })
 
-    directives_block = "\n\n".join(role_directives)
-    full_positive_prompt = f"{directives_block}\n\n{pos_base}".strip() if directives_block else pos_base
+    pos_dir_block = "\n\n".join(role_directives_pos)
+    neg_dir_block = "\n\n".join(role_directives_neg)
+
+    full_positive_prompt = f"{pos_dir_block}\n\n{pos_base}".strip() if pos_dir_block else pos_base
+    full_negative_prompt = f"{neg_dir_block}\n\n{neg_base}".strip() if neg_dir_block else neg_base
 
     # Step 5: Encode Qwen Contexts for positive and negative
     pos_qwen_context = encode_krea2_qwen_context(
@@ -139,7 +154,7 @@ def run_krea2_edit_orchestrator(
 
     neg_qwen_context = encode_krea2_qwen_context(
         clip=clip,
-        prompt=neg_base,
+        prompt=full_negative_prompt,
         physical_images=neg_qwen_images,
         physical_image_map=neg_qwen_image_map,
         is_positive=False
@@ -181,13 +196,21 @@ def run_krea2_edit_orchestrator(
     for ref in vae_ref_specs:
         sp = ref["spec"]
         geom = ref["geom"]
+        ref_item = ref["ref_item"]
         b_boost = getattr(sp, "attention_boost", 1.0)
         m_boost = getattr(sp, "masked_attention_boost", 1.0)
+        aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         info_lines.extend([
             f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
+            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
+            f"  Physical Qwen Range: {ref_item.get('physical_qwen_range')}",
+            f"  VAE Reference Frame: {ref_item.get('vae_reference_frame')}",
             f"  Requested Fit: {geom.mode_requested} | Resolved Fit: {geom.mode_resolved}",
             f"  Source Size: {geom.source_size[0]} x {geom.source_size[1]}",
+            f"  Crop Rectangle: {geom.crop_rectangle}",
             f"  VAE Input Size: {geom.vae_input_pixel_size[0]} x {geom.vae_input_pixel_size[1]}",
+            f"  VAE Latent Grid: {geom.vae_latent_grid_size[0]} x {geom.vae_latent_grid_size[1]}",
+            f"  Target Grid: {geom.target_grid_size[0]} x {geom.target_grid_size[1]}",
             f"  RoPE Centered Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
             f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
             f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
@@ -196,8 +219,11 @@ def run_krea2_edit_orchestrator(
 
     for st in style_ref_specs:
         sp = st["spec"]
+        ref_item = st["ref_item"]
+        aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         info_lines.extend([
             f"Style [Slot {st['slot']}]:",
+            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             f"  Processing: {sp.style_processing}",
             f"  Physical Qwen Spans: {st['spans'][0]}-{st['spans'][1]}",
             f"  Style Fidelity: {sp.style_fidelity:.2f}",

@@ -58,16 +58,57 @@ def test_target_latent_missing_vae_raises():
         )
 
 
-def test_target_latent_node_execution():
-    node = CcCKrea2TargetLatent()
-    mock_vae = MagicMock()
-    lat_dict, info = node.process(
-        vae=mock_vae,
+def test_target_latent_empty_without_vae():
+    lat_dict, info = create_target_latent(
+        vae=None,
         target_latent_content="empty",
         target_geometry="fixed",
-        maximum_mp=2.0,
         fixed_mp=1.0,
         fixed_aspect_ratio="1:1"
+    )
+    assert "samples" in lat_dict
+    assert lat_dict["samples"].shape == (1, 16, 124, 124)
+    assert "VAE Encode Applied: no" in info
+
+
+def test_target_latent_subject_content():
+    img = torch.rand(1, 600, 400, 3)
+    subj_prep = prepare_vision_image(image=img, clip=None, mode="native")
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="subject",
+        subject_image=subj_prep,
+        target_geometry="favor_subject",
+        maximum_mp=1.0,
+        batch_size=2
+    )
+    assert lat_dict["samples"].shape == (2, 16, 64, 64)
+    assert "Latent Content: subject" in info
+    assert "VAE Encode Applied: yes" in info
+    mock_vae.encode.assert_called_once()
+
+
+def test_target_latent_scene_content_missing_raises():
+    with pytest.raises(ValueError, match="Scene image is required"):
+        create_target_latent(
+            vae=MagicMock(),
+            target_latent_content="scene",
+            scene_image=None
+        )
+
+
+def test_target_latent_node_execution():
+    node = CcCKrea2TargetLatent()
+    lat_dict, info = node.process(
+        vae=None,
+        target_content="empty",
+        geometry_mode="fixed",
+        target_megapixels=2.0,
+        fixed_megapixels=1.0,
+        aspect_ratio="1:1"
     )
     assert lat_dict["samples"].shape[1] == 16
     assert "Geometry Strategy: fixed" in info

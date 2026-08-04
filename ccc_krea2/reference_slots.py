@@ -26,23 +26,20 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
     Returns:
         (resolved_reference_dicts, warnings)
     """
-    resolved: List[Dict[str, Any]] = []
+    resolved_unordered: List[Dict[str, Any]] = []
     warnings: List[str] = []
 
     used_slots = set()
-    auto_indices = []
 
-    # Phase 1: Collect manual slots and identify auto references
+    # Phase 1: Collect manual slots and check for duplicates among manual slots
     for idx, spec in enumerate(chain.references):
         req_slot = spec.requested_vision_slot
         if req_slot is not None and isinstance(req_slot, int) and req_slot > 0:
             if req_slot in used_slots:
                 raise ValueError(f"Duplicate vision slot {req_slot} specified in reference chain.")
             used_slots.add(req_slot)
-        else:
-            auto_indices.append(idx)
 
-    # Phase 2: Assign auto slots consecutively starting from 1
+    # Phase 2: Assign auto slots consecutively starting from 1 into unused numbers
     next_auto_slot = 1
     slot_assignments = [None] * len(chain.references)
 
@@ -57,13 +54,35 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
             used_slots.add(next_auto_slot)
             next_auto_slot += 1
 
-    # Phase 3: Expand aliases and validate uniqueness
+    # Build initial list with assigned logical slots
+    for idx, spec in enumerate(chain.references):
+        resolved_unordered.append({
+            "spec": spec,
+            "resolved_slot": slot_assignments[idx]
+        })
+
+    # Phase 3: Sort references strictly by resolved logical slot
+    resolved_sorted = sorted(resolved_unordered, key=lambda item: item["resolved_slot"])
+
+    # Phase 4: Validate that resolved logical slots are consecutive 1..N with no gaps
+    resolved_slots_list = [item["resolved_slot"] for item in resolved_sorted]
+    expected_slots = list(range(1, len(resolved_sorted) + 1))
+    if resolved_slots_list != expected_slots:
+        raise ValueError(
+            f"Invalid vision slot configuration: gaps detected in resolved logical slots "
+            f"(found {resolved_slots_list}, expected consecutive slots 1..{len(resolved_sorted)}). "
+            f"Physical Qwen images cannot contain an empty logical slot."
+        )
+
+    # Phase 5: Expand aliases and assign physical indices/ranges in sorted logical slot order
+    resolved: List[Dict[str, Any]] = []
     global_aliases = set()
     vae_frame_counter = 1
     physical_qwen_index = 1
 
-    for idx, spec in enumerate(chain.references):
-        slot = slot_assignments[idx]
+    for item in resolved_sorted:
+        spec = item["spec"]
+        slot = item["resolved_slot"]
         expanded_aliases = []
 
         for alias in spec.parsed_aliases:
