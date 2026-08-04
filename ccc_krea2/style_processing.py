@@ -1,13 +1,23 @@
-"""Moodboard style reference processing: crops/tiles slicing and preparation recipe application."""
-
 import torch
-from typing import List, Tuple, Any
+from dataclasses import dataclass
+from typing import List, Tuple, Any, Union
 from ccc_krea2.reference_specs import StyleReferenceSpec, PreparedVisionImage
 from ccc_krea2.vision_prep import prepare_vision_image
 
 
 SHUFFLE_2X2 = (2, 0, 3, 1)
 SHUFFLE_4X4 = (10, 3, 12, 5, 0, 15, 6, 9, 2, 13, 4, 11, 8, 1, 14, 7)
+
+
+@dataclass(frozen=True)
+class StyleSpanOperation:
+    logical_reference_id: str
+    logical_vision_slot: int
+    physical_qwen_index: int
+    row_start: int
+    row_end: int
+    style_fidelity: float
+    indirect_style_transfer: bool
 
 
 def slice_style_image(
@@ -50,7 +60,7 @@ def slice_style_image(
 
 def apply_statistical_style_fidelity(
     cond_tensor: torch.Tensor,
-    spans_info: List[Tuple[Tuple[int, int], float, bool]]
+    spans_info: List[Union[StyleSpanOperation, Tuple[Tuple[int, int], float, bool]]]
 ) -> Tuple[torch.Tensor, bool, List[int]]:
     """Apply Krea2 Moodboard statistical style fidelity and multi-span indirect row removal.
 
@@ -69,24 +79,42 @@ def apply_statistical_style_fidelity(
     keep = torch.ones(seq, dtype=torch.bool, device=cond_tensor.device)
     indirect_applied = False
 
+    # Normalize operations into StyleSpanOperation objects
+    ops: List[StyleSpanOperation] = []
+    for item in spans_info:
+        if isinstance(item, StyleSpanOperation):
+            ops.append(item)
+        elif isinstance(item, tuple) and len(item) == 3:
+            (start, end), fidelity, indirect = item
+            ops.append(StyleSpanOperation(
+                logical_reference_id="style",
+                logical_vision_slot=0,
+                physical_qwen_index=0,
+                row_start=start,
+                row_end=end,
+                style_fidelity=fidelity,
+                indirect_style_transfer=indirect
+            ))
+
     # Step 1: Apply Style Fidelity to all style spans using original row coordinates
-    for (start, end), fidelity, indirect in spans_info:
+    for op in ops:
+        start, end = op.row_start, op.row_end
         end = min(end, seq)
         if end <= start:
             continue
-        if indirect:
+        if op.indirect_style_transfer:
             keep[start:end] = False
             indirect_applied = True
             continue
 
-        if fidelity < 1.0:
+        if op.style_fidelity < 1.0:
             span = z[:, start:end]  # (B, rows, 12, fused//12)
             mu = span.mean(dim=1, keepdim=True)
             sigma = span.std(dim=1, keepdim=True) + 1e-6
             stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)  # (B, 3, 12, fused//12)
             idx = torch.arange(end - start, device=span.device) % 3
             target = stats[:, idx]
-            z[:, start:end] = fidelity * span + (1.0 - fidelity) * target
+            z[:, start:end] = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
 
     # Step 2: Remove all indirect style rows in ONE operation using single keep-mask
     z = z.reshape(b, seq, fused)

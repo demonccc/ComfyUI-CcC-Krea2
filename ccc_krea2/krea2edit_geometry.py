@@ -117,8 +117,8 @@ def resolve_krea2edit_geometry(
 
         left = (src_w - crop_w) // 2
         top = (src_h - crop_h) // 2
-        vae_input_w = tgt_w
-        vae_input_h = tgt_h
+        vae_input_w = (tgt_w // 16) * 16
+        vae_input_h = (tgt_h // 16) * 16
         interp_occurred = (crop_w, crop_h) != (tgt_w, tgt_h)
         interp_method = "bicubic"
 

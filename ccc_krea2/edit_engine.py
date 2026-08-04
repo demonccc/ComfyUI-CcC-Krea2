@@ -227,6 +227,17 @@ def run_krea2_edit_orchestrator(
         "=== CcC Krea2 Edit Pipeline Report ===",
         f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
         f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
+        "",
+        "Conditioning Summary:",
+        f"  Positive Row Count Before Moodboard: {pos_qwen_context.pos_rows_before}",
+        f"  Positive Row Count After Moodboard: {pos_qwen_context.pos_rows_after}",
+        f"  Negative Row Count: {neg_qwen_context.neg_rows}",
+        f"  Positive Physical Qwen Image Count: {len(pos_qwen_images)}",
+        f"  Negative Physical Qwen Image Count: {len(neg_qwen_images)}",
+        f"  Token Stream Key: {pos_qwen_context.token_stream_key}",
+        f"  Template Prefix Rows Removed: {pos_qwen_context.template_prefix_rows_removed}",
+        f"  Global Vision Directive Active: {'yes' if global_vision_directive.strip() else 'no'}",
+        f"  Prompt Augmentation Active: {'yes' if prompt_augmentation is not None else 'no'}",
         ""
     ]
 
@@ -237,19 +248,26 @@ def run_krea2_edit_orchestrator(
         b_boost = getattr(sp, "attention_boost", 1.0)
         m_boost = getattr(sp, "masked_attention_boost", 1.0)
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
+        phys_idx = ref_item.get("physical_qwen_range", (1, 1))[0]
+        span_str = str(pos_qwen_context.vision_row_spans[phys_idx - 1]) if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans) else "N/A"
+        anchor_type = "masked_identity" if getattr(sp, "masked_identity_anchor", 0.0) > 0.0 else ("pose_outfit" if getattr(sp, "pose_anchor", 0.0) > 0.0 else "none")
+
         info_lines.extend([
             f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
-            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
-            f"  Physical Qwen Range: {ref_item.get('physical_qwen_range')}",
+            f"  Logical Vision Slot: {ref['slot']}",
+            f"  Physical Qwen Image Index: {phys_idx}",
+            f"  Actual Conditioning Row Span: {span_str}",
             f"  VAE Reference Frame: {ref_item.get('vae_reference_frame')}",
-            f"  Requested Fit: {geom.mode_requested} | Resolved Fit: {geom.mode_resolved}",
-            f"  Source Size: {geom.source_size[0]} x {geom.source_size[1]}",
-            f"  Crop Rectangle: {geom.crop_rectangle}",
+            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
+            f"  Requested Visual Reference Fit: {geom.mode_requested}",
+            f"  Resolved Visual Reference Fit: {geom.mode_resolved}",
+            f"  Source Crop Rectangle: {geom.crop_rectangle}",
             f"  VAE Input Size: {geom.vae_input_pixel_size[0]} x {geom.vae_input_pixel_size[1]}",
             f"  VAE Latent Grid: {geom.vae_latent_grid_size[0]} x {geom.vae_latent_grid_size[1]}",
             f"  Target Grid: {geom.target_grid_size[0]} x {geom.target_grid_size[1]}",
-            f"  RoPE Centered Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
+            f"  RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
             f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
+            f"  Anchor Implementation Type: {anchor_type}",
             f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
             ""
         ])
@@ -259,28 +277,32 @@ def run_krea2_edit_orchestrator(
         ref_item = st["ref_item"]
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_range = ref_item.get("physical_qwen_range", st["spans"])
+        s_start, s_end = phys_range
+        st_spans = pos_qwen_context.vision_row_spans[s_start - 1 : s_end] if (s_start - 1) < len(pos_qwen_context.vision_row_spans) else []
+        shuffle_str = "SHUFFLE_2X2" if sp.style_processing == "2x2" else ("SHUFFLE_4X4" if sp.style_processing == "4x4" else "identity")
+        rows_rem = len(pos_qwen_context.removed_row_indices) if sp.indirect_style_transfer else 0
+
         info_lines.extend([
             f"Style [Slot {st['slot']}]:",
-            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
-            f"  Processing: {sp.style_processing}",
-            f"  Physical Qwen Spans: {phys_range[0]}-{phys_range[1]}",
+            f"  Logical Vision Slot: {st['slot']}",
+            f"  Physical Qwen Image Start: {s_start}",
+            f"  Physical Qwen Image End: {s_end}",
+            f"  Physical Qwen Image Count: {s_end - s_start + 1}",
+            f"  Actual Conditioning Row Spans: {st_spans}",
+            f"  Style Reference Processing: {sp.style_processing}",
+            f"  Crop Shuffle Order: {shuffle_str}",
             f"  Style Fidelity: {sp.style_fidelity:.2f}",
             f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
-            f"  Style Vision Directive Enabled: {sp.style_directive}",
+            f"  Rows Removed: {rows_rem}",
+            f"  Style Directive: {sp.style_directive}",
+            f"  Extra Vision Directive: {sp.extra_vision_directive or 'none'}",
+            f"  VAE Reference Frame: none",
+            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             ""
         ])
 
-    info_lines.extend([
-        "Conditioning Summary:",
-        f"  Positive Qwen Physical Images: {len(pos_qwen_images)}",
-        f"  Negative Qwen Physical Images: {len(neg_qwen_images)}",
-        f"  Global Vision Directive Active: {'yes' if global_vision_directive.strip() else 'no'}",
-        f"  Prompt Augmentation Active: {'yes' if prompt_augmentation is not None else 'no'}",
-    ])
-
     all_warnings = list(slot_warnings) + pos_qwen_context.warnings + neg_qwen_context.warnings
     if all_warnings:
-        info_lines.append("")
         info_lines.append("Warnings:")
         for w in all_warnings:
             info_lines.append(f"  - {w}")

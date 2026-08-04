@@ -9,13 +9,13 @@ Complete user-facing documentation for all nodes in the **CcC Krea2** suite, inc
 CcC Krea2 provides a modern, 5-layer decoupled architecture for precise image editing and reference composition:
 
 1. **Layer 1: Input & Vision Preparation (`CcCKrea2QwenVisionImagePrep`)**
-   Processes input images via Qwen-VL tokenization, yielding reusable, pre-computed `CCC_KREA2_PREPARED_IMAGE` tokens and dual-path geometry bounds.
+   Processes input images via Qwen Vision configuration, yielding a prepared derivative vision image (`PREPARED_VISION_IMAGE`) aligned to patch and merge factors.
 
 2. **Layer 2: Declarative Reference Chain (`CcCKrea2SubjectImage`, `CcCKrea2SceneImage`, `CcCKrea2OutfitImage`, `CcCKrea2StyleImage`)**
-   Defines atomic reference roles with specific weights, fit strategies (`auto`, `fit`, `crop`), prompt alias templates, anchor ranges (0.0–1.0), and attention masks, chaining them into an immutable `CCC_KREA2_REFERENCE_CHAIN`.
+   Defines atomic reference roles with specific weights, fit strategies (`auto`, `fit`, `crop`), prompt alias templates, anchor ranges (0.0–1.0), and attention masks, chaining them into an immutable `REFERENCE_CHAIN`.
 
 3. **Layer 3: Target Latent (`CcCKrea2TargetLatent`)**
-   Computes or extracts the target latent canvas (`empty`, `subject`, `scene`, `inpaint`, `custom`) using an automated 4-way visual reference fit resolver (`fixed`, `fit_subject`, `fit_scene`, `crop_subject`).
+   Generates the target latent dictionary (`empty`, `subject`, `scene`) and output resolution geometry.
 
 4. **Layer 4: Styling & LoRA Stack (`CcCKrea2LoRAStack`, `CcCKrea2LoRAPromptSettings`)**
    Applies model-only LoRAs and prompt augmentations cleanly decoupled from reference role declarations.

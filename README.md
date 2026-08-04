@@ -43,6 +43,8 @@ Reference interpretation depends on the loaded Krea 2 edit LoRA, reference order
 ## Nodes & Workflows
 
 See [NODES.md](NODES.md) for the complete node reference, input descriptions, latent modes, grounding controls, attention masks, inpainting behavior, and example workflows in `workflows/`.
+For a deep dive into internal mechanics, visual span calculations, and workflow strategy matrices, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For version history and revision logs, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 

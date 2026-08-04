@@ -74,6 +74,19 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
             f"Physical Qwen images cannot contain an empty logical slot."
         )
 
+    # Phase 3.5: Enforce non-Style references before Style
+    seen_style = False
+    for item in resolved_sorted:
+        role = item["spec"].role.lower()
+        if role == "style":
+            seen_style = True
+        elif seen_style and role in ("subject", "scene", "outfit"):
+            raise ValueError(
+                "Invalid reference chain order: Style references expand into multiple physical Qwen images; "
+                "placing Style first makes Image N aliases ambiguous; "
+                "place all Subject, Scene, and Outfit references before Style."
+            )
+
     # Phase 5: Expand aliases and assign physical indices/ranges in sorted logical slot order
     resolved: List[Dict[str, Any]] = []
     global_aliases = set()
@@ -96,8 +109,8 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
             if exp_alias.startswith("Image ") and exp_alias[6:].isdigit():
                 lit_num = int(exp_alias[6:])
                 if lit_num != physical_qwen_index:
-                    warnings.append(
-                        f"Literal alias '{exp_alias}' mismatch: physical Qwen index is {physical_qwen_index}."
+                    raise ValueError(
+                        f"Conflicting literal positional alias '{exp_alias}': physical Qwen index is {physical_qwen_index}."
                     )
 
         role = spec.role.lower()
