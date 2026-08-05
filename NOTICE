@@ -5,21 +5,22 @@ This project incorporates architectural concepts, reference implementations, and
 
 1. ComfyUI by the ComfyUI project (comfyanonymous)
    https://github.com/comfyanonymous/ComfyUI
-   Commit reference: main (comfy/text_encoders/qwen3vl.py, comfy/text_encoders/qwen_vl.py)
+   Commit reference: c6f2a8905d4b53efcf46b7a544df20faef262ad0 (comfy/text_encoders/qwen3vl.py, comfy/text_encoders/qwen_vl.py, comfy/text_encoders/krea2.py)
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
 
 2. ComfyUI-Krea2Edit by lbouaraba
    https://github.com/lbouaraba/comfyui-krea2edit
-   Commit reference: main (_fit_encode_image pixel-space reference fitting, floor /16 grid alignment, RoPE 3D frame positioning)
+   Commit reference: 5f8a02c8969b821434c442436dd534ed4461bb0e (_fit_encode_image pixel-space reference fitting, floor /16 grid alignment, RoPE 3D frame positioning)
    Licensed under the Apache License, Version 2.0 (Apache-2.0).
 
 3. ComfyUI-EditUtils by lrzjason
    https://github.com/lrzjason/ComfyUI-EditUtils
+   Commit reference: 8a4d7efb32e12a45bc89a74c102a0ef87a4192b1
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
 
 4. ComfyUI-Krea2Moodboard by RedNodeAI
    https://github.com/RedNodeAI/ComfyUI-Krea2Moodboard
-   Commit reference: main (token-span mapping, statistical style fidelity, multi-span indirect style transfer)
+   Commit reference: a7d83f12469a918a252277d34cd0e035070081d6 (token-span mapping, statistical style fidelity, multi-span indirect style transfer)
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
 
 This package is licensed under the GNU General Public License v3.0 (GPL-3.0).

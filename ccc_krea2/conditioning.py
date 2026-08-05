@@ -110,11 +110,6 @@ def resolve_qwen_token_stream(tokens: Any) -> Tuple[List[Any], str]:
         else:
             rejection_reasons[k] = f"invalid value type: {type(val).__name__}"
 
-    # If test injected custom key or tokens contains other list of lists
-    for k, v in tokens.items():
-        if k not in attempted_keys and isinstance(v, list) and len(v) > 0 and isinstance(v[0], list):
-            return v[0], k
-
     available_keys = list(tokens.keys())
     reason_str = "; ".join(f"'{k}': {r}" for k, r in rejection_reasons.items())
     raise ValueError(
@@ -213,16 +208,6 @@ def extract_vision_spans_from_tokens(
     template_end = max(template_end, 0)
     adjusted_spans = [(max(s - template_end, 0), e - template_end) for s, e in spans if e > template_end]
 
-    if not adjusted_spans and physical_image_map:
-        # Fallback for synthetic/mock tokens without embedded dicts
-        cur = 0
-        for item in physical_image_map:
-            img = item.get("image")
-            n = calculate_qwen_rows_from_embedded_image({"data": img}, clip) if img is not None else 64
-            spans.append((cur, cur + n))
-            cur += n
-        adjusted_spans = spans
-
     # Section 3.5: Strict span validation
     if physical_image_map:
         if len(adjusted_spans) != len(physical_image_map):
@@ -293,6 +278,13 @@ def encode_krea2_qwen_context(
         if isinstance(c_tensor, torch.Tensor):
             pos_rows_before = c_tensor.shape[1]
             pos_rows_after = pos_rows_before
+
+            for idx, (s_start, s_end) in enumerate(vision_row_spans):
+                if s_end > pos_rows_before:
+                    raise ValueError(
+                        f"{LOGGER_PREFIX} Vision span validation failed: span {idx} end index ({s_end}) "
+                        f"exceeds encoded conditioning sequence length ({pos_rows_before})."
+                    )
 
     # Apply Moodboard style processing (Fidelity & Indirect Transfer) for positive conditioning
     if is_positive and conditioning and physical_image_map:
