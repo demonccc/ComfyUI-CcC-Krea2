@@ -266,3 +266,22 @@ def test_process_image_and_mask_geometry_parity():
     assert fit_img.shape[2] == geom.vae_input_pixel_size[0]
     assert fit_mask.shape[1] == geom.vae_input_pixel_size[1]
     assert fit_mask.shape[2] == geom.vae_input_pixel_size[0]
+
+
+def test_unvalidated_raw_list_rejected_when_test_helper_disabled():
+    tok_pairs = [[100, None]]
+    with pytest.raises(ValueError) as excinfo:
+        resolve_qwen_token_stream(tok_pairs, allow_raw_list_test_helper=False)
+    assert "Raw list token stream is permitted only as an internal test helper" in str(excinfo.value)
+
+
+def test_style_fidelity_out_of_bounds_raises_error():
+    cond = torch.randn(1, 10, 24)
+    op_out_of_bounds = StyleSpanOperation(
+        logical_reference_id="style", logical_vision_slot=1, physical_qwen_index=1,
+        row_start=8, row_end=15, style_fidelity=0.5, indirect_style_transfer=False
+    )
+    with pytest.raises(ValueError) as excinfo:
+        apply_statistical_style_fidelity(cond, [op_out_of_bounds])
+    assert "Style span validation failed" in str(excinfo.value)
+

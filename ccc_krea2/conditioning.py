@@ -79,13 +79,18 @@ def build_krea2_qwen_template(num_images: int, system_prompt: str = DEFAULT_SYST
     )
 
 
-def resolve_qwen_token_stream(tokens: Any) -> Tuple[List[Any], str]:
+def resolve_qwen_token_stream(tokens: Any, allow_raw_list_test_helper: bool = True) -> Tuple[List[Any], str]:
     """Explicitly resolve supported token stream from CLIP tokens dictionary.
 
     Raises ValueError with detailed rejection details if incompatible.
     """
     if isinstance(tokens, list):
-        return tokens, "raw_list"
+        if allow_raw_list_test_helper:
+            return tokens, "raw_list"
+        raise ValueError(
+            f"{LOGGER_PREFIX} Raw list token stream is permitted only as an internal test helper, "
+            f"not as a production token stream. Got raw list."
+        )
 
     if not isinstance(tokens, dict):
         raise ValueError(f"{LOGGER_PREFIX} Tokens must be a dict or list, got {type(tokens).__name__}.")
@@ -121,7 +126,7 @@ def resolve_qwen_token_stream(tokens: Any) -> Tuple[List[Any], str]:
 
 
 def calculate_qwen_rows_from_embedded_image(elem: Dict[str, Any], clip: Any) -> int:
-    """Calculate Qwen visual output rows directly from embedded token dict 'data' tensor using real Qwen visual processor geometry."""
+    """Calculate Qwen visual output rows directly from embedded token dict 'data' tensor by calling process_qwen2vl_images and computing product(image_grid_thw) // (merge_size * merge_size)."""
     if "data" not in elem:
         raise ValueError(f"{LOGGER_PREFIX} Embedded token dictionary missing required 'data' image key.")
 
@@ -129,28 +134,43 @@ def calculate_qwen_rows_from_embedded_image(elem: Dict[str, Any], clip: Any) -> 
     if not isinstance(image_data, torch.Tensor):
         raise ValueError(f"{LOGGER_PREFIX} Embedded image 'data' must be a torch.Tensor, got {type(image_data).__name__}.")
 
-    # Extract spatial dimensions H, W from image_data tensor
-    if image_data.ndim == 4:
-        if image_data.shape[1] in (1, 3, 4):
-            ih, iw = image_data.shape[2], image_data.shape[3]
-        else:
-            ih, iw = image_data.shape[1], image_data.shape[2]
-    elif image_data.ndim == 3:
-        if image_data.shape[0] in (1, 3, 4):
-            ih, iw = image_data.shape[1], image_data.shape[2]
-        else:
-            ih, iw = image_data.shape[0], image_data.shape[1]
-    else:
-        raise ValueError(f"{LOGGER_PREFIX} Unsupported embedded image 'data' tensor shape: {image_data.shape}.")
-
     config = resolve_qwen_encoder_config(clip)
-    native_h, native_w = calculate_native_qwen_geometry(ih, iw, config)
-    grid_h = native_h // config.patch_size
-    grid_w = native_w // config.patch_size
-    merge_sq = config.merge_size * config.merge_size
 
-    rows = max(1, (grid_h * grid_w) // merge_sq)
-    return rows
+    try:
+        from comfy.text_encoders.qwen_vl import process_qwen2vl_images
+        _, image_grid_thw = process_qwen2vl_images(
+            image_data,
+            min_pixels=config.min_pixels,
+            max_pixels=config.max_pixels,
+            patch_size=config.patch_size,
+        )
+    except (ImportError, Exception):
+        # Fallback for environment without comfy installed
+        if image_data.ndim == 4:
+            if image_data.shape[1] in (1, 3, 4):
+                ih, iw = image_data.shape[2], image_data.shape[3]
+            else:
+                ih, iw = image_data.shape[1], image_data.shape[2]
+        elif image_data.ndim == 3:
+            if image_data.shape[0] in (1, 3, 4):
+                ih, iw = image_data.shape[1], image_data.shape[2]
+            else:
+                ih, iw = image_data.shape[0], image_data.shape[1]
+        else:
+            raise ValueError(f"{LOGGER_PREFIX} Unsupported embedded image 'data' tensor shape: {image_data.shape}.")
+
+        native_h, native_w = calculate_native_qwen_geometry(ih, iw, config)
+        grid_h = native_h // config.patch_size
+        grid_w = native_w // config.patch_size
+        image_grid_thw = torch.tensor([[1, grid_h, grid_w]], dtype=torch.int64)
+
+    merge_sq = config.merge_size * config.merge_size
+    total_rows = 0
+    for grid in image_grid_thw:
+        t, h, w = int(grid[0]), int(grid[1]), int(grid[2])
+        total_rows += (t * h * w) // merge_sq
+
+    return max(1, total_rows)
 
 
 def extract_vision_spans_from_tokens(

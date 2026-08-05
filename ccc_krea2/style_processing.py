@@ -99,9 +99,11 @@ def apply_statistical_style_fidelity(
     # Step 1: Apply Style Fidelity to all style spans using original row coordinates
     for op in ops:
         start, end = op.row_start, op.row_end
-        end = min(end, seq)
-        if end <= start:
-            continue
+        if start < 0 or end <= start or end > seq:
+            raise ValueError(
+                f"Style span validation failed: span range ({start}, {end}) is invalid "
+                f"or exceeds sequence length ({seq})."
+            )
         if op.indirect_style_transfer:
             keep[start:end] = False
             indirect_applied = True
