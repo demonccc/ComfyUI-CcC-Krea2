@@ -69,3 +69,53 @@ def test_edit_orchestrator_execution():
     assert "Subject" in edit_info
     assert "Scene" in edit_info
     assert "Global Vision Directive Active: yes" in edit_info
+    assert "Anchor Implementation Type: Vision directive only" in edit_info
+    assert "Directive-only Anchor Controls: Pose Anchor, Outfit Anchor, Masked Identity Anchor" in edit_info
+    assert "Directive-only Anchor Controls: Scene Anchor, Masked Region Anchor" in edit_info
+
+
+def test_edit_info_outfit_anchor_reporting():
+    """Assert Outfit edit_info anchor reporting lists Outfit Anchor as Vision directive only."""
+    from ccc_krea2.modular_nodes.outfit_node import CcCKrea2OutfitImage
+
+    mock_clip = MagicMock()
+    mock_clip.tokenize.return_value = {"qwen3vl": [[[{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None]]]}
+    mock_clip.encode_from_tokens_scheduled.return_value = [[[torch.randn(1, 257, 1536), {}]]]
+
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    mock_model = MagicMock()
+    mock_model.clone.return_value = mock_model
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=mock_clip, mode="native")
+
+    outfit_node = CcCKrea2OutfitImage()
+    (chain,) = outfit_node.process(prepared_image=prep, vision_slot="auto")
+
+    target_lat, _ = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="empty",
+        target_geometry="fixed",
+        fixed_mp=0.5,
+        fixed_aspect_ratio="1:1"
+    )
+
+    edit_node = CcCKrea2Edit()
+    _, _, _, _, edit_info = edit_node.process(
+        model=mock_model,
+        clip=mock_clip,
+        vae=mock_vae,
+        references=chain,
+        target_latent=target_lat,
+        positive_prompt="a model wearing outfit",
+        negative_prompt="",
+    )
+
+    assert "Reference [Slot 1 - Outfit]:" in edit_info
+    assert "Anchor Implementation Type: Vision directive only" in edit_info
+    assert "Directive-only Anchor Controls: Outfit Anchor" in edit_info
+    assert "Masked Identity Anchor" not in edit_info
+    assert "Masked Region Anchor" not in edit_info
+

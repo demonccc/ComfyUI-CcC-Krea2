@@ -255,20 +255,33 @@ def run_krea2_edit_orchestrator(
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_idx = ref_item.get("physical_qwen_range", (1, 1))[0]
         span_str = str(pos_qwen_context.vision_row_spans[phys_idx - 1]) if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans) else "N/A"
-        anchor_vals = []
-        if getattr(sp, "pose_anchor", 0.0) > 0:
-            anchor_vals.append(f"pose={sp.pose_anchor:.2f}")
-        if getattr(sp, "outfit_anchor", 0.0) > 0:
-            anchor_vals.append(f"outfit={sp.outfit_anchor:.2f}")
-        if getattr(sp, "masked_identity_anchor", 0.0) > 0:
-            anchor_vals.append(f"masked_identity={sp.masked_identity_anchor:.2f}")
-        if getattr(sp, "scene_anchor", 0.0) > 0:
-            anchor_vals.append(f"scene={sp.scene_anchor:.2f}")
-        if getattr(sp, "masked_region_anchor", 0.0) > 0:
-            anchor_vals.append(f"masked_region={sp.masked_region_anchor:.2f}")
-        anchors_str = ", ".join(anchor_vals) if anchor_vals else "none"
+        role_name = ref["role"].lower()
+        if role_name == "subject":
+            dir_controls_str = "Pose Anchor, Outfit Anchor, Masked Identity Anchor"
+            anchor_vals = []
+            if getattr(sp, "pose_anchor", 0.0) > 0:
+                anchor_vals.append(f"pose={sp.pose_anchor:.2f}")
+            if getattr(sp, "outfit_anchor", 0.0) > 0:
+                anchor_vals.append(f"outfit={sp.outfit_anchor:.2f}")
+            if getattr(sp, "masked_identity_anchor", 0.0) > 0:
+                anchor_vals.append(f"masked_identity={sp.masked_identity_anchor:.2f}")
+        elif role_name == "scene":
+            dir_controls_str = "Scene Anchor, Masked Region Anchor"
+            anchor_vals = []
+            if getattr(sp, "scene_anchor", 0.0) > 0:
+                anchor_vals.append(f"scene={sp.scene_anchor:.2f}")
+            if getattr(sp, "masked_region_anchor", 0.0) > 0:
+                anchor_vals.append(f"masked_region={sp.masked_region_anchor:.2f}")
+        elif role_name == "outfit":
+            dir_controls_str = "Outfit Anchor"
+            anchor_vals = []
+            if getattr(sp, "outfit_anchor", 0.0) > 0:
+                anchor_vals.append(f"outfit={sp.outfit_anchor:.2f}")
+        else:
+            dir_controls_str = "none"
+            anchor_vals = []
 
-        anchor_type = "masked_identity" if getattr(sp, "masked_identity_anchor", 0.0) > 0.0 else ("pose_outfit" if (getattr(sp, "pose_anchor", 0.0) > 0.0 or getattr(sp, "outfit_anchor", 0.0) > 0.0) else "none")
+        anchors_str = ", ".join(anchor_vals) if anchor_vals else "none"
 
         info_lines.extend([
             f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
@@ -286,7 +299,8 @@ def run_krea2_edit_orchestrator(
             f"  RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
             f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
             f"  Remaining Anchor Values: {anchors_str}",
-            f"  Anchor Implementation Type: {anchor_type}",
+            "  Anchor Implementation Type: Vision directive only",
+            f"  Directive-only Anchor Controls: {dir_controls_str}",
             f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
             ""
         ])
