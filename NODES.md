@@ -1,6 +1,6 @@
 # CcC Krea2 Node Reference
 
-This document provides the complete specification of all public nodes in the `ComfyUI-CcC-Krea2` package.
+This document provides the complete specification of all public nodes in the `ComfyUI-CcC-Krea2` package, matching the Python input and output class definitions.
 
 ---
 
@@ -8,10 +8,10 @@ This document provides the complete specification of all public nodes in the `Co
 
 | Socket Type | Connected Between | Description |
 |---|---|---|
-| `PREPARED_VISION_IMAGE` | Layer 1 $\rightarrow$ Layer 3 | Contains original image tensor, prepared vision image tensor, and preparation metadata spec. |
-| `TARGET_LATENT_DICT` | Layer 2 $\rightarrow$ Layer 5 | Target latent dictionary containing `"samples"` tensor and geometry configuration metadata. |
-| `REFERENCE_CHAIN` | Layer 3 $\rightarrow$ Layer 4 $\rightarrow$ Layer 5 | Immutable linked list chain storing ordered reference specifications. |
-| `CCC_KREA2_LORA_STACK` | LoRA Stack $\rightarrow$ Main Nodes | Immutable stack of loaded LoRAs and accumulated prompt augmentations. |
+| `PREPARED_VISION_IMAGE` | Layer 1 $\rightarrow$ Layer 3 | Contains untouched original image tensor, prepared vision image tensor, and preparation spec metadata. |
+| `LATENT` | Layer 2 $\rightarrow$ Layer 5 | Standard ComfyUI latent dictionary containing `"samples"` tensor and geometry metadata. |
+| `REFERENCE_CHAIN` | Layer 3 $\rightarrow$ Layer 4 $\rightarrow$ Layer 5 | Immutable linked chain storing ordered reference specifications. |
+| `CCC_KREA2_PROMPT_AUGMENTATION` | LoRA Stack $\rightarrow$ Main Nodes | Immutable stack of loaded LoRAs and accumulated prompt augmentations. |
 
 ---
 
@@ -20,7 +20,7 @@ This document provides the complete specification of all public nodes in the `Co
 ### 2.1 CcC Krea2 - Qwen Vision Image Prep
 - **Class Name**: `CcCKrea2QwenVisionImagePrep`
 - **Category**: `CcC/Krea2`
-- **Description**: Prepares a derivative image (`vision_image`) optimized for Qwen Vision model tokenization while preserving the raw source image (`original_image`) intact for VAE processing.
+- **Description**: Prepares a derivative vision image (`vision_image`) optimized for Qwen Vision tokenization while preserving the untouched raw source image (`original_image`) for VAE processing.
 - **Required Inputs**:
   - `clip` (`CLIP`): The Qwen3-VL text encoder instance.
   - `image` (`IMAGE`): Input image tensor (`[B, H, W, C]`).
@@ -40,7 +40,7 @@ This document provides the complete specification of all public nodes in the `Co
 ### 2.2 CcC Krea2 - Target Latent
 - **Class Name**: `CcCKrea2TargetLatent`
 - **Category**: `CcC/Krea2`
-- **Description**: Creates the target latent container, independently specifying Latent Content Source and Target Geometry.
+- **Description**: Creates the target latent container, independently specifying Latent Content Source and Target Geometry strategy.
 - **Required Inputs**:
   - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
   - `target_content` (`["empty", "subject", "scene"]`, default: `"empty"`): Latent content source.
@@ -49,7 +49,6 @@ This document provides the complete specification of all public nodes in the `Co
   - `aspect_ratio` (`["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"]`, default: `"1:1"`): Output aspect ratio when target geometry is `fixed`.
   - `batch_size` (`INT`, default: `1`, min: `1`, max: `64`, step: `1`): Latent batch size.
 - **Optional Inputs**:
-  - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
   - `subject_image` (`PREPARED_VISION_IMAGE`): Image used when content is `subject` or geometry is `favor_subject`.
   - `scene_image` (`PREPARED_VISION_IMAGE`): Image used when content is `scene` or geometry is `favor_scene`.
 - **Outputs**:
@@ -64,12 +63,12 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Subject reference specification for character identity, face, body, and person features.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
+  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode (`auto` selects `fit` when aspect ratio matches within tolerance and target dimensions match, or `crop` otherwise).
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
-  - `pose_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Subject pose text anchor weight.
-  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Subject outfit text anchor weight.
-  - `masked_identity_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Masked identity anchor weight.
+  - `pose_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Pose text anchor weight (Vision directive only).
+  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Outfit text anchor weight (Vision directive only).
+  - `masked_identity_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Masked identity text anchor weight (Vision directive only).
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `aliases` (`STRING`, default: `""`): Custom alias template string.
@@ -87,11 +86,11 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Scene reference specification for background, composition, environment, and lighting.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
+  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode (`auto` selects `fit` when aspect ratio matches within tolerance and target dimensions match, or `crop` otherwise).
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
-  - `scene_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Scene composition text anchor weight.
-  - `masked_region_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Masked region anchor weight.
+  - `scene_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Scene composition text anchor weight (Vision directive only).
+  - `masked_region_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Masked region text anchor weight (Vision directive only).
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `aliases` (`STRING`, default: `""`): Custom alias template string.
@@ -109,10 +108,10 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines an Outfit reference specification for garments and clothing without wearer identity.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
+  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode (`auto` selects `fit` when aspect ratio matches within tolerance and target dimensions match, or `crop` otherwise).
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
-  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Outfit detail text anchor weight.
+  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Outfit detail text anchor weight (Vision directive only).
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `aliases` (`STRING`, default: `""`): Custom alias template string.
@@ -137,7 +136,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
 - **Optional Inputs**:
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
-  - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
+  - `reference_chain` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
   - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
@@ -152,12 +151,12 @@ This document provides the complete specification of all public nodes in the `Co
   - `clip` (`CLIP`): Qwen3-VL text encoder instance.
   - `vae` (`VAE`): VAE model instance.
   - `references` (`REFERENCE_CHAIN`): Resolved reference chain from Layer 4.
-  - `target_latent` (`TARGET_LATENT_DICT`): Resolved target latent dict from Layer 2.
+  - `target_latent` (`LATENT`): Resolved target latent dict from Layer 2.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
   - `negative_prompt` (`STRING`, default: `""`, multiline: `True`): Negative text prompt.
   - `global_vision_directive` (`STRING`, default: `""`, multiline: `True`): System vision directive.
 - **Optional Inputs**:
-  - `prompt_augmentation` (`CCC_KREA2_LORA_STACK`): Optional LoRA prompt settings stack.
+  - `prompt_augmentation` (`CCC_KREA2_PROMPT_AUGMENTATION`): Optional LoRA prompt settings stack.
 - **Outputs**:
   - `model` (`MODEL`): Patched diffusion model.
   - `positive` (`CONDITIONING`): Positive conditioning.

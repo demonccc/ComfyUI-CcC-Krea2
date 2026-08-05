@@ -1,15 +1,19 @@
 # CcC Krea2 Technical Architecture and Workflow Strategy
 
-This document provides the canonical technical architecture and workflow strategy for `ComfyUI-CcC-Krea2`. It details the 5-layer modular pipeline, image representation models, Target Latent combinations, reference order resolution, and practical workflow strategies for production deployment.
+This document provides the canonical technical architecture and workflow strategy for `ComfyUI-CcC-Krea2`. It details the 5-layer modular pipeline, image representation models, Target Latent combinations, reference order resolution, directive-only anchor parity, and practical workflow strategies for production deployment.
 
 ---
 
 ## 1. Goals and Design Principles
 
-1. **Strict Upstream Parity**: Reproduce upstream `ComfyUI-Krea2Edit` (commit `5f8a02c`) and `ComfyUI-Krea2Moodboard` (commit `a7d83f1`) algorithms, mathematical definitions, and pixel-space geometry down to integer floor division (`// 16`), crop rounding (`round()`), and tile shuffle orders.
+1. **Strict Upstream Parity**: Reproduce upstream `ComfyUI-Krea2Edit` (commit `5f8a02c`) and `ComfyUI-Krea2Moodboard` (commit `a7d83f1`) algorithms, mathematical definitions, and pixel-space geometry down to exact pixel target division, crop rounding, and tile shuffle orders.
 2. **Modular 5-Layer Pipeline**: Decouple image prep, target latent creation, declarative reference definitions, immutable chain ordering, and edit orchestration into dedicated, composable nodes.
 3. **Triple Image Representations**: Explicitly separate raw source images, Qwen Vision semantic images (`vision_image`), and spatial VAE reference latents (`vae_reference_latent`).
-4. **Deterministic Reference Ordering**: Single-source slot resolution ensuring all non-Style references precede Style references in physical token streams and VAE spatial frames.
+4. **Directive-Only Anchors Parity**: Text anchors modulate Qwen Vision prompt directives only, without modifying attention hooks, VAE latents, or RoPE geometry:
+   - **Subject**: Pose Anchor, Outfit Anchor, Masked Identity Anchor
+   - **Scene**: Scene Anchor, Masked Region Anchor
+   - **Outfit**: Outfit Anchor
+5. **Deterministic Reference Ordering**: Single-source slot resolution ensuring all non-Style references precede Style references in physical token streams and VAE spatial frames.
 
 ---
 
@@ -24,10 +28,10 @@ graph TD
     L5 -->|Output| OUT["Model, Positive, Negative, Latent, Edit Info"]
 ```
 
-- **Layer 1 (Qwen Vision Image Prep)**: Resizes raw image into a Qwen-optimized derivative (`vision_image`) aligned to patch boundaries (`32x32`), while retaining the original pixel tensor for VAE processing.
+- **Layer 1 (Qwen Vision Image Prep)**: Resizes raw image into a lightweight Qwen-optimized derivative (`vision_image`) aligned to patch boundaries (`32x32`), while retaining the untouched raw source image (`original_image`) intact for VAE processing.
 - **Layer 2 (Target Latent)**: Resolves the target latent tensor (`[B, 16, H//8, W//8]`), independently configuring Latent Content Source (`Empty`, `Subject`, `Scene`) and Target Geometry (`Favor Subject`, `Favor Scene`, `Fixed`).
 - **Layer 3 (Declarative References)**: Defines per-reference specs (`Subject`, `Scene`, `Outfit`, `Style`), configuring visual fit modes (`Auto`, `Fit`, `Crop`), attention boosts, masks, and style processing mode.
-- **Layer 4 (Reference Chain)**: Maintains an immutable linked chain of reference specifications (`PREPARED_REFERENCE_CHAIN`).
+- **Layer 4 (Reference Chain)**: Maintains an immutable linked chain of reference specifications (`REFERENCE_CHAIN`).
 - **Layer 5 (Edit Orchestrator)**: Consumes the reference chain, resolves physical Qwen indices and VAE frame numbers, executes Qwen text/vision encoding, applies Moodboard statistical transforms, patches diffusion model attention hooks, and formats `edit_info`.
 
 ---
@@ -85,57 +89,41 @@ The 9 primary Target Latent combinations across Content and Geometry:
 
 ---
 
-## 7. Practical Workflow Strategies
+## 7. Practical Workflow Strategies & Canonical Workflows
 
-### 7.1 Maximum Identity Continuity / Subtle Adjustment
-- **Target Content**: `Subject`
-- **Target Geometry**: `Favor Subject`
-- **Active References**: Subject reference (Slot 1)
-- **Subject Fit**: `Auto`
-- **Prompt**: Requests limited change
-- **Optional**: Face mask and higher Subject Attention Boost (`1.2` - `1.5`)
-- **Rationale**: Initializing the latent directly from Subject pixels and matching target geometry to the Subject reference minimizes geometric adaptation and preserves fine identity details.
+### 7.1 Practical Editing Strategies
 
-### 7.2 Freer Generation / New Pose / Environment
-- **Target Content**: `Empty`
-- **Target Geometry**: `Favor Subject`
-- **Active References**: Subject reference (Slot 1)
-- **Rationale**: Generating from noise allows the diffusion model to generate new poses and environments while maintaining Subject-friendly aspect ratio constraints. Identity guidance is provided via Qwen vision tokens and spatial VAE reference latents.
+- **Maximum Identity Continuity**: Target Content = `Subject`, Target Geometry = `Favor Subject`. Active References: Subject reference (Slot 1). Preserves fine facial and identity details.
+- **Freer Generation**: Target Content = `Empty`, Target Geometry = `Favor Subject`. Active References: Subject reference (Slot 1). Allows new poses/environments while adhering to Subject aspect constraints.
+- **Scene-Preserving Subject Replacement**: Target Content = `Scene`, Target Geometry = `Favor Scene`. Active References: Scene (Slot 1), Subject (Slot 2).
 
-### 7.3 Subject Replacement in an Existing Scene
-- **Target Content**: `Scene`
-- **Target Geometry**: `Favor Scene`
-- **Active References**: Scene reference (Slot 1), Subject reference (Slot 2)
-- **Masking**: Inpaint mask applied over original character in Scene image
-- **Rationale**: Retains background pixels while inserting new Subject identity into the masked region.
+### 7.2 Canonical Workflows Index
 
-### 7.4 Identity-Priority Placement into a Scene
-- **Target Content**: `Scene` or `Empty`
-- **Target Geometry**: `Favor Subject`
-- **Active References**: Scene reference (Slot 1), Subject reference (Slot 2)
-- **Order Note**: Always maintain `Scene` as Slot 1 and `Subject` as Slot 2 to satisfy Edit LoRA training expectations.
-- **Rationale**: Priority for identity comes from setting Target Geometry to `Favor Subject`, raising Subject Attention Boost, applying identity anchors, and prompt conditioning—**not** from reversing reference slot order.
+The canonical modular workflow collection in `workflows/`:
 
-### 7.5 Fine Outfit Replacement
-- **Target Content**: `Subject`
-- **Target Geometry**: `Favor Subject`
-- **Active References**: Subject reference (Slot 1), Outfit reference (Slot 2)
-- **Anchors**: `subject_outfit_anchor` = `0.0`, `outfit_anchor` = `0.8` (Note: anchors modulate Qwen text directives only).
+| Workflow File | Description | Key Features / Strategy Covered |
+|---|---|---|
+| `workflows/01_t2i_basic.json` | T2I Basic Generation | Empty + Fixed Target Latent, native text-to-image pipeline |
+| `workflows/02_t2i_lora_stack.json` | T2I + LoRA Stack | Empty + Fixed Target Latent with 4-slot LoRA Stack |
+| `workflows/03_subject_edit.json` | Single Subject Edit | Subject + Favor Subject (Maximum Identity Continuity) |
+| `workflows/04_subject_scene_edit.json` | Subject + Scene Edit | Scene + Favor Scene (Scene-Preserving Subject Replacement) |
+| `workflows/05_subject_outfit_edit.json` | Subject + Outfit Edit | Subject + Outfit reference competition and outfit transfer |
+| `workflows/06_subject_scene_outfit_edit.json` | Subject + Scene + Outfit | Triple-reference editing pipeline |
+| `workflows/07_style_moodboard_edit.json` | Style / Moodboard Transfer | Subject + Style 2x2 indirect moodboard statistical style transfer |
+| `workflows/08_inpaint_subject_edit.json` | Subject Inpainting | Inpaint-masked Subject identity editing |
+| `workflows/09_inpaint_scene_edit.json` | Scene Inpainting | Inpaint-masked Scene composition insertion |
+| `workflows/10_multi_subject_chasing_slots.json` | Multi-Subject Chasing Slots | Multiple Subject references with sequential logical slot resolution |
+| `workflows/11_advanced_directives_fit_modes.json` | Directives & Fit Modes | Custom Extra Vision Directives and Auto/Fit/Crop fit modes |
+| `workflows/12_full_pipeline_composition.json` | Full Pipeline Composition | Subject + Scene + Outfit + Style + LoRA Stack composite |
 
-### 7.6 Scene-Preserving Subject or Outfit Edit
-- **Target Content**: `Scene`
-- **Target Geometry**: `Favor Scene`
-- **Active References**: Scene (Slot 1), Subject / Outfit (Slot 2+)
-
-### 7.7 Fixed Delivery Format
-- **Target Geometry**: `Fixed` (e.g., 1024x576 16:9), Content selected independently based on editing goal.
+Legacy workflows targeting earlier node interfaces are located in `workflows/legacy/`.
 
 ---
 
 ## 8. Visual Reference Fit Options
 
-- **`Auto`**: Evaluates source vs target dimensions. If dimensions match or coverage is high ($\ge 92\%$), performs crop-and-resize. Otherwise falls back to aspect-preserving `Fit`.
-- **`Fit`**: Preserves aspect ratio, scaling inside target bounds. Target VAE input dimensions are floored via `(int(src * scale) // 16) * 16`.
+- **`Auto`**: Evaluates source vs target dimensions. If aspect ratios match within tolerance and target dimensions match, selects `fit`. Otherwise selects `crop` (scale to cover and center crop).
+- **`Fit`**: Preserves aspect ratio, scaling inside target bounds. Target VAE input dimensions are floored to exact pixel targets divisible by 8/16.
 - **`Crop`**: Preserves aspect ratio by scaling to cover, then center-cropping to exact target dimensions.
 
 > [!NOTE]
@@ -170,38 +158,6 @@ The single source of truth for reference ordering is `reference_slots.py`. All n
 
 ---
 
-## 12. Execution Sequence (19 Steps)
-
-1. Inspect Target Latent dimensions (`target_w`, `target_h`).
-2. Resolve logical reference slots, aliases, VAE frames, and physical Qwen indices.
-3. Assert resolved references are in strictly increasing slot order.
-4. Apply prompt augmentation layering.
-5. Build automatic role text directives using physical Qwen image ranges.
-6. Build positive role directive block.
-7. Build negative role directive block.
-8. Resolve visual reference fit geometry for non-Style references.
-9. Crop and resize VAE reference images and masks in lockstep.
-10. VAE encode spatial reference latents.
-11. Build VAE reference specifications list.
-12. Build positive Qwen physical images list.
-13. Build negative Qwen physical images list.
-14. Expand Style references into crops/tiles (full, 2x2, 4x4).
-15. Append Style crops to positive Qwen physical images list.
-16. Tokenize and encode positive and negative Qwen context with dynamic templates.
-17. Extract Qwen vision row spans via real token dictionary (`elem["data"]`) and encoder geometry.
-18. Perform Moodboard Style Fidelity transformation and single-pass indirect Style row deletion.
-19. Patch diffusion model spatial attention hooks and format `edit_info` report.
-
----
-
-## 13. Limitations and Non-Guarantees
-
-- **No Global Model Patching**: Model hooks are restricted strictly to reference conditioning calls.
-- **Strict Qwen Token Stream Requirement**: Vision span extraction requires recognized token keys (`qwen3vl_4b`, `qwen_vl`, `qwen3vl`).
-- **Style Spatial Exclusion**: Style references do not provide spatial VAE reference latents or participate in negative conditioning.
-
----
-
-## 14. Upstream Parity and Attribution
+## 12. Upstream Parity and Attribution
 
 - Ported from and attributed to `ComfyUI-Krea2Edit` by lbouaraba (Apache-2.0 / GPL-3.0) and `ComfyUI-Krea2Moodboard` by RedNodeAI (GPL-3.0).

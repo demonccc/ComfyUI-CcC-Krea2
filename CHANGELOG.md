@@ -14,20 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exact target pixel dimensions for `crop_and_resize` near-match VAE reference geometry.
 - Comprehensive per-Style diagnostic metrics in `edit_info` output (actual spans, total rows, rows removed, direct/indirect transfer status).
 - `CcC Krea2 - Text to Image` node (`CcCKrea2TextToImage`) for native text-to-image generation using CLIP tokenization, scheduled text encoding, and Empty SD3 Latent generation.
-- Curated text-to-image example workflow `workflows/text_to_image.json`.
 - `CcC Krea2 - LoRA Stack` node (`CcCKrea2LoRAStack`) for model-only LoRA stacking (up to 4 slots) with global/slot strengths, persistent slot loader instances, and prompt augmentation accumulators.
 - `CcC Krea2 - LoRA Prompt Settings` node (`CcCKrea2LoRAPromptSettings`) for slot-level positive and negative prompt fragment configuration with `prepend` and `append` positioning.
 - Immutable prompt augmentation module (`ccc_krea2/prompt_augmentation.py`) supporting deterministic text merging via double newline `\n\n` separators without mutating input strings.
-- Optional `prompt_augmentation` socket on all 7 Krea 2 main nodes.
+- Optional `prompt_augmentation` socket on all Krea 2 main nodes.
 - Full LoRA Stack integration across production example workflow JSON files in `workflows/`.
-- Unit test suites `tests/test_t2i_node.py`, `tests/test_prompt_augmentation.py`, and `tests/test_lora_nodes.py`, as well as updated interface and workflow tests.
+- Strict workflow contract assertions in `tests/test_workflow_files.py` validating socket names, socket types, node classes, Qwen3-VL loader modes, and Style node ordering.
 
 ### Fixed
-- Pruned unauthorized `masked_region_anchor` from Subject node (`CcCKrea2SubjectImage`) and unauthorized `masked_identity_anchor`/`masked_region_anchor` from Outfit node (`CcCKrea2OutfitImage`).
-- Synchronized all 19 workflow JSON files against active node input contracts, socket types, widget order, and loader choices.
-- Completely updated `NODES.md`, `ARCHITECTURE.md`, and `README.md` to reflect actual Python class definitions and contract parity.
-- Standardized default `boost` widget value to `2.5` for `subject` role in `CcCKrea2ImageAdvancedSettings` across example workflows.
-- Corrected documentation option lists for `grounding_resize_mode` and `reference_fit_mode` in `NODES.md`.
+- Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.
+- Corrected `edit_info` anchor reporting to accurately output `Anchor Implementation Type: Vision directive only` and list active directive-only controls for Subject, Scene, and Outfit roles.
+- Canonicalized modular workflow collection (`01_t2i_basic.json` through `12_full_pipeline_composition.json`) using current socket types (`PREPARED_VISION_IMAGE`, `REFERENCE_CHAIN`, `LATENT`, `CCC_KREA2_PROMPT_AUGMENTATION`) and input names (`reference_chain`, `visual_fit_mode`).
+- Reorganized superseded workflow files into `workflows/legacy/` with explanatory migration README.
+- Completely updated `NODES.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` to achieve 100% contract parity with Python node interface definitions.
 
 ## [0.1.0-alpha] - 2026-07-30
 
@@ -44,5 +43,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicit inpaint base role selection per node.
 - Pure PyTorch mask dilation via `F.max_pool2d` removing `scipy` dependency.
 - Model-driven empty latent generation honoring `batch_size`.
-- Mandatory VAE input across all 7 custom node definitions.
+- Mandatory VAE input across all custom node definitions.
 - Unit test suite in `tests/` covering mock integration, geometry, masks, dynamic prompt templates, resize method wiring, role resolution clamping, workflow files, and patch isolation.
