@@ -91,7 +91,7 @@ def resolve_krea2edit_geometry(
             else:
                 resolved_mode = "fit"
     elif fit_mode == "crop":
-        resolved_mode = "crop_and_resize"
+        resolved_mode = "crop"
     else:
         resolved_mode = fit_mode
 
@@ -106,30 +106,48 @@ def resolve_krea2edit_geometry(
         interp_occurred = False
         interp_method = "none"
 
-    elif resolved_mode in ("crop", "crop_and_resize"):
-        # Minimal center crop to match target aspect ratio, then resize to exact target dimensions
+    elif resolved_mode == "crop":
+        # Manual Visual Reference Fit = crop: center crop to exact target aspect ratio & resize to exact target pixel dimensions
         if src_ar > tgt_ar:
             crop_h = src_h
-            crop_w = int(src_h * tgt_ar)
+            crop_w = int(round(src_h * tgt_ar))
         else:
             crop_w = src_w
-            crop_h = int(src_w / tgt_ar)
+            crop_h = int(round(src_w / tgt_ar))
+
+        left = (src_w - crop_w) // 2
+        top = (src_h - crop_h) // 2
+        vae_input_w = tgt_w
+        vae_input_h = tgt_h
+        interp_occurred = (crop_w, crop_h) != (tgt_w, tgt_h)
+        interp_method = "bicubic"
+
+    elif resolved_mode == "crop_and_resize":
+        # Minimal center crop to match target aspect ratio, then resize to /16 target dimensions
+        if src_ar > tgt_ar:
+            crop_h = src_h
+            crop_w = int(round(src_h * tgt_ar))
+        else:
+            crop_w = src_w
+            crop_h = int(round(src_w / tgt_ar))
 
         left = (src_w - crop_w) // 2
         top = (src_h - crop_h) // 2
         vae_input_w = (tgt_w // 16) * 16
         vae_input_h = (tgt_h // 16) * 16
-        interp_occurred = (crop_w, crop_h) != (tgt_w, tgt_h)
+        interp_occurred = (crop_w, crop_h) != (vae_input_w, vae_input_h)
         interp_method = "bicubic"
 
     else:  # "fit" - Genuine aspect-ratio mismatch
         sc = min(tgt_h / float(src_h), tgt_w / float(src_w))
-        # Section 6.1: Exact upstream behavior uses int(src * sc) // 16 * 16 (no round() before // 16)
-        fitted_h = min(tgt_h, max(16, (int(src_h * sc) // 16) * 16))
-        fitted_w = min(tgt_w, max(16, (int(src_w * sc) // 16) * 16))
+        # Cap against target dimensions floored to /16
+        target_cap_h = max(16, (tgt_h // 16) * 16)
+        target_cap_w = max(16, (tgt_w // 16) * 16)
+        fitted_h = min(max(16, (int(src_h * sc) // 16) * 16), target_cap_h)
+        fitted_w = min(max(16, (int(src_w * sc) // 16) * 16), target_cap_w)
 
-        crop_h = min(src_h, max(1, int(fitted_h / sc)))
-        crop_w = min(src_w, max(1, int(fitted_w / sc)))
+        crop_h = min(src_h, max(1, int(round(fitted_h / sc))))
+        crop_w = min(src_w, max(1, int(round(fitted_w / sc))))
 
         left = (src_w - crop_w) // 2
         top = (src_h - crop_h) // 2

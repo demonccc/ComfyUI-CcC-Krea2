@@ -121,6 +121,6 @@ def test_geometry_parity_floor_vs_round():
 
     # Test manual crop mode
     geom_crop = resolve_krea2edit_geometry(src_h=600, src_w=800, tgt_h=512, tgt_w=512, fit_mode="crop")
-    assert geom_crop.mode_resolved == "crop_and_resize"
+    assert geom_crop.mode_resolved == "crop"
     assert geom_crop.vae_input_pixel_size == (512, 512)
 
