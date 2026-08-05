@@ -40,7 +40,12 @@ def run_krea2_edit_orchestrator(
 
     # Step 2: Resolve reference slots, aliases, VAE frames, and physical Qwen indices
     resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(references)
-    resolved_refs.sort(key=lambda r: r["resolved_slot"])
+    for i in range(len(resolved_refs) - 1):
+        if resolved_refs[i]["resolved_slot"] >= resolved_refs[i + 1]["resolved_slot"]:
+            raise ValueError(
+                f"[CcC Krea2] Resolved references out of slot order: slot {resolved_refs[i]['resolved_slot']} "
+                f"comes before slot {resolved_refs[i+1]['resolved_slot']}."
+            )
 
     # Step 3: Prompt augmentation layering
     pos_base, neg_base = apply_prompt_augmentation(
@@ -280,7 +285,8 @@ def run_krea2_edit_orchestrator(
         s_start, s_end = phys_range
         st_spans = pos_qwen_context.vision_row_spans[s_start - 1 : s_end] if (s_start - 1) < len(pos_qwen_context.vision_row_spans) else []
         shuffle_str = "SHUFFLE_2X2" if sp.style_processing == "2x2" else ("SHUFFLE_4X4" if sp.style_processing == "4x4" else "identity")
-        rows_rem = len(pos_qwen_context.removed_row_indices) if sp.indirect_style_transfer else 0
+        style_total_rows = sum(e - s for s, e in st_spans)
+        rows_rem = style_total_rows if sp.indirect_style_transfer else 0
 
         info_lines.extend([
             f"Style [Slot {st['slot']}]:",
@@ -296,7 +302,7 @@ def run_krea2_edit_orchestrator(
             f"  Rows Removed: {rows_rem}",
             f"  Style Directive: {sp.style_directive}",
             f"  Extra Vision Directive: {sp.extra_vision_directive or 'none'}",
-            f"  VAE Reference Frame: none",
+            "  VAE Reference Frame: none",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             ""
         ])
