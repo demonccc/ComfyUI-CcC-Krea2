@@ -124,12 +124,12 @@
         },
         {
           "name": "subject_image",
-          "type": "CCC_KREA2_PREPARED_IMAGE",
+          "type": "PREPARED_VISION_IMAGE",
           "link": null
         },
         {
           "name": "scene_image",
-          "type": "CCC_KREA2_PREPARED_IMAGE",
+          "type": "PREPARED_VISION_IMAGE",
           "link": null
         }
       ],
@@ -233,7 +233,7 @@
       "outputs": [
         {
           "name": "prepared_image",
-          "type": "CCC_KREA2_PREPARED_IMAGE",
+          "type": "PREPARED_VISION_IMAGE",
           "links": [
             7
           ],
@@ -281,7 +281,7 @@
       "inputs": [
         {
           "name": "prepared_image",
-          "type": "CCC_KREA2_PREPARED_IMAGE",
+          "type": "PREPARED_VISION_IMAGE",
           "link": 7
         },
         {
@@ -291,14 +291,14 @@
         },
         {
           "name": "previous_references",
-          "type": "CCC_KREA2_REFERENCE_CHAIN",
+          "type": "REFERENCE_CHAIN",
           "link": null
         }
       ],
       "outputs": [
         {
           "name": "references",
-          "type": "CCC_KREA2_REFERENCE_CHAIN",
+          "type": "REFERENCE_CHAIN",
           "links": [
             8
           ],
@@ -352,7 +352,7 @@
         },
         {
           "name": "references",
-          "type": "CCC_KREA2_REFERENCE_CHAIN",
+          "type": "REFERENCE_CHAIN",
           "link": 8
         },
         {
@@ -565,7 +565,7 @@
       0,
       7,
       0,
-      "CCC_KREA2_PREPARED_IMAGE"
+      "PREPARED_VISION_IMAGE"
     ],
     [
       6,
@@ -613,7 +613,7 @@
       0,
       8,
       3,
-      "CCC_KREA2_REFERENCE_CHAIN"
+      "REFERENCE_CHAIN"
     ],
     [
       9,

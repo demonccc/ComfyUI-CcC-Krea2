@@ -85,3 +85,15 @@ def test_nodes_doc_has_modular_node_class_names_and_accurate_claims():
     # Must not list obsolete Target Latent content modes
     assert "`inpaint`" not in content
     assert "`custom`" not in content
+
+
+def test_changelog_and_notice_contracts():
+    changelog = read_repo_file("CHANGELOG.md")
+    assert "## [Unreleased]" in changelog
+
+    notice = read_repo_file("NOTICE")
+    assert "c6f2a8905d4b53efcf46b7a544df20faef262ad0" in notice
+    assert "5f8a02c8969b821434c442436dd534ed4461bb0e" in notice
+    assert "8a4d7efb32e12a45bc89a74c102a0ef87a4192b1" in notice
+    assert "a7d83f12469a918a252277d34cd0e035070081d6" in notice
+

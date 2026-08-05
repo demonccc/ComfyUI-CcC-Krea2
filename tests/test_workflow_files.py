@@ -1,6 +1,7 @@
 """Structural validation tests for curated workflow JSON files."""
 
 import json
+import pytest
 from pathlib import Path
 
 EDITING_WORKFLOW_FILES = [
@@ -608,5 +609,35 @@ def test_modular_workflow_files_structure():
         assert "CLIPLoader" in node_types
         assert "VAELoader" in node_types
         assert any(t in node_types for t in ("CcCKrea2TextToImage", "CcCKrea2Edit"))
+
+
+def test_all_workflows_registered_node_classes_and_sockets():
+    """Validate that every node type in workflows exists, socket names/types are valid, and fit choices are valid."""
+    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
+
+    krea2_node_types = set(NODE_CLASS_MAPPINGS.keys())
+    stale_type_names = {"TARGET_LATENT_DICT", "CCC_KREA2_PREPARED_IMAGE"}
+
+    for rel_path in EXPECTED_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        raw_str = json.dumps(data)
+        for stale_name in stale_type_names:
+            assert stale_name not in raw_str, f"Stale socket/type name '{stale_name}' found in {rel_path}"
+
+        nodes = data.get("nodes", [])
+        for n in nodes:
+            ntype = n.get("type")
+            if ntype and ntype.startswith("CcCKrea2"):
+                assert ntype in krea2_node_types, f"Unregistered node class '{ntype}' found in {rel_path}"
+
+            # Validate Visual Reference Fit widget values if reference node
+            if ntype in ("CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"):
+                widgets = n.get("widgets_values", [])
+                for w in widgets:
+                    if isinstance(w, str) and w in ("exact", "stretch"):
+                        pytest.fail(f"Invalid visual reference fit value '{w}' found in node {ntype} in {rel_path}")
+
 
 

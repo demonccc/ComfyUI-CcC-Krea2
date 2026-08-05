@@ -43,17 +43,18 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Creates the target latent container, independently specifying Latent Content Source and Target Geometry.
 - **Required Inputs**:
   - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
-  - `target_latent_content` (`["empty", "subject", "scene"]`, default: `"empty"`): Latent content source.
-  - `target_geometry` (`["favor_subject", "favor_scene", "fixed"]`, default: `"fixed"`): Latent output resolution geometry strategy.
-  - `fixed_megapixels` (`FLOAT`, default: `1.0`, min: `0.1`, max: `12.0`, step: `0.01`): Output megapixels when target geometry is `fixed`.
-  - `fixed_aspect_ratio` (`["1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "3:2", "2:3"]`, default: `"1:1"`): Output aspect ratio when target geometry is `fixed`.
+  - `target_content` (`["empty", "subject", "scene"]`, default: `"empty"`): Latent content source.
+  - `geometry_mode` (`["favor_subject", "favor_scene", "fixed"]`, default: `"fixed"`): Latent output resolution geometry strategy.
+  - `fixed_megapixels` (`FLOAT`, default: `2.0`, min: `0.1`, max: `12.0`, step: `0.01`): Output megapixels when target geometry is `fixed`.
+  - `aspect_ratio` (`["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"]`, default: `"1:1"`): Output aspect ratio when target geometry is `fixed`.
   - `batch_size` (`INT`, default: `1`, min: `1`, max: `64`, step: `1`): Latent batch size.
 - **Optional Inputs**:
-  - `subject_image` (`IMAGE`): Image used when content is `subject` or geometry is `favor_subject`.
-  - `scene_image` (`IMAGE`): Image used when content is `scene` or geometry is `favor_scene`.
+  - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
+  - `subject_image` (`PREPARED_VISION_IMAGE`): Image used when content is `subject` or geometry is `favor_subject`.
+  - `scene_image` (`PREPARED_VISION_IMAGE`): Image used when content is `scene` or geometry is `favor_scene`.
 - **Outputs**:
-  - `target_latent` (`TARGET_LATENT_DICT`): Target latent dictionary.
-  - `latent` (`LATENT`): Standard ComfyUI latent dictionary format.
+  - `target_latent` (`LATENT`): Standard ComfyUI latent dictionary format.
+  - `latent_info` (`STRING`): Text summary of target latent dimensions.
 
 ---
 
@@ -63,7 +64,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Subject reference specification for character identity, face, body, and person features.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`["auto", "1", "2", "3", "4"]`, default: `"auto"`): Logical slot assignment.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
   - `attention_boost` (`FLOAT`, default: `2.5`, min: `0.0`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.0`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
@@ -75,7 +76,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
-  - `references` (`REFERENCE_CHAIN`): Updated immutable reference chain.
+  - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
 ---
 
@@ -85,7 +86,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Scene reference specification for background, composition, environment, and lighting.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`["auto", "1", "2", "3", "4"]`, default: `"auto"`): Logical slot assignment.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.0`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `scene_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Scene composition text anchor weight.
@@ -94,7 +95,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
-  - `references` (`REFERENCE_CHAIN`): Updated immutable reference chain.
+  - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
 ---
 
@@ -104,7 +105,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines an Outfit reference specification for garments and clothing without wearer identity.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`["auto", "1", "2", "3", "4"]`, default: `"auto"`): Logical slot assignment.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.0`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Outfit detail text anchor weight.
@@ -112,7 +113,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
-  - `references` (`REFERENCE_CHAIN`): Updated immutable reference chain.
+  - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
 ---
 
@@ -122,16 +123,16 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Style reference specification for color palette, lighting, texture, and Moodboard processing.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`["auto", "1", "2", "3", "4"]`, default: `"auto"`): Logical slot assignment.
-  - `style_processing` (`["full", "2x2", "4x4"]`, default: `"full"`): Crop tile expansion mode.
-  - `style_fidelity` (`FLOAT`, default: `1.0`, min: `0.0`, max: `1.0`, step: `0.05`): Statistical style fidelity weight.
-  - `indirect_style_transfer` (`BOOLEAN`, default: `False`): Whether to remove style vision rows after encoding.
-  - `style_directive` (`STRING`, default: `""`): Descriptive style directive text.
+  - `style_processing` (`["2x2", "4x4", "full"]`, default: `"2x2"`): Crop tile expansion mode.
+  - `style_fidelity` (`FLOAT`, default: `0.5`, min: `0.0`, max: `1.0`, step: `0.05`): Statistical style fidelity weight.
+  - `indirect_style_transfer` (`BOOLEAN`, default: `True`): Whether to remove style vision rows after encoding.
+  - `style_directive` (`BOOLEAN`, default: `True`): Whether to append automatic style text directives.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
 - **Optional Inputs**:
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
   - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
-  - `references` (`REFERENCE_CHAIN`): Updated immutable reference chain.
+  - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
 ---
 
