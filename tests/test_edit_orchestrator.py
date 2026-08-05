@@ -12,8 +12,21 @@ from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit
 def test_edit_orchestrator_execution():
     # Setup mock clip and vae
     mock_clip = MagicMock()
-    mock_clip.tokenize.return_value = ["token1"]
-    mock_clip.encode_from_tokens_scheduled.return_value = [["cond"]]
+
+    def mock_tokenize(prompt, images=None, **kwargs):
+        tok_pairs = []
+        if images:
+            for img in images:
+                tok_pairs.append([{"type": "image", "data": img}, None])
+        else:
+            tok_pairs.append([100, None])
+        return {"qwen3vl": [tok_pairs]}
+
+    mock_clip.tokenize.side_effect = mock_tokenize
+
+    # 1 text token + 256 rows (img1 512x512) + 256 rows (img2 512x512) = 513 rows
+    cond_tensor = torch.randn(1, 513, 1536)
+    mock_clip.encode_from_tokens_scheduled.return_value = [[cond_tensor, {}]]
 
     mock_vae = MagicMock()
     mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}

@@ -26,15 +26,23 @@ from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry, process_ima
 
 
 class DummyClip:
-    def __init__(self, token_dict):
-        self.token_dict = token_dict
+    def __init__(self, token_dict=None):
+        self.token_dict = token_dict or {}
 
     def tokenize(self, prompt, images=None, llama_template=None):
-        return self.token_dict
+        if self.token_dict:
+            return self.token_dict
+        tok_pairs = []
+        if images:
+            for img in images:
+                tok_pairs.append([{"type": "image", "data": img}, None])
+        else:
+            tok_pairs.append([100, None])
+        return {"qwen3vl": [tok_pairs]}
 
     def encode_from_tokens_scheduled(self, tokens):
-        # 1 text prefix token + 64 image 1 rows + 64 image 2 rows = 129 rows
-        seq_len = 129
+        # 1 text prefix token + 256 image 1 rows + 64 image 2 rows = 321 rows
+        seq_len = 321
         fused_dim = 1536  # divisible by 12 (1536 / 12 = 128)
         cond = torch.randn(1, seq_len, fused_dim)
         att_mask = torch.ones(1, seq_len, dtype=torch.float32)
@@ -59,6 +67,10 @@ def test_real_span_mapping_with_text_prefix_and_bhwc_data():
         [{"type": "image", "data": img2}, None]
     ]
     tokens = {"qwen3vl_4b": [tok_pairs]}
+
+    pairs, key = resolve_qwen_token_stream(tokens)
+    assert key == "qwen3vl_4b"
+    assert pairs == tok_pairs
 
     phys_map = [
         {"image": img1, "role": "subject"},
@@ -95,6 +107,25 @@ def test_span_validation_fails_on_mismatched_image_count():
     assert "Vision span validation failed" in str(excinfo.value)
 
 
+def test_encode_krea2_qwen_context_execution():
+    clip = DummyClip()
+    img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
+    img2 = torch.zeros((1, 256, 256, 3), dtype=torch.float32)
+    phys_images = [img1, img2]
+    phys_map = [
+        {"image": img1, "role": "subject", "physical_qwen_image_index": 1},
+        {"image": img2, "role": "scene", "physical_qwen_image_index": 2}
+    ]
+    encoded = encode_krea2_qwen_context(
+        clip=clip,
+        prompt="a test prompt",
+        physical_images=phys_images,
+        physical_image_map=phys_map
+    )
+    assert encoded.pos_rows_before == 321
+    assert len(encoded.vision_row_spans) == 2
+
+
 # --- 14.2 Style Fidelity Tests ---
 
 def test_style_fidelity_identity_and_statistical_target():
@@ -118,6 +149,16 @@ def test_style_fidelity_identity_and_statistical_target():
     # Unmodified rows remain identical
     assert torch.allclose(cond[:, 0:2], res_tgt[:, 0:2])
     assert torch.allclose(cond[:, 6:], res_tgt[:, 6:])
+
+
+def test_slice_style_image_modes():
+    img = torch.rand(1, 512, 512, 3)
+    full_crops = slice_style_image(img, mode="full")
+    assert len(full_crops) == 1
+    crops_2x2 = slice_style_image(img, mode="2x2")
+    assert len(crops_2x2) == 4
+    crops_4x4 = slice_style_image(img, mode="4x4")
+    assert len(crops_4x4) == 16
 
 
 # --- 14.3 Indirect Style Transfer Tests ---
@@ -154,7 +195,7 @@ def test_style_before_non_style_is_rejected():
         style_fidelity=0.5,
         style_processing="2x2",
         indirect_style_transfer=True,
-        style_directive=True
+        style_directive="modern"
     )
     s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, 0.0, "auto")
 
@@ -188,7 +229,7 @@ def test_physical_automatic_directives_for_expanded_style():
         style_fidelity=0.5,
         style_processing="2x2",
         indirect_style_transfer=True,
-        style_directive=True
+        style_directive="vibrant"
     )
 
     chain = ReferenceChain().append(s_scene).append(s_subj).append(s_style)
@@ -214,3 +255,14 @@ def test_krea2edit_geometry_parity_floor_vs_round():
     # Source crop rectangle uses round() for exact aspect math
     left, top, crop_w, crop_h = geom.crop_rectangle
     assert crop_w > 0 and crop_h > 0
+
+
+def test_process_image_and_mask_geometry_parity():
+    img = torch.rand(1, 500, 1000, 3)
+    mask = torch.rand(1, 500, 1000)
+    geom = resolve_krea2edit_geometry(src_h=500, src_w=1000, tgt_h=245, tgt_w=490, fit_mode="fit")
+    fit_img, fit_mask = process_image_and_mask_geometry(img, mask, geom)
+    assert fit_img.shape[1] == geom.vae_input_pixel_size[1]
+    assert fit_img.shape[2] == geom.vae_input_pixel_size[0]
+    assert fit_mask.shape[1] == geom.vae_input_pixel_size[1]
+    assert fit_mask.shape[2] == geom.vae_input_pixel_size[0]
