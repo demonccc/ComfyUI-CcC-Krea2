@@ -15,16 +15,14 @@ class CcCKrea2QwenVisionImagePrep:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "clip": ("CLIP",),
                 "image": ("IMAGE",),
                 "mode": (["native", "adaptive", "fixed"], {"default": "native"}),
                 "min_mp": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 12.0, "step": 0.01}),
                 "max_mp": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 12.0, "step": 0.01}),
                 "fixed_mp": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 12.0, "step": 0.01}),
-                "downscale_method": (["auto", "area", "bicubic", "bilinear", "nearest-exact"], {"default": "auto"}),
-                "upscale_method": (["auto", "bicubic", "bilinear", "nearest-exact"], {"default": "auto"}),
-            },
-            "optional": {
-                "clip": ("CLIP",),
+                "downscale_method": (["auto", "area", "bicubic", "bilinear", "lanczos", "nearest-exact"], {"default": "auto"}),
+                "upscale_method": (["auto", "bicubic", "bilinear", "lanczos", "nearest-exact"], {"default": "auto"}),
             }
         }
 
