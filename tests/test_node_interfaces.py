@@ -223,3 +223,33 @@ def test_role_instructions_formatting():
     inst_src = build_role_instructions([ReferenceRole.SOURCE])
     assert "Image 1 is the source image." in inst_src
     assert "The source image is the base image being edited." in inst_src
+
+
+def test_declarative_reference_nodes_anchor_controls_contract():
+    """Assert Subject, Scene, and Outfit nodes strictly expose only approved anchor controls."""
+    subj_cls = NODE_CLASS_MAPPINGS["CcCKrea2SubjectImage"]
+    subj_req = subj_cls.INPUT_TYPES()["required"]
+
+    assert "masked_identity_anchor" in subj_req
+    assert "pose_anchor" in subj_req
+    assert "outfit_anchor" in subj_req
+    assert "attention_boost" in subj_req
+    assert "masked_attention_boost" in subj_req
+    assert "masked_region_anchor" not in subj_req
+
+    scene_cls = NODE_CLASS_MAPPINGS["CcCKrea2SceneImage"]
+    scene_req = scene_cls.INPUT_TYPES()["required"]
+
+    assert "scene_anchor" in scene_req
+    assert "masked_region_anchor" in scene_req
+    assert "attention_boost" in scene_req
+    assert "masked_attention_boost" in scene_req
+
+    outfit_cls = NODE_CLASS_MAPPINGS["CcCKrea2OutfitImage"]
+    outfit_req = outfit_cls.INPUT_TYPES()["required"]
+
+    assert "outfit_anchor" in outfit_req
+    assert "attention_boost" in outfit_req
+    assert "masked_attention_boost" in outfit_req
+    assert "masked_identity_anchor" not in outfit_req
+    assert "masked_region_anchor" not in outfit_req

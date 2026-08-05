@@ -302,6 +302,8 @@ def run_krea2_edit_orchestrator(
         style_total_rows = sum(e - s for s, e in st_spans)
         rows_rem = style_total_rows if sp.indirect_style_transfer else 0
 
+        status_str = "indirect (rows removed post-encoding)" if sp.indirect_style_transfer else "direct (rows preserved)"
+
         info_lines.extend([
             f"Style [Slot {st['slot']}]:",
             f"  Logical Vision Slot: {st['slot']}",
@@ -309,11 +311,13 @@ def run_krea2_edit_orchestrator(
             f"  Physical Qwen Image End: {s_end}",
             f"  Physical Qwen Image Count: {s_end - s_start + 1}",
             f"  Actual Conditioning Row Spans: {st_spans}",
+            f"  Total Rows for Style: {style_total_rows}",
+            f"  Rows Removed for Style: {rows_rem}",
+            f"  Direct/Indirect Status: {status_str}",
             f"  Style Reference Processing: {sp.style_processing}",
             f"  Crop Shuffle Order: {shuffle_str}",
             f"  Style Fidelity: {sp.style_fidelity:.2f}",
             f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
-            f"  Rows Removed: {rows_rem}",
             f"  Style Directive: {sp.style_directive}",
             f"  Extra Vision Directive: {sp.extra_vision_directive or 'none'}",
             "  VAE Reference Frame: none",

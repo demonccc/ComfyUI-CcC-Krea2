@@ -284,3 +284,20 @@ def test_style_fidelity_out_of_bounds_raises_error():
         apply_statistical_style_fidelity(cond, [op_out_of_bounds])
     assert "Style span validation failed" in str(excinfo.value)
 
+
+def test_production_qwen_processor_failure_raises_runtime_error(monkeypatch):
+    """Assert production (test_mode=False) raises RuntimeError if process_qwen2vl_images is unavailable or fails."""
+    import sys
+    from unittest.mock import MagicMock
+    from ccc_krea2.conditioning import calculate_qwen_rows_from_embedded_image
+
+    img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
+    elem = {"type": "image", "data": img1}
+
+    # Simulate production environment where comfy module is present but process_qwen2vl_images fails
+    mock_comfy = MagicMock()
+    monkeypatch.setitem(sys.modules, "comfy", mock_comfy)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        calculate_qwen_rows_from_embedded_image(elem, clip=None, test_mode=False)
+    assert "Required Qwen processor" in str(excinfo.value) or "Qwen visual processor failed" in str(excinfo.value)

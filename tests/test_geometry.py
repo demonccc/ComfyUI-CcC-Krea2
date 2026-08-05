@@ -115,3 +115,38 @@ def test_image_and_mask_remain_spatially_aligned():
     # In cropped region (y=200..600), mask is 0 for top half (y < 400 -> y_grid < 0.5) and 1 for bottom half (y >= 400 -> y_grid >= 0.5)
     assert res_mask[0, 0, 0].item() == 0.0
     assert res_mask[0, -1, 0].item() == 1.0
+
+
+def test_near_match_geometry_divisible_by_8_not_16():
+    """Assert crop_and_resize equals exact target dimensions when target is divisible by 8 but not 16."""
+    from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry, process_image_and_mask_geometry
+
+    # Target: 520x520 (520 % 8 == 0, 520 % 16 == 8)
+    tgt_h, tgt_w = 520, 520
+    # Near-match source: 528x520 (ratio 1.015 vs 1.0 -> within 0.15 threshold for near-match crop_and_resize in Auto mode)
+    src_h, src_w = 528, 520
+
+    # 1. Fit mode with near-match coverage -> resolves to crop_and_resize
+    geom_near = resolve_krea2edit_geometry(540, 540, tgt_h, tgt_w, fit_mode="fit")
+    assert geom_near.mode_resolved == "crop_and_resize"
+    assert geom_near.vae_input_pixel_size == (520, 520)
+
+    # 2. Manual crop mode -> exact target dimensions
+    geom_crop = resolve_krea2edit_geometry(src_h, src_w, tgt_h, tgt_w, fit_mode="crop")
+    assert geom_crop.mode_resolved == "crop"
+    assert geom_crop.vae_input_pixel_size == (520, 520)
+
+    # 3. Genuine mismatch source: 1040x520 (aspect ratio 2.0 vs 1.0 -> resolves to fit)
+    geom_fit = resolve_krea2edit_geometry(1040, 520, tgt_h, tgt_w, fit_mode="fit")
+    assert geom_fit.mode_resolved == "fit"
+    # Genuine fit truncates to /16: 520 // 16 * 16 = 512, 260 // 16 * 16 = 256
+    assert geom_fit.vae_input_pixel_size[0] % 16 == 0
+    assert geom_fit.vae_input_pixel_size[1] % 16 == 0
+
+    # 4. Image and mask transform parity
+    src_img = torch.zeros((1, src_h, src_w, 3), dtype=torch.float32)
+    src_mask = torch.zeros((1, src_h, src_w), dtype=torch.float32)
+
+    res_img, res_mask = process_image_and_mask_geometry(src_img, src_mask, geom_near)
+    assert res_img.shape == (1, 520, 520, 3)
+    assert res_mask.shape == (1, 520, 520)

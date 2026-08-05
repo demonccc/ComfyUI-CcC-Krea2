@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Surgical stabilization pass for 5-layer modular reference architecture (`feat/modular-reference-pipeline-refactor`).
+- Mandatory Qwen visual row processing via `comfy.text_encoders.qwen_vl.process_qwen2vl_images` in production with clear `RuntimeError` failure handling on missing processors or GPU execution failures.
+- Strict half-open vision span validation `(start >= 0, end > start, end <= sequence_length, no overlap, physical order)` preventing invalid or out-of-order token stream spans.
+- Exact target pixel dimensions for `crop_and_resize` near-match VAE reference geometry.
+- Comprehensive per-Style diagnostic metrics in `edit_info` output (actual spans, total rows, rows removed, direct/indirect transfer status).
 - `CcC Krea2 - Text to Image` node (`CcCKrea2TextToImage`) for native text-to-image generation using CLIP tokenization, scheduled text encoding, and Empty SD3 Latent generation.
 - Curated text-to-image example workflow `workflows/text_to_image.json`.
 - `CcC Krea2 - LoRA Stack` node (`CcCKrea2LoRAStack`) for model-only LoRA stacking (up to 4 slots) with global/slot strengths, persistent slot loader instances, and prompt augmentation accumulators.
@@ -18,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit test suites `tests/test_t2i_node.py`, `tests/test_prompt_augmentation.py`, and `tests/test_lora_nodes.py`, as well as updated interface and workflow tests.
 
 ### Fixed
+- Pruned unauthorized `masked_region_anchor` from Subject node (`CcCKrea2SubjectImage`) and unauthorized `masked_identity_anchor`/`masked_region_anchor` from Outfit node (`CcCKrea2OutfitImage`).
+- Synchronized all 19 workflow JSON files against active node input contracts, socket types, widget order, and loader choices.
+- Completely updated `NODES.md`, `ARCHITECTURE.md`, and `README.md` to reflect actual Python class definitions and contract parity.
 - Standardized default `boost` widget value to `2.5` for `subject` role in `CcCKrea2ImageAdvancedSettings` across example workflows.
 - Corrected documentation option lists for `grounding_resize_mode` and `reference_fit_mode` in `NODES.md`.
 
