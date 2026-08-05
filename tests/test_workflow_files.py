@@ -4,14 +4,17 @@ import json
 import pytest
 from pathlib import Path
 
-EDITING_WORKFLOW_FILES = [
-    "workflows/subject_edit.json",
-    "workflows/subject_scene.json",
-    "workflows/subject_outfit.json",
-    "workflows/subject_outfit_scene.json",
-    "workflows/subject_scene_qwen_simple.json",
-    "workflows/subject_scene_outfit_qwen_simple.json",
+LEGACY_WORKFLOW_FILES = [
+    "workflows/legacy/subject_edit.json",
+    "workflows/legacy/subject_scene.json",
+    "workflows/legacy/subject_outfit.json",
+    "workflows/legacy/subject_outfit_scene.json",
+    "workflows/legacy/subject_scene_qwen_simple.json",
+    "workflows/legacy/subject_scene_outfit_qwen_simple.json",
+    "workflows/legacy/text_to_image.json",
 ]
+
+EDITING_WORKFLOW_FILES = LEGACY_WORKFLOW_FILES[:6]
 
 MODULAR_WORKFLOW_FILES = [
     "workflows/01_t2i_basic.json",
@@ -28,17 +31,15 @@ MODULAR_WORKFLOW_FILES = [
     "workflows/12_full_pipeline_composition.json",
 ]
 
-EXPECTED_WORKFLOW_FILES = EDITING_WORKFLOW_FILES + [
-    "workflows/text_to_image.json",
-] + MODULAR_WORKFLOW_FILES
+EXPECTED_WORKFLOW_FILES = MODULAR_WORKFLOW_FILES
 
 EXPECTED_ROLES_PER_WORKFLOW = {
-    "workflows/subject_edit.json": (["subject"], "CcCKrea2Subject"),
-    "workflows/subject_scene.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
-    "workflows/subject_outfit.json": (["outfit", "subject"], "CcCKrea2SubjectOutfit"),
-    "workflows/subject_outfit_scene.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
-    "workflows/subject_scene_qwen_simple.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
-    "workflows/subject_scene_outfit_qwen_simple.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
+    "workflows/legacy/subject_edit.json": (["subject"], "CcCKrea2Subject"),
+    "workflows/legacy/subject_scene.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
+    "workflows/legacy/subject_outfit.json": (["outfit", "subject"], "CcCKrea2SubjectOutfit"),
+    "workflows/legacy/subject_outfit_scene.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
+    "workflows/legacy/subject_scene_qwen_simple.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
+    "workflows/legacy/subject_scene_outfit_qwen_simple.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
 }
 
 MAIN_NODE_TYPES = (
@@ -252,10 +253,10 @@ def test_advanced_settings_chaining_and_bypass():
 def test_qwen_workflows_and_non_qwen_isolation():
     """15-20. Upstream Qwen3VL node types, config chaining, scene img wiring, prompt wiring."""
     qwen_files = [
-        "workflows/subject_scene_qwen_simple.json",
-        "workflows/subject_scene_outfit_qwen_simple.json",
+        "workflows/legacy/subject_scene_qwen_simple.json",
+        "workflows/legacy/subject_scene_outfit_qwen_simple.json",
     ]
-    non_qwen_files = [f for f in EDITING_WORKFLOW_FILES if f not in qwen_files] + ["workflows/text_to_image.json"]
+    non_qwen_files = [f for f in LEGACY_WORKFLOW_FILES if f not in qwen_files]
 
     for rel_path in non_qwen_files:
         with open(rel_path, "r", encoding="utf-8") as f:
@@ -396,26 +397,26 @@ def test_qwen_workflows_and_non_qwen_isolation():
 
 
 def test_workflow_prompt_content():
-    """Verify exact prompt defaults across all six workflows."""
+    """Verify exact prompt defaults across legacy workflows."""
     expected_non_qwen_prompts = {
-        "workflows/subject_edit.json": (
+        "workflows/legacy/subject_edit.json": (
             "The subject is inside a futuristic high-rise apartment in a futuristic city.\n"
             "Do not keep the original bedroom background.\n"
             "Replace the environment completely."
         ),
-        "workflows/subject_scene.json": (
+        "workflows/legacy/subject_scene.json": (
             "Replace the main person in the scene image with the person from the subject image.\n"
             "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
             "Adapt the subject naturally to the environment and lighting of the scene image.\n"
             "The result should look seamless and natural, as if the subject was originally part of the scene."
         ),
-        "workflows/subject_outfit.json": (
+        "workflows/legacy/subject_outfit.json": (
             "Dress the person from the subject image in the complete clothing from the outfit image.\n"
             "Use only the clothing from the outfit image.\n"
             "Preserve the subject image identity, pose and original background.\n"
             "Do not copy the background, environment or composition from the outfit image."
         ),
-        "workflows/subject_outfit_scene.json": (
+        "workflows/legacy/subject_outfit_scene.json": (
             "Replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n"
             "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
             "Use only the clothing from the outfit image.\n"
@@ -433,7 +434,7 @@ def test_workflow_prompt_content():
         assert actual_prompt == expected_prompt, f"Prompt mismatch in {filepath}:\ngot: {repr(actual_prompt)}\nexpected: {repr(expected_prompt)}"
 
     expected_qwen_prompts = {
-        "workflows/subject_scene_qwen_simple.json": (
+        "workflows/legacy/subject_scene_qwen_simple.json": (
             "Analyze the scene image and write one complete image-editing prompt.\n\n"
             "The output prompt must replace the main person in the scene image with the person from the subject image.\n\n"
             "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
@@ -446,7 +447,7 @@ def test_workflow_prompt_content():
             "Return only the final transformation prompt.\n"
             "Do not explain your analysis and do not add headings."
         ),
-        "workflows/subject_scene_outfit_qwen_simple.json": (
+        "workflows/legacy/subject_scene_outfit_qwen_simple.json": (
             "Analyze the scene image and write one complete image-editing prompt.\n\n"
             "The output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n\n"
             "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
@@ -469,7 +470,7 @@ def test_workflow_prompt_content():
             data = json.load(f)
         qwen_node = next(n for n in data["nodes"] if n.get("type") == "SimpleQwenVLggufV2")
         actual_user_prompt = qwen_node["widgets_values"][2]
-        assert actual_user_prompt == expected_user_prompt, f"Qwen user_prompt mismatch in {filepath}:\ngot: {repr(actual_user_prompt)}\nexpected: {repr(expected_user_prompt)}"
+        assert actual_user_prompt == expected_user_prompt, f"User prompt mismatch in {filepath}:\ngot: {repr(actual_user_prompt)}\nexpected: {repr(expected_user_prompt)}"
         assert "subject image" in actual_user_prompt
         assert "scene image" in actual_user_prompt
         if "outfit" in filepath:
@@ -548,8 +549,8 @@ def test_subject_boost_default_correction():
 
 
 def test_text_to_image_workflow_structure():
-    """Validate detailed structure of workflows/text_to_image.json."""
-    filepath = "workflows/text_to_image.json"
+    """Validate detailed structure of workflows/legacy/text_to_image.json."""
+    filepath = "workflows/legacy/text_to_image.json"
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -632,12 +633,105 @@ def test_all_workflows_registered_node_classes_and_sockets():
             if ntype and ntype.startswith("CcCKrea2"):
                 assert ntype in krea2_node_types, f"Unregistered node class '{ntype}' found in {rel_path}"
 
-            # Validate Visual Reference Fit widget values if reference node
+def test_canonical_modular_workflows_strict_contract():
+    """Strict contract validation for canonical modular workflows (01 through 12)."""
+    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
+
+    stale_inputs = {"previous_references", "visual_reference_fit"}
+    stale_types = {"TARGET_LATENT_DICT", "CCC_KREA2_PREPARED_IMAGE", "CCC_KREA2_REFERENCE_CHAIN", "CCC_KREA2_LORA_STACK"}
+    unsupported_loader_modes = {"qwen2_5_vl", "qwen25vl"}
+
+    for rel_path in MODULAR_WORKFLOW_FILES:
+        with open(rel_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        raw_str = json.dumps(data)
+        for st_type in stale_types:
+            assert st_type not in raw_str, f"Stale socket type '{st_type}' found in {rel_path}"
+
+        nodes = data.get("nodes", [])
+        node_by_id = {n["id"]: n for n in nodes}
+        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
+
+        ref_chain_order = []  # track order of reference nodes in chain
+
+        for n in nodes:
+            nid = n["id"]
+            ntype = n.get("type", "")
+
+            # 1. Registered class check
+            if ntype.startswith("CcCKrea2"):
+                assert ntype in NODE_CLASS_MAPPINGS, f"Unregistered class '{ntype}' node {nid} in {rel_path}"
+
+            # 2. Input sockets check
+            for inp in n.get("inputs", []):
+                iname = inp.get("name")
+                itype = inp.get("type")
+                assert iname not in stale_inputs, f"Stale input name '{iname}' in node {nid} ({ntype}) in {rel_path}"
+                assert itype not in stale_types, f"Stale input type '{itype}' in node {nid} ({ntype}) in {rel_path}"
+
+            # 3. Output sockets check
+            for out in n.get("outputs", []):
+                otype = out.get("type")
+                assert otype not in stale_types, f"Stale output type '{otype}' in node {nid} ({ntype}) in {rel_path}"
+
+            # 4. CLIPLoader loader mode check
+            if ntype == "CLIPLoader":
+                wvals = n.get("widgets_values", [])
+                if len(wvals) >= 2:
+                    assert wvals[1] not in unsupported_loader_modes, (
+                        f"Unsupported Qwen2.5-VL loader mode '{wvals[1]}' in node {nid} in {rel_path}"
+                    )
+
+            # 5. Vision Prep CLIP connection check
+            if ntype == "CcCKrea2QwenVisionImagePrep":
+                clip_inp = next((i for i in n.get("inputs", []) if i.get("name") == "clip"), None)
+                assert clip_inp is not None and clip_inp.get("link") is not None, (
+                    f"Vision Prep node {nid} missing CLIP link in {rel_path}"
+                )
+
+            # 6. Reference node removed fields check & reference chain order collection
             if ntype in ("CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"):
-                widgets = n.get("widgets_values", [])
-                for w in widgets:
-                    if isinstance(w, str) and w in ("exact", "stretch"):
-                        pytest.fail(f"Invalid visual reference fit value '{w}' found in node {ntype} in {rel_path}")
+                wvals = n.get("widgets_values", [])
+                raw_node_str = json.dumps(n)
+                if ntype == "CcCKrea2SubjectImage":
+                    assert "masked_region_anchor" not in raw_node_str, f"Subject node {nid} contains removed masked_region_anchor in {rel_path}"
+                    ref_chain_order.append((nid, "subject"))
+                elif ntype == "CcCKrea2OutfitImage":
+                    assert "masked_identity_anchor" not in raw_node_str, f"Outfit node {nid} contains removed masked_identity_anchor in {rel_path}"
+                    assert "masked_region_anchor" not in raw_node_str, f"Outfit node {nid} contains removed masked_region_anchor in {rel_path}"
+                    ref_chain_order.append((nid, "outfit"))
+                elif ntype == "CcCKrea2SceneImage":
+                    ref_chain_order.append((nid, "scene"))
+                elif ntype == "CcCKrea2StyleImage":
+                    ref_chain_order.append((nid, "style"))
+
+            # 7. Edit node wiring check
+            if ntype == "CcCKrea2Edit":
+                # Target latent input linked
+                lat_inp = next((i for i in n.get("inputs", []) if i.get("name") == "target_latent"), None)
+                assert lat_inp is not None and lat_inp.get("link") is not None, (
+                    f"Main node {nid} ({ntype}) missing target_latent link in {rel_path}"
+                )
+                # Latent output linked to KSampler
+                lat_out = next((o for o in n.get("outputs", []) if o.get("name") == "latent"), None)
+                assert lat_out is not None and lat_out.get("links"), (
+                    f"Main node {nid} ({ntype}) latent output not linked in {rel_path}"
+                )
+                first_link = link_map[lat_out["links"][0]]
+                dst_node = node_by_id[first_link[3]]
+                assert dst_node.get("type") == "KSampler", (
+                    f"Main node {nid} ({ntype}) latent output must connect to KSampler in {rel_path}"
+                )
+
+        # 8. Validate Style ordering (Style nodes must come after non-Style nodes)
+        seen_style = False
+        for nid, role in ref_chain_order:
+            if role == "style":
+                seen_style = True
+            elif seen_style:
+                pytest.fail(f"Non-style reference '{role}' node {nid} appears after Style node in {rel_path}")
+
 
 
 

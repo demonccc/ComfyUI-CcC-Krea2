@@ -64,8 +64,8 @@
         "Node name for S&R": "CLIPLoader"
       },
       "widgets_values": [
-        "qwen2_5_vl.safetensors",
-        "qwen2_5_vl",
+        "qwen3_vl.safetensors",
+        "qwen3_vl",
         "default"
       ]
     },
