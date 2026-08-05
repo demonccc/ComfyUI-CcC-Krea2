@@ -104,10 +104,6 @@ def apply_statistical_style_fidelity(
                 f"Style span validation failed: span range ({start}, {end}) is invalid "
                 f"or exceeds sequence length ({seq})."
             )
-        if op.indirect_style_transfer:
-            keep[start:end] = False
-            indirect_applied = True
-            continue
 
         if op.style_fidelity < 1.0:
             span = z[:, start:end]  # (B, rows, 12, fused//12)
@@ -117,6 +113,10 @@ def apply_statistical_style_fidelity(
             idx = torch.arange(end - start, device=span.device) % 3
             target = stats[:, idx]
             z[:, start:end] = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
+
+        if op.indirect_style_transfer:
+            keep[start:end] = False
+            indirect_applied = True
 
     # Step 2: Remove all indirect style rows in ONE operation using single keep-mask
     z = z.reshape(b, seq, fused)

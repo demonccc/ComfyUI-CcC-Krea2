@@ -36,7 +36,6 @@ class CcCKrea2OutfitImage:
                 "attention_boost": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.05}),
                 "masked_attention_boost": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.05}),
                 "outfit_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
-                "masked_region_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
                 "extra_vision_directive": ("STRING", {"default": "", "multiline": True}),
                 "vision_slot": ("INT", {"default": 0, "min": 0, "max": 16, "step": 1}),
                 "aliases": ("STRING", {"default": ""}),
@@ -54,7 +53,6 @@ class CcCKrea2OutfitImage:
         attention_boost=1.0,
         masked_attention_boost=1.0,
         outfit_anchor=0.0,
-        masked_region_anchor=0.0,
         extra_vision_directive="",
         vision_slot=0,
         aliases="",
@@ -85,7 +83,6 @@ class CcCKrea2OutfitImage:
             outfit_anchor=outfit_anchor,
             attention_mask=attention_mask,
             masked_attention_boost=masked_attention_boost,
-            masked_region_anchor=masked_region_anchor,
             visual_fit_mode=visual_fit_mode
         )
 

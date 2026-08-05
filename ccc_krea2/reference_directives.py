@@ -37,8 +37,6 @@ def build_automatic_role_directive(spec_dict: Dict[str, Any]) -> str:
             directives.append(f"Anchor the subject outfit with weight {spec.outfit_anchor:.2f}.")
         if getattr(spec, "masked_identity_anchor", 0.0) > 0.0 and spec.attention_mask is not None:
             directives.append(f"Anchor masked identity region with weight {spec.masked_identity_anchor:.2f}.")
-        if getattr(spec, "masked_region_anchor", 0.0) > 0.0 and spec.attention_mask is not None:
-            directives.append(f"Anchor masked subject region with weight {spec.masked_region_anchor:.2f}.")
 
     elif role == "scene":
         assert isinstance(spec, SceneReferenceSpec)
@@ -56,8 +54,6 @@ def build_automatic_role_directive(spec_dict: Dict[str, Any]) -> str:
         directives.append("Do not use the wearer's face, identity, body, pose, or background from the outfit image.")
         if spec.outfit_anchor > 0.0:
             directives.append(f"Anchor the outfit design with weight {spec.outfit_anchor:.2f}.")
-        if getattr(spec, "masked_region_anchor", 0.0) > 0.0 and spec.attention_mask is not None:
-            directives.append(f"Anchor masked outfit region with weight {spec.masked_region_anchor:.2f}.")
 
     elif role == "style":
         assert isinstance(spec, StyleReferenceSpec)

@@ -64,17 +64,18 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Subject reference specification for character identity, face, body, and person features.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
-  - `attention_boost` (`FLOAT`, default: `2.5`, min: `0.0`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
-  - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.0`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
-  - `pose_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Subject pose text anchor weight.
-  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Subject outfit text anchor weight.
-  - `masked_identity_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Masked identity anchor weight.
+  - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
+  - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
+  - `pose_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Subject pose text anchor weight.
+  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Subject outfit text anchor weight.
+  - `masked_identity_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Masked identity anchor weight.
+  - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
+  - `aliases` (`STRING`, default: `""`): Custom alias template string.
 - **Optional Inputs**:
   - `attention_mask` (`MASK`): Optional spatial attention mask.
-  - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
-  - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
+  - `reference_chain` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
   - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
@@ -86,14 +87,17 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Scene reference specification for background, composition, environment, and lighting.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
-  - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.0`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
-  - `scene_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Scene composition text anchor weight.
+  - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
+  - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
+  - `scene_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Scene composition text anchor weight.
+  - `masked_region_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Masked region anchor weight.
+  - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
+  - `aliases` (`STRING`, default: `""`): Custom alias template string.
 - **Optional Inputs**:
   - `attention_mask` (`MASK`): Optional spatial attention mask.
-  - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
-  - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
+  - `reference_chain` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
   - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 
@@ -105,13 +109,16 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines an Outfit reference specification for garments and clothing without wearer identity.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
   - `visual_reference_fit` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
-  - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.0`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
-  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.01`): Outfit detail text anchor weight.
-- **Optional Inputs**:
+  - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
+  - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
+  - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Outfit detail text anchor weight.
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
-  - `previous_references` (`REFERENCE_CHAIN`): Chain of previous references.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
+  - `aliases` (`STRING`, default: `""`): Custom alias template string.
+- **Optional Inputs**:
+  - `attention_mask` (`MASK`): Optional spatial attention mask.
+  - `reference_chain` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
   - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
 

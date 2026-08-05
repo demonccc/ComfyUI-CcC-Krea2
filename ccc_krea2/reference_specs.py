@@ -48,7 +48,6 @@ class SubjectReferenceSpec(BaseReferenceSpec):
     attention_mask: Optional[torch.Tensor] = None
     masked_attention_boost: float = 1.0
     masked_identity_anchor: float = 1.0
-    masked_region_anchor: float = 0.0
     visual_fit_mode: str = "auto"
 
 
@@ -70,7 +69,6 @@ class OutfitReferenceSpec(BaseReferenceSpec):
     outfit_anchor: float = 0.0
     attention_mask: Optional[torch.Tensor] = None
     masked_attention_boost: float = 1.0
-    masked_region_anchor: float = 0.0
     visual_fit_mode: str = "auto"
 
 

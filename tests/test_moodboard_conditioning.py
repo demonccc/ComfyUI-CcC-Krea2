@@ -197,7 +197,7 @@ def test_style_before_non_style_is_rejected():
         indirect_style_transfer=True,
         style_directive="modern"
     )
-    s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, 0.0, "auto")
+    s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto")
 
     chain = ReferenceChain().append(s_style).append(s_subj)
     with pytest.raises(ValueError) as excinfo:
@@ -207,7 +207,7 @@ def test_style_before_non_style_is_rejected():
 
 def test_conflicting_literal_alias_raises_error():
     prep = make_dummy_prep_image()
-    s_subj = SubjectReferenceSpec("subject", prep, 1, "Image 5", ("Image 5",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, 0.0, "auto")
+    s_subj = SubjectReferenceSpec("subject", prep, 1, "Image 5", ("Image 5",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto")
 
     chain = ReferenceChain().append(s_subj)
     with pytest.raises(ValueError) as excinfo:
@@ -218,7 +218,7 @@ def test_conflicting_literal_alias_raises_error():
 def test_physical_automatic_directives_for_expanded_style():
     prep = make_dummy_prep_image()
     s_scene = SceneReferenceSpec("scene", prep, 1, "scene_image", ("scene_image",), "", 1.0, 0.0, None, 1.0, 0.0, "auto")
-    s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, 0.0, "auto")
+    s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto")
     s_style = StyleReferenceSpec(
         role="style",
         prepared_image=prep,
@@ -247,11 +247,10 @@ def test_physical_automatic_directives_for_expanded_style():
 # --- 14.5 Krea2Edit Geometry Parity Tests ---
 
 def test_krea2edit_geometry_parity_floor_vs_round():
-    # External target: 490 x 245 (divisible by 8: 488x240, not 16)
+    # External target: 490 x 245 (divisible by 8)
     geom = resolve_krea2edit_geometry(src_h=500, src_w=1000, tgt_h=245, tgt_w=490, fit_mode="fit")
-    # Upstream calculation uses floor // 16 for fitted VAE input dimensions
-    assert geom.vae_input_pixel_size[0] % 16 == 0
-    assert geom.vae_input_pixel_size[1] % 16 == 0
+    # Near-match branch uses exact target pixel dimensions for crop_and_resize
+    assert geom.vae_input_pixel_size == (490, 245)
     # Source crop rectangle uses round() for exact aspect math
     left, top, crop_w, crop_h = geom.crop_rectangle
     assert crop_w > 0 and crop_h > 0
