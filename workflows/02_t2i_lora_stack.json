@@ -65,7 +65,7 @@
       },
       "widgets_values": [
         "qwen3_vl.safetensors",
-        "qwen3_vl",
+        "krea2",
         "default"
       ]
     },
@@ -131,20 +131,20 @@
       },
       "widgets_values": [
         true,
-        true,
-        "style",
-        " cinematic lighting",
-        "",
         false,
-        "outfit",
+        "append",
         "",
         "",
         false,
-        "pose",
+        "append",
         "",
         "",
         false,
-        "identity",
+        "append",
+        "",
+        "",
+        false,
+        "append",
         "",
         ""
       ]
@@ -199,17 +199,17 @@
       "widgets_values": [
         true,
         1.0,
-        true,
-        "krea2_style_lora.safetensors",
-        0.8,
         false,
-        "",
+        "None",
         1.0,
         false,
-        "",
+        "None",
         1.0,
         false,
-        "",
+        "None",
+        1.0,
+        false,
+        "None",
         1.0
       ]
     },
@@ -283,11 +283,12 @@
       },
       "widgets_values": [
         "A futuristic city skyline at night.",
-        "blurry, low quality",
-        1024,
-        1024,
+        "1:1",
         1.0,
-        1
+        1,
+        1,
+        1,
+        "blurry, low quality"
       ]
     },
     {

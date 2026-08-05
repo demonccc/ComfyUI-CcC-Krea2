@@ -65,7 +65,7 @@
       },
       "widgets_values": [
         "qwen3_vl.safetensors",
-        "qwen3_vl",
+        "krea2",
         "default"
       ]
     },
@@ -171,11 +171,12 @@
       },
       "widgets_values": [
         "A majestic mountain landscape at sunset.",
-        "",
-        1024,
-        1024,
+        "1:1",
         1.0,
-        1
+        1,
+        1,
+        1,
+        ""
       ]
     },
     {

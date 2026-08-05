@@ -679,18 +679,79 @@ def test_canonical_modular_workflows_strict_contract():
             if ntype == "CLIPLoader":
                 wvals = n.get("widgets_values", [])
                 if len(wvals) >= 2:
-                    assert wvals[1] not in unsupported_loader_modes, (
-                        f"Unsupported Qwen2.5-VL loader mode '{wvals[1]}' in node {nid} in {rel_path}"
+                    assert wvals[1] == "krea2", (
+                        f"CLIPLoader model type must be 'krea2', got '{wvals[1]}' in node {nid} in {rel_path}"
                     )
 
-            # 5. Vision Prep CLIP connection check
+            # 5. Dynamic widget contract validation for CcCKrea2 nodes
+            if ntype in NODE_CLASS_MAPPINGS:
+                cls = NODE_CLASS_MAPPINGS[ntype]
+                input_spec = cls.INPUT_TYPES()
+                req_spec = input_spec.get("required", {})
+                opt_spec = input_spec.get("optional", {})
+
+                # Collect expected widget fields in order
+                expected_widgets = []
+                for name, spec in list(req_spec.items()) + list(opt_spec.items()):
+                    type_info = spec[0]
+                    # If type_info is a list of choices or primitive type name, it's a widget
+                    if isinstance(type_info, list):
+                        expected_widgets.append((name, "CHOICE", type_info, spec[1] if len(spec) > 1 else {}))
+                    elif type_info in ("STRING", "FLOAT", "INT", "BOOLEAN"):
+                        expected_widgets.append((name, type_info, None, spec[1] if len(spec) > 1 else {}))
+
+                wvals = n.get("widgets_values", [])
+                assert len(wvals) == len(expected_widgets), (
+                    f"Node {nid} ({ntype}) in {rel_path} widget count mismatch: "
+                    f"got {len(wvals)}, expected {len(expected_widgets)} ({[w[0] for w in expected_widgets]})"
+                )
+
+                for idx, (wname, wkind, choices, kwargs) in enumerate(expected_widgets):
+                    val = wvals[idx]
+                    if wkind == "CHOICE":
+                        assert isinstance(val, str), (
+                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be string choice, got {type(val).__name__}"
+                        )
+                        assert val in choices, (
+                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} value '{val}' not in choices {choices}"
+                        )
+                    elif wkind == "STRING":
+                        assert isinstance(val, str), (
+                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be string, got {type(val).__name__}"
+                        )
+                    elif wkind == "FLOAT":
+                        assert isinstance(val, (float, int)) and not isinstance(val, bool), (
+                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be float, got {type(val).__name__}"
+                        )
+                        min_v = kwargs.get("min")
+                        max_v = kwargs.get("max")
+                        if min_v is not None:
+                            assert val >= min_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} < min {min_v} in {rel_path}"
+                        if max_v is not None:
+                            assert val <= max_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} > max {max_v} in {rel_path}"
+                    elif wkind == "INT":
+                        assert isinstance(val, int) and not isinstance(val, bool), (
+                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be int, got {type(val).__name__}"
+                        )
+                        min_v = kwargs.get("min")
+                        max_v = kwargs.get("max")
+                        if min_v is not None:
+                            assert val >= min_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} < min {min_v} in {rel_path}"
+                        if max_v is not None:
+                            assert val <= max_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} > max {max_v} in {rel_path}"
+                    elif wkind == "BOOLEAN":
+                        assert isinstance(val, bool), (
+                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be bool, got {type(val).__name__}"
+                        )
+
+            # 6. Vision Prep CLIP connection check
             if ntype == "CcCKrea2QwenVisionImagePrep":
                 clip_inp = next((i for i in n.get("inputs", []) if i.get("name") == "clip"), None)
                 assert clip_inp is not None and clip_inp.get("link") is not None, (
                     f"Vision Prep node {nid} missing CLIP link in {rel_path}"
                 )
 
-            # 6. Reference node removed fields check & reference chain order collection
+            # 7. Reference node removed fields check & reference chain order collection
             if ntype in ("CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"):
                 wvals = n.get("widgets_values", [])
                 raw_node_str = json.dumps(n)
@@ -706,7 +767,7 @@ def test_canonical_modular_workflows_strict_contract():
                 elif ntype == "CcCKrea2StyleImage":
                     ref_chain_order.append((nid, "style"))
 
-            # 7. Edit node wiring check
+            # 8. Edit node wiring check
             if ntype == "CcCKrea2Edit":
                 # Target latent input linked
                 lat_inp = next((i for i in n.get("inputs", []) if i.get("name") == "target_latent"), None)
@@ -724,13 +785,14 @@ def test_canonical_modular_workflows_strict_contract():
                     f"Main node {nid} ({ntype}) latent output must connect to KSampler in {rel_path}"
                 )
 
-        # 8. Validate Style ordering (Style nodes must come after non-Style nodes)
+        # 9. Validate Style ordering (Style nodes must come after non-Style nodes)
         seen_style = False
         for nid, role in ref_chain_order:
             if role == "style":
                 seen_style = True
             elif seen_style:
                 pytest.fail(f"Non-style reference '{role}' node {nid} appears after Style node in {rel_path}")
+
 
 
 

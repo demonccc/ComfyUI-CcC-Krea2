@@ -301,3 +301,27 @@ def test_production_qwen_processor_failure_raises_runtime_error(monkeypatch):
     with pytest.raises(RuntimeError) as excinfo:
         calculate_qwen_rows_from_embedded_image(elem, clip=None, test_mode=False)
     assert "Required Qwen processor" in str(excinfo.value) or "Qwen visual processor failed" in str(excinfo.value)
+
+
+def test_production_qwen_processor_positive_path_with_image_grid_thw(monkeypatch):
+    """Verify Qwen processor row calculation when image_grid_thw is produced by processor."""
+    import sys
+    from unittest.mock import MagicMock
+    from ccc_krea2.conditioning import calculate_qwen_rows_from_embedded_image
+
+    img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
+    elem = {"type": "image", "data": img1}
+
+    mock_qwen_vl = MagicMock()
+    grid_tensor = torch.tensor([[1, 32, 32]], dtype=torch.int64)
+    mock_qwen_vl.process_qwen2vl_images.return_value = (None, grid_tensor)
+
+    monkeypatch.setitem(sys.modules, "comfy", MagicMock())
+    monkeypatch.setitem(sys.modules, "comfy.text_encoders", MagicMock())
+    monkeypatch.setitem(sys.modules, "comfy.text_encoders.qwen_vl", mock_qwen_vl)
+
+    dummy_clip = DummyClip()
+    rows = calculate_qwen_rows_from_embedded_image(elem, clip=dummy_clip, test_mode=False)
+    assert rows == 256
+
+

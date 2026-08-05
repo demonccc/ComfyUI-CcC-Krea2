@@ -65,7 +65,7 @@
       },
       "widgets_values": [
         "qwen3_vl.safetensors",
-        "qwen3_vl",
+        "krea2",
         "default"
       ]
     },
@@ -158,8 +158,6 @@
         2.0,
         1.0,
         "1:1",
-        1,
-        1,
         1
       ]
     },
@@ -307,15 +305,15 @@
         "Node name for S&R": "CcCKrea2SubjectImage"
       },
       "widgets_values": [
-        "auto",
-        "subject_image",
-        "Apply high contrast lighting.",
+        "crop",
         1.5,
+        1.2,
         0.2,
         0.1,
-        1.2,
         1.0,
-        "crop"
+        "Apply high contrast lighting.",
+        0,
+        "subject_image"
       ]
     },
     {

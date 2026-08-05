@@ -65,7 +65,7 @@
       },
       "widgets_values": [
         "qwen3_vl.safetensors",
-        "qwen3_vl",
+        "krea2",
         "default"
       ]
     },
@@ -158,8 +158,6 @@
         2.0,
         1.0,
         "1:1",
-        1,
-        1,
         1
       ]
     },
@@ -308,14 +306,14 @@
       },
       "widgets_values": [
         "auto",
-        "subject_image, Image {slot}",
+        1.0,
+        0.1,
+        1.0,
+        0.0,
+        0.0,
         "",
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        1.0,
-        "auto"
+        0,
+        ""
       ]
     },
     {
@@ -463,13 +461,13 @@
       },
       "widgets_values": [
         "auto",
-        "scene_image, Image {slot}",
-        "",
+        1.0,
+        0.1,
         1.0,
         0.0,
-        1.0,
-        1.0,
-        "auto"
+        "",
+        0,
+        ""
       ]
     },
     {
@@ -617,12 +615,12 @@
       },
       "widgets_values": [
         "auto",
-        "outfit_image, Image {slot}",
+        1.0,
+        0.1,
+        1.0,
         "",
-        1.0,
-        0.0,
-        1.0,
-        "auto"
+        0,
+        ""
       ]
     },
     {
