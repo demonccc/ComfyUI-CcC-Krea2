@@ -71,3 +71,54 @@ def test_slot_sorting_order():
     assert resolved[0]["spec"].role == "scene"
     assert resolved[1]["resolved_slot"] == 2
     assert resolved[1]["spec"].role == "subject"
+
+
+def test_internal_masked_anchor_dataclass_defaults():
+    """Assert SubjectReferenceSpec and SceneReferenceSpec masked directive anchor defaults are 0.0."""
+    from ccc_krea2.reference_specs import SubjectReferenceSpec, SceneReferenceSpec
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=None, mode="native")
+
+    default_subj = SubjectReferenceSpec(
+        role="subject",
+        prepared_image=prep,
+        requested_vision_slot=None,
+        aliases_template="",
+        parsed_aliases=(),
+        extra_vision_directive="",
+    )
+    assert default_subj.masked_identity_anchor == 0.0
+
+    explicit_subj = SubjectReferenceSpec(
+        role="subject",
+        prepared_image=prep,
+        requested_vision_slot=None,
+        aliases_template="",
+        parsed_aliases=(),
+        extra_vision_directive="",
+        masked_identity_anchor=0.8,
+    )
+    assert explicit_subj.masked_identity_anchor == 0.8
+
+    default_scene = SceneReferenceSpec(
+        role="scene",
+        prepared_image=prep,
+        requested_vision_slot=None,
+        aliases_template="",
+        parsed_aliases=(),
+        extra_vision_directive="",
+    )
+    assert default_scene.masked_region_anchor == 0.0
+
+    explicit_scene = SceneReferenceSpec(
+        role="scene",
+        prepared_image=prep,
+        requested_vision_slot=None,
+        aliases_template="",
+        parsed_aliases=(),
+        extra_vision_directive="",
+        masked_region_anchor=0.9,
+    )
+    assert explicit_scene.masked_region_anchor == 0.9
+
