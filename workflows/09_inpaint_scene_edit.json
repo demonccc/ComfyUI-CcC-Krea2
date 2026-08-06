@@ -1,6 +1,6 @@
 {
   "last_node_id": 11,
-  "last_link_id": 14,
+  "last_link_id": 15,
   "nodes": [
     {
       "id": 1,
@@ -130,7 +130,7 @@
         {
           "name": "scene_image",
           "type": "PREPARED_VISION_IMAGE",
-          "link": null
+          "link": 15
         }
       ],
       "outputs": [
@@ -145,7 +145,7 @@
         {
           "name": "latent_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -188,7 +188,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -231,20 +231,21 @@
           "name": "prepared_image",
           "type": "PREPARED_VISION_IMAGE",
           "links": [
-            6
+            6,
+            15
           ],
           "slot_index": 0
         },
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -293,7 +294,7 @@
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
             7
@@ -368,7 +369,7 @@
       ],
       "outputs": [
         {
-          "name": "model",
+          "name": "patched_model",
           "type": "MODEL",
           "links": [
             8
@@ -402,7 +403,7 @@
         {
           "name": "edit_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 4
         }
       ],
@@ -657,6 +658,14 @@
       11,
       0,
       "IMAGE"
+    ],
+    [
+      15,
+      6,
+      0,
+      4,
+      2,
+      "PREPARED_VISION_IMAGE"
     ]
   ],
   "groups": [

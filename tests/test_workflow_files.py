@@ -641,6 +641,19 @@ def test_canonical_modular_workflows_strict_contract():
     stale_types = {"TARGET_LATENT_DICT", "CCC_KREA2_PREPARED_IMAGE", "CCC_KREA2_REFERENCE_CHAIN", "CCC_KREA2_LORA_STACK"}
     unsupported_loader_modes = {"qwen2_5_vl", "qwen25vl"}
 
+    expected_strategies = {
+        "workflows/03_subject_edit.json": ("subject", "favor_subject"),
+        "workflows/04_subject_scene_edit.json": ("scene", "favor_scene"),
+        "workflows/05_subject_outfit_edit.json": ("empty", "favor_subject"),
+        "workflows/06_subject_scene_outfit_edit.json": ("empty", "favor_subject"),
+        "workflows/07_style_moodboard_edit.json": ("empty", "fixed"),
+        "workflows/08_inpaint_subject_edit.json": ("subject", "fixed"),
+        "workflows/09_inpaint_scene_edit.json": ("scene", "fixed"),
+        "workflows/10_multi_subject_chasing_slots.json": ("empty", "favor_subject"),
+        "workflows/11_advanced_directives_fit_modes.json": ("empty", "favor_subject"),
+        "workflows/12_full_pipeline_composition.json": ("empty", "favor_subject"),
+    }
+
     for rel_path in MODULAR_WORKFLOW_FILES:
         with open(rel_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -663,14 +676,14 @@ def test_canonical_modular_workflows_strict_contract():
             if ntype.startswith("CcCKrea2"):
                 assert ntype in NODE_CLASS_MAPPINGS, f"Unregistered class '{ntype}' node {nid} in {rel_path}"
 
-            # 2. Input sockets check
+            # 2. Input sockets check against stale lists
             for inp in n.get("inputs", []):
                 iname = inp.get("name")
                 itype = inp.get("type")
                 assert iname not in stale_inputs, f"Stale input name '{iname}' in node {nid} ({ntype}) in {rel_path}"
                 assert itype not in stale_types, f"Stale input type '{itype}' in node {nid} ({ntype}) in {rel_path}"
 
-            # 3. Output sockets check
+            # 3. Output sockets check against stale lists
             for out in n.get("outputs", []):
                 otype = out.get("type")
                 assert otype not in stale_types, f"Stale output type '{otype}' in node {nid} ({ntype}) in {rel_path}"
@@ -679,22 +692,64 @@ def test_canonical_modular_workflows_strict_contract():
             if ntype == "CLIPLoader":
                 wvals = n.get("widgets_values", [])
                 if len(wvals) >= 2:
+                    assert wvals[1] not in unsupported_loader_modes, (
+                        f"Unsupported CLIPLoader mode '{wvals[1]}' in node {nid} in {rel_path}"
+                    )
                     assert wvals[1] == "krea2", (
                         f"CLIPLoader model type must be 'krea2', got '{wvals[1]}' in node {nid} in {rel_path}"
                     )
 
-            # 5. Dynamic widget contract validation for CcCKrea2 nodes
+            # 5. Full input/output socket contract validation for registered nodes
             if ntype in NODE_CLASS_MAPPINGS:
                 cls = NODE_CLASS_MAPPINGS[ntype]
                 input_spec = cls.INPUT_TYPES()
                 req_spec = input_spec.get("required", {})
                 opt_spec = input_spec.get("optional", {})
+                allowed_input_names = set(req_spec.keys()) | set(opt_spec.keys())
+
+                # Validate input sockets against allowed set
+                for inp in n.get("inputs", []):
+                    iname = inp.get("name")
+                    assert iname in allowed_input_names, (
+                        f"Node {nid} ({ntype}) in {rel_path} has unknown input socket '{iname}' not in allowed {allowed_input_names}"
+                    )
+                    # If input is linked, validate link output type matches input type
+                    link_id = inp.get("link")
+                    if link_id is not None and link_id in link_map:
+                        link_item = link_map[link_id]
+                        src_node_id = link_item[1]
+                        src_slot = link_item[2]
+                        src_node = node_by_id.get(src_node_id)
+                        if src_node and "outputs" in src_node and src_slot < len(src_node["outputs"]):
+                            src_out_type = src_node["outputs"][src_slot].get("type")
+                            dst_inp_type = inp.get("type")
+                            assert src_out_type == dst_inp_type or src_out_type == "*" or dst_inp_type == "*", (
+                                f"Link {link_id} type mismatch in {rel_path}: node {src_node_id} ({src_node.get('type')}) output '{src_out_type}' -> node {nid} ({ntype}) input '{iname}' ('{dst_inp_type}')"
+                            )
+
+                # Validate output socket names and types against RETURN_NAMES & RETURN_TYPES
+                ret_names = getattr(cls, "RETURN_NAMES", ())
+                ret_types = getattr(cls, "RETURN_TYPES", ())
+                node_outputs = n.get("outputs", [])
+                assert len(node_outputs) == len(ret_names), (
+                    f"Node {nid} ({ntype}) in {rel_path} output count mismatch: got {len(node_outputs)}, expected {len(ret_names)}"
+                )
+                for idx, out in enumerate(node_outputs):
+                    oname = out.get("name")
+                    otype = out.get("type")
+                    exp_name = ret_names[idx]
+                    exp_type = ret_types[idx]
+                    assert oname == exp_name, (
+                        f"Node {nid} ({ntype}) in {rel_path} output {idx} name mismatch: got '{oname}', expected '{exp_name}'"
+                    )
+                    assert otype == exp_type, (
+                        f"Node {nid} ({ntype}) in {rel_path} output {idx} type mismatch: got '{otype}', expected '{exp_type}'"
+                    )
 
                 # Collect expected widget fields in order
                 expected_widgets = []
                 for name, spec in list(req_spec.items()) + list(opt_spec.items()):
                     type_info = spec[0]
-                    # If type_info is a list of choices or primitive type name, it's a widget
                     if isinstance(type_info, list):
                         expected_widgets.append((name, "CHOICE", type_info, spec[1] if len(spec) > 1 else {}))
                     elif type_info in ("STRING", "FLOAT", "INT", "BOOLEAN"):
@@ -753,7 +808,6 @@ def test_canonical_modular_workflows_strict_contract():
 
             # 7. Reference node removed fields check & reference chain order collection
             if ntype in ("CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"):
-                wvals = n.get("widgets_values", [])
                 raw_node_str = json.dumps(n)
                 if ntype == "CcCKrea2SubjectImage":
                     assert "masked_region_anchor" not in raw_node_str, f"Subject node {nid} contains removed masked_region_anchor in {rel_path}"
@@ -767,7 +821,47 @@ def test_canonical_modular_workflows_strict_contract():
                 elif ntype == "CcCKrea2StyleImage":
                     ref_chain_order.append((nid, "style"))
 
-            # 8. Edit node wiring check
+            # 8. Target Latent conditional dependency check
+            if ntype == "CcCKrea2TargetLatent":
+                wvals = n.get("widgets_values", [])
+                target_content = wvals[0]
+                geometry_mode = wvals[1]
+
+                # Check expected strategy if registered in table
+                if rel_path in expected_strategies:
+                    exp_content, exp_geom = expected_strategies[rel_path]
+                    assert target_content == exp_content, f"Workflow {rel_path} target_content mismatch: got '{target_content}', expected '{exp_content}'"
+                    assert geometry_mode == exp_geom, f"Workflow {rel_path} geometry_mode mismatch: got '{geometry_mode}', expected '{exp_geom}'"
+
+                inps = {i["name"]: i for i in n.get("inputs", [])}
+
+                if target_content in ("subject", "scene"):
+                    assert "vae" in inps and inps["vae"].get("link") is not None, (
+                        f"Target Latent node {nid} in {rel_path} target_content='{target_content}' requires linked VAE input"
+                    )
+
+                if target_content == "subject" or geometry_mode == "favor_subject":
+                    assert "subject_image" in inps and inps["subject_image"].get("link") is not None, (
+                        f"Target Latent node {nid} in {rel_path} target_content='{target_content}', geometry_mode='{geometry_mode}' requires linked subject_image"
+                    )
+
+                if target_content == "scene" or geometry_mode == "favor_scene":
+                    assert "scene_image" in inps and inps["scene_image"].get("link") is not None, (
+                        f"Target Latent node {nid} in {rel_path} target_content='{target_content}', geometry_mode='{geometry_mode}' requires linked scene_image"
+                    )
+
+                # Output link check
+                lat_out = next((o for o in n.get("outputs", []) if o.get("name") == "target_latent"), None)
+                assert lat_out is not None and lat_out.get("links"), (
+                    f"Target Latent node {nid} output 'target_latent' not linked in {rel_path}"
+                )
+                first_link = link_map[lat_out["links"][0]]
+                dst_node = node_by_id[first_link[3]]
+                assert dst_node.get("type") == "CcCKrea2Edit", (
+                    f"Target Latent node {nid} output must connect to CcCKrea2Edit target_latent input in {rel_path}"
+                )
+
+            # 9. Edit node wiring check
             if ntype == "CcCKrea2Edit":
                 # Target latent input linked
                 lat_inp = next((i for i in n.get("inputs", []) if i.get("name") == "target_latent"), None)
@@ -785,13 +879,60 @@ def test_canonical_modular_workflows_strict_contract():
                     f"Main node {nid} ({ntype}) latent output must connect to KSampler in {rel_path}"
                 )
 
-        # 9. Validate Style ordering (Style nodes must come after non-Style nodes)
-        seen_style = False
-        for nid, role in ref_chain_order:
-            if role == "style":
-                seen_style = True
-            elif seen_style:
-                pytest.fail(f"Non-style reference '{role}' node {nid} appears after Style node in {rel_path}")
+        # 10. Validate Style ordering by following the reference_chain link topology
+        # Find root reference node (reference node whose reference_chain input is not linked)
+        role_type_map = {
+            "CcCKrea2SubjectImage": "subject",
+            "CcCKrea2SceneImage": "scene",
+            "CcCKrea2OutfitImage": "outfit",
+            "CcCKrea2StyleImage": "style",
+        }
+        ref_nodes = [n for n in nodes if n.get("type") in role_type_map]
+
+        if ref_nodes:
+            # Find root node
+            root_node = None
+            for rnode in ref_nodes:
+                ref_inp = next((i for i in rnode.get("inputs", []) if i.get("name") == "reference_chain"), None)
+                if not ref_inp or ref_inp.get("link") is None:
+                    root_node = rnode
+                    break
+
+            assert root_node is not None, f"Could not find root reference node in {rel_path}"
+
+            # Walk chain
+            curr = root_node
+            ref_chain_order = []
+            while curr:
+                role = role_type_map[curr["type"]]
+                ref_chain_order.append((curr["id"], role))
+
+                # Find next node in chain
+                out_ref = next((o for o in curr.get("outputs", []) if o.get("name") == "reference_chain"), None)
+                if out_ref and out_ref.get("links"):
+                    link_id = out_ref["links"][0]
+                    link_item = link_map.get(link_id)
+                    if link_item:
+                        next_node_id = link_item[3]
+                        next_node = node_by_id.get(next_node_id)
+                        if next_node and next_node.get("type") in role_type_map:
+                            curr = next_node
+                        else:
+                            curr = None
+                    else:
+                        curr = None
+                else:
+                    curr = None
+
+            # Assert style nodes appear only at end of chain
+            seen_style = False
+            for nid, role in ref_chain_order:
+                if role == "style":
+                    seen_style = True
+                elif seen_style:
+                    pytest.fail(f"Non-style reference '{role}' node {nid} appears after Style node in reference chain of {rel_path}")
+
+
 
 
 

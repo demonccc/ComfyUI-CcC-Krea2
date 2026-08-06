@@ -310,18 +310,68 @@ def test_production_qwen_processor_positive_path_with_image_grid_thw(monkeypatch
     from ccc_krea2.conditioning import calculate_qwen_rows_from_embedded_image
 
     img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
-    elem = {"type": "image", "data": img1}
+    img2 = torch.ones((1, 256, 256, 3), dtype=torch.float32)
+    elem1 = {"type": "image", "data": img1}
+    elem2 = {"type": "image", "data": img2}
 
+    fake_calls = []
+
+    def fake_process_qwen2vl_images(image_data, min_pixels=None, max_pixels=None, patch_size=None):
+        fake_calls.append({
+            "image_data": image_data,
+            "min_pixels": min_pixels,
+            "max_pixels": max_pixels,
+            "patch_size": patch_size,
+        })
+        # Deliberately return fake grids inconsistent with native dimensions:
+        # For 512x512 img1: native grid is 32x32=1024 -> 256 rows. Fake grid [1, 16, 16]=256 -> 64 rows.
+        # For 256x256 img2: fake grid [1, 8, 8]=64 -> 16 rows.
+        if len(fake_calls) == 1:
+            grid = torch.tensor([[1, 16, 16]], dtype=torch.int64)
+        else:
+            grid = torch.tensor([[1, 8, 8]], dtype=torch.int64)
+        return None, grid
+
+    mock_comfy = MagicMock()
     mock_qwen_vl = MagicMock()
-    grid_tensor = torch.tensor([[1, 32, 32]], dtype=torch.int64)
-    mock_qwen_vl.process_qwen2vl_images.return_value = (None, grid_tensor)
+    mock_qwen_vl.process_qwen2vl_images = fake_process_qwen2vl_images
 
-    monkeypatch.setitem(sys.modules, "comfy", MagicMock())
+    monkeypatch.setitem(sys.modules, "comfy", mock_comfy)
     monkeypatch.setitem(sys.modules, "comfy.text_encoders", MagicMock())
     monkeypatch.setitem(sys.modules, "comfy.text_encoders.qwen_vl", mock_qwen_vl)
 
     dummy_clip = DummyClip()
-    rows = calculate_qwen_rows_from_embedded_image(elem, clip=dummy_clip, test_mode=False)
-    assert rows == 256
+
+    rows1 = calculate_qwen_rows_from_embedded_image(elem1, clip=dummy_clip, test_mode=False)
+    rows2 = calculate_qwen_rows_from_embedded_image(elem2, clip=dummy_clip, test_mode=False)
+
+    # 1. Assert fake was called once per embedded physical image
+    assert len(fake_calls) == 2, "fake process_qwen2vl_images must be called once per embedded image"
+
+    # 2. Captured call arguments & exact elem['data'] & BHWC tensor format & data integrity
+    assert torch.equal(fake_calls[0]["image_data"], img1)
+    assert fake_calls[0]["image_data"].shape == (1, 512, 512, 3)
+    assert torch.equal(fake_calls[1]["image_data"], img2)
+    assert fake_calls[1]["image_data"].shape == (1, 256, 256, 3)
+
+    # 3. Span length follows fake grid & merge_size compression (2x2=4)
+    # (16*16 // 4) = 64 rows (deliberately inconsistent with 512x512 native 256 rows)
+    assert rows1 == 64, f"Expected 64 rows from fake grid [1, 16, 16], got {rows1}"
+    # (8*8 // 4) = 16 rows
+    assert rows2 == 16, f"Expected 16 rows from fake grid [1, 8, 8], got {rows2}"
+
+    # 4. Validate span ordering with preceding text rows
+    text_prefix_rows = 5
+    span1_start = text_prefix_rows
+    span1_end = span1_start + rows1
+    span2_start = span1_end
+    span2_end = span2_start + rows2
+
+    assert span1_start > 0, "First visual span must not begin at zero when text precedes it"
+    assert span1_end == 5 + 64 == 69
+    assert span2_start == 69
+    assert span2_end == 69 + 16 == 85
+    assert span2_start > span1_start, "Multiple images must preserve physical order"
+
 
 

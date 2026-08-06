@@ -19,15 +19,15 @@
 ```mermaid
 graph TD
     L1["Layer 1: Qwen Vision Image Prep<br/>(CcCKrea2QwenVisionImagePrep)"] -->|Prepared Vision Image| L3["Layer 3: Declarative References<br/>(Subject, Scene, Outfit, Style)"]
-    L2["Layer 2: Target Latent<br/>(CcCKrea2TargetLatent)"] -->|Target Latent Dict| L5["Layer 5: Edit Orchestrator<br/>(CcCKrea2Edit)"]
+    L2["Layer 2: Target Latent<br/>(CcCKrea2TargetLatent)"] -->|Target Latent| L5["Layer 5: Edit Orchestrator<br/>(CcCKrea2Edit)"]
     L3 -->|Reference Spec| L4["Layer 4: Reference Chain<br/>(Immutable Specs Chain)"]
     L4 -->|Ordered Reference Chain| L5
-    L5 -->|Output| OUT["Model, Positive, Negative, Latent, Edit Info"]
+    L5 -->|Output| OUT["Patched Model, Positive, Negative, Latent, Edit Info"]
 ```
 
 1. **Layer 1: Qwen Vision Image Prep (`CcCKrea2QwenVisionImagePrep`)**: Prepares derivative images (`vision_image`) optimized for Qwen Vision tokenization while retaining original pixel tensors for VAE processing.
-2. **Layer 2: Target Latent (`CcCKrea2TargetLatent`)**: Creates the target latent container, independently configuring Latent Content Source (`Empty`, `Subject`, `Scene`) and Target Geometry (`Favor Subject`, `Favor Scene`, `Fixed`).
-3. **Layer 3: Declarative Reference Nodes (`Subject`, `Scene`, `Outfit`, `Style`)**: Configures reference specifications, visual reference fit modes (`Auto`, `Fit`, `Crop`), attention boosts, masks, and style fidelity.
+2. **Layer 2: Target Latent (`CcCKrea2TargetLatent`)**: Creates the target latent container, independently configuring Latent Content Source (`empty`, `subject`, `scene`) and Target Geometry (`favor_subject`, `favor_scene`, `fixed`).
+3. **Layer 3: Declarative Reference Nodes (`Subject`, `Scene`, `Outfit`, `Style`)**: Configures reference specifications, visual reference fit modes (`auto`, `fit`, `crop`), attention boosts, masks, and style fidelity.
 4. **Layer 4: Immutable Reference Chain**: Links reference specifications in strict non-Style before Style order.
 5. **Layer 5: CcC Krea2 Edit Orchestrator (`CcCKrea2Edit`)**: Executes Qwen tokenization, Moodboard style fidelity transforms, model patching, and report generation.
 
@@ -56,11 +56,12 @@ Legacy workflow files targeting earlier node contracts are stored in [`workflows
 
 ## Quick-Start Workflow Example
 
-1. Connect `CLIP` and source image to **CcC Krea2 - Qwen Vision Image Prep**.
-2. Connect prepared image to **CcC Krea2 - Subject Reference Node**.
-3. Connect **CcC Krea2 - Target Latent** (`target_latent_content` = `"empty"`, `target_geometry` = `"favor_subject"`).
-4. Connect Reference Chain and Target Latent to **CcC Krea2 - Edit**.
-5. Connect output `model`, `positive`, `negative`, and `target_latent` to KSampler.
+1. Load CLIP using **CLIPLoader** configured with model type `krea2`.
+2. Connect `CLIP` and source image to **CcC Krea2 - Qwen Vision Image Prep**.
+3. Connect prepared image to **CcC Krea2 - Subject Reference Node**.
+4. Connect **CcC Krea2 - Target Latent** (`target_content` = `"empty"`, `geometry_mode` = `"favor_subject"`).
+5. Connect Reference Chain output to `references` input and Target Latent output to `target_latent` input on **CcC Krea2 - Edit**.
+6. Connect outputs `patched_model`, `positive`, `negative`, and `latent` to KSampler (`latent` connects to `KSampler.latent_image`).
 
 ---
 

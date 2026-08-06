@@ -1,6 +1,6 @@
 {
   "last_node_id": 11,
-  "last_link_id": 15,
+  "last_link_id": 16,
   "nodes": [
     {
       "id": 1,
@@ -125,7 +125,7 @@
         {
           "name": "subject_image",
           "type": "PREPARED_VISION_IMAGE",
-          "link": null
+          "link": 16
         },
         {
           "name": "scene_image",
@@ -145,7 +145,7 @@
         {
           "name": "latent_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -233,20 +233,21 @@
           "name": "prepared_image",
           "type": "PREPARED_VISION_IMAGE",
           "links": [
-            7
+            7,
+            16
           ],
           "slot_index": 0
         },
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -295,7 +296,7 @@
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
             8
@@ -371,7 +372,7 @@
       ],
       "outputs": [
         {
-          "name": "model",
+          "name": "patched_model",
           "type": "MODEL",
           "links": [
             9
@@ -405,7 +406,7 @@
         {
           "name": "edit_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 4
         }
       ],
@@ -668,6 +669,14 @@
       11,
       0,
       "IMAGE"
+    ],
+    [
+      16,
+      6,
+      0,
+      4,
+      1,
+      "PREPARED_VISION_IMAGE"
     ]
   ],
   "groups": [

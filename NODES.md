@@ -42,15 +42,20 @@ This document provides the complete specification of all public nodes in the `Co
 - **Category**: `CcC/Krea2`
 - **Description**: Creates the target latent container, independently specifying Latent Content Source and Target Geometry strategy.
 - **Required Inputs**:
-  - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
   - `target_content` (`["empty", "subject", "scene"]`, default: `"empty"`): Latent content source.
   - `geometry_mode` (`["favor_subject", "favor_scene", "fixed"]`, default: `"fixed"`): Latent output resolution geometry strategy.
+  - `target_megapixels` (`FLOAT`, default: `2.0`, min: `0.1`, max: `12.0`, step: `0.01`): Target megapixels for geometry resolution when favoring subject or scene.
   - `fixed_megapixels` (`FLOAT`, default: `2.0`, min: `0.1`, max: `12.0`, step: `0.01`): Output megapixels when target geometry is `fixed`.
   - `aspect_ratio` (`["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"]`, default: `"1:1"`): Output aspect ratio when target geometry is `fixed`.
   - `batch_size` (`INT`, default: `1`, min: `1`, max: `64`, step: `1`): Latent batch size.
 - **Optional Inputs**:
+  - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
   - `subject_image` (`PREPARED_VISION_IMAGE`): Image used when content is `subject` or geometry is `favor_subject`.
   - `scene_image` (`PREPARED_VISION_IMAGE`): Image used when content is `scene` or geometry is `favor_scene`.
+- **Runtime Requirements**:
+  - `vae` is required at execution time whenever `target_content` is `subject` or `scene`.
+  - `subject_image` is required at execution time whenever `target_content` is `subject` or `geometry_mode` is `favor_subject`.
+  - `scene_image` is required at execution time whenever `target_content` is `scene` or `geometry_mode` is `favor_scene`.
 - **Outputs**:
   - `target_latent` (`LATENT`): Standard ComfyUI latent dictionary format.
   - `latent_info` (`STRING`): Text summary of target latent dimensions.
@@ -63,7 +68,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Subject reference specification for character identity, face, body, and person features.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode (`auto` selects `fit` when aspect ratio matches within tolerance and target dimensions match, or `crop` otherwise).
+  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
   - `pose_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Pose text anchor weight (Vision directive only).
@@ -86,7 +91,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines a Scene reference specification for background, composition, environment, and lighting.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode (`auto` selects `fit` when aspect ratio matches within tolerance and target dimensions match, or `crop` otherwise).
+  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
   - `scene_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Scene composition text anchor weight (Vision directive only).
@@ -108,7 +113,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Defines an Outfit reference specification for garments and clothing without wearer identity.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`): Prepared image from Layer 1.
-  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode (`auto` selects `fit` when aspect ratio matches within tolerance and target dimensions match, or `crop` otherwise).
+  - `visual_fit_mode` (`["auto", "fit", "crop"]`, default: `"auto"`): VAE reference fitting mode.
   - `attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Spatial cross-attention boost.
   - `masked_attention_boost` (`FLOAT`, default: `1.0`, min: `0.1`, max: `10.0`, step: `0.05`): Attention boost inside mask region.
   - `outfit_anchor` (`FLOAT`, default: `0.0`, min: `0.0`, max: `1.0`, step: `0.05`): Outfit detail text anchor weight (Vision directive only).
@@ -133,9 +138,10 @@ This document provides the complete specification of all public nodes in the `Co
   - `style_fidelity` (`FLOAT`, default: `0.5`, min: `0.0`, max: `1.0`, step: `0.05`): Statistical style fidelity weight.
   - `indirect_style_transfer` (`BOOLEAN`, default: `True`): Whether to remove style vision rows after encoding.
   - `style_directive` (`BOOLEAN`, default: `True`): Whether to append automatic style text directives.
-  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
-- **Optional Inputs**:
   - `extra_vision_directive` (`STRING`, default: `""`): Custom Qwen text directive.
+  - `vision_slot` (`INT`, default: `0`, min: `0`, max: `16`, step: `1`): Logical slot assignment (`0` for auto).
+  - `aliases` (`STRING`, default: `""`): Custom alias template string.
+- **Optional Inputs**:
   - `reference_chain` (`REFERENCE_CHAIN`): Chain of previous references.
 - **Outputs**:
   - `reference_chain` (`REFERENCE_CHAIN`): Updated immutable reference chain.
@@ -151,22 +157,35 @@ This document provides the complete specification of all public nodes in the `Co
   - `clip` (`CLIP`): Qwen3-VL text encoder instance.
   - `vae` (`VAE`): VAE model instance.
   - `references` (`REFERENCE_CHAIN`): Resolved reference chain from Layer 4.
-  - `target_latent` (`LATENT`): Resolved target latent dict from Layer 2.
+  - `target_latent` (`LATENT`): Resolved target latent container from Layer 2.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
   - `negative_prompt` (`STRING`, default: `""`, multiline: `True`): Negative text prompt.
-  - `global_vision_directive` (`STRING`, default: `""`, multiline: `True`): System vision directive.
 - **Optional Inputs**:
   - `prompt_augmentation` (`CCC_KREA2_PROMPT_AUGMENTATION`): Optional LoRA prompt settings stack.
+  - `global_vision_directive` (`STRING`, default: `""`, multiline: `True`): System vision directive.
 - **Outputs**:
-  - `model` (`MODEL`): Patched diffusion model.
+  - `patched_model` (`MODEL`): Patched diffusion model.
   - `positive` (`CONDITIONING`): Positive conditioning.
   - `negative` (`CONDITIONING`): Negative conditioning.
-  - `target_latent` (`LATENT`): Target latent dictionary.
+  - `latent` (`LATENT`): Target latent container.
   - `edit_info` (`STRING`): Comprehensive execution diagnostic text report.
 
 ---
 
-## 3. LoRA & T2I Nodes
+## 3. Visual Reference Fit Modes
+
+Public modes: `auto`, `fit`, `crop`.
+
+Internal Auto resolution outcomes:
+- `exact`: Input dimensions match target dimensions exactly.
+- `crop_only`: Aspect ratio matches within tolerance (0.01); resizes without letterboxing to exact target dimensions. `crop_only` is Auto-only.
+- `crop_and_resize`: Fills exact target dimensions via aspect-preserving crop and scale.
+- `fit`: Preserves original reference geometry using `/16`-aligned aspect ratio fitting.
+- Manual `crop`: Fills exact target dimensions.
+
+---
+
+## 4. LoRA & T2I Nodes
 
 - **`CcCKrea2LoRAStack`**: Combines up to 4 LoRAs with global and per-slot strength controls.
 - **`CcCKrea2LoRAPromptSettings`**: Configures slot-level positive and negative prompt text fragments.

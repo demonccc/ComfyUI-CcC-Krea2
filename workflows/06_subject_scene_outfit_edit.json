@@ -1,6 +1,6 @@
 {
   "last_node_id": 17,
-  "last_link_id": 20,
+  "last_link_id": 22,
   "nodes": [
     {
       "id": 1,
@@ -125,7 +125,7 @@
         {
           "name": "subject_image",
           "type": "PREPARED_VISION_IMAGE",
-          "link": null
+          "link": 21
         },
         {
           "name": "scene_image",
@@ -145,7 +145,7 @@
         {
           "name": "latent_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -154,7 +154,7 @@
       },
       "widgets_values": [
         "empty",
-        "fixed",
+        "favor_subject",
         2.0,
         1.0,
         "1:1",
@@ -188,7 +188,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -231,20 +231,21 @@
           "name": "prepared_image",
           "type": "PREPARED_VISION_IMAGE",
           "links": [
-            6
+            6,
+            21
           ],
           "slot_index": 0
         },
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -288,12 +289,12 @@
         {
           "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
-          "link": null
+          "link": 22
         }
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
             7
@@ -343,7 +344,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -393,13 +394,13 @@
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -443,15 +444,16 @@
         {
           "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
-          "link": 7
+          "link": null
         }
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
-            10
+            10,
+            22
           ],
           "slot_index": 0
         }
@@ -497,7 +499,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -547,13 +549,13 @@
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -602,7 +604,7 @@
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
             13
@@ -676,7 +678,7 @@
       ],
       "outputs": [
         {
-          "name": "model",
+          "name": "patched_model",
           "type": "MODEL",
           "links": [
             14
@@ -710,7 +712,7 @@
         {
           "name": "edit_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 4
         }
       ],
@@ -912,7 +914,7 @@
     ],
     [
       10,
-      12,
+      7,
       0,
       13,
       2,
@@ -1013,6 +1015,22 @@
       17,
       0,
       "IMAGE"
+    ],
+    [
+      21,
+      6,
+      0,
+      4,
+      1,
+      "PREPARED_VISION_IMAGE"
+    ],
+    [
+      22,
+      10,
+      0,
+      7,
+      2,
+      "REFERENCE_CHAIN"
     ]
   ],
   "groups": [

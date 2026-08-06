@@ -1,6 +1,6 @@
 {
   "last_node_id": 14,
-  "last_link_id": 17,
+  "last_link_id": 19,
   "nodes": [
     {
       "id": 1,
@@ -130,7 +130,7 @@
         {
           "name": "scene_image",
           "type": "PREPARED_VISION_IMAGE",
-          "link": null
+          "link": 18
         }
       ],
       "outputs": [
@@ -145,7 +145,7 @@
         {
           "name": "latent_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -153,8 +153,8 @@
         "Node name for S&R": "CcCKrea2TargetLatent"
       },
       "widgets_values": [
-        "empty",
-        "fixed",
+        "scene",
+        "favor_scene",
         2.0,
         1.0,
         "1:1",
@@ -188,7 +188,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -238,13 +238,13 @@
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -288,12 +288,12 @@
         {
           "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
-          "link": null
+          "link": 19
         }
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
             7
@@ -343,7 +343,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -386,20 +386,21 @@
           "name": "prepared_image",
           "type": "PREPARED_VISION_IMAGE",
           "links": [
-            9
+            9,
+            18
           ],
           "slot_index": 0
         },
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -443,15 +444,16 @@
         {
           "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
-          "link": 7
+          "link": null
         }
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
-            10
+            10,
+            19
           ],
           "slot_index": 0
         }
@@ -523,7 +525,7 @@
       ],
       "outputs": [
         {
-          "name": "model",
+          "name": "patched_model",
           "type": "MODEL",
           "links": [
             11
@@ -557,7 +559,7 @@
         {
           "name": "edit_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 4
         }
       ],
@@ -775,7 +777,7 @@
     ],
     [
       10,
-      10,
+      7,
       0,
       11,
       3,
@@ -836,6 +838,22 @@
       14,
       0,
       "IMAGE"
+    ],
+    [
+      18,
+      9,
+      0,
+      4,
+      2,
+      "PREPARED_VISION_IMAGE"
+    ],
+    [
+      19,
+      10,
+      0,
+      7,
+      2,
+      "REFERENCE_CHAIN"
     ]
   ],
   "groups": [

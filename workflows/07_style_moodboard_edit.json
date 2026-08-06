@@ -1,6 +1,6 @@
 {
-  "last_node_id": 11,
-  "last_link_id": 14,
+  "last_node_id": 14,
+  "last_link_id": 18,
   "nodes": [
     {
       "id": 1,
@@ -55,7 +55,8 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            2
+            2,
+            15
           ],
           "slot_index": 0
         }
@@ -145,7 +146,7 @@
         {
           "name": "latent_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -188,7 +189,7 @@
         {
           "name": "MASK",
           "type": "MASK",
-          "links": null,
+          "links": [],
           "slot_index": 1
         }
       ],
@@ -238,13 +239,13 @@
         {
           "name": "vision_image",
           "type": "IMAGE",
-          "links": null,
+          "links": [],
           "slot_index": 1
         },
         {
           "name": "vision_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 2
         }
       ],
@@ -281,19 +282,14 @@
           "link": 6
         },
         {
-          "name": "attention_mask",
-          "type": "MASK",
-          "link": null
-        },
-        {
           "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
-          "link": null
+          "link": 18
         }
       ],
       "outputs": [
         {
-          "name": "references",
+          "name": "reference_chain",
           "type": "REFERENCE_CHAIN",
           "links": [
             7
@@ -367,7 +363,7 @@
       ],
       "outputs": [
         {
-          "name": "model",
+          "name": "patched_model",
           "type": "MODEL",
           "links": [
             8
@@ -401,7 +397,7 @@
         {
           "name": "edit_info",
           "type": "STRING",
-          "links": null,
+          "links": [],
           "slot_index": 4
         }
       ],
@@ -542,6 +538,146 @@
       "widgets_values": [
         "Krea2_Edit"
       ]
+    },
+    {
+      "id": 12,
+      "type": "LoadImage",
+      "pos": [
+        100,
+        100
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            16
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "widgets_values": [
+        "subject.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "CcCKrea2QwenVisionImagePrep",
+      "pos": [
+        450,
+        100
+      ],
+      "size": [
+        315,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 15
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "prepared_image",
+          "type": "PREPARED_VISION_IMAGE",
+          "links": [
+            17
+          ]
+        },
+        {
+          "name": "vision_image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "vision_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "widgets_values": [
+        "native",
+        0.0,
+        1.0,
+        1.0,
+        "auto",
+        "auto"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "CcCKrea2SubjectImage",
+      "pos": [
+        800,
+        100
+      ],
+      "size": [
+        315,
+        250
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prepared_image",
+          "type": "PREPARED_VISION_IMAGE",
+          "link": 17
+        },
+        {
+          "name": "attention_mask",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "name": "reference_chain",
+          "type": "REFERENCE_CHAIN",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "reference_chain",
+          "type": "REFERENCE_CHAIN",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "widgets_values": [
+        "auto",
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        "",
+        0,
+        ""
+      ]
     }
   ],
   "links": [
@@ -656,6 +792,38 @@
       11,
       0,
       "IMAGE"
+    ],
+    [
+      15,
+      2,
+      0,
+      13,
+      0,
+      "CLIP"
+    ],
+    [
+      16,
+      12,
+      0,
+      13,
+      1,
+      "IMAGE"
+    ],
+    [
+      17,
+      13,
+      0,
+      14,
+      0,
+      "PREPARED_VISION_IMAGE"
+    ],
+    [
+      18,
+      14,
+      0,
+      7,
+      1,
+      "REFERENCE_CHAIN"
     ]
   ],
   "groups": [

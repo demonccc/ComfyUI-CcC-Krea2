@@ -19,14 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Immutable prompt augmentation module (`ccc_krea2/prompt_augmentation.py`) supporting deterministic text merging via double newline `\n\n` separators without mutating input strings.
 - Optional `prompt_augmentation` socket on all Krea 2 main nodes.
 - Full LoRA Stack integration across production example workflow JSON files in `workflows/`.
-- Strict workflow contract assertions in `tests/test_workflow_files.py` validating socket names, socket types, node classes, Qwen3-VL loader modes, and Style node ordering.
+- Strict workflow contract assertions in `tests/test_workflow_files.py` validating socket names, socket types, node classes, Qwen3-VL loader modes, Target Latent conditional dependencies, link types, and Style node ordering.
 
 ### Fixed
 - Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.
 - Corrected `edit_info` anchor reporting to accurately output `Anchor Implementation Type: Vision directive only` and list active directive-only controls for Subject, Scene, and Outfit roles.
 - Canonicalized modular workflow collection (`01_t2i_basic.json` through `12_full_pipeline_composition.json`) using current socket types (`PREPARED_VISION_IMAGE`, `REFERENCE_CHAIN`, `LATENT`, `CCC_KREA2_PROMPT_AUGMENTATION`) and input names (`reference_chain`, `visual_fit_mode`).
 - Reorganized superseded workflow files into `workflows/legacy/` with explanatory migration README.
-- Completely updated `NODES.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` to achieve 100% contract parity with Python node interface definitions.
+- Synchronized `NODES.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` with current Python node interface definitions and canonical workflow contracts.
 
 ## [0.1.0-alpha] - 2026-07-30
 
