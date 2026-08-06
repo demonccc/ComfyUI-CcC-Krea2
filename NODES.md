@@ -176,12 +176,16 @@ This document provides the complete specification of all public nodes in the `Co
 
 Public modes: `auto`, `fit`, `crop`.
 
-Internal Auto resolution outcomes:
-- `exact`: Input dimensions match target dimensions exactly.
-- `crop_only`: Aspect ratio matches within tolerance (0.01); resizes without letterboxing to exact target dimensions. `crop_only` is Auto-only.
-- `crop_and_resize`: Fills exact target dimensions via aspect-preserving crop and scale.
-- `fit`: Preserves original reference geometry using `/16`-aligned aspect ratio fitting.
-- Manual `crop`: Fills exact target dimensions.
+### Internal Auto Resolution Outcomes (`auto`)
+- **`exact`**: Selected when source dimensions match target dimensions exactly (`src == tgt`). Performs no crop, no resize, and no interpolation.
+- **`crop_only`**: Selected only inside `auto` when the source is slightly larger than the target (`src >= tgt`), requiring at most 5% discarded per dimension (`dw_pct <= 0.05` and `dh_pct <= 0.05`) and at most 10% total area discarded (`area_discarded <= 0.10`). Performs an exact target-size center crop without resize or interpolation.
+- **`crop_and_resize`**: Selected for the upstream near-match aspect ratio path when dimensional coverage is at least 92% (`coverage_h >= 0.92` and `coverage_w >= 0.92`). Performs a center crop to target aspect ratio followed by bicubic interpolation and antialiasing to exact target pixel dimensions.
+- **`fit`**: Selected for genuine aspect ratio mismatches (`coverage < 0.92`). Performs a Krea2Edit-compatible source crop and resizes to `/16`-aligned VAE reference dimensions with fractional centered RoPE offsets, preserving reference geometry without black or gray pixel padding canvas.
+
+### Manual Fit Modes
+- **Manual `fit`**: Uses upstream near-match (`crop_and_resize`) or genuine mismatch (`fit`) behavior, explicitly bypassing the `auto`-only `crop_only` optimization.
+- **Manual `crop`**: Performs a center crop to target aspect ratio and resizes directly to exact target pixel dimensions using bicubic interpolation.
+
 
 ---
 

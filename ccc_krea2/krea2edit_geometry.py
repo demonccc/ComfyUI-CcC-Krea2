@@ -123,7 +123,7 @@ def resolve_krea2edit_geometry(
         interp_method = "bicubic"
 
     elif resolved_mode == "crop_and_resize":
-        # Minimal center crop to match target aspect ratio, then resize to /16 target dimensions
+        # Minimal center crop to match target aspect ratio, then resize to exact target dimensions
         if src_ar > tgt_ar:
             crop_h = src_h
             crop_w = int(round(src_h * tgt_ar))
