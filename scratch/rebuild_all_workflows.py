@@ -94,7 +94,7 @@ def sanitize_node_sockets_and_outputs(workflow):
 def update_target_latent_widgets(node, target_content, geometry_mode):
     wvals = node.get("widgets_values", [])
     target_mp = float(wvals[2]) if len(wvals) > 2 and isinstance(wvals[2], (int, float)) else 2.0
-    fixed_mp = float(wvals[3]) if len(wvals) > 3 and isinstance(wvals[3], (int, float)) else 1.0
+    fixed_mp = float(wvals[3]) if len(wvals) > 3 and isinstance(wvals[3], (int, float)) else 2.0
     aspect = wvals[4] if len(wvals) > 4 and isinstance(wvals[4], str) else "1:1"
     batch = int(wvals[5]) if len(wvals) > 5 and isinstance(wvals[5], (int, float)) else 1
     node["widgets_values"] = [target_content, geometry_mode, target_mp, fixed_mp, aspect, batch]

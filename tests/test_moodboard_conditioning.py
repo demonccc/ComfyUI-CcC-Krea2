@@ -380,11 +380,14 @@ def test_integrated_qwen_token_to_span_mapping(monkeypatch):
     from unittest.mock import MagicMock
     from ccc_krea2.conditioning import extract_vision_spans_from_tokens
 
-    img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
-    img2 = torch.ones((1, 256, 256, 3), dtype=torch.float32)
+    token_img_1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
+    token_img_2 = torch.ones((1, 256, 256, 3), dtype=torch.float32)
 
-    elem1 = {"type": "image", "data": img1}
-    elem2 = {"type": "image", "data": img2}
+    elem1 = {"type": "image", "data": token_img_1}
+    elem2 = {"type": "image", "data": token_img_2}
+
+    physical_sentinel_1 = torch.full((1, 128, 128, 3), 0.5, dtype=torch.float32)
+    physical_sentinel_2 = torch.full((1, 64, 64, 3), 0.75, dtype=torch.float32)
 
     fake_calls = []
 
@@ -440,8 +443,8 @@ def test_integrated_qwen_token_to_span_mapping(monkeypatch):
 
     tokens_dict = {"qwen3vl": [token_pairs]}
     physical_image_map = [
-        {"role": "subject", "image": img1},
-        {"role": "scene", "image": img2},
+        {"role": "subject", "image": physical_sentinel_1},
+        {"role": "scene", "image": physical_sentinel_2},
     ]
 
     spans, warnings, stream_key, prefix_removed = extract_vision_spans_from_tokens(
@@ -452,10 +455,14 @@ def test_integrated_qwen_token_to_span_mapping(monkeypatch):
         test_mode=False,
     )
 
-    # 1. Assert processor called once per embedded image in token order
+    # 1. Assert processor called once per embedded image in token order by object identity
     assert len(fake_calls) == 2
-    assert fake_calls[0]["image_data"] is img1
-    assert fake_calls[1]["image_data"] is img2
+    assert fake_calls[0]["image_data"] is token_img_1
+    assert fake_calls[1]["image_data"] is token_img_2
+    assert fake_calls[0]["image_data"] is not physical_sentinel_1
+    assert fake_calls[0]["image_data"] is not physical_sentinel_2
+    assert fake_calls[1]["image_data"] is not physical_sentinel_1
+    assert fake_calls[1]["image_data"] is not physical_sentinel_2
     assert fake_calls[0]["image_data"].shape == (1, 512, 512, 3)
     assert fake_calls[1]["image_data"].shape == (1, 256, 256, 3)
 

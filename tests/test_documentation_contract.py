@@ -45,6 +45,13 @@ def test_architecture_doc_contracts():
     assert "Tested Upstream Parity" in content
     assert "NOTICE" in content
 
+    # Section 5 Target Latent outputs assertions
+    target_latent_sec = content[content.find("## 5. Target Latent"):content.find("## 6. Target Latent")]
+    assert "latent" in target_latent_sec
+    assert "latent_info" in target_latent_sec
+    assert "LATENT" in target_latent_sec
+    assert "STRING" in target_latent_sec
+
     # 5-column strategy matrix headings
     headings = ["Workflow filename", "Target Content", "Target Geometry", "References", "Main objective"]
     for heading in headings:
@@ -65,6 +72,18 @@ def test_architecture_doc_contracts():
     for c_type, g_type in combinations:
         assert f"`{c_type}`" in content or c_type in content
         assert f"`{g_type}`" in content or g_type in content
+
+    # Section 6 matrix cross-reference combinations check
+    matrix_sec = content[content.find("## 6. Target Latent"):content.find("## 7. Visual Reference")]
+    subj_favor_scene_line = next(line for line in matrix_sec.splitlines() if "`subject`" in line and "`favor_scene`" in line)
+    assert "workflows/04_subject_scene_edit.json" in subj_favor_scene_line
+    assert "subject_image" in subj_favor_scene_line
+    assert "scene_image" in subj_favor_scene_line
+
+    scene_favor_subj_line = next(line for line in matrix_sec.splitlines() if "`scene`" in line and "`favor_subject`" in line)
+    assert "workflows/04_subject_scene_edit.json" in scene_favor_subj_line
+    assert "scene_image" in scene_favor_subj_line
+    assert "subject_image" in scene_favor_subj_line
 
     # Fit mode documentation
     assert "`exact`" in content
@@ -128,3 +147,9 @@ def test_changelog_and_notice_contracts():
     assert "5f8a02c8969b821434c442436dd534ed4461bb0e" in notice
     assert "8a4d7efb32e12a45bc89a74c102a0ef87a4192b1" in notice
     assert "a7d83f12469a918a252277d34cd0e035070081d6" in notice
+
+
+def test_rebuild_workflows_fixed_mp_fallback_default():
+    """Verify that scratch/rebuild_all_workflows.py uses 2.0 as fallback default for fixed_mp."""
+    script_content = read_repo_file("scratch/rebuild_all_workflows.py")
+    assert "fixed_mp = float(wvals[3]) if len(wvals) > 3 and isinstance(wvals[3], (int, float)) else 2.0" in script_content

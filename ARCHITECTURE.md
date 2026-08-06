@@ -80,7 +80,9 @@ In this architecture, an input image exists in up to three distinct representati
 
 Inputs: `target_content`, `geometry_mode`, `target_megapixels`, `fixed_megapixels`, `aspect_ratio`, `batch_size`. Optional inputs: `vae`, `subject_image`, `scene_image`. VAE, Subject image, and Scene image are required at runtime based on the selected content and geometry options.
 
-Output: `target_latent` (`LATENT`).
+Outputs:
+- `latent` — `LATENT`
+- `latent_info` — `STRING`
 
 ---
 
@@ -103,8 +105,8 @@ The five-column strategy matrix covering all nine Content and Geometry combinati
 | `workflows/01_t2i_basic.json` | `empty` | `fixed` | None | Native text-to-image basic generation at fixed target resolution |
 | `workflows/02_t2i_lora_stack.json` | `empty` | `fixed` | None | T2I + 4-slot LoRA Stack generation at fixed target resolution |
 | `workflows/04_subject_scene_edit.json` (configurable) | `empty` | `favor_scene` | Scene, Subject | Free restaging of Subject into Scene-proportioned layout (requires Scene `scene_image` connection) |
-| `workflows/03_subject_edit.json` (configurable) | `subject` | `favor_scene` | Subject | Subject pixel edit adapted inside Scene aspect ratio |
-| `workflows/09_inpaint_scene_edit.json` (configurable) | `scene` | `favor_subject` | Scene | Scene background restyling into vertical portrait layout |
+| `workflows/04_subject_scene_edit.json` (configurable) | `subject` | `favor_scene` | Scene slot 1, Subject slot 2 | Initialize denoising from Subject pixels, preserve Scene-compatible output geometry, and adapt Subject initialization to Scene framing (requires Subject `subject_image`, Scene `scene_image`, and VAE connections) |
+| `workflows/04_subject_scene_edit.json` (configurable) | `scene` | `favor_subject` | Scene slot 1, Subject slot 2 | Initialize denoising from Scene pixels, favor Subject-compatible output geometry, and accept possible Scene reframing for lower Subject-reference adaptation (requires Scene `scene_image`, Subject `subject_image`, and VAE connections) |
 
 ---
 
