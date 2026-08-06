@@ -17,9 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CcC Krea2 - LoRA Stack` node (`CcCKrea2LoRAStack`) for model-only LoRA stacking (up to 4 slots) with global/slot strengths, persistent slot loader instances, and prompt augmentation accumulators.
 - `CcC Krea2 - LoRA Prompt Settings` node (`CcCKrea2LoRAPromptSettings`) for slot-level positive and negative prompt fragment configuration with `prepend` and `append` positioning.
 - Immutable prompt augmentation module (`ccc_krea2/prompt_augmentation.py`) supporting deterministic text merging via double newline `\n\n` separators without mutating input strings.
-- Optional `prompt_augmentation` socket on all Krea 2 main nodes.
-- Full LoRA Stack integration across production example workflow JSON files in `workflows/`.
-- Strict workflow contract assertions in `tests/test_workflow_files.py` validating socket names, socket types, node classes, Qwen3-VL loader modes, Target Latent conditional dependencies, link types, and Style node ordering.
+- Tested Upstream Parity wording updated in ARCHITECTURE.md reflecting exact commits in NOTICE.
+- Exact Auto Visual Reference Fit outcomes documented (`exact`, `crop_only`, `crop_and_resize`, `fit`).
+- Corrected Indirect Style explanation clarifying total indirect Style visual row removal via keep-mask without mandatory retained Style spans.
+- Replaced workflow strategy table with five-column matrix (`Workflow filename`, `Target Content`, `Target Geometry`, `References`, `Main objective`).
+- Documented README Favor Subject connection requirement (prepared image to Target Latent `subject_image`).
+- Added integrated Qwen token-to-span mapping test (`test_integrated_qwen_token_to_span_mapping`).
+- Strengthened workflow contract tests to enforce required non-widget linked socket presence and declared vs serialized type parity.
+- Corrected obsolete `crop_and_resize` `/16` dimension comment in `ccc_krea2/krea2edit_geometry.py`.
+
 
 ### Fixed
 - Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.

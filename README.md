@@ -58,9 +58,11 @@ Legacy workflow files targeting earlier node contracts are stored in [`workflows
 
 1. Load CLIP using **CLIPLoader** configured with model type `krea2`.
 2. Connect `CLIP` and source image to **CcC Krea2 - Qwen Vision Image Prep**.
-3. Connect prepared image to **CcC Krea2 - Subject Reference Node**.
-4. Connect **CcC Krea2 - Target Latent** (`target_content` = `"empty"`, `geometry_mode` = `"favor_subject"`).
-5. Connect Reference Chain output to `references` input and Target Latent output to `target_latent` input on **CcC Krea2 - Edit**.
+3. Connect the prepared image output (`prepared_image`) to both:
+   - **CcC Krea2 - Subject Reference Node** (`prepared_image` input) for reference attention guidance;
+   - **CcC Krea2 - Target Latent** (`subject_image` input) to compute output resolution geometry when favoring subject geometry.
+4. Configure **CcC Krea2 - Target Latent** (`target_content` = `"empty"`, `geometry_mode` = `"favor_subject"`). Selecting `target_content` = `"empty"` means denoising starts from pure noise, while `geometry_mode` = `"favor_subject"` uses the connected `subject_image` to calculate output dimensions.
+5. Connect Reference Chain output (`reference_chain`) to `references` input and Target Latent output (`target_latent`) to `target_latent` input on **CcC Krea2 - Edit**.
 6. Connect outputs `patched_model`, `positive`, `negative`, and `latent` to KSampler (`latent` connects to `KSampler.latent_image`).
 
 ---

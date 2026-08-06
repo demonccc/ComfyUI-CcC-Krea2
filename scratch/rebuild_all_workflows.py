@@ -4,7 +4,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath("."))
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
-from ccc_krea2.lora import get_lora_names
 
 
 def get_max_link_id(workflow):
@@ -101,29 +100,6 @@ def update_target_latent_widgets(node, target_content, geometry_mode):
     node["widgets_values"] = [target_content, geometry_mode, target_mp, fixed_mp, aspect, batch]
 
 
-def process_workflow_file(filepath):
-    with open(filepath, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    filename = os.path.basename(filepath)
-    nodes_by_type = {}
-    nodes_by_id = {n["id"]: n for n in data.get("nodes", [])}
-
-    for n in data.get("nodes", []):
-        nodes_by_type.setdefault(n["type"], []).append(n)
-
-    # 1. Update Target Latent widgets & connections based on workflow file
-    target_latent = nodes_by_type.get("CcCKrea2TargetLatent", [None])[0]
-    vae_loader = nodes_by_type.get("VAELoader", [None])[0]
-
-    if filename == "03_subject_edit.json":
-        if target_latent:
-            update_target_latent_widgets(target_latent, "subject", "favor_subject")
-            subj_prep = nodes_by_id.get(6)
-            if subj_prep and vae_loader:
-                ensure_link(data, vae_loader["id"], 0, target_latent["id"], "vae", "VAE")
-                ensure_link(data, subj_prep["id"], 0, target_latent["id"], "subject_image", "PREPARED_VISION_IMAGE")
-
 def wire_reference_chain(data, role_node_ids, edit_node_id):
     nodes = {n["id"]: n for n in data["nodes"]}
     # First node in chain has no reference_chain input link
@@ -207,11 +183,6 @@ def process_workflow_file(filepath):
             update_target_latent_widgets(target_latent, "empty", "fixed")
 
         clip_loader = nodes_by_type.get("CLIPLoader", [None])[0]
-        style_node = nodes_by_id.get(7)
-        edit_node = nodes_by_id.get(8)
-
-        subj_load = nodes_by_id.get(12)
-        subj_prep = nodes_by_id.get(13)
         subj_ref = nodes_by_id.get(14)
 
         if not subj_ref:
@@ -318,22 +289,20 @@ def process_workflow_file(filepath):
 
             wire_reference_chain(data, [10, 7, 13, 16], 17)
 
-
     # Sanitize socket names and output specifications
     sanitize_node_sockets_and_outputs(data)
 
     # Clean up output link lists to ensure consistency
-    links_by_id = {l[0]: l for l in data.get("links", [])}
+    links_by_id = {lnk[0]: lnk for lnk in data.get("links", [])}
     for n in data.get("nodes", []):
         for out in n.get("outputs", []):
             out["links"] = [lid for lid in (out.get("links") or []) if lid in links_by_id]
-
 
     # Update last_node_id and last_link_id
     if data.get("nodes"):
         data["last_node_id"] = max(n["id"] for n in data["nodes"])
     if data.get("links"):
-        data["last_link_id"] = max(l[0] for l in data["links"])
+        data["last_link_id"] = max(lnk[0] for lnk in data["links"])
 
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
