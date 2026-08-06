@@ -707,25 +707,53 @@ def test_canonical_modular_workflows_strict_contract():
                 opt_spec = input_spec.get("optional", {})
                 allowed_input_names = set(req_spec.keys()) | set(opt_spec.keys())
 
-                # Validate input sockets against allowed set
+                # Validate required non-widget input sockets presence and link validity
+                for rname, rspec in req_spec.items():
+                    type_info = rspec[0]
+                    if not isinstance(type_info, list) and type_info not in ("STRING", "FLOAT", "INT", "BOOLEAN"):
+                        node_inps = {i.get("name"): i for i in n.get("inputs", [])}
+                        assert rname in node_inps, (
+                            f"Workflow {rel_path}, node {nid} ({ntype}): missing required linked socket '{rname}'"
+                        )
+                        sinp = node_inps[rname]
+                        assert sinp.get("link") is not None and sinp.get("link") in link_map, (
+                            f"Workflow {rel_path}, node {nid} ({ntype}): required socket '{rname}' is unlinked or invalid"
+                        )
+
+                # Validate input sockets against allowed set and verify declared input types
                 for inp in n.get("inputs", []):
                     iname = inp.get("name")
                     assert iname in allowed_input_names, (
                         f"Node {nid} ({ntype}) in {rel_path} has unknown input socket '{iname}' not in allowed {allowed_input_names}"
                     )
-                    # If input is linked, validate link output type matches input type
-                    link_id = inp.get("link")
-                    if link_id is not None and link_id in link_map:
-                        link_item = link_map[link_id]
-                        src_node_id = link_item[1]
-                        src_slot = link_item[2]
-                        src_node = node_by_id.get(src_node_id)
-                        if src_node and "outputs" in src_node and src_slot < len(src_node["outputs"]):
-                            src_out_type = src_node["outputs"][src_slot].get("type")
-                            dst_inp_type = inp.get("type")
-                            assert src_out_type == dst_inp_type or src_out_type == "*" or dst_inp_type == "*", (
-                                f"Link {link_id} type mismatch in {rel_path}: node {src_node_id} ({src_node.get('type')}) output '{src_out_type}' -> node {nid} ({ntype}) input '{iname}' ('{dst_inp_type}')"
+                    declared_spec = req_spec.get(iname) or opt_spec.get(iname)
+                    if declared_spec is not None:
+                        declared_type = declared_spec[0]
+                        if not isinstance(declared_type, list) and declared_type not in ("STRING", "FLOAT", "INT", "BOOLEAN"):
+                            serialized_dst_type = inp.get("type")
+                            assert serialized_dst_type == declared_type or declared_type == "*" or serialized_dst_type == "*", (
+                                f"Workflow {rel_path}, node {nid} ({ntype}) input '{iname}': "
+                                f"serialized destination type '{serialized_dst_type}' != declared type '{declared_type}'"
                             )
+                            link_id = inp.get("link")
+                            if link_id is not None and link_id in link_map:
+                                link_item = link_map[link_id]
+                                src_node_id = link_item[1]
+                                src_slot = link_item[2]
+                                src_node = node_by_id.get(src_node_id)
+                                if src_node:
+                                    src_ntype = src_node.get("type")
+                                    if src_ntype in NODE_CLASS_MAPPINGS:
+                                        src_cls = NODE_CLASS_MAPPINGS[src_ntype]
+                                        src_ret_types = getattr(src_cls, "RETURN_TYPES", ())
+                                        if src_slot < len(src_ret_types):
+                                            linked_src_type = src_ret_types[src_slot]
+                                            assert linked_src_type == declared_type or declared_type == "*" or linked_src_type == "*", (
+                                                f"Workflow {rel_path}, node {nid} ({ntype}) input '{iname}': "
+                                                f"linked source output type '{linked_src_type}' from node {src_node_id} ({src_ntype}) != declared type '{declared_type}' "
+                                                f"(serialized dst type: '{serialized_dst_type}')"
+                                            )
+
 
                 # Validate output socket names and types against RETURN_NAMES & RETURN_TYPES
                 ret_names = getattr(cls, "RETURN_NAMES", ())
