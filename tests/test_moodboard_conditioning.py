@@ -374,4 +374,109 @@ def test_production_qwen_processor_positive_path_with_image_grid_thw(monkeypatch
     assert span2_start > span1_start, "Multiple images must preserve physical order"
 
 
+def test_integrated_qwen_token_to_span_mapping(monkeypatch):
+    """Verify integrated token-to-span mapping calling extract_vision_spans_from_tokens."""
+    import sys
+    from unittest.mock import MagicMock
+    from ccc_krea2.conditioning import extract_vision_spans_from_tokens
 
+    img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)
+    img2 = torch.ones((1, 256, 256, 3), dtype=torch.float32)
+
+    elem1 = {"type": "image", "data": img1}
+    elem2 = {"type": "image", "data": img2}
+
+    fake_calls = []
+
+    def fake_process_qwen2vl_images(image_data, min_pixels=None, max_pixels=None, patch_size=None):
+        fake_calls.append({
+            "image_data": image_data,
+            "min_pixels": min_pixels,
+            "max_pixels": max_pixels,
+            "patch_size": patch_size,
+        })
+        if len(fake_calls) == 1:
+            grid = torch.tensor([[1, 16, 16]], dtype=torch.int64)
+        else:
+            grid = torch.tensor([[1, 8, 8]], dtype=torch.int64)
+        return None, grid
+
+    mock_comfy = MagicMock()
+    mock_qwen_vl = MagicMock()
+    mock_qwen_vl.process_qwen2vl_images = fake_process_qwen2vl_images
+
+    monkeypatch.setitem(sys.modules, "comfy", mock_comfy)
+    monkeypatch.setitem(sys.modules, "comfy.text_encoders", MagicMock())
+    monkeypatch.setitem(sys.modules, "comfy.text_encoders.qwen_vl", mock_qwen_vl)
+
+    dummy_clip = DummyClip()
+
+    IM_START = 151644
+    USER = 872
+    NEWLINE = 198
+
+    token_pairs = [
+        [IM_START, None],
+        [USER, None],
+        [NEWLINE, None],
+        [101, None],
+        [102, None],
+        [103, None],
+        [104, None],
+        [105, None],
+        [elem1, None],
+        [201, None],
+        [202, None],
+        [203, None],
+        [204, None],
+        [205, None],
+        [206, None],
+        [207, None],
+        [208, None],
+        [209, None],
+        [210, None],
+        [elem2, None],
+    ]
+
+    tokens_dict = {"qwen3vl": [token_pairs]}
+    physical_image_map = [
+        {"role": "subject", "image": img1},
+        {"role": "scene", "image": img2},
+    ]
+
+    spans, warnings, stream_key, prefix_removed = extract_vision_spans_from_tokens(
+        tokens=tokens_dict,
+        physical_image_map=physical_image_map,
+        clip=dummy_clip,
+        allow_raw_list_test_helper=False,
+        test_mode=False,
+    )
+
+    # 1. Assert processor called once per embedded image in token order
+    assert len(fake_calls) == 2
+    assert fake_calls[0]["image_data"] is img1
+    assert fake_calls[1]["image_data"] is img2
+    assert fake_calls[0]["image_data"].shape == (1, 512, 512, 3)
+    assert fake_calls[1]["image_data"].shape == (1, 256, 256, 3)
+
+    # 2. Assert stream_key and template prefix stripping
+    assert stream_key == "qwen3vl"
+    assert prefix_removed == 3
+
+    # 3. Assert span count
+    assert len(spans) == 2
+
+    s1, e1 = spans[0]
+    s2, e2 = spans[1]
+
+    # 4. Assert half-open spans, prefix stripping reflection, text separation, and physical order
+    assert s1 == 5
+    assert e1 == 5 + 64 == 69
+    assert e1 > s1
+
+    assert s2 == 69 + 10 == 79
+    assert e2 == 79 + 16 == 95
+    assert e2 > s2
+
+    # No overlap and physical order
+    assert s2 >= e1
