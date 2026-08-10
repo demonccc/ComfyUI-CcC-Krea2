@@ -3,14 +3,14 @@
 import torch
 from dataclasses import dataclass, field
 from typing import List, Tuple, Any, Optional, Dict
-from ccc_krea2.constants import (
+from .constants import (
     LOGGER_PREFIX,
     VISION_PAD_TOKEN,
     DEFAULT_SYSTEM_PROMPT,
     ReferenceRole,
 )
-from ccc_krea2.style_processing import apply_statistical_style_fidelity, StyleSpanOperation
-from ccc_krea2.vision_prep import resolve_qwen_encoder_config, calculate_native_qwen_geometry
+from .style_processing import apply_statistical_style_fidelity, StyleSpanOperation
+from .vision_prep import resolve_qwen_encoder_config, calculate_native_qwen_geometry
 
 
 @dataclass

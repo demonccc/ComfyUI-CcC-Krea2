@@ -2,22 +2,22 @@
 
 import torch
 from typing import Tuple, Dict, Any, Optional, List
-from ccc_krea2.references import PreparedReference
-from ccc_krea2.constants import ReferenceRole
-from ccc_krea2.reference_specs import (
+from .references import PreparedReference
+from .constants import ReferenceRole
+from .reference_specs import (
     ReferenceChain,
     StyleReferenceSpec
 )
-from ccc_krea2.reference_slots import resolve_reference_slots_and_aliases
-from ccc_krea2.reference_directives import build_automatic_role_directive
-from ccc_krea2.krea2edit_geometry import (
+from .reference_slots import resolve_reference_slots_and_aliases
+from .reference_directives import build_automatic_role_directive
+from .krea2edit_geometry import (
     resolve_krea2edit_geometry,
     process_image_and_mask_geometry
 )
-from ccc_krea2.style_processing import expand_style_reference_spans
-from ccc_krea2.prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
-from ccc_krea2.conditioning import encode_krea2_qwen_context
-from ccc_krea2.patch import patch_krea2_model
+from .style_processing import expand_style_reference_spans
+from .prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
+from .conditioning import encode_krea2_qwen_context
+from .patch import patch_krea2_model
 
 
 def run_krea2_edit_orchestrator(

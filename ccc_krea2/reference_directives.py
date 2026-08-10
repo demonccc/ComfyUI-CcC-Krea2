@@ -1,7 +1,7 @@
 """Automatic vision directive generation for Subject, Scene, Outfit, and Style roles."""
 
 from typing import List, Dict, Any
-from ccc_krea2.reference_specs import (
+from .reference_specs import (
     SubjectReferenceSpec,
     SceneReferenceSpec,
     OutfitReferenceSpec,

@@ -1,8 +1,8 @@
 import torch
 from dataclasses import dataclass
 from typing import List, Tuple, Any, Union
-from ccc_krea2.reference_specs import StyleReferenceSpec, PreparedVisionImage
-from ccc_krea2.vision_prep import prepare_vision_image
+from .reference_specs import StyleReferenceSpec, PreparedVisionImage
+from .vision_prep import prepare_vision_image
 
 
 SHUFFLE_2X2 = (2, 0, 3, 1)

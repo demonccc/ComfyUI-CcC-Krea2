@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 from dataclasses import dataclass
 from typing import Tuple, Dict, Any, Optional
-from ccc_krea2.geometry import resize_tensor
+from .geometry import resize_tensor
 
 
 @dataclass

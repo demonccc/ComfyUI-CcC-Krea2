@@ -1,6 +1,6 @@
 """CcC Krea2 - Target Latent node."""
 
-from ccc_krea2.target_latent import build_target_latent
+from ..target_latent import build_target_latent
 
 
 class CcCKrea2TargetLatent:

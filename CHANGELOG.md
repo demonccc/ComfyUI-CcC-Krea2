@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- Fixed ComfyUI custom node package import error by converting internal ccc_krea2 absolute imports to package-relative imports.
 - Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.
 - Corrected `edit_info` anchor reporting to accurately output `Anchor Implementation Type: Vision directive only` and list active directive-only controls for Subject, Scene, and Outfit roles.
 - Canonicalized modular workflow collection (`01_t2i_basic.json` through `12_full_pipeline_composition.json`) using current socket types (`PREPARED_VISION_IMAGE`, `REFERENCE_CHAIN`, `LATENT`, `CCC_KREA2_PROMPT_AUGMENTATION`) and input names (`reference_chain`, `visual_fit_mode`).

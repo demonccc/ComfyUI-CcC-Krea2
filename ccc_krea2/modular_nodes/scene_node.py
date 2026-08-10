@@ -1,8 +1,8 @@
 """CcC Krea2 - Scene Image node."""
 
 from typing import Optional
-from ccc_krea2.reference_specs import SceneReferenceSpec, ReferenceChain
-from ccc_krea2.reference_slots import parse_aliases
+from ..reference_specs import SceneReferenceSpec, ReferenceChain
+from ..reference_slots import parse_aliases
 
 
 def parse_vision_slot(val) -> Optional[int]:

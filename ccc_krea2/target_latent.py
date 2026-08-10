@@ -4,8 +4,8 @@ import torch
 import math
 from dataclasses import dataclass
 from typing import Dict, Any, Tuple, Optional
-from ccc_krea2.reference_specs import PreparedVisionImage
-from ccc_krea2.geometry import resize_tensor
+from .reference_specs import PreparedVisionImage
+from .geometry import resize_tensor
 
 
 def get_image_dims(image_tensor: torch.Tensor) -> Tuple[int, int]:

@@ -1,7 +1,7 @@
 """CcC Krea2 - Edit node."""
 
-from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
-from ccc_krea2.prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
+from ..edit_engine import run_krea2_edit_orchestrator
+from ..prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 
 
 class CcCKrea2Edit:

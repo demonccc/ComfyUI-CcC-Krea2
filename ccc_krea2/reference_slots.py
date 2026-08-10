@@ -1,7 +1,7 @@
 """Slot assignment resolution, alias parsing, and reference validation."""
 
 from typing import List, Tuple, Dict, Any
-from ccc_krea2.reference_specs import ReferenceChain
+from .reference_specs import ReferenceChain
 
 
 def parse_aliases(raw_aliases: str) -> Tuple[str, ...]:

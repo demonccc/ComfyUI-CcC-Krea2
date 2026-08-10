@@ -1,6 +1,6 @@
 """CcC Krea2 - Qwen Vision Image Prep node."""
 
-from ccc_krea2.vision_prep import prepare_vision_image, format_vision_info
+from ..vision_prep import prepare_vision_image, format_vision_info
 
 
 class CcCKrea2QwenVisionImagePrep:

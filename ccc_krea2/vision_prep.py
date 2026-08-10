@@ -2,8 +2,8 @@ import torch
 import math
 from dataclasses import dataclass
 from typing import Tuple, Dict, Any, List
-from ccc_krea2.reference_specs import VisionPrepSpec, PreparedVisionImage
-from ccc_krea2.geometry import resize_tensor
+from .reference_specs import VisionPrepSpec, PreparedVisionImage
+from .geometry import resize_tensor
 
 
 @dataclass(frozen=True)
