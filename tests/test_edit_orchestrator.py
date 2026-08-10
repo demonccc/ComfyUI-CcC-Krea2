@@ -1,6 +1,7 @@
 """Unit tests for Edit orchestrator node execution."""
 
 import torch
+import pytest
 from unittest.mock import MagicMock
 from ccc_krea2.vision_prep import prepare_vision_image
 from ccc_krea2.target_latent import create_target_latent
@@ -118,4 +119,96 @@ def test_edit_info_outfit_anchor_reporting():
     assert "Directive-only Anchor Controls: Outfit Anchor" in edit_info
     assert "Masked Identity Anchor" not in edit_info
     assert "Masked Region Anchor" not in edit_info
+
+
+def test_edit_orchestrator_execution_native_5d_latent():
+    mock_clip = MagicMock()
+
+    def mock_tokenize(prompt, images=None, **kwargs):
+        tok_pairs = []
+        if images:
+            for img in images:
+                tok_pairs.append([{"type": "image", "data": img}, None])
+        else:
+            tok_pairs.append([100, None])
+        return {"qwen3vl": [tok_pairs]}
+
+    mock_clip.tokenize.side_effect = mock_tokenize
+    cond_tensor = torch.randn(1, 513, 1536)
+    mock_clip.encode_from_tokens_scheduled.return_value = [[cond_tensor, {}]]
+
+    # Mock VAE returns native 5D reference latents [1, 16, 1, 64, 64]
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 1, 64, 64))}
+
+    mock_model = MagicMock()
+    mock_model.clone.return_value = mock_model
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=mock_clip, mode="native")
+
+    subj_node = CcCKrea2SubjectImage()
+    (chain1,) = subj_node.process(prepared_image=prep, vision_slot="auto")
+    scene_node = CcCKrea2SceneImage()
+    (chain2,) = scene_node.process(prepared_image=prep, vision_slot="auto", previous_references=chain1)
+
+    target_lat = {
+        "samples": torch.zeros((1, 16, 1, 144, 216)),
+        "batch_index": [0]
+    }
+
+    edit_node = CcCKrea2Edit()
+    model_out, pos_out, neg_out, lat_out, edit_info = edit_node.process(
+        model=mock_model,
+        clip=mock_clip,
+        vae=mock_vae,
+        references=chain2,
+        target_latent=target_lat,
+        positive_prompt="a photo of a person in a room",
+        negative_prompt="blurry",
+        global_vision_directive="High quality"
+    )
+
+    assert pos_out is not None
+    assert neg_out is not None
+    assert lat_out is target_lat
+    assert lat_out["samples"].shape == (1, 16, 1, 144, 216)
+    assert "Target Latent Geometry: 216 x 144 (Batch Size: 1)" in edit_info
+    assert "Subject" in edit_info
+    assert "Scene" in edit_info
+
+
+def test_edit_orchestrator_invalid_latent_dimensions_raises():
+    mock_clip = MagicMock()
+    mock_vae = MagicMock()
+    mock_model = MagicMock()
+
+    subj_node = CcCKrea2SubjectImage()
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=mock_clip, mode="native")
+    (chain,) = subj_node.process(prepared_image=prep, vision_slot="auto")
+
+    edit_node = CcCKrea2Edit()
+
+    with pytest.raises(ValueError, match="Target latent samples must be a 4D or 5D tensor"):
+        edit_node.process(
+            model=mock_model,
+            clip=mock_clip,
+            vae=mock_vae,
+            references=chain,
+            target_latent={"samples": torch.zeros((16, 144, 216))},
+            positive_prompt="test",
+            negative_prompt=""
+        )
+
+    with pytest.raises(ValueError, match="Target latent samples must be a 4D or 5D tensor"):
+        edit_node.process(
+            model=mock_model,
+            clip=mock_clip,
+            vae=mock_vae,
+            references=chain,
+            target_latent={"samples": torch.zeros((1, 16, 1, 1, 144, 216))},
+            positive_prompt="test",
+            negative_prompt=""
+        )
 

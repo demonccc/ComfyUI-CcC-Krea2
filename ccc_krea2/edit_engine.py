@@ -34,7 +34,14 @@ def run_krea2_edit_orchestrator(
     """Execute the full 19-step modular Krea 2 Edit orchestrator pipeline."""
     # Step 1: Target latent geometry inspection
     samples = target_latent["samples"]
-    bs, c, lh, lw = samples.shape
+    if not isinstance(samples, torch.Tensor) or samples.ndim not in (4, 5):
+        raise ValueError(
+            f"Target latent samples must be a 4D or 5D tensor, "
+            f"got shape {getattr(samples, 'shape', None)}"
+        )
+
+    bs = samples.shape[0]
+    lh, lw = samples.shape[-2:]
     target_h = lh * 8
     target_w = lw * 8
 
