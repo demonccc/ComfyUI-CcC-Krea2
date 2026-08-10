@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- Fixed Target Latent VAE output normalization to accept native 5D tensors ([B, C, T, H, W]) alongside 4D tensors ([B, C, H, W]) with dimension-agnostic batch expansion.
 - Fixed ComfyUI custom node package import error by converting internal ccc_krea2 absolute imports to package-relative imports.
 - Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.
 - Corrected `edit_info` anchor reporting to accurately output `Anchor Implementation Type: Vision directive only` and list active directive-only controls for Subject, Scene, and Outfit roles.

@@ -164,7 +164,7 @@ def adapt_target_content_image(
 
 
 def normalize_vae_output(encoded: Any, batch_size: int) -> torch.Tensor:
-    """Normalize VAE encode output into a 4D tensor and expand batch dimension if necessary."""
+    """Normalize VAE encode output into a 4D or 5D tensor and expand batch dimension if necessary."""
     if isinstance(encoded, torch.Tensor):
         latent = encoded
     elif isinstance(encoded, dict) and "samples" in encoded:
@@ -176,12 +176,13 @@ def normalize_vae_output(encoded: Any, batch_size: int) -> torch.Tensor:
     else:
         raise ValueError(f"Unsupported VAE return format: {type(encoded)}")
 
-    if not isinstance(latent, torch.Tensor) or latent.ndim != 4:
-        raise ValueError(f"Normalized VAE latent must be a 4D tensor, got shape {getattr(latent, 'shape', None)}")
+    if not isinstance(latent, torch.Tensor) or latent.ndim not in (4, 5):
+        raise ValueError(f"Normalized VAE latent must be a 4D or 5D tensor, got shape {getattr(latent, 'shape', None)}")
 
     b = latent.shape[0]
     if b == 1 and batch_size > 1:
-        latent = latent.repeat(batch_size, 1, 1, 1)
+        repeats = [batch_size] + [1] * (latent.ndim - 1)
+        latent = latent.repeat(*repeats)
     elif b == batch_size:
         pass
     else:
