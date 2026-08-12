@@ -19,7 +19,9 @@ from .prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
 from .conditioning import (
     encode_krea2_qwen_context,
     build_krea2_user_content,
+    build_krea2_negative_user_content,
     attach_reference_latents_to_conditioning,
+    attach_reference_latents_method_to_conditioning,
 )
 from .patch import patch_krea2_model, check_patch_safety
 from .ostris_backend import (
@@ -203,7 +205,8 @@ def run_krea2_edit_orchestrator(
 
             # Vision image enters positive Qwen list
             pos_idx = len(pos_qwen_images) + 1
-            pos_qwen_images.append(spec.prepared_image.vision_image)
+            vis_img = vlm_img if (reference_method == "ostris_edit" and is_appearance) else spec.prepared_image.vision_image
+            pos_qwen_images.append(vis_img)
             pos_qwen_image_map.append({
                 "role": ref_role,
                 "slot": slot,
@@ -213,7 +216,7 @@ def run_krea2_edit_orchestrator(
                 "physical_qwen_image_index": pos_idx,
                 "style_group_id": None,
                 "crop_tile_index": None,
-                "image": spec.prepared_image.vision_image,
+                "image": vis_img,
                 "spec": spec
             })
 
@@ -266,8 +269,10 @@ def run_krea2_edit_orchestrator(
     # Format user content using canonical Qwen prompt formatters
     if reference_method == "ostris_edit":
         user_content = build_ostris_qwen_prompt(resolved_references=resolved_refs, user_prompt=pos_base)
+        neg_user_content = neg_base
     else:
         user_content = build_krea2_user_content(resolved_references=resolved_refs, user_prompt=pos_base)
+        neg_user_content = build_krea2_negative_user_content(resolved_references=resolved_refs, user_negative_prompt=neg_base)
 
     # Step 5: Encode Qwen Contexts for positive and negative
     pos_qwen_context = encode_krea2_qwen_context(
@@ -280,7 +285,7 @@ def run_krea2_edit_orchestrator(
 
     neg_qwen_context = encode_krea2_qwen_context(
         clip=clip,
-        prompt=neg_base,
+        prompt=neg_user_content,
         physical_images=neg_qwen_images,
         physical_image_map=neg_qwen_image_map,
         is_positive=False
@@ -325,11 +330,12 @@ def run_krea2_edit_orchestrator(
     elif reference_method == "ostris_edit":
         check_patch_safety(model, "ostris_edit")
         pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
-        neg_conditioning = neg_qwen_context.conditioning # TEXT-ONLY negative, no reference_latents
         if apply_model_patch:
-            patched_model = patch_ostris_model(model=model, prepared_refs=prepared_refs, ostris_kv_cache=ostris_kv_cache)
+            pos_conditioning = attach_reference_latents_method_to_conditioning(pos_conditioning, "index_timestep_zero")
         else:
-            patched_model = model
+            slot_warnings.append("Ostris reference method was not explicitly applied; the connected MODEL/runtime must already provide compatible index_timestep_zero behavior.")
+        neg_conditioning = neg_qwen_context.conditioning
+        patched_model = model
     else: # krea2_edit
         check_patch_safety(model, "krea2_edit")
         if apply_model_patch:
@@ -354,12 +360,16 @@ def run_krea2_edit_orchestrator(
     elif not apply_model_patch:
         ref_transport_text = "standard ComfyUI reference_latents"
 
+    ostris_applied_str = "yes" if (reference_method == "ostris_edit" and apply_model_patch) else "no"
+    kv_cache_str = "disabled (feature currently unsupported)" if reference_method == "ostris_edit" else "not applicable"
+
     info_lines = [
         "=== CcC Krea2 Edit Pipeline Report ===",
         f"Reference Contract: {reference_method}",
         f"CcC Patch: {patch_text}",
         f"Reference Transport: {ref_transport_text}",
-        f"Ostris KV Cache: {'yes' if ostris_kv_cache else 'unsupported'}",
+        f"Ostris Reference Method Applied: {ostris_applied_str}",
+        f"Ostris KV Cache: {kv_cache_str}",
         f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
         f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
         "",

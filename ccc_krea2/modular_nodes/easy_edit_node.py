@@ -30,24 +30,24 @@ class CcCKrea2EasyEdit:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model": ("MODEL",),
-                "clip": ("CLIP",),
-                "vae": ("VAE",),
-                "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "model": ("MODEL", {"tooltip": "Input Diffusion MODEL to edit."}),
+                "clip": ("CLIP", {"tooltip": "Krea2 Qwen CLIP text/vision encoder."}),
+                "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
+                "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
                 "preset": (
                     ["balanced", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
-                    {"default": "balanced"}
+                    {"default": "balanced", "tooltip": "Selects the routing preset recipe."}
                 ),
-                "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image"}),
-                "style_source": (["style image", "scene image", "subject image"], {"default": "style image"}),
-                "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
+                "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."}),
+                "style_source": (["style image", "scene image", "subject image"], {"default": "style image", "tooltip": "Source image socket to use for style conditioning."}),
+                "apply_krea2_edit_patch": ("BOOLEAN", {"default": True, "tooltip": "Merged edit LoRA weights do not necessarily include the compatible runtime reference forward."}),
             },
             "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "subject": ("IMAGE",),
-                "scene": ("IMAGE",),
-                "outfit": ("IMAGE",),
-                "style": ("IMAGE",),
+                "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt."}),
+                "subject": ("IMAGE", {"tooltip": "Subject reference image."}),
+                "scene": ("IMAGE", {"tooltip": "Scene reference image."}),
+                "outfit": ("IMAGE", {"tooltip": "Outfit reference image."}),
+                "style": ("IMAGE", {"tooltip": "Style reference image."}),
             }
         }
 
@@ -103,25 +103,25 @@ class CcCKrea2EasyEditOstris:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model": ("MODEL",),
-                "clip": ("CLIP",),
-                "vae": ("VAE",),
-                "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "model": ("MODEL", {"tooltip": "Input Diffusion MODEL to edit."}),
+                "clip": ("CLIP", {"tooltip": "Krea2 Qwen CLIP text/vision encoder."}),
+                "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
+                "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
                 "preset": (
                     ["balanced", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
-                    {"default": "balanced"}
+                    {"default": "balanced", "tooltip": "Selects the routing preset recipe."}
                 ),
-                "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image"}),
-                "style_source": (["style image", "scene image", "subject image"], {"default": "style image"}),
-                "apply_ostris_edit_patch": ("BOOLEAN", {"default": True}),
-                "ostris_kv_cache": ("BOOLEAN", {"default": False}),
+                "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."}),
+                "style_source": (["style image", "scene image", "subject image"], {"default": "style image", "tooltip": "Source image socket to use for style conditioning."}),
+                "apply_ostris_edit_patch": ("BOOLEAN", {"default": True, "tooltip": "When enabled, CcC explicitly selects index_timestep_zero reference behavior. Disable only if the connected MODEL/runtime already provides compatible Ostris edit behavior."}),
+                "ostris_kv_cache": ("BOOLEAN", {"default": False, "tooltip": "Currently unavailable in CcC. Intended only for LoRAs trained with ai-toolkit kv_cache."}),
             },
             "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "subject": ("IMAGE",),
-                "scene": ("IMAGE",),
-                "outfit": ("IMAGE",),
-                "style": ("IMAGE",),
+                "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt."}),
+                "subject": ("IMAGE", {"tooltip": "Subject reference image."}),
+                "scene": ("IMAGE", {"tooltip": "Scene reference image."}),
+                "outfit": ("IMAGE", {"tooltip": "Outfit reference image."}),
+                "style": ("IMAGE", {"tooltip": "Style reference image."}),
             }
         }
 

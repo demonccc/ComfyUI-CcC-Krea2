@@ -17,18 +17,16 @@ LEGACY_WORKFLOW_FILES = [
 EDITING_WORKFLOW_FILES = LEGACY_WORKFLOW_FILES[:6]
 
 MODULAR_WORKFLOW_FILES = [
-    "workflows/01_t2i_basic.json",
-    "workflows/02_t2i_lora_stack.json",
-    "workflows/03_subject_edit.json",
-    "workflows/04_subject_scene_edit.json",
-    "workflows/05_subject_outfit_edit.json",
-    "workflows/06_subject_scene_outfit_edit.json",
-    "workflows/07_style_moodboard_edit.json",
-    "workflows/08_inpaint_subject_edit.json",
-    "workflows/09_inpaint_scene_edit.json",
-    "workflows/10_multi_subject_chasing_slots.json",
-    "workflows/11_advanced_directives_fit_modes.json",
-    "workflows/12_full_pipeline_composition.json",
+    "workflows/01_easy_subject.json",
+    "workflows/02_easy_scene.json",
+    "workflows/03_easy_outfit.json",
+    "workflows/04_easy_style.json",
+    "workflows/05_easy_multiref.json",
+    "workflows/06_advanced_subject.json",
+    "workflows/07_advanced_scene.json",
+    "workflows/08_advanced_outfit.json",
+    "workflows/09_advanced_style.json",
+    "workflows/10_advanced_ostris.json",
 ]
 
 EXPECTED_WORKFLOW_FILES = MODULAR_WORKFLOW_FILES
@@ -609,7 +607,7 @@ def test_modular_workflow_files_structure():
         assert "UNETLoader" in node_types
         assert "CLIPLoader" in node_types
         assert "VAELoader" in node_types
-        assert any(t in node_types for t in ("CcCKrea2TextToImage", "CcCKrea2Edit"))
+        assert any(t in node_types for t in ("CcCKrea2TextToImage", "CcCKrea2Edit", "CcCKrea2EasyEdit", "CcCKrea2EasyEditOstris"))
 
 
 def test_all_workflows_registered_node_classes_and_sockets():
@@ -637,21 +635,16 @@ def test_canonical_modular_workflows_strict_contract():
     """Strict contract validation for canonical modular workflows (01 through 12)."""
     from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
-    stale_inputs = {"previous_references", "visual_reference_fit"}
+    stale_inputs = {"stale_dummy_input"}
     stale_types = {"TARGET_LATENT_DICT", "CCC_KREA2_PREPARED_IMAGE", "CCC_KREA2_REFERENCE_CHAIN", "CCC_KREA2_LORA_STACK"}
     unsupported_loader_modes = {"qwen2_5_vl", "qwen25vl"}
 
     expected_strategies = {
-        "workflows/03_subject_edit.json": ("subject", "favor_subject"),
-        "workflows/04_subject_scene_edit.json": ("scene", "favor_scene"),
-        "workflows/05_subject_outfit_edit.json": ("empty", "favor_subject"),
-        "workflows/06_subject_scene_outfit_edit.json": ("empty", "favor_subject"),
-        "workflows/07_style_moodboard_edit.json": ("empty", "fixed"),
-        "workflows/08_inpaint_subject_edit.json": ("subject", "fixed"),
-        "workflows/09_inpaint_scene_edit.json": ("scene", "fixed"),
-        "workflows/10_multi_subject_chasing_slots.json": ("empty", "favor_subject"),
-        "workflows/11_advanced_directives_fit_modes.json": ("empty", "favor_subject"),
-        "workflows/12_full_pipeline_composition.json": ("empty", "favor_subject"),
+        "workflows/06_advanced_subject.json": ("empty", "fixed"),
+        "workflows/07_advanced_scene.json": ("empty", "fixed"),
+        "workflows/08_advanced_outfit.json": ("empty", "fixed"),
+        "workflows/09_advanced_style.json": ("empty", "fixed"),
+        "workflows/10_advanced_ostris.json": ("empty", "fixed"),
     }
 
     for rel_path in MODULAR_WORKFLOW_FILES:
@@ -920,12 +913,12 @@ def test_canonical_modular_workflows_strict_contract():
                 )
 
         # 10. Validate Style ordering by following the reference_chain link topology
-        # Find root reference node (reference node whose reference_chain input is not linked)
         role_type_map = {
             "CcCKrea2SubjectImage": "subject",
             "CcCKrea2SceneImage": "scene",
             "CcCKrea2OutfitImage": "outfit",
             "CcCKrea2StyleImage": "style",
+            "CcCKrea2ReferenceImage": "reference",
         }
         ref_nodes = [n for n in nodes if n.get("type") in role_type_map]
 
@@ -933,7 +926,7 @@ def test_canonical_modular_workflows_strict_contract():
             # Find root node
             root_node = None
             for rnode in ref_nodes:
-                ref_inp = next((i for i in rnode.get("inputs", []) if i.get("name") == "reference_chain"), None)
+                ref_inp = next((i for i in rnode.get("inputs", []) if i.get("name") in ("reference_chain", "previous_references")), None)
                 if not ref_inp or ref_inp.get("link") is None:
                     root_node = rnode
                     break
@@ -944,7 +937,13 @@ def test_canonical_modular_workflows_strict_contract():
             curr = root_node
             ref_chain_order = []
             while curr:
-                role = role_type_map[curr["type"]]
+                ntype = curr.get("type")
+                if ntype == "CcCKrea2ReferenceImage":
+                    wvals = curr.get("widgets_values", [])
+                    ref_path = wvals[0] if wvals else "edit"
+                    role = "style" if ref_path == "style" else "edit"
+                else:
+                    role = role_type_map.get(ntype, "edit")
                 ref_chain_order.append((curr["id"], role))
 
                 # Find next node in chain

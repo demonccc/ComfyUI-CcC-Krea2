@@ -87,6 +87,49 @@ def build_krea2_user_content(
     return joined_blocks or (user_prompt or "")
 
 
+def build_krea2_negative_user_content(
+    resolved_references: List[Dict[str, Any]],
+    user_negative_prompt: str = "",
+) -> str:
+    """Build canonical Qwen user content for negative prompt using ONLY non-Style appearance edit references.
+
+    Includes only references where reference_path != 'style' and appearance_reference is True.
+    Matches exact count and order of neg_qwen_images for krea2_edit/native backends.
+    """
+    blocks = []
+    for item in resolved_references:
+        spec = item.get("spec")
+        if spec is None:
+            continue
+        ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
+        if ref_path == "style":
+            continue
+        is_appearance = getattr(spec, "appearance_reference", True)
+        if not is_appearance:
+            continue
+
+        expanded_aliases = item.get("expanded_aliases", ())
+        alias_str = ", ".join(expanded_aliases) if expanded_aliases else getattr(spec, "alias", "")
+        instruction = getattr(spec, "vision_instruction", "")
+
+        marker = VISION_PAD_TOKEN
+        adj = ""
+        if alias_str and instruction:
+            adj = f" ({alias_str}): {instruction}"
+        elif alias_str:
+            adj = f" ({alias_str})"
+        elif instruction:
+            adj = f": {instruction}"
+        blocks.append(f"{marker}{adj}")
+
+    formatted_refs = "\n".join(blocks) if blocks else ""
+    raw_prompt = user_negative_prompt or ""
+
+    if formatted_refs and raw_prompt:
+        return f"{formatted_refs}\n{raw_prompt}"
+    return formatted_refs or raw_prompt
+
+
 def attach_reference_latents_to_conditioning(
     conditioning: List[Any],
     reference_latents: List[torch.Tensor]
@@ -113,6 +156,33 @@ def attach_reference_latents_to_conditioning(
                     d["reference_latents"] = list(existing_refs) + list(reference_latents)
                 else:
                     d["reference_latents"] = list(reference_latents)
+                updated_cond.append((t, d))
+            else:
+                updated_cond.append(cond_tuple)
+        return updated_cond
+
+
+def attach_reference_latents_method_to_conditioning(
+    conditioning: List[Any],
+    method: str
+) -> List[Any]:
+    """Attach reference_latents_method metadata to conditioning using node_helpers.conditioning_set_values."""
+    if not conditioning or not method:
+        return conditioning
+
+    try:
+        import node_helpers
+        return node_helpers.conditioning_set_values(
+            conditioning,
+            {"reference_latents_method": method}
+        )
+    except (ImportError, AttributeError):
+        # Fallback for isolated environments without node_helpers
+        updated_cond = []
+        for cond_tuple in conditioning:
+            if isinstance(cond_tuple, (list, tuple)) and len(cond_tuple) >= 2:
+                t, d = cond_tuple[0], dict(cond_tuple[1])
+                d["reference_latents_method"] = method
                 updated_cond.append((t, d))
             else:
                 updated_cond.append(cond_tuple)

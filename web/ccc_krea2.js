@@ -5,8 +5,8 @@ app.registerExtension({
     async nodeCreated(node) {
         if (!node || !node.comfyClass) return;
 
-        // Dynamic widget management for CcCKrea2QwenVisionPrep
-        if (node.comfyClass === "CcCKrea2QwenVisionPrep") {
+        // Dynamic widget management for CcCKrea2QwenVisionImagePrep
+        if (node.comfyClass === "CcCKrea2QwenVisionImagePrep") {
             const modeWidget = node.widgets?.find(w => w.name === "mode");
             if (modeWidget) {
                 const updatePrepState = () => {

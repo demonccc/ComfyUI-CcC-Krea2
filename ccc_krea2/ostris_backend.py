@@ -47,7 +47,7 @@ def preprocess_ostris_vision_image(image_tensor: torch.Tensor) -> torch.Tensor:
 
 
 def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tensor:
-    """Preprocess pixel image for Ostris VAE reference encoding: max 1MP (1024x1024), /16 snapped."""
+    """Preprocess pixel image for Ostris VAE reference encoding matching upstream _fit_area: max 1MP (1024x1024), /16 snapped using AREA interpolation whenever dimensions change."""
     if image_tensor is None:
         return image_tensor
 
@@ -55,20 +55,14 @@ def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tenso
         image_tensor = image_tensor.unsqueeze(0)
 
     bs, h, w, c = image_tensor.shape
-    curr_area = h * w
+    curr_area = float(h * w)
 
-    target_h, target_w = h, w
-    if curr_area > OSTRIS_VAE_MAX_PIXELS:
-        scale = math.sqrt(OSTRIS_VAE_MAX_PIXELS / float(curr_area))
-        target_h = int(round(h * scale))
-        target_w = int(round(w * scale))
-
-    snapped_h = max(16, int(round(target_h / 16.0)) * 16)
-    snapped_w = max(16, int(round(target_w / 16.0)) * 16)
+    scale = min(1.0, math.sqrt(OSTRIS_VAE_MAX_PIXELS / curr_area))
+    snapped_w = max(16, int(round((w * scale) / 16.0) * 16))
+    snapped_h = max(16, int(round((h * scale) / 16.0) * 16))
 
     if (snapped_h, snapped_w) != (h, w):
-        method = "area" if curr_area > OSTRIS_VAE_MAX_PIXELS else "auto"
-        resized = resize_tensor(image_tensor, target_h=snapped_h, target_w=snapped_w, method=method)
+        resized = resize_tensor(image_tensor, target_h=snapped_h, target_w=snapped_w, method="area")
         return torch.clamp(resized, 0.0, 1.0)
 
     return image_tensor

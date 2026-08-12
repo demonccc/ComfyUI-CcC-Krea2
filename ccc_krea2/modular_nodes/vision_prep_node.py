@@ -15,14 +15,14 @@ class CcCKrea2QwenVisionImagePrep:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "clip": ("CLIP",),
-                "image": ("IMAGE",),
-                "mode": (["native", "adaptive", "fixed"], {"default": "native"}),
-                "min_mp": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 12.0, "step": 0.01}),
-                "max_mp": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 12.0, "step": 0.01}),
-                "fixed_mp": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 12.0, "step": 0.01}),
-                "downscale_method": (["auto", "area", "bicubic", "bilinear", "lanczos", "nearest-exact"], {"default": "auto"}),
-                "upscale_method": (["auto", "bicubic", "bilinear", "lanczos", "nearest-exact"], {"default": "auto"}),
+                "clip": ("CLIP", {"tooltip": "Krea2 Qwen CLIP text/vision encoder."}),
+                "image": ("IMAGE", {"tooltip": "Source pixel image to prepare for Qwen Vision."}),
+                "mode": (["native", "adaptive", "fixed"], {"default": "native", "tooltip": "Qwen Vision prep mode: native (unmodified), adaptive (min/max MP), or fixed (exact MP)."}),
+                "min_mp": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 12.0, "step": 0.01, "tooltip": "Minimum megapixels floor for adaptive mode."}),
+                "max_mp": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 12.0, "step": 0.01, "tooltip": "Maximum megapixels ceiling for adaptive mode."}),
+                "fixed_mp": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 12.0, "step": 0.01, "tooltip": "Fixed megapixels target for fixed mode."}),
+                "downscale_method": (["auto", "area", "bicubic", "bilinear", "lanczos", "nearest-exact"], {"default": "auto", "tooltip": "Resampling method when downscaling."}),
+                "upscale_method": (["auto", "bicubic", "bilinear", "lanczos", "nearest-exact"], {"default": "auto", "tooltip": "Resampling method when upscaling."}),
             }
         }
 
