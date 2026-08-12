@@ -206,3 +206,93 @@ def test_edit_orchestrator_invalid_latent_dimensions_raises():
             negative_prompt=""
         )
 
+def test_target_vision_generic():
+    from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+    # Setup mocks
+    mock_clip = MagicMock()
+    mock_clip.tokenize.return_value = {"qwen3vl": [[ [{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None], [100, None] ]]}
+    mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 260, 1536), {}]]
+
+    mock_model = MagicMock()
+    mock_model.clone.return_value = mock_model
+
+    from ccc_krea2.target_latent import TargetVisionContext
+    from ccc_krea2.target_latent import TargetVisionContext
+    
+    mock_target_image = MagicMock()
+    mock_target_image.original_image = torch.rand(1, 512, 512, 3)
+    mock_target_image.vision_image = torch.rand(1, 512, 512, 3)
+    
+    target_latent = {
+        "samples": torch.zeros((1, 16, 64, 64)),
+        "batch_index": [0],
+        "target_vision_context": TargetVisionContext(
+            include_in_vision="yes",
+            target_vision_slot=None,
+            target_alias="",
+            target_vision_instruction="",
+            target_image=mock_target_image
+        )
+    }
+
+    from ccc_krea2.reference_slots import ReferenceChain
+    mock_vae = MagicMock()
+    _, pos_out, _, _, _ = run_krea2_edit_orchestrator(
+        model=mock_model, clip=mock_clip, vae=mock_vae, references=ReferenceChain(), target_latent=target_latent,
+        positive_prompt="raw positive prompt", negative_prompt="",
+        global_vision_directive="", reference_method="native",
+        prompt_augmentation=None, ostris_kv_cache=False, edit_node=None
+    )
+
+    # Check the tokenize calls: positive prompt is the first call, negative is the second
+    # call_args_list[0] -> pos_prompt
+    pos_prompt_call = mock_clip.tokenize.call_args_list[0]
+    prompt = pos_prompt_call[0][0]
+    
+    assert "(target)" not in prompt
+    assert "target scene/context" not in prompt
+    assert prompt.endswith("raw positive prompt")
+
+def test_target_vision_explicit():
+    from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+    # Setup mocks
+    mock_clip = MagicMock()
+    mock_clip.tokenize.return_value = {"qwen3vl": [[ [{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None], [100, None] ]]}
+    mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 260, 1536), {}]]
+
+    mock_model = MagicMock()
+    mock_model.clone.return_value = mock_model
+
+    from ccc_krea2.target_latent import TargetVisionContext
+    from ccc_krea2.target_latent import TargetVisionContext
+    
+    mock_target_image = MagicMock()
+    mock_target_image.original_image = torch.rand(1, 512, 512, 3)
+    mock_target_image.vision_image = torch.rand(1, 512, 512, 3)
+    
+    target_latent = {
+        "samples": torch.zeros((1, 16, 64, 64)),
+        "batch_index": [0],
+        "target_vision_context": TargetVisionContext(
+            include_in_vision="yes",
+            target_vision_slot=None,
+            target_alias="composition",
+            target_vision_instruction="Use this reference for camera composition.",
+            target_image=mock_target_image
+        )
+    }
+
+    from ccc_krea2.reference_slots import ReferenceChain
+    mock_vae = MagicMock()
+    _, pos_out, _, _, _ = run_krea2_edit_orchestrator(
+        model=mock_model, clip=mock_clip, vae=mock_vae, references=ReferenceChain(), target_latent=target_latent,
+        positive_prompt="raw positive prompt", negative_prompt="",
+        global_vision_directive="", reference_method="native",
+        prompt_augmentation=None, ostris_kv_cache=False, edit_node=None
+    )
+
+    pos_prompt_call = mock_clip.tokenize.call_args_list[0]
+    prompt = pos_prompt_call[0][0]
+    
+    assert "(composition)" in prompt
+    assert "Use this reference for camera composition." in prompt

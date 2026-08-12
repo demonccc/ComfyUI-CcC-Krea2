@@ -479,16 +479,15 @@ def route_easy_preset(
         if not has_s and not has_sc and not has_o:
             pass
         elif has_s and not has_sc and not has_o:
-            # No outfit: warn, do subject only
-            preset_warnings.append("preset 'outfit_transfer': no Outfit source; using Subject-only route.")
             target_content_mode = "empty"
+            target_content_source = None
+            target_content_role = ""
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, NORMAL_BOOST, "subject"))
         elif not has_s and has_sc and not has_o:
-            # No outfit, no subject: Scene only
             target_content_mode = "empty"
+            target_content_source = None
+            target_content_role = ""
             target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
         elif not has_s and not has_sc and has_o:
             target_content_mode = "image"
             target_content_source = Ou
@@ -496,13 +495,10 @@ def route_easy_preset(
             target_geometry_mode, target_geometry_source = "favor_image", Ou
             refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
         elif has_s and has_sc and not has_o:
-            preset_warnings.append("preset 'outfit_transfer': no Outfit source (Subject+Scene present).")
-            target_content_mode = "image"
-            target_content_source = Sc
-            target_content_role = "scene"
+            target_content_mode = "empty"
+            target_content_source = None
+            target_content_role = ""
             target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
-            refs.append(_ref(S, NORMAL_BOOST, "subject"))
         elif has_s and not has_sc and has_o:
             target_content_mode = "image"
             target_content_source = Ou

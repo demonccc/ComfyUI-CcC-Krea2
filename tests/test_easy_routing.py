@@ -125,6 +125,7 @@ class TestBalancedMatrix:
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
+        assert route.target_content_role == "scene"
         assert route.target_geometry_source is Sc
         assert_refs(route.edit_references, [(S, BALANCED_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")])
 
@@ -142,6 +143,7 @@ class TestCombinedSceneOutfitRef:
         # Scene + Outfit (same): should produce combined ref
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
+        assert route.target_content_role == "scene+outfit"
         assert len(route.edit_references) == 1
         _, _, alias, instruction = route.edit_references[0]
         assert alias == "scene+outfit"
@@ -155,6 +157,7 @@ class TestCombinedSceneOutfitRef:
         # S + Sc + same-outfit → S, combined_scene_outfit
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
+        assert route.target_content_role == "scene+outfit"
         # Subject + combined scene+outfit
         assert len(route.edit_references) == 2
         aliases = [alias for _, _, alias, _ in route.edit_references]
@@ -383,6 +386,37 @@ class TestOutfitTransferMatrix:
     def test_none(self, dummy_sources):
         sources = resolve_easy_sources()
         route = route_easy_preset(sources, preset="outfit_transfer")
+        assert any("missing" in w for w in route.warnings)
+
+    def test_subject_only_missing_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S)
+        route = route_easy_preset(sources, preset="outfit_transfer")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert len(route.edit_references) == 0
+        assert any("missing" in w for w in route.warnings)
+        assert route.target_geometry_source is S
+
+    def test_scene_only_missing_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(scene=Sc)
+        route = route_easy_preset(sources, preset="outfit_transfer")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert len(route.edit_references) == 0
+        assert any("missing" in w for w in route.warnings)
+        assert route.target_geometry_source is Sc
+
+    def test_subject_scene_missing_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="outfit_transfer")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_content_role == ""
+        assert len(route.edit_references) == 0
+        assert route.target_geometry_source is Sc
         assert any("missing" in w for w in route.warnings)
 
     def test_outfit_only(self, dummy_sources):

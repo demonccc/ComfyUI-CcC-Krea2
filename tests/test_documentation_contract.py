@@ -64,8 +64,14 @@ def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     content = read_repo_file("NODES.md")
 
     # Ensure stale properties are removed
-    assert "prompt_augmentation" not in content
     assert "appearance_reference" not in content
+
+    # Check prompt_augmentation is only in Advanced, not Easy
+    easy_section = content.split("## 2. Advanced Nodes")[0]
+    advanced_section = content.split("## 2. Advanced Nodes")[1]
+
+    assert "prompt_augmentation" not in easy_section, "prompt_augmentation must not be an Easy input"
+    assert "prompt_augmentation" in advanced_section, "prompt_augmentation must be documented in Advanced"
 
     # Check updated schemas
     assert "target_latent" in content, "target_latent output missing from NODES.md"

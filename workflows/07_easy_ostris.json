@@ -403,8 +403,7 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "subject.jpg",
-        "image"
+        "subject.jpg"
       ]
     },
     {
@@ -440,8 +439,7 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "scene.jpg",
-        "image"
+        "scene.jpg"
       ]
     }
   ],

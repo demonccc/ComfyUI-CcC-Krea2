@@ -55,12 +55,25 @@ def get_node_class(node_type):
     return None
 
 # List of widgets that are permitted to bypass strict combo enum validation because they represent dynamic file lists.
-DYNAMIC_FILE_SELECTORS = ["unet_name", "clip_name", "vae_name", "lora_1_name", "lora_2_name", "lora_3_name", "lora_4_name", "image"]
+# Now strict tuples of (node_type, widget_name)
+DYNAMIC_FILE_SELECTORS = {
+    ("UNETLoader", "unet_name"),
+    ("CLIPLoader", "clip_name"),
+    ("VAELoader", "vae_name"),
+    ("LoadImage", "image"),
+    ("CcCKrea2LoRAStack", "lora_1_name"),
+    ("CcCKrea2LoRAStack", "lora_2_name"),
+    ("CcCKrea2LoRAStack", "lora_3_name"),
+    ("CcCKrea2LoRAStack", "lora_4_name")
+}
 
 # Frontend-only widgets mapping: node_type -> list of (widget_name, injection_index, default_value)
+# IMPORTANT DISTINCTION:
+# 'control_after_generate' sets widget.options.serialize = false but IS still persisted in workflow JSON.
+# 'image_upload' on LoadImage sets widget.serialize = false and is NOT persisted in workflow JSON.
+# Therefore only KSampler needs frontend injection here.
 FRONTEND_WIDGETS_MAP = {
-    "KSampler": [("control_after_generate", 1, "randomize")],
-    "LoadImage": [("image_upload", 1, "image")]
+    "KSampler": [("control_after_generate", 1, "randomize")]
 }
 
 CANONICAL_NAMES = [
@@ -144,7 +157,7 @@ class WorkflowBuilder:
                 # Validate primitive type/combo membership
                 if isinstance(val_type, list) or isinstance(val_type, tuple):
                     if val not in val_type:
-                        if name not in DYNAMIC_FILE_SELECTORS:
+                        if (node_type, name) not in DYNAMIC_FILE_SELECTORS:
                             raise ValueError(f"Value '{val}' not in choices {val_type} for '{name}' on '{node_type}'")
                 elif val_type == "BOOLEAN":
                     if not isinstance(val, bool):

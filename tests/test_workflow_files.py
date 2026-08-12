@@ -124,8 +124,26 @@ def test_strict_workflow_schema():
 
             out_type = from_node["outputs"][from_slot]["type"]
             in_type = to_node["inputs"][to_slot]["type"]
-            if out_type != "*" and in_type != "*":
-                assert out_type == in_type or out_type == link_type, f"Link type mismatch in {filename}: {out_type} != {in_type} on {from_id}->{to_id}"
+
+            # Strict independent assertions
+            if out_type != "*":
+                assert link_type == out_type, f"Link type mismatch on source in {filename}: {link_type} != {out_type} on {from_id}->{to_id}"
+            if in_type != "*":
+                assert link_type == in_type, f"Link type mismatch on destination in {filename}: {link_type} != {in_type} on {from_id}->{to_id}"
+
+            # Record that the socket is connected for required checking
+            to_node.setdefault("_connected_inputs", set()).add(to_node["inputs"][to_slot]["name"])
+
+        # Check for unique IDs and maximum match
+        link_ids = [link[0] for link in wf.get("links", [])]
+        assert len(link_ids) == len(set(link_ids)), f"Duplicate link IDs in {filename}"
+        if link_ids:
+            assert max(link_ids) == wf.get("last_link_id"), f"last_link_id mismatch in {filename}"
+
+        node_ids = [n["id"] for n in wf.get("nodes", [])]
+        assert len(node_ids) == len(set(node_ids)), f"Duplicate node IDs in {filename}"
+        if node_ids:
+            assert max(node_ids) == wf.get("last_node_id"), f"last_node_id mismatch in {filename}"
 
         for node in wf.get("nodes", []):
             ntype = node.get("type")
@@ -144,6 +162,13 @@ def test_strict_workflow_schema():
             opt = in_types.get("optional", {})
             all_in = {**req, **opt}
 
+            # Enforce required non-widget sockets
+            for name, schema_val in req.items():
+                val_type = schema_val[0]
+                is_widget = isinstance(val_type, list) or isinstance(val_type, tuple) or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+                if not is_widget:
+                    assert name in node.get("_connected_inputs", set()), f"Required socket '{name}' is missing or unconnected on node {ntype} in {filename}"
+
             # Check linked input types match the schema socket types (they shouldn't be widgets)
             for inp in node.get("inputs", []):
                 name = inp.get("name")
@@ -151,6 +176,12 @@ def test_strict_workflow_schema():
                 expected_type = all_in[name][0]
                 assert not (isinstance(expected_type, list) or expected_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]), f"Input '{name}' is serialized as a linked input but the schema defines it as a widget on {ntype}"
                 assert inp.get("type") == expected_type, f"Input '{name}' type mismatch on {ntype}. Expected {expected_type}, got {inp.get('type')}"
+                # Assert link exists in link table
+                assert inp.get("link") in link_ids, f"Input link {inp.get('link')} not found in links table in {filename}"
+
+            for out in node.get("outputs", []):
+                for link_id in out.get("links", []):
+                    assert link_id in link_ids, f"Output link {link_id} not found in links table in {filename}"
 
             # Validate widget count matches schema exactly
             widget_count_schema = sum(1 for name, schema_val in all_in.items() if isinstance(schema_val[0], list) or isinstance(schema_val[0], tuple) or schema_val[0] in ["STRING", "INT", "FLOAT", "BOOLEAN"])
@@ -159,12 +190,20 @@ def test_strict_workflow_schema():
             frontend_extras = 0
             if ntype == "KSampler":
                 frontend_extras = 1
-            elif ntype == "LoadImage":
-                frontend_extras = 1
             widget_count_schema += frontend_extras
 
             widgets = node.get("widgets_values", [])
             assert len(widgets) == widget_count_schema, f"Widget count mismatch on {ntype}. Expected {widget_count_schema}, got {len(widgets)}"
+
+            # Explicit frontend serialization tests
+            if ntype == "KSampler":
+                assert widgets == [0, "randomize", 20, 1.0, "euler", "normal", 1.0], f"KSampler widgets do not match frontend spec in {filename}: {widgets}"
+            elif ntype == "LoadImage":
+                assert len(widgets) == 1, f"LoadImage must have exactly 1 widget, got {widgets} in {filename}"
+                assert isinstance(widgets[0], str), "LoadImage widget must be a string filename"
+            elif ntype == "CLIPLoader":
+                # clip_name, type, device
+                assert widgets[1] == "krea2", f"CLIPLoader type must be 'krea2', got {widgets} in {filename}"
 
             out_types = getattr(cls, "RETURN_TYPES", tuple())
             out_names = getattr(cls, "RETURN_NAMES", out_types)
@@ -280,7 +319,7 @@ def test_generator_idempotency(tmp_path):
     sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
     import build_canonical_workflows
 
-    # Run generator, saving to a temp directory instead of ./workflows
+    # Run generator for run1
     original_cwd = os.getcwd()
     os.chdir(tmp_path)
     try:
@@ -288,19 +327,46 @@ def test_generator_idempotency(tmp_path):
     finally:
         os.chdir(original_cwd)
 
-    # Compare generated files in tmp_path/workflows with original workflows/
     gen_dir = tmp_path / "workflows"
-    orig_dir = Path("workflows")
+    run1_contents = {}
+    for p in gen_dir.glob("*.json"):
+        with open(p, "r") as f:
+            run1_contents[p.name] = json.load(f)
+
+    assert set(run1_contents.keys()) == set(MODERN_CANONICAL), "Run 1 produced unexpected extra or missing files"
+
+    # Run generator for run2
+    os.chdir(tmp_path)
+    try:
+        build_canonical_workflows.main()
+    finally:
+        os.chdir(original_cwd)
+
+    run2_contents = {}
+    for p in gen_dir.glob("*.json"):
+        with open(p, "r") as f:
+            run2_contents[p.name] = json.load(f)
+
+    assert set(run1_contents.keys()) == set(run2_contents.keys()), "Run 2 file set differs from Run 1"
 
     for filename in MODERN_CANONICAL:
-        gen_file = gen_dir / filename
-        orig_file = orig_dir / filename
+        assert run1_contents[filename] == run2_contents[filename], f"Generator output for {filename} is not idempotent (Run 1 != Run 2)!"
 
-        assert gen_file.exists(), f"Generator failed to produce {filename}"
-        assert orig_file.exists(), f"Original {filename} is missing"
+def test_builder_validation():
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
+    import build_canonical_workflows
 
-        with open(gen_file, "r") as gf, open(orig_file, "r") as of:
-            gen_data = json.load(gf)
-            orig_data = json.load(of)
+    builder = build_canonical_workflows.WorkflowBuilder()
 
-            assert gen_data == orig_data, f"Generator output for {filename} is not idempotent!"
+    # Test unknown widget rejection
+    import pytest
+    with pytest.raises(ValueError, match="Unknown widget values"):
+        builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"apply_patch": True})
+
+    with pytest.raises(ValueError, match="Unknown widget values"):
+        builder.add_node("CcCKrea2EasyEdit", pos=[0, 0], size=[200, 200], widgets_values={"some_fake_widget": 123})
+
+    # Test strict combo validation bypass prevention
+    with pytest.raises(ValueError, match="not in choices"):
+        builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"reference_method": "invalid.safetensors"})
