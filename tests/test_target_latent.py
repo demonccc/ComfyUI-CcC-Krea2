@@ -195,3 +195,61 @@ def test_target_latent_legacy_translation_precedence():
     )
     assert lat_dict["target_vision_context"].target_image is scene_prep
 
+
+def test_target_latent_legacy_geometry_favor_subject():
+    img_subj = torch.rand(1, 400, 300, 3) # 3:4
+    img_scene = torch.rand(1, 300, 400, 3) # 4:3
+    subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="subject",
+        subject_image=subj_prep,
+        scene_image=scene_prep,
+        target_geometry="favor_subject",
+        maximum_mp=1.0,
+        batch_size=1
+    )
+    assert "Content Source Size: 300 x 400" in info
+
+
+def test_target_latent_legacy_geometry_favor_scene():
+    img_subj = torch.rand(1, 400, 300, 3) # 3:4
+    img_scene = torch.rand(1, 300, 400, 3) # 4:3
+    subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="subject",
+        subject_image=subj_prep,
+        scene_image=scene_prep,
+        target_geometry="favor_scene",
+        maximum_mp=1.0,
+        batch_size=1
+    )
+    assert "Content Source Size: 300 x 400" in info
+    assert "Content Target Size: 400 x 304" in info
+
+
+def test_target_latent_strict_image_content():
+    img_subj = torch.rand(1, 400, 300, 3)
+    subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
+    mock_vae = MagicMock()
+
+    with pytest.raises(ValueError, match="Target image is required when target_content is 'image'"):
+        create_target_latent(
+            vae=mock_vae,
+            target_latent_content="image",
+            target_image=None,
+            subject_image=subj_prep,
+            target_geometry="favor_image",
+            maximum_mp=1.0,
+            batch_size=1
+        )
+

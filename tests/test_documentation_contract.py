@@ -1,7 +1,6 @@
 """Tests verifying documentation contracts across README.md, NODES.md, ARCHITECTURE.md, and CHANGELOG.md."""
 
 import os
-from pathlib import Path
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -55,10 +54,18 @@ def test_architecture_doc_contracts():
     assert "fixed" in content
     assert "favor_image" in content
 
-
+    # Check new requirements
+    assert "Layer 3: Generic Reference Image" in content or "Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image)" in content
+    assert "Advanced pipeline is **generic infrastructure**, while the Easy Edit node provides the **opinionated recipe**." in content
+    assert "VAE-encoded target_image" in content
+    assert "Global Vision Directive, negative prompt" not in content # negative context shouldn't have global vision directive
 
 def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     content = read_repo_file("NODES.md")
+
+    # Ensure stale properties are removed
+    assert "prompt_augmentation" not in content
+    assert "appearance_reference" not in content
 
     required_nodes = [
         "CcCKrea2EasyEdit",
@@ -73,13 +80,13 @@ def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
 
 def test_changelog_contracts():
     changelog = read_repo_file("CHANGELOG.md")
-    
+
     assert "195 passing" not in changelog
     assert "01_t2i_basic" not in changelog
     assert "12_full_pipeline_composition" not in changelog
     assert "Documented README Favor Subject subject_image requirement" not in changelog
     assert "768px / 1024px without upscale" not in changelog
-    
+
     assert "Ostris KV cache remains unsupported and raises NotImplementedError when requested." in changelog or "Ostris KV cache remains unsupported" in changelog
 
 def test_markdown_links():

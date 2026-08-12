@@ -344,7 +344,7 @@ def build_target_latent(
     elif orig_target_content == "scene":
         active_target_image = target_image or scene_image
     else:
-        active_target_image = target_image or subject_image or scene_image
+        active_target_image = target_image
 
 
 

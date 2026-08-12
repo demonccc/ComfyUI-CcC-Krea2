@@ -9,11 +9,7 @@ This document provides the canonical technical architecture and workflow strateg
 1. **Tested Upstream Parity**: Tested parity against the exact upstream commits recorded in NOTICE (`ComfyUI-Krea2Edit` commit `5f8a02c` and `ComfyUI-Krea2Moodboard` commit `a7d83f1`). Parity applies specifically to those recorded upstream revisions; future upstream changes may require revalidation, and project-specific extensions are intentionally not upstream behavior.
 2. **Modular 5-Layer Pipeline**: Decouple image prep, target latent creation, declarative reference definitions, immutable chain ordering, and edit orchestration into dedicated, composable nodes.
 3. **Triple Image Representations**: Explicitly separate raw source images, Qwen Vision semantic images (`vision_image`), and spatial VAE reference latents (`vae_reference_latent`).
-4. **Directive-Only Anchors Parity**: Text anchors modulate Qwen Vision prompt directives only, without modifying attention hooks, VAE latents, or RoPE geometry:
-   - **Subject**: Pose Anchor, Outfit Anchor, Masked Identity Anchor
-   - **Scene**: Scene Anchor, Masked Region Anchor
-   - **Outfit**: Outfit Anchor
-5. **Deterministic Reference Ordering**: Single-source slot resolution ensuring all non-Style references precede Style references in physical token streams and VAE spatial frames.
+4. **Deterministic Reference Ordering**: Single-source slot resolution ensuring all non-Style references precede Style references in physical token streams and VAE spatial frames.
 
 ### Project-Specific Architectural Extensions
 The following features are project-specific extensions designed for modular ComfyUI pipelines and are intentionally distinct from upstream single-script behavior:
@@ -30,7 +26,7 @@ The following features are project-specific extensions designed for modular Comf
 
 ```mermaid
 graph TD
-    L1["Layer 1: Qwen Vision Image Prep<br/>(CcCKrea2QwenVisionImagePrep)"] -->|Prepared Vision Image| L3["Layer 3: Declarative Reference Nodes<br/>(Subject, Scene, Outfit, Style)"]
+    L1["Layer 1: Qwen Vision Image Prep<br/>(CcCKrea2QwenVisionImagePrep)"] -->|Prepared Vision Image| L3["Layer 3: Generic Reference Image<br/>(CcCKrea2ReferenceImage)"]
     L2["Layer 2: Target Latent<br/>(CcCKrea2TargetLatent)"] -->|Target Latent| L5["Layer 5: Edit Orchestrator<br/>(CcCKrea2Edit)"]
     L3 -->|Reference Spec| L4["Layer 4: Reference Chain<br/>(Immutable Specs Chain)"]
     L4 -->|Ordered Reference Chain| L5
@@ -39,8 +35,8 @@ graph TD
 
 - **Layer 1 (Qwen Vision Image Prep)**: Resizes raw image into a lightweight Qwen-optimized derivative (`vision_image`) aligned to patch boundaries (`32x32`), while retaining the untouched raw source image (`original_image`) intact for VAE processing.
 - **Layer 2 (Target Latent)**: Resolves the target latent tensor (`[B, 16, H//8, W//8]`), independently configuring Latent Content Source (`empty`, `image`) and Target Geometry (`favor_image`, `fixed`).
-- **Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image), configuring visual fit modes (`auto`, `fit`, `crop`), attention boosts, masks, and style processing mode. ADVANCED = INFRASTRUCTURE.
-- **Layer 4 (Reference Chain)**: Maintains an immutable linked chain of reference specifications (`REFERENCE_CHAIN`). Reference definition nodes accept an optional `reference_chain` input and produce an updated `reference_chain` output.
+- **Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image), configuring visual fit modes (`auto`, `fit`, `crop`), attention boosts, masks, and style processing mode. The Advanced pipeline is **generic infrastructure**, while the Easy Edit node provides the **opinionated recipe**.
+- **Layer 4 (Reference Chain)**: Maintains an immutable linked chain of reference specifications (`REFERENCE_CHAIN`). Reference definition nodes accept an optional `previous_references` input and produce an updated `reference_chain` output.
 - **Layer 5 (Edit Orchestrator)**: Consumes the resolved reference chain via its `references` input, resolves physical Qwen indices and VAE frame numbers, executes Qwen text/vision encoding, applies Moodboard statistical transforms, patches diffusion model attention hooks, and formats `edit_info`.
 
 ---
@@ -75,7 +71,7 @@ In this architecture, an input image exists in up to three distinct representati
 
 `CcCKrea2TargetLatent` separates **Target Latent Content** from **Target Geometry**:
 
-- **Target Latent Content**: `empty` (`Empty`, zeros tensor) or `image` (`Image`, VAE-encoded geometry image).
+- **Target Latent Content**: `empty` (`Empty`, zeros tensor) or `image` (`Image`, VAE-encoded target_image).
 - **Target Geometry**: `favor_image` (`Favor Image`, dimensions derived from the connected geometry image) or `fixed` (`Fixed`, dimensions derived from fixed megapixel / aspect ratio selection).
 
 Inputs: `target_content`, `geometry_mode`, `target_megapixels`, `fixed_megapixels`, `aspect_ratio`, `batch_size`. Optional inputs: `vae`, `geometry_image`. VAE and Geometry image are required at runtime based on the selected content and geometry options.
@@ -92,9 +88,9 @@ The four combinations of Target Content and Geometry define the canonical target
 
 | Target Content | Target Geometry | References Required | Main objective |
 |---|---|---|---|
-| `image` | `favor_image` | Geometry Image | Maximum identity/scene continuity (e.g. `PRESERVE_IDENTITY`). Denoising starts from VAE-encoded pixels at exact image proportions. |
-| `empty` | `favor_image` | Geometry Image | Free text-driven generation but strictly constrained to the aspect ratio and dimensional properties of the geometry image. |
-| `image` | `fixed` | Geometry Image | Fixed-resolution generation (e.g. 1024x1024) initializing denoising from the geometry image. Requires `auto` or `crop` scaling. |
+| `image` | `favor_image` | Target Image, Geometry Image | Maximum identity/scene continuity (e.g. `PRESERVE_IDENTITY`). Denoising starts from VAE-encoded target_image at exact geometry_image proportions. |
+| `empty` | `favor_image` | Geometry Image | Free text-driven generation but strictly constrained to the aspect ratio and dimensional properties of the geometry_image. |
+| `image` | `fixed` | Target Image | Fixed-resolution generation (e.g. 1024x1024) initializing denoising from the target_image. Requires `auto` or `crop` scaling. |
 | `empty` | `fixed` | None | Pure text-to-image or unconstrained generation at fixed target resolution (e.g. `MAX_IDENTITY` fallback without image). |
 
 > [!NOTE]
@@ -146,10 +142,19 @@ The single source of truth for reference ordering is `easy_routing.py` for Easy 
 ## 10. Positive and Negative Conditioning
 
 - **Positive Qwen Context**: Includes Subject, Scene, Outfit, expanded Style images/directives, Global Vision Directive, positive prompt, and prompt augmentation.
-- **Negative Qwen Context**: Includes Subject, Scene, Outfit, Global Vision Directive, negative prompt, and negative prompt augmentation. **Strictly excludes all Style images, crops, tiles, Style automatic directives, and Moodboard operations.**
+- **Negative Qwen Context**: Includes Subject, Scene, Outfit, negative prompt, and negative prompt augmentation. **Strictly excludes all Style images, crops, tiles, Style automatic directives, Moodboard operations, and Global Vision Directives.**
 
 ---
 
-## 11. Upstream Parity and Attribution
+## 11. Legacy Compatibility
+
+- **Directive-Only Anchors Parity**: Text anchors modulate Qwen Vision prompt directives only, without modifying attention hooks, VAE latents, or RoPE geometry:
+   - **Subject**: Pose Anchor, Outfit Anchor, Masked Identity Anchor
+   - **Scene**: Scene Anchor, Masked Region Anchor
+   - **Outfit**: Outfit Anchor
+
+---
+
+## 12. Upstream Parity and Attribution
 
 - Ported from and attributed to `ComfyUI-Krea2Edit` by lbouaraba (Apache-2.0 / GPL-3.0) and `ComfyUI-Krea2Moodboard` by RedNodeAI (GPL-3.0).

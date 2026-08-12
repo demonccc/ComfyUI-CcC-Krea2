@@ -1,17 +1,17 @@
 {
-  "last_node_id": 7,
-  "last_link_id": 6,
+  "last_node_id": 10,
+  "last_link_id": 13,
   "nodes": [
     {
       "id": 1,
       "type": "UNETLoader",
       "pos": [
-        100,
-        100
+        0,
+        0
       ],
       "size": [
-        315,
-        80
+        300,
+        100
       ],
       "flags": {},
       "order": 1,
@@ -29,18 +29,21 @@
       "properties": {
         "Node name for S&R": "UNETLoader"
       },
-      "widgets_values": []
+      "widgets_values": [
+        "krea2_model.safetensors",
+        "default"
+      ]
     },
     {
       "id": 2,
       "type": "CLIPLoader",
       "pos": [
-        100,
-        200
+        0,
+        150
       ],
       "size": [
-        315,
-        80
+        300,
+        100
       ],
       "flags": {},
       "order": 2,
@@ -49,36 +52,69 @@
       "outputs": [
         {
           "name": "CLIP",
-          "type": "CLIP"
+          "type": "CLIP",
+          "links": [
+            6
+          ]
         }
       ],
       "properties": {
         "Node name for S&R": "CLIPLoader"
       },
       "widgets_values": [
-        "clip_l.safetensors",
-        "krea2",
-        false
+        "qwen3_vl.safetensors",
+        "krea2"
       ]
     },
     {
       "id": 3,
-      "type": "CcCKrea2LoRAStack",
+      "type": "VAELoader",
       "pos": [
-        550,
-        100
+        0,
+        300
       ],
       "size": [
-        315,
-        200
+        300,
+        100
       ],
       "flags": {},
       "order": 3,
       "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3,
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "ae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "CcCKrea2LoRAStack",
+      "pos": [
+        350,
+        0
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
       "inputs": [
         {
           "name": "model",
-          "type": "MODEL",
           "link": 1
         }
       ],
@@ -87,15 +123,13 @@
           "name": "model",
           "type": "MODEL",
           "links": [
-            2
+            5
           ]
         },
         {
           "name": "prompt_augmentation",
           "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": [
-            3
-          ]
+          "links": []
         }
       ],
       "properties": {
@@ -103,10 +137,9 @@
       },
       "widgets_values": [
         true,
-        "krea2_ostris_edit_lora.safetensors",
         1.0,
-        false,
-        "None",
+        true,
+        "krea2_ostris_edit_lora.safetensors",
         1.0,
         false,
         "None",
@@ -120,20 +153,81 @@
       ]
     },
     {
-      "id": 4,
-      "type": "LoadImage",
+      "id": 5,
+      "type": "KSampler",
       "pos": [
-        100,
-        370
+        1500,
+        0
       ],
       "size": [
-        315,
-        315
+        300,
+        200
       ],
       "flags": {},
-      "order": 4,
+      "order": 5,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {
+          "name": "model",
+          "link": 10
+        },
+        {
+          "name": "positive",
+          "link": 11
+        },
+        {
+          "name": "negative",
+          "link": 12
+        },
+        {
+          "name": "latent_image",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        20,
+        1.0,
+        "euler",
+        "normal",
+        1.0
+      ]
+    },
+    {
+      "id": 6,
+      "type": "VAEDecode",
+      "pos": [
+        1850,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "link": 2
+        },
+        {
+          "name": "vae",
+          "link": 3
+        }
+      ],
       "outputs": [
         {
           "name": "IMAGE",
@@ -141,107 +235,110 @@
           "links": [
             4
           ]
-        },
-        {
-          "name": "MASK",
-          "type": "MASK"
         }
       ],
       "properties": {
-        "Node name for S&R": "LoadImage"
+        "Node name for S&R": "VAEDecode"
       },
-      "widgets_values": [
-        "subject.jpg",
-        "image"
-      ]
+      "widgets_values": []
     },
     {
-      "id": 5,
-      "type": "LoadImage",
+      "id": 7,
+      "type": "SaveImage",
       "pos": [
-        100,
-        720
+        2200,
+        0
       ],
       "size": [
-        315,
-        315
+        300,
+        200
       ],
       "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            5
-          ]
-        },
-        {
-          "name": "MASK",
-          "type": "MASK"
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "scene.jpg",
-        "image"
-      ]
-    },
-    {
-      "id": 6,
-      "type": "CcCKrea2EasyEditOstris",
-      "pos": [
-        550,
-        370
-      ],
-      "size": [
-        400,
-        300
-      ],
-      "flags": {},
-      "order": 6,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
-          "name": "subject_image",
-          "type": "IMAGE",
+          "name": "images",
           "link": 4
-        },
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "CcCKrea2"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "CcCKrea2EasyEditOstris",
+      "pos": [
+        800,
+        0
+      ],
+      "size": [
+        400,
+        400
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
         {
-          "name": "scene_image",
-          "type": "IMAGE",
+          "name": "model",
           "link": 5
         },
         {
-          "name": "outfit_image",
-          "type": "IMAGE"
+          "name": "clip",
+          "link": 6
         },
         {
-          "name": "style_image",
-          "type": "IMAGE"
+          "name": "vae",
+          "link": 7
         },
         {
-          "name": "model",
-          "type": "MODEL",
-          "link": 2
+          "name": "subject",
+          "link": 8
         },
         {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "link": 3
+          "name": "scene",
+          "link": 9
         }
       ],
       "outputs": [
         {
-          "name": "MODEL",
+          "name": "patched_model",
           "type": "MODEL",
           "links": [
-            6
+            10
           ]
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            11
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "edit_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
@@ -252,36 +349,82 @@
         "outfit image",
         "style image",
         true,
-        1.0,
-        false
+        false,
+        "A photo of a person",
+        "bad quality"
       ]
     },
     {
-      "id": 7,
-      "type": "KSampler",
+      "id": 9,
+      "type": "LoadImage",
       "pos": [
-        1200,
-        370
+        0,
+        500
       ],
       "size": [
-        315,
+        300,
         200
       ],
       "flags": {},
-      "order": 7,
+      "order": 9,
       "mode": 0,
-      "inputs": [
+      "inputs": [],
+      "outputs": [
         {
-          "name": "model",
-          "type": "MODEL",
-          "link": 6
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
         }
       ],
-      "outputs": [],
       "properties": {
-        "Node name for S&R": "KSampler"
+        "Node name for S&R": "LoadImage"
       },
-      "widgets_values": []
+      "widgets_values": [
+        "subject.jpg"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "LoadImage",
+      "pos": [
+        0,
+        750
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "scene.jpg"
+      ]
     }
   ],
   "links": [
@@ -289,99 +432,135 @@
       1,
       1,
       0,
-      3,
+      4,
       0,
       "MODEL"
     ],
     [
       2,
-      3,
+      5,
       0,
       6,
-      4,
-      "MODEL"
+      0,
+      "LATENT"
     ],
     [
       3,
       3,
-      1,
-      6,
-      5,
-      "CCC_KREA2_PROMPT_AUGMENTATION"
-    ],
-    [
-      4,
-      4,
-      0,
-      6,
-      0,
-      "IMAGE"
-    ],
-    [
-      5,
-      5,
       0,
       6,
       1,
-      "IMAGE"
+      "VAE"
     ],
     [
-      6,
+      4,
       6,
       0,
       7,
       0,
+      "IMAGE"
+    ],
+    [
+      5,
+      4,
+      0,
+      8,
+      0,
       "MODEL"
+    ],
+    [
+      6,
+      2,
+      0,
+      8,
+      1,
+      "CLIP"
+    ],
+    [
+      7,
+      3,
+      0,
+      8,
+      2,
+      "VAE"
+    ],
+    [
+      8,
+      9,
+      0,
+      8,
+      3,
+      "IMAGE"
+    ],
+    [
+      9,
+      10,
+      0,
+      8,
+      4,
+      "IMAGE"
+    ],
+    [
+      10,
+      8,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      11,
+      8,
+      1,
+      5,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      12,
+      8,
+      2,
+      5,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      13,
+      8,
+      3,
+      5,
+      3,
+      "LATENT"
     ]
   ],
   "groups": [
     {
-      "title": "Models",
+      "title": "Loaders",
       "bounding": [
-        50,
-        50,
-        400,
-        200
+        0,
+        -50,
+        700,
+        500
       ],
       "color": "#3f789e"
     },
     {
-      "title": "LoRA",
+      "title": "Easy Edit",
       "bounding": [
-        500,
-        50,
-        400,
-        250
+        750,
+        -50,
+        700,
+        500
       ],
       "color": "#3f789e"
     },
     {
-      "title": "Images / References",
+      "title": "Sampling",
       "bounding": [
-        50,
-        320,
-        400,
-        1500
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Easy Edit + Sampling",
-      "bounding": [
-        500,
-        320,
-        600,
-        800
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Output",
-      "bounding": [
-        1150,
-        320,
-        400,
-        300
+        1480,
+        -50,
+        1100,
+        500
       ],
       "color": "#3f789e"
     }

@@ -63,9 +63,7 @@ class CcCKrea2TargetLatent:
         if "maximum_mp" in kwargs:
             target_megapixels = kwargs["maximum_mp"]
 
-        # Compatibility handling for legacy geometry_mode choices
-        if geometry_mode in ("favor_subject", "favor_scene"):
-            geometry_mode = "favor_image"
+
 
         latent_dict, info_str = build_target_latent(
             vae=vae,

@@ -17,7 +17,6 @@ This document provides the complete specification of all public nodes in the `Co
 - **Optional Inputs**:
   - `subject`, `scene`, `outfit`, `style` (`IMAGE`): Visual references for routing.
   - `negative_prompt` (`STRING`): Negative text prompt.
-  - `prompt_augmentation` (`CCC_KREA2_PROMPT_AUGMENTATION`): Optional LoRA prompt settings stack.
   - `ostris_kv_cache` (`BOOLEAN`, default: `False`): Included only in `CcCKrea2EasyEditOstris` to enable unsupported experimental AI-Toolkit kv-cache feature.
 - **Outputs**:
   - `patched_model` (`MODEL`), `positive` (`CONDITIONING`), `negative` (`CONDITIONING`), `latent` (`LATENT`), `edit_info` (`STRING`).
@@ -48,7 +47,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`).
   - `reference_path` (`["edit", "style"]`).
-  - `alias`, `vision_instruction`, `attention_boost`, `appearance_reference`, `style_processing`.
+  - `alias`, `vision_instruction`, `attention_boost`, `style_processing`.
 - **Outputs**: `reference_chain`.
 
 ### 2.4 CcC Krea2 - Edit Orchestrator
