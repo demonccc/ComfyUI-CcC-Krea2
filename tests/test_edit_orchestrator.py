@@ -217,12 +217,11 @@ def test_target_vision_generic():
     mock_model.clone.return_value = mock_model
 
     from ccc_krea2.target_latent import TargetVisionContext
-    from ccc_krea2.target_latent import TargetVisionContext
-    
+
     mock_target_image = MagicMock()
     mock_target_image.original_image = torch.rand(1, 512, 512, 3)
     mock_target_image.vision_image = torch.rand(1, 512, 512, 3)
-    
+
     target_latent = {
         "samples": torch.zeros((1, 16, 64, 64)),
         "batch_index": [0],
@@ -248,7 +247,7 @@ def test_target_vision_generic():
     # call_args_list[0] -> pos_prompt
     pos_prompt_call = mock_clip.tokenize.call_args_list[0]
     prompt = pos_prompt_call[0][0]
-    
+
     assert "(target)" not in prompt
     assert "target scene/context" not in prompt
     assert prompt.endswith("raw positive prompt")
@@ -264,12 +263,11 @@ def test_target_vision_explicit():
     mock_model.clone.return_value = mock_model
 
     from ccc_krea2.target_latent import TargetVisionContext
-    from ccc_krea2.target_latent import TargetVisionContext
-    
+
     mock_target_image = MagicMock()
     mock_target_image.original_image = torch.rand(1, 512, 512, 3)
     mock_target_image.vision_image = torch.rand(1, 512, 512, 3)
-    
+
     target_latent = {
         "samples": torch.zeros((1, 16, 64, 64)),
         "batch_index": [0],
@@ -293,6 +291,6 @@ def test_target_vision_explicit():
 
     pos_prompt_call = mock_clip.tokenize.call_args_list[0]
     prompt = pos_prompt_call[0][0]
-    
+
     assert "(composition)" in prompt
     assert "Use this reference for camera composition." in prompt

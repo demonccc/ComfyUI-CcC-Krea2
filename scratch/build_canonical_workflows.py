@@ -212,6 +212,9 @@ class WorkflowBuilder:
         if to_idx is None:
             raise ValueError(f"Input {to_in_name} not found on node {to_node['type']}")
 
+        if to_node["inputs"][to_idx].get("link") is not None:
+            raise ValueError(f"Input {to_in_name} on node {to_node['type']} already has a link")
+
         out_type = from_node["outputs"][from_idx]["type"]
         in_type = to_node["inputs"][to_idx]["type"]
 

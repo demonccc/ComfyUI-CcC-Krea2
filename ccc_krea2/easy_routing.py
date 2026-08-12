@@ -408,14 +408,18 @@ def route_easy_preset(
         else:
             # S + Sc + Ou
             target_content_mode = "image"
-            target_content_source = S
-            target_content_role = "subject"
-            target_geometry_mode, target_geometry_source = "favor_image", S
             if outfit_is_scene_physically:
-                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+                target_content_source = S
+                target_content_role = "subject"
+                target_geometry_mode, target_geometry_source = "favor_image", S
+                refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
+                refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
             elif outfit_is_distinct:
+                target_content_source = Sc
+                target_content_role = "scene"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+                refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
                 refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
-            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
 
     elif preset == "preserve_scene":
         if not has_sc:

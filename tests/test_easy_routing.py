@@ -314,17 +314,26 @@ class TestMaxIdentityMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset="max_identity")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is S
-        assert_refs(route.edit_references, [(Ou, NORMAL_BOOST, "outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene"
+        assert route.target_geometry_source is Sc
+        assert_refs(route.edit_references, [(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")])
 
     def test_subject_scene_as_outfit(self, dummy_sources):
+        from ccc_krea2.easy_routing import EASY_SCENE_AND_OUTFIT_INSTRUCTION
         S, Sc, Ou, _ = dummy_sources
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
         route = route_easy_preset(sources, preset="max_identity")
         assert route.target_content_mode == "image"
         assert route.target_content_source is S
+        assert route.target_content_role == "subject"
         assert route.target_geometry_source is S
-        assert_refs(route.edit_references, [(Sc, OUTFIT_EMPHASIS_BOOST, "scene+outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
+        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene+outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
+        sc_ref = next(r for r in route.edit_references if r[2] == "scene+outfit")
+        assert sc_ref[3] == EASY_SCENE_AND_OUTFIT_INSTRUCTION
+        for r in route.edit_references:
+            if r[2] != "subject":
+                assert r[1] <= NORMAL_BOOST
 
 
 # ---------------------------------------------------------------------------

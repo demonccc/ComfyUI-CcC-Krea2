@@ -45,9 +45,9 @@ This document provides the complete specification of all public nodes in the `Co
 - **Required Inputs**:
   - `target_content` (`CHOICE`), `geometry_mode` (`CHOICE`), `target_megapixels` (`FLOAT`), `fixed_megapixels` (`FLOAT`), `aspect_ratio` (`CHOICE`), `batch_size` (`INT`).
 - **Optional Inputs**:
-  - `include_in_vision` (`BOOLEAN`), `target_vision_slot` (`CHOICE`), `target_alias` (`STRING`), `target_vision_instruction` (`STRING`), `vae` (`VAE`), `target_image` (`IMAGE`), `geometry_image` (`IMAGE`).
+  - `include_in_vision` (`CHOICE`: `auto`, `yes`, `no`), `target_vision_slot` (`CHOICE`), `target_alias` (`STRING`), `target_vision_instruction` (`STRING`), `vae` (`VAE`), `target_image` (`PREPARED_VISION_IMAGE`), `geometry_image` (`PREPARED_VISION_IMAGE`).
 - **Legacy Compatibility Optional Inputs**:
-  - `subject_image` (`IMAGE`), `scene_image` (`IMAGE`).
+  - `subject_image` (`PREPARED_VISION_IMAGE`), `scene_image` (`PREPARED_VISION_IMAGE`).
 - **Outputs**:
   - `target_latent` (`LATENT`), `latent_info` (`STRING`).
 

@@ -110,9 +110,17 @@ def test_strict_workflow_schema():
 
         # Validate all links
         nodes_by_id = {n["id"]: n for n in wf.get("nodes", [])}
+        links_by_id = {}
         for link in wf.get("links", []):
             assert len(link) == 6, f"Invalid link format in {filename}: {link}"
-            _, from_id, from_slot, to_id, to_slot, link_type = link
+            link_id, from_id, from_slot, to_id, to_slot, link_type = link
+            links_by_id[link_id] = {
+                "source_node_id": from_id,
+                "source_slot": from_slot,
+                "target_node_id": to_id,
+                "target_slot": to_slot,
+                "type": link_type,
+            }
             assert from_id in nodes_by_id, f"Link source node {from_id} not found in {filename}"
             assert to_id in nodes_by_id, f"Link target node {to_id} not found in {filename}"
 
@@ -145,7 +153,25 @@ def test_strict_workflow_schema():
         if node_ids:
             assert max(node_ids) == wf.get("last_node_id"), f"last_node_id mismatch in {filename}"
 
+        used_link_ids = set()
         for node in wf.get("nodes", []):
+            for i, inp in enumerate(node.get("inputs", [])):
+                link_id = inp.get("link")
+                if link_id is not None:
+                    assert link_id in links_by_id, f"Node {node['id']} refers to missing link {link_id}"
+                    assert links_by_id[link_id]["target_node_id"] == node["id"]
+                    assert links_by_id[link_id]["target_slot"] == i
+                    used_link_ids.add(link_id)
+
+            for i, out in enumerate(node.get("outputs", [])):
+                for link_id in out.get("links") or []:
+                    assert link_id in links_by_id, f"Node {node['id']} refers to missing link {link_id}"
+                    assert links_by_id[link_id]["source_node_id"] == node["id"]
+                    assert links_by_id[link_id]["source_slot"] == i
+
+        for link_id in links_by_id:
+            assert link_id in used_link_ids, f"Global link {link_id} is orphaned (not attached to any input socket)"
+
             ntype = node.get("type")
             if not ntype:
                 continue
@@ -370,3 +396,117 @@ def test_builder_validation():
     # Test strict combo validation bypass prevention
     with pytest.raises(ValueError, match="not in choices"):
         builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"reference_method": "invalid.safetensors"})
+
+def test_builder_duplicate_link_rejection():
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
+    import build_canonical_workflows
+
+    builder = build_canonical_workflows.WorkflowBuilder()
+    n1 = builder.add_node("CcCKrea2TargetLatent", pos=[0,0], size=[1,1])
+    n2 = builder.add_node("CcCKrea2Edit", pos=[0,0], size=[1,1], inputs=["target_latent"])
+
+    # First link should succeed
+    builder.link(n1, "target_latent", n2, "target_latent")
+
+    # Second link to the same input should fail
+    import pytest
+    with pytest.raises(ValueError, match="already has a link"):
+        builder.link(n1, "target_latent", n2, "target_latent")
+
+def test_orphan_link_rejection():
+    import json
+    import copy
+    import pytest
+    from test_workflow_files import MODERN_CANONICAL
+
+    with open(f"workflows/{MODERN_CANONICAL[0]}", "r", encoding="utf-8") as f:
+        wf = json.load(f)
+
+    def _validate(w):
+        links_by_id = {}
+        for link in w.get("links", []):
+            link_id, from_id, from_slot, to_id, to_slot, link_type = link
+            links_by_id[link_id] = {
+                "source_node_id": from_id,
+                "source_slot": from_slot,
+                "target_node_id": to_id,
+                "target_slot": to_slot,
+                "type": link_type,
+            }
+        used_link_ids = set()
+        for node in w.get("nodes", []):
+            for i, inp in enumerate(node.get("inputs", [])):
+                link_id = inp.get("link")
+                if link_id is not None:
+                    assert link_id in links_by_id, f"Node {node['id']} refers to missing link {link_id}"
+                    assert links_by_id[link_id]["target_node_id"] == node["id"]
+                    assert links_by_id[link_id]["target_slot"] == i
+                    used_link_ids.add(link_id)
+            for i, out in enumerate(node.get("outputs", [])):
+                for link_id in out.get("links") or []:
+                    assert link_id in links_by_id, f"Node {node['id']} refers to missing link {link_id}"
+                    assert links_by_id[link_id]["source_node_id"] == node["id"]
+                    assert links_by_id[link_id]["source_slot"] == i
+
+        for link_id in links_by_id:
+            assert link_id in used_link_ids, f"Global link {link_id} is orphaned"
+
+    # Case A: Change one input["link"] to another existing but WRONG link ID.
+    wf_a = copy.deepcopy(wf)
+    link_ids = [link[0] for link in wf_a["links"]]
+    for node in wf_a["nodes"]:
+        for inp in node.get("inputs", []):
+            if inp.get("link") is not None:
+                other_link = next(lnk for lnk in link_ids if lnk != inp["link"])
+                inp["link"] = other_link
+                break
+        else:
+            continue
+        break
+
+    with pytest.raises(AssertionError):
+        _validate(wf_a)
+
+    # Case B: Add an unused link to the global links table
+    wf_b = copy.deepcopy(wf)
+    wf_b["links"].append([9999, 1, 0, 2, 0, "TEST"])
+    with pytest.raises(AssertionError):
+        _validate(wf_b)
+
+    # Case C: Put the same destination input behind two global links.
+    wf_c = copy.deepcopy(wf)
+    # Find a valid link, duplicate it with a new ID
+    valid_link = wf_c["links"][0]
+    new_link = list(valid_link)
+    new_link[0] = 9999
+    wf_c["links"].append(new_link)
+    # the target node/slot is in new_link[3] / new_link[4], but the node's inputs list only holds one link ID (the original one)
+    # So new_link[0] (9999) will be orphaned.
+    with pytest.raises(AssertionError):
+        _validate(wf_c)
+
+def test_generator_matches_checked_in_canonical_workflows(tmp_path):
+    import sys
+    import os
+    import json
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
+    import build_canonical_workflows
+    from test_workflow_files import MODERN_CANONICAL
+
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        build_canonical_workflows.main()
+    finally:
+        os.chdir(original_cwd)
+
+    gen_dir = tmp_path / "workflows"
+    for filename in MODERN_CANONICAL:
+        with open(gen_dir / filename, "r", encoding="utf-8") as f:
+            generated = json.load(f)
+        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
+            checked_in = json.load(f)
+
+        assert generated == checked_in, f"Generated {filename} does not match checked-in version! Please commit the newly generated workflows."
+

@@ -78,6 +78,18 @@ def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     assert "vision_slot" in content, "vision_slot missing from CcCKrea2ReferenceImage in NODES.md"
     assert "masked_attention_boost" in content, "masked_attention_boost missing from CcCKrea2ReferenceImage in NODES.md"
 
+    # Target Latent type checks
+    assert "include_in_vision" in content
+    assert "auto" in content
+    assert "yes" in content
+    assert "no" in content
+    assert "PREPARED_VISION_IMAGE" in content
+    assert "target_image" in content
+    assert "geometry_image" in content
+    assert "include_in_vision (`BOOLEAN`)" not in content
+    assert "`target_image` (`PREPARED_VISION_IMAGE`)" in content
+    assert "`geometry_image` (`PREPARED_VISION_IMAGE`)" in content
+
     required_nodes = [
         "CcCKrea2EasyEdit",
         "CcCKrea2EasyEditOstris",
