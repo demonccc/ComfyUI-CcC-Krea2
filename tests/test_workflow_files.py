@@ -107,6 +107,7 @@ def _is_connected(workflow, node, input_name):
 def validate_workflow_schema(wf, filename="<workflow>"):
     nodes_by_id = {n["id"]: n for n in wf.get("nodes", [])}
     links_by_id = {}
+    connected_inputs_by_node = {}
 
     for link in wf.get("links", []):
         assert len(link) == 6, f"Invalid link format in {filename}: {link}"
@@ -137,7 +138,7 @@ def validate_workflow_schema(wf, filename="<workflow>"):
             assert link_type == in_type, f"Link type mismatch on destination in {filename}: {link_type} != {in_type} on {from_id}->{to_id}"
 
         # Record that the socket is connected for required checking
-        to_node.setdefault("_connected_inputs", set()).add(to_node["inputs"][to_slot]["name"])
+        connected_inputs_by_node.setdefault(to_id, set()).add(to_node["inputs"][to_slot]["name"])
 
     # Check for unique IDs and maximum match
     link_ids = [link[0] for link in wf.get("links", [])]
@@ -150,7 +151,6 @@ def validate_workflow_schema(wf, filename="<workflow>"):
     if node_ids:
         assert max(node_ids) == wf.get("last_node_id"), f"last_node_id mismatch in {filename}"
 
-    used_link_ids = set()
     target_side_link_ids = set()
     source_side_link_ids = set()
 
@@ -161,7 +161,6 @@ def validate_workflow_schema(wf, filename="<workflow>"):
                 assert link_id in links_by_id, f"Node {node['id']} refers to missing link {link_id}"
                 assert links_by_id[link_id]["target_node_id"] == node["id"]
                 assert links_by_id[link_id]["target_slot"] == i
-                used_link_ids.add(link_id)
                 target_side_link_ids.add(link_id)
 
         for i, out in enumerate(node.get("outputs", [])):
@@ -169,16 +168,13 @@ def validate_workflow_schema(wf, filename="<workflow>"):
                 assert link_id in links_by_id, f"Node {node['id']} refers to missing link {link_id}"
                 assert links_by_id[link_id]["source_node_id"] == node["id"]
                 assert links_by_id[link_id]["source_slot"] == i
-                used_link_ids.add(link_id)
                 source_side_link_ids.add(link_id)
 
         ntype = node.get("type")
-        if not ntype:
-            continue
+        assert ntype, f"Node {node['id']} is missing a type in {filename}"
 
         cls = get_node_class(ntype)
-        if not cls:
-            continue
+        assert cls is not None, f"Unknown node type '{ntype}' in {filename}"
 
         if ntype.startswith("CcCKrea2"):
             assert node.get("properties", {}).get("Node name for S&R") == ntype, f"Missing S&R name on {ntype}"
@@ -193,7 +189,7 @@ def validate_workflow_schema(wf, filename="<workflow>"):
             val_type = schema_val[0]
             is_widget = isinstance(val_type, list) or isinstance(val_type, tuple) or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
             if not is_widget:
-                assert name in node.get("_connected_inputs", set()), f"Required socket '{name}' is missing or unconnected on node {ntype} in {filename}"
+                assert name in connected_inputs_by_node.get(node["id"], set()), f"Required socket '{name}' is missing or unconnected on node {ntype} in {filename}"
 
         # Check linked input types match the schema socket types (they shouldn't be widgets)
         for inp in node.get("inputs", []):
@@ -206,7 +202,7 @@ def validate_workflow_schema(wf, filename="<workflow>"):
             assert inp.get("link") in link_ids, f"Input link {inp.get('link')} not found in links table in {filename}"
 
         for out in node.get("outputs", []):
-            for link_id in out.get("links", []):
+            for link_id in out.get("links") or []:
                 assert link_id in link_ids, f"Output link {link_id} not found in links table in {filename}"
 
         # Validate widget count matches schema exactly
@@ -432,10 +428,8 @@ def test_builder_duplicate_link_rejection():
 
 
 def test_orphan_link_rejection():
-    import json
     import copy
     import pytest
-    from test_workflow_files import MODERN_CANONICAL
 
     with open(f"workflows/{MODERN_CANONICAL[0]}", "r", encoding="utf-8") as f:
         wf = json.load(f)
@@ -498,33 +492,79 @@ def test_orphan_link_rejection():
         validate_workflow_schema(wf_e, "Case E")
 
 def test_validator_regression_all_nodes():
-    import json
     import copy
     import pytest
-    from test_workflow_files import MODERN_CANONICAL
+
+    with open(f"workflows/{MODERN_CANONICAL[0]}", "r", encoding="utf-8") as f:
+        wf = json.load(f)
+
+    # Case A: Unconnected output contract
+    wf_a = copy.deepcopy(wf)
+    for node in wf_a["nodes"]:
+        if node["type"] == "LoadImage":
+            node["outputs"][0]["type"] = "INVALID_TYPE"
+            break
+    with pytest.raises(AssertionError):
+        validate_workflow_schema(wf_a, "Case A")
+
+    # Case B: Widget contract
+    wf_b = copy.deepcopy(wf)
+    for node in wf_b["nodes"]:
+        if node["type"] == "KSampler":
+            node["widgets_values"].pop()
+            break
+    with pytest.raises(AssertionError):
+        validate_workflow_schema(wf_b, "Case B")
+
+    # Case C: Unknown node class
+    wf_c = copy.deepcopy(wf)
+    for node in wf_c["nodes"]:
+        if node["type"] == "LoadImage":
+            node["type"] = "UnknownNode"
+            break
+    with pytest.raises(AssertionError):
+        validate_workflow_schema(wf_c, "Case C")
+
+def test_validate_workflow_schema_does_not_mutate_workflow():
+    import copy
+
+    with open(f"workflows/{MODERN_CANONICAL[0]}", "r", encoding="utf-8") as f:
+        wf = json.load(f)
+
+    wf_before = copy.deepcopy(wf)
+    validate_workflow_schema(wf, MODERN_CANONICAL[0])
+
+    assert wf == wf_before, "Workflow was mutated by validation!"
+
+    # Validate a second time to ensure it still works (no cached state affecting it)
+    validate_workflow_schema(wf, MODERN_CANONICAL[0])
+
+def test_validator_handles_none_links():
+    import copy
 
     with open(f"workflows/{MODERN_CANONICAL[0]}", "r", encoding="utf-8") as f:
         wf = json.load(f)
 
     wf_mutated = copy.deepcopy(wf)
-
-    # Mutate a middle node (not the last one)
-    # The last node is SaveImage, we'll mutate LoadImage or KSampler
+    found_unconnected = False
     for node in wf_mutated["nodes"]:
-        if node["type"] == "LoadImage":
-            node["outputs"][0]["type"] = "INVALID_TYPE"
+        for out in node.get("outputs", []):
+            if not out.get("links"):
+                out["links"] = None
+                found_unconnected = True
+                break
+        if found_unconnected:
             break
 
-    with pytest.raises(AssertionError):
-        validate_workflow_schema(wf_mutated, "All nodes regression")
+    assert found_unconnected, "No unconnected output found to test None links!"
+    # Should not raise exception
+    validate_workflow_schema(wf_mutated, "None links test")
 
 def test_generator_matches_checked_in_canonical_workflows(tmp_path):
     import sys
     import os
-    import json
     sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
     import build_canonical_workflows
-    from test_workflow_files import MODERN_CANONICAL
 
     original_cwd = os.getcwd()
     os.chdir(tmp_path)
