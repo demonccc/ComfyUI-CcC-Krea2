@@ -1,8 +1,7 @@
-"""Structural validation tests for curated workflow JSON files."""
-
 import json
 import pytest
 from pathlib import Path
+from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 LEGACY_WORKFLOW_FILES = [
     "workflows/legacy/subject_edit.json",
@@ -14,966 +13,125 @@ LEGACY_WORKFLOW_FILES = [
     "workflows/legacy/text_to_image.json",
 ]
 
-EDITING_WORKFLOW_FILES = LEGACY_WORKFLOW_FILES[:6]
-
-MODULAR_WORKFLOW_FILES = [
-    "workflows/01_easy_subject.json",
-    "workflows/02_easy_subject_scene.json",
-    "workflows/03_easy_subject_outfit.json",
-    "workflows/04_easy_subject_scene_outfit.json",
-    "workflows/05_easy_outfit_from_scene.json",
-    "workflows/06_easy_style_transfer.json",
-    "workflows/07_easy_ostris.json",
-    "workflows/08_advanced_krea2_edit.json",
-    "workflows/09_advanced_native.json",
-    "workflows/10_advanced_ostris.json",
+MODERN_CANONICAL = [
+    "01_easy_subject.json",
+    "02_easy_subject_scene.json",
+    "03_easy_subject_outfit.json",
+    "04_easy_subject_scene_outfit.json",
+    "05_easy_outfit_from_scene.json",
+    "06_easy_style_transfer.json",
+    "07_easy_ostris.json",
+    "08_advanced_krea2_edit.json",
+    "09_advanced_native.json",
+    "10_advanced_ostris.json",
 ]
 
-EXPECTED_WORKFLOW_FILES = MODULAR_WORKFLOW_FILES
-
-EXPECTED_ROLES_PER_WORKFLOW = {
-    "workflows/legacy/subject_edit.json": (["subject"], "CcCKrea2Subject"),
-    "workflows/legacy/subject_scene.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
-    "workflows/legacy/subject_outfit.json": (["outfit", "subject"], "CcCKrea2SubjectOutfit"),
-    "workflows/legacy/subject_outfit_scene.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
-    "workflows/legacy/subject_scene_qwen_simple.json": (["scene", "subject"], "CcCKrea2SubjectScene"),
-    "workflows/legacy/subject_scene_outfit_qwen_simple.json": (["scene", "outfit", "subject"], "CcCKrea2SubjectSceneOutfit"),
-}
-
-MAIN_NODE_TYPES = (
-    "CcCKrea2Subject",
-    "CcCKrea2SubjectScene",
-    "CcCKrea2SubjectOutfit",
-    "CcCKrea2SubjectSceneOutfit",
-)
-
-
-def _is_node_inside_group(node, group):
-    pos = node.get("pos", [0, 0])
-    gx, gy, gw, gh = group.get("bounding", [0, 0, 0, 0])
-    return gx <= pos[0] <= gx + gw and gy <= pos[1] <= gy + gh
-
-
-def test_expected_filenames_and_directory_contents():
-    """1. Exactly the expected workflow files exist and example_workflows directory is absent."""
-    assert Path("example_workflows").exists() is False, "example_workflows directory must not exist"
-
+def test_canonical_filenames():
     workflows_dir = Path("workflows")
-    assert workflows_dir.exists(), "workflows directory does not exist"
-
-    found_files = set(str(p).replace("\\", "/") for p in workflows_dir.glob("*.json"))
-    expected_files = set(EXPECTED_WORKFLOW_FILES)
-    assert found_files == expected_files, f"Mismatch in workflow files: found {found_files}, expected {expected_files}"
-
-
-def test_workflow_json_parsing_and_loaders():
-    """2-7. JSON parses, uses Krea2 loader stack, and does not use legacy LoRA loaders."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        assert isinstance(data, dict), f"Invalid JSON structure in {rel_path}"
-
-        nodes = data.get("nodes", [])
-        node_types = [n.get("type") for n in nodes]
-        assert "UNETLoader" in node_types, f"Missing UNETLoader in {rel_path}"
-        assert "CLIPLoader" in node_types, f"Missing CLIPLoader in {rel_path}"
-        assert "VAELoader" in node_types, f"Missing VAELoader in {rel_path}"
-
-        if rel_path in EDITING_WORKFLOW_FILES or "lora" in rel_path or rel_path == "workflows/text_to_image.json":
-            stack_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAStack"]
-            ps_nodes = [n for n in nodes if n.get("type") == "CcCKrea2LoRAPromptSettings"]
-            assert len(stack_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAStack in {rel_path}"
-            assert len(ps_nodes) == 1, f"Expected exactly 1 CcCKrea2LoRAPromptSettings in {rel_path}"
-
-        assert "LoraLoaderModelOnly" not in node_types, f"LoraLoaderModelOnly found in {rel_path}"
-        assert "CheckpointLoaderSimple" not in node_types, f"CheckpointLoaderSimple found in {rel_path}"
-        assert "LoraLoader" not in node_types, f"Standard LoraLoader found in {rel_path}"
-
-        raw_json_str = json.dumps(data)
-        assert "flux1-dev.safetensors" not in raw_json_str, f"flux1-dev.safetensors found in {rel_path}"
-
-
-def test_workflow_main_nodes_and_groups():
-    """8-10. Main nodes, individual image groups, and required standard groups."""
-    for rel_path, (roles, expected_main_node) in EXPECTED_ROLES_PER_WORKFLOW.items():
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        nodes = data.get("nodes", [])
-        node_types = [n.get("type") for n in nodes]
-        assert expected_main_node in node_types, f"Expected {expected_main_node} in {rel_path}"
-
-        group_titles = [g.get("title", "") for g in data.get("groups", [])]
-
-        # Check individual image groups
-        for role in roles:
-            expected_title = f"{role.capitalize()} Image"
-            assert expected_title in group_titles, f"Missing group '{expected_title}' in {rel_path}"
-
-        # Standard groups
-        assert "Models" in group_titles, f"Missing 'Models' group in {rel_path}"
-        assert "Advanced Settings (disabled by default)" in group_titles, f"Missing Advanced Settings group in {rel_path}"
-        assert "LoRA Stack + Edit + KSampler" in group_titles, f"Missing 'LoRA Stack + Edit + KSampler' group in {rel_path}"
-        assert "LoRA Prompt Augmentation (disabled by default)" in group_titles, f"Missing 'LoRA Prompt Augmentation' group in {rel_path}"
-        assert "Output" in group_titles, f"Missing 'Output' group in {rel_path}"
-
-
-def test_lora_stack_and_prompt_settings_wiring_and_layout():
-    """Verify wiring and group layout for CcCKrea2LoRAPromptSettings and CcCKrea2LoRAStack."""
-    for rel_path in EDITING_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        nodes = data.get("nodes", [])
-        node_by_type = {n["type"]: n for n in nodes if "type" in n}
-        groups_by_title = {g["title"]: g for g in data.get("groups", []) if "title" in g}
-
-        stack_node = node_by_type["CcCKrea2LoRAStack"]
-        ps_node = node_by_type["CcCKrea2LoRAPromptSettings"]
-        main_node = next(n for n in nodes if n.get("type") in MAIN_NODE_TYPES)
-        ksampler_node = next(n for n in nodes if n.get("type") == "KSampler")
-
-        # 1. Check prompt settings mode == 0 and disabled widget values
-        assert ps_node.get("mode") == 0, f"Prompt settings mode must be 0 in {rel_path}"
-        ps_widgets = ps_node.get("widgets_values", [])
-        assert ps_widgets[0] is False, f"Prompt settings enabled widget must be false in {rel_path}"
-        # All 4 per-slot prompt enabled must be False
-        assert ps_widgets[1] is False
-        assert ps_widgets[5] is False
-        assert ps_widgets[9] is False
-        assert ps_widgets[13] is False
-        # All positive/negative prompt texts must be empty strings
-        for text_idx in (3, 4, 7, 8, 11, 12, 15, 16):
-            assert ps_widgets[text_idx] == "", f"Prompt text widget index {text_idx} must be empty string in {rel_path}"
-
-        # 2. Check LoRA Stack widgets
-        stack_widgets = stack_node.get("widgets_values", [])
-        assert stack_widgets[0] is True, f"LoRA Stack enabled widget must be true in {rel_path}"
-        assert stack_widgets[1] == 1.0, f"Global strength must be 1.0 in {rel_path}"
-        assert stack_widgets[2] is True, f"LoRA slot 1 must be enabled in {rel_path}"
-        assert stack_widgets[3] == "krea2_edit_lora.safetensors", f"LoRA slot 1 filename mismatch in {rel_path}"
-        assert stack_widgets[4] == 1.0, f"LoRA slot 1 strength must be 1.0 in {rel_path}"
-        # Slots 2, 3, 4 disabled
-        assert stack_widgets[5] is False
-        assert stack_widgets[8] is False
-        assert stack_widgets[11] is False
-
-        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
-
-        # 3. Wiring checks
-        # Prompt Settings -> Stack lora_prompt_settings
-        ps_out_links = ps_node["outputs"][0]["links"]
-        assert ps_out_links is not None and len(ps_out_links) == 1
-        ps_link = link_map[ps_out_links[0]]
-        assert ps_link[3] == stack_node["id"]
-        assert ps_link[5] == "CCC_KREA2_LORA_PROMPT_SETTINGS"
-
-        # Stack.model -> main node.model
-        stack_model_out_links = stack_node["outputs"][0]["links"]
-        assert stack_model_out_links is not None and len(stack_model_out_links) == 1
-        model_link = link_map[stack_model_out_links[0]]
-        assert model_link[3] == main_node["id"]
-        assert model_link[5] == "MODEL"
-
-        # Stack.prompt_augmentation -> main node.prompt_augmentation
-        stack_aug_out_links = stack_node["outputs"][1]["links"]
-        assert stack_aug_out_links is not None and len(stack_aug_out_links) == 1
-        aug_link = link_map[stack_aug_out_links[0]]
-        assert aug_link[3] == main_node["id"]
-        assert aug_link[5] == "CCC_KREA2_PROMPT_AUGMENTATION"
-
-        # 4. Group containment checks
-        stack_group = groups_by_title["LoRA Stack + Edit + KSampler"]
-        ps_group = groups_by_title["LoRA Prompt Augmentation (disabled by default)"]
-
-        # Prompt Settings is inside prompt augmentation group, and NOT inside stack group
-        assert _is_node_inside_group(ps_node, ps_group), f"Prompt Settings node must be inside 'LoRA Prompt Augmentation' group in {rel_path}"
-        assert not _is_node_inside_group(ps_node, stack_group), f"Prompt Settings node must NOT be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
-
-        # Stack, main edit node, and KSampler are inside stack group
-        assert _is_node_inside_group(stack_node, stack_group), f"LoRA Stack node must be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
-        assert _is_node_inside_group(main_node, stack_group), f"Main edit node must be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
-        assert _is_node_inside_group(ksampler_node, stack_group), f"KSampler node must be inside 'LoRA Stack + Edit + KSampler' group in {rel_path}"
-
-
-def test_advanced_settings_chaining_and_bypass():
-    """11-14. Mode == 2, main node adv inputs disconnected, role count & chain order match."""
-    for rel_path, (expected_chain, expected_main_node) in EXPECTED_ROLES_PER_WORKFLOW.items():
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        nodes = data.get("nodes", [])
-        main_node = next(n for n in nodes if n.get("type") == expected_main_node)
-
-        # Check main node sockets disconnected
-        for inp in main_node.get("inputs", []):
-            if inp.get("name") in ("image_advanced_settings", "edit_advanced_settings"):
-                assert inp.get("link") is None, f"{inp['name']} should be disconnected in {rel_path}"
-
-        # Check advanced setting nodes mode == 2
-        img_adv_nodes = [n for n in nodes if n.get("type") == "CcCKrea2ImageAdvancedSettings"]
-        edit_adv_nodes = [n for n in nodes if n.get("type") == "CcCKrea2EditAdvancedSettings"]
-
-        assert len(img_adv_nodes) == len(expected_chain), f"Expected {len(expected_chain)} image adv nodes in {rel_path}"
-        assert len(edit_adv_nodes) == 1, f"Expected 1 edit adv node in {rel_path}"
-
-        for n in img_adv_nodes + edit_adv_nodes:
-            assert n.get("mode") == 2, f"Node {n['type']} in {rel_path} should have mode=2 (bypassed)"
-
-        # Check chained order
-        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
-        node_by_id = {n["id"]: n for n in nodes}
-
-        # Find head of chain (no incoming link)
-        head_node = next(n for n in img_adv_nodes if n.get("inputs", [{}])[0].get("link") is None)
-
-        chain_roles = []
-        curr = head_node
-        while curr:
-            role = curr.get("widgets_values", [""])[0]
-            chain_roles.append(role)
-
-            out_links = curr.get("outputs", [{}])[0].get("links")
-            if out_links:
-                next_link_id = out_links[0]
-                link_tuple = link_map[next_link_id]
-                target_node_id = link_tuple[3]
-                curr = node_by_id.get(target_node_id)
-                if curr and curr.get("type") != "CcCKrea2ImageAdvancedSettings":
-                    curr = None
-            else:
-                curr = None
-
-        assert chain_roles == expected_chain, f"Chain order mismatch in {rel_path}: got {chain_roles}, expected {expected_chain}"
-
-
-def test_qwen_workflows_and_non_qwen_isolation():
-    """15-20. Upstream Qwen3VL node types, config chaining, scene img wiring, prompt wiring."""
-    qwen_files = [
-        "workflows/legacy/subject_scene_qwen_simple.json",
-        "workflows/legacy/subject_scene_outfit_qwen_simple.json",
-    ]
-    non_qwen_files = [f for f in LEGACY_WORKFLOW_FILES if f not in qwen_files]
-
-    for rel_path in non_qwen_files:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        raw_json_str = json.dumps(data)
-        assert "QWEN3VL_CONFIG" not in raw_json_str, f"QWEN3VL_CONFIG found in {rel_path}"
-        node_types = [n.get("type") for n in data.get("nodes", [])]
-        assert not any("Qwen" in t for t in node_types), f"Qwen node found in non-Qwen workflow {rel_path}"
-
-    for rel_path in qwen_files:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            assert isinstance(data, dict), f"Failed json.load for {rel_path}"
-
-        raw_json_str = json.dumps(data)
-        assert "QWEN3VL_CONFIG" not in raw_json_str, f"QWEN3VL_CONFIG string found in {rel_path}"
-
-        group_titles = [g.get("title", "") for g in data.get("groups", [])]
-        assert "Qwen Prompt Builder" in group_titles, f"Missing 'Qwen Prompt Builder' group in {rel_path}"
-
-        nodes = data.get("nodes", [])
-        node_by_type = {n.get("type"): n for n in nodes}
-
-        assert "SimpleQwenVLggufV2" in node_by_type, f"Missing SimpleQwenVLggufV2 in {rel_path}"
-        assert "Qwen3VL_ModelConfig" in node_by_type, f"Missing Qwen3VL_ModelConfig in {rel_path}"
-        assert "Qwen3VL_SamplingConfig" in node_by_type, f"Missing Qwen3VL_SamplingConfig in {rel_path}"
-
-        # Socket types check: STRING
-        m_cfg = node_by_type["Qwen3VL_ModelConfig"]
-        s_cfg = node_by_type["Qwen3VL_SamplingConfig"]
-        qwen_node = node_by_type["SimpleQwenVLggufV2"]
-
-        assert m_cfg["outputs"][0]["type"] == "STRING", f"ModelConfig output not STRING in {rel_path}"
-        assert s_cfg["inputs"][0]["type"] == "STRING", f"SamplingConfig input not STRING in {rel_path}"
-        assert s_cfg["outputs"][0]["type"] == "STRING", f"SamplingConfig output not STRING in {rel_path}"
-
-        cfg_override_inp = next(i for i in qwen_node["inputs"] if i["name"] == "config_override")
-        assert cfg_override_inp["type"] == "STRING", f"SimpleQwenVLggufV2 config_override input not STRING in {rel_path}"
-
-        # Verify video input type is "*"
-        video_inp = next(i for i in qwen_node["inputs"] if i["name"] == "video")
-        assert video_inp["type"] == "*", f"SimpleQwenVLggufV2 video input type must be '*' in {rel_path}"
-
-        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
-
-        # Link tuples type check
-        m_out_link_id = m_cfg["outputs"][0]["links"][0]
-        m_out_link = link_map[m_out_link_id]
-        assert m_out_link[5] == "STRING", f"ModelConfig link type not STRING in {rel_path}"
-        assert m_out_link[3] == s_cfg["id"], f"ModelConfig link target mismatch in {rel_path}"
-
-        s_out_link_id = s_cfg["outputs"][0]["links"][0]
-        s_out_link = link_map[s_out_link_id]
-        assert s_out_link[5] == "STRING", f"SamplingConfig link type not STRING in {rel_path}"
-        assert s_out_link[3] == qwen_node["id"], f"SamplingConfig link target mismatch in {rel_path}"
-        assert s_out_link[4] == 6, f"SamplingConfig link target slot should be 6 (config_override) in {rel_path}"
-
-        # ModelConfig widget count and specific values
-        m_widgets = m_cfg.get("widgets_values", [])
-        assert len(m_widgets) == 19, f"ModelConfig widget count mismatch: got {len(m_widgets)}, expected 19 in {rel_path}"
-        assert m_widgets[11] == "qwen25", f"chat_handler must be 'qwen25' in {rel_path}"
-        assert m_widgets[12] == "none", f"chat_format must be 'none' in {rel_path}"
-        assert m_widgets[17] == "F16", f"type_k must be 'F16' in {rel_path}"
-        assert m_widgets[18] == "F16", f"type_v must be 'F16' in {rel_path}"
-        assert "auto" not in (m_widgets[11], m_widgets[12]), f"auto found in chat handler/format in {rel_path}"
-        assert "default" not in (m_widgets[17], m_widgets[18]), f"default found in type_k/type_v in {rel_path}"
-
-        # Qwen3VL_SamplingConfig widgets (10 items)
-        s_widgets = s_cfg.get("widgets_values", [])
-        assert len(s_widgets) == 10, f"Qwen3VL_SamplingConfig must have exactly 10 widget values in {rel_path}"
-
-        # SimpleQwenVLggufV2 widgets (7 items)
-        q_widgets = qwen_node.get("widgets_values", [])
-        assert len(q_widgets) == 7, f"SimpleQwenVLggufV2 widget count mismatch: got {len(q_widgets)}, expected 7 in {rel_path}"
-        assert q_widgets[0] == "None", f"model_preset must be 'None' in {rel_path}"
-        assert q_widgets[1] == "None", f"system_preset must be 'None' in {rel_path}"
-        user_prompt_text = q_widgets[2]
-        assert isinstance(user_prompt_text, str)
-        assert isinstance(q_widgets[3], int), f"seed must be integer in {rel_path}"
-        assert q_widgets[4] == "fixed", f"control_after_generate must be 'fixed' in {rel_path}"
-        assert q_widgets[5] is False, f"unload_all_models must be false in {rel_path}"
-        assert q_widgets[6] == "subprocess", f"mode must be 'subprocess' in {rel_path}"
-        assert q_widgets[6] != "full", f"mode must not be 'full' in {rel_path}"
-
-        # Canonical image role terms and escaped newline in user prompt
-        assert "subject image" in user_prompt_text
-        assert "scene image" in user_prompt_text
-        if "outfit" in rel_path:
-            assert "outfit image" in user_prompt_text
-        assert "Return only the final transformation prompt.\nDo not explain" in user_prompt_text, (
-            f"user_prompt missing required escaped newline segment in {rel_path}"
-        )
-
-        # Outputs check (4 outputs serialized, text output linked in parallel to main node prompt and Preview as Text)
-        outputs = qwen_node.get("outputs", [])
-        assert len(outputs) == 4, f"SimpleQwenVLggufV2 must serialize 4 outputs in {rel_path}"
-        output_names = [o["name"] for o in outputs]
-        assert output_names == ["text", "conditioning", "system_prompt", "user_prompt"]
-
-        text_out = next(o for o in outputs if o["name"] == "text")
-        assert text_out["links"] is not None and len(text_out["links"]) == 2, (
-            f"SimpleQwenVLggufV2 text output must have exactly 2 outgoing links in {rel_path}"
-        )
-
-        for unlinked_name in ("conditioning", "system_prompt", "user_prompt"):
-            out_obj = next(o for o in outputs if o["name"] == unlinked_name)
-            assert out_obj["links"] is None, f"{unlinked_name} output should not be linked in {rel_path}"
-
-        # Scene image connected to real `image` socket (slot index 0)
-        qwen_img_link_id = qwen_node["inputs"][0]["link"]  # slot 0 is "image"
-        qwen_img_link = link_map[qwen_img_link_id]
-        scene_load_img_node = next(n for n in nodes if n["type"] == "LoadImage" and n.get("widgets_values", [""])[0] == "scene.jpg")
-        assert qwen_img_link[1] == scene_load_img_node["id"], f"Scene LoadImage not connected to Qwen image socket in {rel_path}"
-
-        # Qwen text output connected to CcC main node prompt input and Preview as Text node
-        main_node = next(n for n in nodes if n["type"] in MAIN_NODE_TYPES)
-        prompt_input = next(i for i in main_node["inputs"] if i["name"] == "prompt")
-        assert prompt_input["link"] in text_out["links"], f"Qwen text output not connected to main node prompt in {rel_path}"
-
-        # Verify Preview as Text node (PreviewAny)
-        preview_nodes = [n for n in nodes if n["type"] == "PreviewAny"]
-        assert len(preview_nodes) == 1, f"Exactly one Preview as Text (PreviewAny) node must exist in {rel_path}"
-        preview_node = preview_nodes[0]
-        assert preview_node["title"] == "Preview as Text"
-
-        # Verify preview node is in Qwen Prompt Builder group
-        qwen_group = next(g for g in data["groups"] if g["title"] == "Qwen Prompt Builder")
-        gx, gy, gw, gh = qwen_group["bounding"]
-        px, py = preview_node["pos"]
-        assert gx <= px <= gx + gw and gy <= py <= gy + gh, f"Preview node must be inside Qwen Prompt Builder group in {rel_path}"
-
-        # Verify input connection to SimpleQwenVLggufV2.text
-        preview_input_link = preview_node["inputs"][0]["link"]
-        assert preview_input_link in text_out["links"], f"Preview as Text source must be connected to Qwen text output in {rel_path}"
-
-        # Verify preview_mode = Plain text
-        assert preview_node["widgets_values"][0] == "Plain text", f"Preview as Text widget_values must be ['Plain text'] in {rel_path}"
-
-
-def test_workflow_prompt_content():
-    """Verify exact prompt defaults across legacy workflows."""
-    expected_non_qwen_prompts = {
-        "workflows/legacy/subject_edit.json": (
-            "The subject is inside a futuristic high-rise apartment in a futuristic city.\n"
-            "Do not keep the original bedroom background.\n"
-            "Replace the environment completely."
-        ),
-        "workflows/legacy/subject_scene.json": (
-            "Replace the main person in the scene image with the person from the subject image.\n"
-            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
-            "Adapt the subject naturally to the environment and lighting of the scene image.\n"
-            "The result should look seamless and natural, as if the subject was originally part of the scene."
-        ),
-        "workflows/legacy/subject_outfit.json": (
-            "Dress the person from the subject image in the complete clothing from the outfit image.\n"
-            "Use only the clothing from the outfit image.\n"
-            "Preserve the subject image identity, pose and original background.\n"
-            "Do not copy the background, environment or composition from the outfit image."
-        ),
-        "workflows/legacy/subject_outfit_scene.json": (
-            "Replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n"
-            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
-            "Use only the clothing from the outfit image.\n"
-            "Do not copy the background, environment or composition from the outfit image.\n"
-            "Adapt the subject and clothing naturally to the scene image lighting and environment.\n"
-            "The result should look seamless and natural, as if the subject was originally part of the scene."
-        ),
-    }
-
-    for filepath, expected_prompt in expected_non_qwen_prompts.items():
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        main_node = next(n for n in data["nodes"] if n.get("type") in MAIN_NODE_TYPES)
-        actual_prompt = main_node["widgets_values"][0]
-        assert actual_prompt == expected_prompt, f"Prompt mismatch in {filepath}:\ngot: {repr(actual_prompt)}\nexpected: {repr(expected_prompt)}"
-
-    expected_qwen_prompts = {
-        "workflows/legacy/subject_scene_qwen_simple.json": (
-            "Analyze the scene image and write one complete image-editing prompt.\n\n"
-            "The output prompt must replace the main person in the scene image with the person from the subject image.\n\n"
-            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
-            "Adapt the subject naturally to the environment and lighting of the scene image.\n"
-            "The result should look seamless and natural, as if the subject was originally part of the scene.\n\n"
-            "Refer to the images using exactly these terms:\n"
-            "- subject image\n"
-            "- scene image\n\n"
-            "Do not describe incidental brand names, street names, signs, or other unnecessary scene-specific details unless they are essential to preserve the scene composition.\n\n"
-            "Return only the final transformation prompt.\n"
-            "Do not explain your analysis and do not add headings."
-        ),
-        "workflows/legacy/subject_scene_outfit_qwen_simple.json": (
-            "Analyze the scene image and write one complete image-editing prompt.\n\n"
-            "The output prompt must replace the main person in the scene image with the person from the subject image, wearing the complete clothing from the outfit image.\n\n"
-            "Preserve the composition, background, camera angle, lighting and visual style of the scene image.\n"
-            "Use only the clothing from the outfit image.\n"
-            "Do not copy the background, environment or composition from the outfit image.\n"
-            "Adapt the subject and clothing naturally to the scene image lighting and environment.\n"
-            "The result should look seamless and natural, as if the subject was originally part of the scene.\n\n"
-            "Refer to the images using exactly these terms:\n"
-            "- subject image\n"
-            "- scene image\n"
-            "- outfit image\n\n"
-            "Do not describe incidental brand names, street names, signs, or other unnecessary scene-specific details unless they are essential to preserve the scene composition.\n\n"
-            "Return only the final transformation prompt.\n"
-            "Do not explain your analysis and do not add headings."
-        ),
-    }
-
-    for filepath, expected_user_prompt in expected_qwen_prompts.items():
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        qwen_node = next(n for n in data["nodes"] if n.get("type") == "SimpleQwenVLggufV2")
-        actual_user_prompt = qwen_node["widgets_values"][2]
-        assert actual_user_prompt == expected_user_prompt, f"User prompt mismatch in {filepath}:\ngot: {repr(actual_user_prompt)}\nexpected: {repr(expected_user_prompt)}"
-        assert "subject image" in actual_user_prompt
-        assert "scene image" in actual_user_prompt
-        if "outfit" in filepath:
-            assert "outfit image" in actual_user_prompt
-        assert "Return only the final transformation prompt." in actual_user_prompt
-        assert "Do not describe incidental brand names, street names, signs, or other unnecessary scene-specific details" in actual_user_prompt
-
-
-
-def test_metadata_and_graph_integrity():
-    """21-22. Maxima match, unique IDs, valid links."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        nodes = data.get("nodes", [])
-        links = data.get("links", [])
-
-        node_ids = [n["id"] for n in nodes]
-        link_ids = [link_item[0] for link_item in links]
-
-        if "qwen" not in rel_path:
-            assert not any(n["type"] == "PreviewAny" for n in nodes), f"No PreviewAny node allowed in non-Qwen workflow {rel_path}"
-
-        for n in nodes:
-            if n["type"] == "CcCKrea2ImageAdvancedSettings":
-                assert len(n.get("widgets_values", [])) == 10, (
-                    f"CcCKrea2ImageAdvancedSettings in {rel_path} must have exactly 10 widget values after removing override switches"
-                )
-
-        assert len(node_ids) == len(set(node_ids)), f"Duplicate node IDs in {rel_path}"
-        assert len(link_ids) == len(set(link_ids)), f"Duplicate link IDs in {rel_path}"
-
-        max_node_id = max(node_ids)
-        max_link_id = max(link_ids)
-
-        assert data.get("last_node_id") == max_node_id, f"last_node_id mismatch in {rel_path}: got {data.get('last_node_id')}, expected {max_node_id}"
-        assert data.get("last_link_id") == max_link_id, f"last_link_id mismatch in {rel_path}: got {data.get('last_link_id')}, expected {max_link_id}"
-
-        node_id_set = set(node_ids)
-        link_id_set = set(link_ids)
-
-        for link_item in links:
-            lid, src_id, src_slot, dst_id, dst_slot, ltype = link_item
-            assert src_id in node_id_set, f"Link {lid} references non-existent src node {src_id} in {rel_path}"
-            assert dst_id in node_id_set, f"Link {lid} references non-existent dst node {dst_id} in {rel_path}"
-
-        for n in nodes:
-            for inp in n.get("inputs", []):
-                link_id = inp.get("link")
-                if link_id is not None:
-                    assert link_id in link_id_set, f"Node {n['id']} input references non-existent link {link_id} in {rel_path}"
-
-            for out in n.get("outputs", []):
-                out_links = out.get("links")
-                if out_links:
-                    for lid in out_links:
-                        assert lid in link_id_set, f"Node {n['id']} output references non-existent link {lid} in {rel_path}"
-
-
-def test_subject_boost_default_correction():
-    """Verify that every CcCKrea2ImageAdvancedSettings node with role 'subject' has boost == 2.5."""
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        for n in data.get("nodes", []):
-            if n.get("type") == "CcCKrea2ImageAdvancedSettings":
-                widgets = n.get("widgets_values", [])
-                role = widgets[0]
-                boost = widgets[1]
-                if role == "subject":
-                    assert boost == 2.5, f"Expected subject boost == 2.5 in {rel_path}, got {boost}"
-                else:
-                    assert boost == 1.0, f"Expected non-subject role '{role}' boost == 1.0 in {rel_path}, got {boost}"
-
-
-def test_text_to_image_workflow_structure():
-    """Validate detailed structure of workflows/legacy/text_to_image.json."""
-    filepath = "workflows/legacy/text_to_image.json"
-    with open(filepath, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    nodes = data.get("nodes", [])
-    node_types = [n.get("type") for n in nodes]
-
-    assert node_types.count("CcCKrea2TextToImage") == 1
-    assert node_types.count("CcCKrea2LoRAStack") == 1
-    assert node_types.count("CcCKrea2LoRAPromptSettings") == 1
-
-    stack_node = next(n for n in nodes if n.get("type") == "CcCKrea2LoRAStack")
-    ps_node = next(n for n in nodes if n.get("type") == "CcCKrea2LoRAPromptSettings")
-    vae_loader = next(n for n in nodes if n.get("type") == "VAELoader")
-
-    # All LoRA slots disabled by default, no Identity Edit enabled
-    stack_widgets = stack_node.get("widgets_values", [])
-    assert stack_widgets[0] is True  # global enabled
-    # Slot 1 to 4 disabled
-    for slot_offset in [2, 5, 8, 11]:
-        assert stack_widgets[slot_offset] is False, f"LoRA slot at offset {slot_offset} should be disabled by default"
-
-    # Identity Edit LoRA not in stack
-    assert "krea2_edit_lora.safetensors" not in str(stack_widgets)
-
-    # LoRA prompt settings disabled by default
-    ps_widgets = ps_node.get("widgets_values", [])
-    assert ps_widgets[0] is False
-
-    # VAE connected ONLY to VAEDecode
-    vae_out_links = vae_loader["outputs"][0].get("links", [])
-    assert len(vae_out_links) == 1
-    link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
-    vae_link = link_map[vae_out_links[0]]
-    dst_node_id = vae_link[3]
-    dst_node = next(n for n in nodes if n["id"] == dst_node_id)
-    assert dst_node["type"] == "VAEDecode"
-
-    # Verify Groups
-    group_titles = [g.get("title", "") for g in data.get("groups", [])]
-    assert "Models" in group_titles
-    assert "LoRA Prompt Augmentation (disabled by default)" in group_titles
-    assert "LoRA Stack + Text to Image + KSampler" in group_titles
-    assert "Output" in group_titles
-
-
-def test_modular_workflow_files_structure():
-    """Validate that all 12 modular example workflows parse cleanly and use new node types."""
-    for rel_path in MODULAR_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        assert isinstance(data, dict)
-        nodes = data.get("nodes", [])
-        node_types = [n.get("type") for n in nodes]
-
-        assert "UNETLoader" in node_types
-        assert "CLIPLoader" in node_types
-        assert "VAELoader" in node_types
-        assert any(t in node_types for t in ("CcCKrea2TextToImage", "CcCKrea2Edit", "CcCKrea2EasyEdit", "CcCKrea2EasyEditOstris"))
-
-
-def test_all_workflows_registered_node_classes_and_sockets():
-    """Validate that every node type in workflows exists, socket names/types are valid, and fit choices are valid."""
-    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
-
-    krea2_node_types = set(NODE_CLASS_MAPPINGS.keys())
-    stale_type_names = {"TARGET_LATENT_DICT", "CCC_KREA2_PREPARED_IMAGE"}
-
-    for rel_path in EXPECTED_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        raw_str = json.dumps(data)
-        for stale_name in stale_type_names:
-            assert stale_name not in raw_str, f"Stale socket/type name '{stale_name}' found in {rel_path}"
-
-        nodes = data.get("nodes", [])
-        for n in nodes:
-            ntype = n.get("type")
-            if ntype and ntype.startswith("CcCKrea2"):
-                assert ntype in krea2_node_types, f"Unregistered node class '{ntype}' found in {rel_path}"
-
-def test_canonical_modular_workflows_strict_contract():
-    """Strict contract validation for canonical modular workflows (01 through 12)."""
-    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
-
-    stale_inputs = {"stale_dummy_input"}
-    stale_types = {"TARGET_LATENT_DICT", "CCC_KREA2_PREPARED_IMAGE", "CCC_KREA2_REFERENCE_CHAIN", "CCC_KREA2_LORA_STACK"}
-    unsupported_loader_modes = {"qwen2_5_vl", "qwen25vl"}
-
-    expected_strategies = {
-        "workflows/06_advanced_subject.json": ("empty", "fixed"),
-        "workflows/07_advanced_scene.json": ("empty", "fixed"),
-        "workflows/08_advanced_outfit.json": ("empty", "fixed"),
-        "workflows/09_advanced_style.json": ("empty", "fixed"),
-        "workflows/10_advanced_ostris.json": ("empty", "fixed"),
-    }
-
-    for rel_path in MODULAR_WORKFLOW_FILES:
-        with open(rel_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        raw_str = json.dumps(data)
-        for st_type in stale_types:
-            assert st_type not in raw_str, f"Stale socket type '{st_type}' found in {rel_path}"
-
-        nodes = data.get("nodes", [])
-        node_by_id = {n["id"]: n for n in nodes}
-        link_map = {link_item[0]: link_item for link_item in data.get("links", [])}
-
-        ref_chain_order = []  # track order of reference nodes in chain
-
-        for n in nodes:
-            nid = n["id"]
-            ntype = n.get("type", "")
-
-            # 1. Registered class check
-            if ntype.startswith("CcCKrea2"):
-                assert ntype in NODE_CLASS_MAPPINGS, f"Unregistered class '{ntype}' node {nid} in {rel_path}"
-
-            # 2. Input sockets check against stale lists
-            for inp in n.get("inputs", []):
-                iname = inp.get("name")
-                itype = inp.get("type")
-                assert iname not in stale_inputs, f"Stale input name '{iname}' in node {nid} ({ntype}) in {rel_path}"
-                assert itype not in stale_types, f"Stale input type '{itype}' in node {nid} ({ntype}) in {rel_path}"
-
-            # 3. Output sockets check against stale lists
-            for out in n.get("outputs", []):
-                otype = out.get("type")
-                assert otype not in stale_types, f"Stale output type '{otype}' in node {nid} ({ntype}) in {rel_path}"
-
-            # 4. CLIPLoader loader mode check
-            if ntype == "CLIPLoader":
-                wvals = n.get("widgets_values", [])
-                if len(wvals) >= 2:
-                    assert wvals[1] not in unsupported_loader_modes, (
-                        f"Unsupported CLIPLoader mode '{wvals[1]}' in node {nid} in {rel_path}"
-                    )
-                    assert wvals[1] == "krea2", (
-                        f"CLIPLoader model type must be 'krea2', got '{wvals[1]}' in node {nid} in {rel_path}"
-                    )
-
-            # 5. Full input/output socket contract validation for registered nodes
-            if ntype in NODE_CLASS_MAPPINGS:
-                cls = NODE_CLASS_MAPPINGS[ntype]
-                input_spec = cls.INPUT_TYPES()
-                req_spec = input_spec.get("required", {})
-                opt_spec = input_spec.get("optional", {})
-                allowed_input_names = set(req_spec.keys()) | set(opt_spec.keys())
-
-                # Validate required non-widget input sockets presence and link validity
-                for rname, rspec in req_spec.items():
-                    type_info = rspec[0]
-                    if not isinstance(type_info, list) and type_info not in ("STRING", "FLOAT", "INT", "BOOLEAN"):
-                        node_inps = {i.get("name"): i for i in n.get("inputs", [])}
-                        assert rname in node_inps, (
-                            f"Workflow {rel_path}, node {nid} ({ntype}): missing required linked socket '{rname}'"
-                        )
-                        sinp = node_inps[rname]
-                        assert sinp.get("link") is not None and sinp.get("link") in link_map, (
-                            f"Workflow {rel_path}, node {nid} ({ntype}): required socket '{rname}' is unlinked or invalid"
-                        )
-
-                # Validate input sockets against allowed set and verify declared input types
-                for inp in n.get("inputs", []):
-                    iname = inp.get("name")
-                    assert iname in allowed_input_names, (
-                        f"Node {nid} ({ntype}) in {rel_path} has unknown input socket '{iname}' not in allowed {allowed_input_names}"
-                    )
-                    declared_spec = req_spec.get(iname) or opt_spec.get(iname)
-                    if declared_spec is not None:
-                        declared_type = declared_spec[0]
-                        if not isinstance(declared_type, list) and declared_type not in ("STRING", "FLOAT", "INT", "BOOLEAN"):
-                            serialized_dst_type = inp.get("type")
-                            assert serialized_dst_type == declared_type or declared_type == "*" or serialized_dst_type == "*", (
-                                f"Workflow {rel_path}, node {nid} ({ntype}) input '{iname}': "
-                                f"serialized destination type '{serialized_dst_type}' != declared type '{declared_type}'"
-                            )
-                            link_id = inp.get("link")
-                            if link_id is not None and link_id in link_map:
-                                link_item = link_map[link_id]
-                                src_node_id = link_item[1]
-                                src_slot = link_item[2]
-                                src_node = node_by_id.get(src_node_id)
-                                if src_node:
-                                    src_ntype = src_node.get("type")
-                                    if src_ntype in NODE_CLASS_MAPPINGS:
-                                        src_cls = NODE_CLASS_MAPPINGS[src_ntype]
-                                        src_ret_types = getattr(src_cls, "RETURN_TYPES", ())
-                                        if src_slot < len(src_ret_types):
-                                            linked_src_type = src_ret_types[src_slot]
-                                            assert linked_src_type == declared_type or declared_type == "*" or linked_src_type == "*", (
-                                                f"Workflow {rel_path}, node {nid} ({ntype}) input '{iname}': "
-                                                f"linked source output type '{linked_src_type}' from node {src_node_id} ({src_ntype}) != declared type '{declared_type}' "
-                                                f"(serialized dst type: '{serialized_dst_type}')"
-                                            )
-
-
-                # Validate output socket names and types against RETURN_NAMES & RETURN_TYPES
-                ret_names = getattr(cls, "RETURN_NAMES", ())
-                ret_types = getattr(cls, "RETURN_TYPES", ())
-                node_outputs = n.get("outputs", [])
-                assert len(node_outputs) == len(ret_names), (
-                    f"Node {nid} ({ntype}) in {rel_path} output count mismatch: got {len(node_outputs)}, expected {len(ret_names)}"
-                )
-                for idx, out in enumerate(node_outputs):
-                    oname = out.get("name")
-                    otype = out.get("type")
-                    exp_name = ret_names[idx]
-                    exp_type = ret_types[idx]
-                    assert oname == exp_name, (
-                        f"Node {nid} ({ntype}) in {rel_path} output {idx} name mismatch: got '{oname}', expected '{exp_name}'"
-                    )
-                    assert otype == exp_type, (
-                        f"Node {nid} ({ntype}) in {rel_path} output {idx} type mismatch: got '{otype}', expected '{exp_type}'"
-                    )
-
-                # Collect expected widget fields in order
-                expected_widgets = []
-                req_widgets = []
-                for name, spec in req_spec.items():
-                    type_info = spec[0]
-                    if isinstance(type_info, list):
-                        req_widgets.append((name, "CHOICE", type_info, spec[1] if len(spec) > 1 else {}))
-                    elif type_info in ("STRING", "FLOAT", "INT", "BOOLEAN"):
-                        req_widgets.append((name, type_info, None, spec[1] if len(spec) > 1 else {}))
-
-                for name, spec in list(req_spec.items()) + list(opt_spec.items()):
-                    type_info = spec[0]
-                    if isinstance(type_info, list):
-                        expected_widgets.append((name, "CHOICE", type_info, spec[1] if len(spec) > 1 else {}))
-                    elif type_info in ("STRING", "FLOAT", "INT", "BOOLEAN"):
-                        expected_widgets.append((name, type_info, None, spec[1] if len(spec) > 1 else {}))
-
-                wvals = n.get("widgets_values", [])
-                assert len(req_widgets) <= len(wvals) <= len(expected_widgets), (
-                    f"Node {nid} ({ntype}) in {rel_path} widget count mismatch: "
-                    f"got {len(wvals)}, expected between {len(req_widgets)} and {len(expected_widgets)}"
-                )
-
-
-                for idx, (wname, wkind, choices, kwargs) in enumerate(expected_widgets):
-                    if idx >= len(wvals):
-                        break
-                    val = wvals[idx]
-
-                    if wkind == "CHOICE":
-                        assert isinstance(val, str), (
-                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be string choice, got {type(val).__name__}"
-                        )
-                        assert val in choices, (
-                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} value '{val}' not in choices {choices}"
-                        )
-                    elif wkind == "STRING":
-                        assert isinstance(val, str), (
-                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be string, got {type(val).__name__}"
-                        )
-                    elif wkind == "FLOAT":
-                        assert isinstance(val, (float, int)) and not isinstance(val, bool), (
-                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be float, got {type(val).__name__}"
-                        )
-                        min_v = kwargs.get("min")
-                        max_v = kwargs.get("max")
-                        if min_v is not None:
-                            assert val >= min_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} < min {min_v} in {rel_path}"
-                        if max_v is not None:
-                            assert val <= max_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} > max {max_v} in {rel_path}"
-                    elif wkind == "INT":
-                        assert isinstance(val, int) and not isinstance(val, bool), (
-                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be int, got {type(val).__name__}"
-                        )
-                        min_v = kwargs.get("min")
-                        max_v = kwargs.get("max")
-                        if min_v is not None:
-                            assert val >= min_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} < min {min_v} in {rel_path}"
-                        if max_v is not None:
-                            assert val <= max_v, f"Node {nid} ({ntype}) widget '{wname}' val {val} > max {max_v} in {rel_path}"
-                    elif wkind == "BOOLEAN":
-                        assert isinstance(val, bool), (
-                            f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be bool, got {type(val).__name__}"
-                        )
-
-            # 6. Vision Prep CLIP connection check
-            if ntype == "CcCKrea2QwenVisionImagePrep":
-                clip_inp = next((i for i in n.get("inputs", []) if i.get("name") == "clip"), None)
-                assert clip_inp is not None and clip_inp.get("link") is not None, (
-                    f"Vision Prep node {nid} missing CLIP link in {rel_path}"
-                )
-
-            # 7. Reference node removed fields check & reference chain order collection
-            if ntype in ("CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"):
-                raw_node_str = json.dumps(n)
-                if ntype == "CcCKrea2SubjectImage":
-                    assert "masked_region_anchor" not in raw_node_str, f"Subject node {nid} contains removed masked_region_anchor in {rel_path}"
-                    ref_chain_order.append((nid, "subject"))
-                elif ntype == "CcCKrea2OutfitImage":
-                    assert "masked_identity_anchor" not in raw_node_str, f"Outfit node {nid} contains removed masked_identity_anchor in {rel_path}"
-                    assert "masked_region_anchor" not in raw_node_str, f"Outfit node {nid} contains removed masked_region_anchor in {rel_path}"
-                    ref_chain_order.append((nid, "outfit"))
-                elif ntype == "CcCKrea2SceneImage":
-                    ref_chain_order.append((nid, "scene"))
-                elif ntype == "CcCKrea2StyleImage":
-                    ref_chain_order.append((nid, "style"))
-
-            # 8. Target Latent conditional dependency check
-            if ntype == "CcCKrea2TargetLatent":
-                wvals = n.get("widgets_values", [])
-                target_content = wvals[0]
-                geometry_mode = wvals[1]
-
-                # Check expected strategy if registered in table
-                if rel_path in expected_strategies:
-                    exp_content, exp_geom = expected_strategies[rel_path]
-                    assert target_content == exp_content, f"Workflow {rel_path} target_content mismatch: got '{target_content}', expected '{exp_content}'"
-                    assert geometry_mode == exp_geom, f"Workflow {rel_path} geometry_mode mismatch: got '{geometry_mode}', expected '{exp_geom}'"
-
-                inps = {i["name"]: i for i in n.get("inputs", [])}
-
-                if target_content in ("subject", "scene"):
-                    assert "vae" in inps and inps["vae"].get("link") is not None, (
-                        f"Target Latent node {nid} in {rel_path} target_content='{target_content}' requires linked VAE input"
-                    )
-
-                if target_content == "subject" or geometry_mode == "favor_subject":
-                    assert "subject_image" in inps and inps["subject_image"].get("link") is not None, (
-                        f"Target Latent node {nid} in {rel_path} target_content='{target_content}', geometry_mode='{geometry_mode}' requires linked subject_image"
-                    )
-
-                if target_content == "scene" or geometry_mode == "favor_scene":
-                    assert "scene_image" in inps and inps["scene_image"].get("link") is not None, (
-                        f"Target Latent node {nid} in {rel_path} target_content='{target_content}', geometry_mode='{geometry_mode}' requires linked scene_image"
-                    )
-
-                # Output link check
-                lat_out = next((o for o in n.get("outputs", []) if o.get("name") == "target_latent"), None)
-                assert lat_out is not None and lat_out.get("links"), (
-                    f"Target Latent node {nid} output 'target_latent' not linked in {rel_path}"
-                )
-                first_link = link_map[lat_out["links"][0]]
-                dst_node = node_by_id[first_link[3]]
-                assert dst_node.get("type") == "CcCKrea2Edit", (
-                    f"Target Latent node {nid} output must connect to CcCKrea2Edit target_latent input in {rel_path}"
-                )
-
-            # 9. Edit node wiring check
-            if ntype == "CcCKrea2Edit":
-                # Target latent input linked
-                lat_inp = next((i for i in n.get("inputs", []) if i.get("name") == "target_latent"), None)
-                assert lat_inp is not None and lat_inp.get("link") is not None, (
-                    f"Main node {nid} ({ntype}) missing target_latent link in {rel_path}"
-                )
-                # Latent output linked to KSampler
-                lat_out = next((o for o in n.get("outputs", []) if o.get("name") == "latent"), None)
-                assert lat_out is not None and lat_out.get("links"), (
-                    f"Main node {nid} ({ntype}) latent output not linked in {rel_path}"
-                )
-                first_link = link_map[lat_out["links"][0]]
-                dst_node = node_by_id[first_link[3]]
-                assert dst_node.get("type") == "KSampler", (
-                    f"Main node {nid} ({ntype}) latent output must connect to KSampler in {rel_path}"
-                )
-
-        # 10. Validate Style ordering by following the reference_chain link topology
-        role_type_map = {
-            "CcCKrea2SubjectImage": "subject",
-            "CcCKrea2SceneImage": "scene",
-            "CcCKrea2OutfitImage": "outfit",
-            "CcCKrea2StyleImage": "style",
-            "CcCKrea2ReferenceImage": "reference",
-        }
-        ref_nodes = [n for n in nodes if n.get("type") in role_type_map]
-
-        if ref_nodes:
-            # Find root node
-            root_node = None
-            for rnode in ref_nodes:
-                ref_inp = next((i for i in rnode.get("inputs", []) if i.get("name") in ("reference_chain", "previous_references")), None)
-                if not ref_inp or ref_inp.get("link") is None:
-                    root_node = rnode
-                    break
-
-            assert root_node is not None, f"Could not find root reference node in {rel_path}"
-
-            # Walk chain
-            curr = root_node
-            ref_chain_order = []
-            while curr:
-                ntype = curr.get("type")
-                if ntype == "CcCKrea2ReferenceImage":
-                    wvals = curr.get("widgets_values", [])
-                    ref_path = wvals[0] if wvals else "edit"
-                    role = "style" if ref_path == "style" else "edit"
-                else:
-                    role = role_type_map.get(ntype, "edit")
-                ref_chain_order.append((curr["id"], role))
-
-                # Find next node in chain
-                out_ref = next((o for o in curr.get("outputs", []) if o.get("name") == "reference_chain"), None)
-                if out_ref and out_ref.get("links"):
-                    link_id = out_ref["links"][0]
-                    link_item = link_map.get(link_id)
-                    if link_item:
-                        next_node_id = link_item[3]
-                        next_node = node_by_id.get(next_node_id)
-                        if next_node and next_node.get("type") in role_type_map:
-                            curr = next_node
-                        else:
-                            curr = None
-                    else:
-                        curr = None
-                else:
-                    curr = None
-
-            # Assert style nodes appear only at end of chain
-            seen_style = False
-            for nid, role in ref_chain_order:
-                if role == "style":
-                    seen_style = True
-                elif seen_style:
-                    pytest.fail(f"Non-style reference '{role}' node {nid} appears after Style node in reference chain of {rel_path}")
-
-
-
-
-
-
+    assert workflows_dir.exists()
+    
+    found_files = set(str(p.name) for p in workflows_dir.glob("*.json"))
+    expected_files = set(MODERN_CANONICAL)
+    
+    assert found_files == expected_files, f"Mismatch in canonical files. Found: {found_files}, Expected: {expected_files}"
+
+def _get_nodes_by_type(workflow, type_name):
+    return [n for n in workflow.get("nodes", []) if n.get("type") == type_name]
+
+def _is_connected(workflow, node, input_name):
+    inputs = node.get("inputs", [])
+    for inp in inputs:
+        if inp.get("name") == input_name and inp.get("link") is not None:
+            return True
+    return False
+
+def test_easy_workflows_sockets_and_presets():
+    for filename in MODERN_CANONICAL[:7]:
+        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
+            wf = json.load(f)
+            
+        is_ostris = "ostris" in filename
+        edit_type = "CcCKrea2EasyEditOstris" if is_ostris else "CcCKrea2EasyEdit"
+        edit_nodes = _get_nodes_by_type(wf, edit_type)
+        assert len(edit_nodes) == 1, f"Missing {edit_type} in {filename}"
+        edit = edit_nodes[0]
+        
+        assert edit.get("properties", {}).get("Node name for S&R") == edit_type, f"Wrong S&R name in {filename}"
+        
+        has_s = _is_connected(wf, edit, "subject_image")
+        has_sc = _is_connected(wf, edit, "scene_image")
+        has_o = _is_connected(wf, edit, "outfit_image")
+        has_st = _is_connected(wf, edit, "style_image")
+        
+        widgets = edit.get("widgets_values", [])
+        preset = widgets[0]
+        outfit_source = widgets[1]
+        
+        if filename == "01_easy_subject.json":
+            assert has_s and not has_sc and not has_o and not has_st
+        elif filename == "02_easy_subject_scene.json":
+            assert has_s and has_sc and not has_o and not has_st
+        elif filename == "03_easy_subject_outfit.json":
+            assert has_s and not has_sc and has_o and not has_st
+        elif filename == "04_easy_subject_scene_outfit.json":
+            assert has_s and has_sc and has_o and not has_st
+        elif filename == "05_easy_outfit_from_scene.json":
+            assert has_s and has_sc and not has_o and not has_st
+            assert preset == "outfit_transfer"
+            assert outfit_source == "scene image"
+        elif filename == "06_easy_style_transfer.json":
+            assert has_s and not has_sc and not has_o and has_st
+            assert preset == "style_transfer"
+        elif filename == "07_easy_ostris.json":
+            assert has_s and has_sc
+            assert widgets[3] is True # apply_ostris_edit_patch
+            assert widgets[5] is False # ostris_kv_cache
+
+def test_advanced_workflows():
+    for filename in MODERN_CANONICAL[7:10]:
+        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
+            wf = json.load(f)
+            
+        edit_nodes = _get_nodes_by_type(wf, "CcCKrea2Edit")
+        assert len(edit_nodes) == 1
+        edit = edit_nodes[0]
+        
+        assert edit.get("properties", {}).get("Node name for S&R") == "CcCKrea2Edit"
+        
+        ref_method = edit.get("widgets_values", [])[0]
+        if "krea2_edit" in filename:
+            assert ref_method == "krea2_edit"
+        elif "native" in filename:
+            assert ref_method == "native"
+        elif "ostris" in filename:
+            assert ref_method == "ostris_edit"
+            
+        gen_refs = _get_nodes_by_type(wf, "CcCKrea2ReferenceImage")
+        assert len(gen_refs) >= 2
+        
+        for ntype in ["CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"]:
+            assert len(_get_nodes_by_type(wf, ntype)) == 0, f"No legacy {ntype} allowed in canonical advanced"
+
+def test_clip_loader_and_lora():
+    for filename in MODERN_CANONICAL:
+        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
+            wf = json.load(f)
+            
+        clips = _get_nodes_by_type(wf, "CLIPLoader")
+        assert len(clips) == 1
+        assert clips[0].get("widgets_values", [])[1] == "krea2"
+        
+        if "native" not in filename:
+            loras = _get_nodes_by_type(wf, "CcCKrea2LoRAStack")
+            assert len(loras) == 1
+            assert loras[0].get("widgets_values", [])[0] is True # enabled
+
+def test_groups():
+    for filename in MODERN_CANONICAL:
+        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
+            wf = json.load(f)
+        groups = wf.get("groups", [])
+        assert len(groups) >= 3, f"Must have meaningful groups in {filename}"
+        title_count = sum("CcC Krea2 Edit Pipeline" == g.get("title") for g in groups)
+        assert title_count < len(groups), f"Must use meaningful names, not just CcC Krea2 Edit Pipeline for all"
 

@@ -30,7 +30,7 @@ def preprocess_ostris_vision_image(image_tensor: torch.Tensor) -> torch.Tensor:
     if image_tensor.ndim == 3:
         image_tensor = image_tensor.unsqueeze(0)
 
-    bs, h, w, c = image_tensor.shape
+    _, h, w, _ = image_tensor.shape
     curr_area = h * w
 
     if curr_area > OSTRIS_VISION_PIXEL_BUDGET:
@@ -51,7 +51,7 @@ def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tenso
     if image_tensor.ndim == 3:
         image_tensor = image_tensor.unsqueeze(0)
 
-    bs, h, w, c = image_tensor.shape
+    _, h, w, _ = image_tensor.shape
     curr_area = float(h * w)
 
     scale = min(1.0, math.sqrt(OSTRIS_VAE_MAX_PIXELS / curr_area))

@@ -225,7 +225,7 @@ class TestPreserveIdentityMatrix:
         S, Sc, Ou, _ = dummy_sources
         sources = resolve_easy_sources(subject=S, outfit=Ou)
         route = route_easy_preset(sources, preset="preserve_identity")
-        assert_refs(route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_EMPHASIS_BOOST, "outfit")])
+        assert_refs(route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")])
 
     def test_scene_outfit_fallback(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -235,6 +235,7 @@ class TestPreserveIdentityMatrix:
         assert any("missing" in w for w in route.warnings)
         assert route.target_content_mode == "image"
         assert len(route.edit_references) == 2
+        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene"), (Ou, NORMAL_BOOST, "outfit")])
         assert_no_more_than_2_refs(route)
 
     def test_subject_scene_outfit(self, dummy_sources):
@@ -242,10 +243,16 @@ class TestPreserveIdentityMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset="preserve_identity")
         assert route.target_content_mode == "image"
-        aliases = [alias for _, _, alias, _ in route.edit_references]
-        assert "subject" in aliases
-        assert "outfit" in aliases
+        assert_refs(route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_EMPHASIS_BOOST, "outfit")])
         assert_no_more_than_2_refs(route)
+
+    def test_subject_scene_as_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
+        route = route_easy_preset(sources, preset="preserve_identity")
+        assert route.target_content_mode == "empty"
+        assert route.target_geometry_source is Sc
+        assert_refs(route.edit_references, [(Sc, OUTFIT_EMPHASIS_BOOST, "scene+outfit"), (S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject")])
 
 
 # ---------------------------------------------------------------------------
@@ -285,10 +292,9 @@ class TestMaxIdentityMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc)
         route = route_easy_preset(sources, preset="max_identity")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is Sc
-        aliases = [alias for _, _, alias, _ in route.edit_references]
-        assert "scene" in aliases
-        assert "subject" in aliases
+        assert route.target_content_source is S
+        assert route.target_geometry_source is S
+        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
 
     def test_scene_outfit_fallback(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -297,6 +303,7 @@ class TestMaxIdentityMatrix:
         assert any("missing" in w for w in route.warnings)
         assert route.target_content_mode == "image"
         assert len(route.edit_references) == 2
+        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene"), (Ou, NORMAL_BOOST, "outfit")])
         assert_no_more_than_2_refs(route)
 
     def test_subject_scene_outfit(self, dummy_sources):
@@ -304,8 +311,17 @@ class TestMaxIdentityMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset="max_identity")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is Sc
-        assert_refs(route.edit_references, [(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")])
+        assert route.target_content_source is S
+        assert_refs(route.edit_references, [(Ou, NORMAL_BOOST, "outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
+
+    def test_subject_scene_as_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
+        route = route_easy_preset(sources, preset="max_identity")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is S
+        assert route.target_geometry_source is S
+        assert_refs(route.edit_references, [(Sc, OUTFIT_EMPHASIS_BOOST, "scene+outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
 
 
 # ---------------------------------------------------------------------------

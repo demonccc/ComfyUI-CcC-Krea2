@@ -18,14 +18,14 @@
 
 ```mermaid
 graph TD
-    L1["Layer 1: Qwen Vision Prep<br/>(CcCKrea2QwenVisionPrep)"] -->|Prepared Image| L3["Layer 3: Generic Reference<br/>(CcCKrea2ReferenceImage)"]
+    L1["Layer 1: Qwen Vision Prep<br/>(CcCKrea2QwenVisionImagePrep)"] -->|Prepared Image| L3["Layer 3: Generic Reference<br/>(CcCKrea2ReferenceImage)"]
     L2["Layer 2: Target Latent<br/>(CcCKrea2TargetLatent)"] -->|Target Latent| L5["Layer 5: Edit Orchestrator<br/>(CcCKrea2Edit / EasyEdit)"]
     L3 -->|Reference Spec| L4["Layer 4: Reference Chain<br/>(Immutable Specs Chain)"]
     L4 -->|Ordered Reference Chain| L5
     L5 -->|Output| OUT["Patched Model, Positive, Negative, Latent, Edit Info"]
 ```
 
-1. **Layer 1: Qwen Vision Prep (`CcCKrea2QwenVisionPrep`)**: Prepares derivative images (`vision_image`) optimized for Qwen Vision tokenization (Native, Adaptive, or Fixed MP) while retaining original pixel tensors for VAE processing.
+1. **Layer 1: Qwen Vision Prep (`CcCKrea2QwenVisionImagePrep`)**: Prepares derivative images (`vision_image`) optimized for Qwen Vision tokenization (Native, Adaptive, or Fixed MP) while retaining original pixel tensors for VAE processing.
 2. **Layer 2: Target Latent (`CcCKrea2TargetLatent`)**: Creates the target latent container, independently configuring `target_content` (`empty`, `image`) and `geometry_mode` (`fixed`, `favor_image`). Supports Target Vision Context inclusion without triggering VAE appearance frames.
 3. **Layer 3: Declarative Reference Node (`CcCKrea2ReferenceImage`)**: Generic reference configuration for edit (appearance/semantic) and style paths. Legacy role nodes (`Subject`, `Scene`, `Outfit`, `Style`) are deprecated in favor of generic reference nodes and Easy presets.
 4. **Layer 4: Immutable Reference Chain**: Links reference specifications in strict non-Style before Style order.
@@ -38,7 +38,7 @@ graph TD
 | Backend | Reference Transport | Qwen Prompt Format | VAE Pixel Prep | Model Patching |
 | :--- | :--- | :--- | :--- | :--- |
 | **Krea2 Edit** | CcC Krea2 Model Wrapper | Canonical `<VISION>` blocks + text | Krea2 geometry & RoPE alignment | `patch_krea2_model` |
-| **Ostris Edit** | `index_timestep_zero` | `Picture N: <VISION>` blocks + text | Ostris 1024x1024 /16 snapped pixels | `patch_ostris_model` (object patch) |
+| **Ostris Edit** | `index_timestep_zero` | `Picture N: <VISION>` blocks + text | Ostris 1024x1024 /16 snapped pixels | None for canonical current ComfyUI execution |
 | **Native** | Standard `reference_latents` | Canonical `<VISION>` blocks + text | Direct `vae.encode` (unmodified) | None (Unpatched) |
 
 ---
@@ -49,8 +49,8 @@ graph TD
 2. Connect `CLIP` and source image to **CcC Krea2 - Qwen Vision Image Prep**.
 3. Connect the prepared image output (`prepared_image`) to both:
    - **CcC Krea2 - Reference Image** (`prepared_image` input) for reference attention guidance;
-   - **CcC Krea2 - Target Latent** (`subject_image` input) to compute output resolution geometry when favoring subject geometry.
-4. Configure **CcC Krea2 - Target Latent** (`target_content` = `"empty"`, `geometry_mode` = `"favor_image"`). Selecting `target_content` = `"empty"` means denoising starts from pure noise, while `geometry_mode` = `"favor_image"` uses the connected `subject_image` input to calculate output dimensions.
+   - **CcC Krea2 - Target Latent** (`geometry_image` input) to compute output resolution geometry when favoring image geometry.
+4. Configure **CcC Krea2 - Target Latent** (`target_content` = `"empty"`, `geometry_mode` = `"favor_image"`). Selecting `target_content` = `"empty"` means denoising starts from pure noise, while `geometry_mode` = `"favor_image"` uses the connected `geometry_image` input to calculate output dimensions.
 5. Connect Reference Chain output (`reference_chain`) to `references` input and Target Latent output (`target_latent`) to `target_latent` input on **CcC Krea2 - Edit**.
 6. Connect outputs `patched_model`, `positive`, `negative`, and `latent` to KSampler (`latent` connects to `KSampler.latent_image`).
 

@@ -88,13 +88,13 @@ def test_legacy_functions_not_called_in_canonical_path():
 
 def test_patch_krea2_model_raises_on_already_patched():
     """Verify that patch_krea2_model raises RuntimeError when MODEL is already patched."""
-    from ccc_krea2.patch import patch_krea2_model, is_model_already_patched
+    from ccc_krea2.patch import patch_krea2_model
 
     mock_model = MagicMock()
     mock_model.clone.return_value = mock_model
 
     img = torch.rand(1, 64, 64, 3)
-    prep = prepare_vision_image(image=img, clip=MagicMock(), mode="native")
+
     from ccc_krea2.references import PreparedReference, ReferenceRole
     dummy_ref = PreparedReference(
         role=ReferenceRole.SUBJECT,

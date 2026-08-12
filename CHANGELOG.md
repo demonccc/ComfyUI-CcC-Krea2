@@ -10,13 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Modular Krea2 Pipeline Surgical Correction Pass (`feat/easy-edit-and-reference-backends`).
 - Decoupled 3-phase Easy Routing Engine (`easy_routing.py`) with strict 6-preset matrix and independent target content/geometry sources.
-- Grounding & Semantic Image Prep Recipes (`grounding.py`) supporting 1024px longest-edge for `max_identity` and 768px for other presets without upscale.
+- Grounding & Semantic Image Prep Recipes (`grounding.py`).
 - Thin resolver architecture for `easy_edit_node.py` delegating to shared orchestrator `run_krea2_edit_orchestrator`.
 - Unified Target Vision Context slot resolution in single-pass reference chain sorting.
 - Native ComfyUI reference latents support (`reference_method = "native"` and `apply_krea2_edit_patch = False`).
-- Upstream-aligned Ostris backend rebuild (`ostris_backend.py`) with MIT attribution, `Picture N:` Qwen prompt formatting, 384² VLM area downscale without `/16` snapping, 1MP VAE reference prep, and KV cache handling.
+- Upstream-aligned Ostris backend rebuild (`ostris_backend.py`) with MIT attribution, `Picture N:` Qwen prompt formatting, 384² VLM area downscale without `/16` snapping, 1MP VAE reference prep, and Ostris KV cache remains unsupported and raises NotImplementedError when requested.
 - ComfyUI frontend web extension (`web/ccc_krea2.js`) for dynamic presentation widget graying.
-- Table-driven test suite with 195 passing unit and contract tests across all 6 presets, Ostris backend, and native reference paths.
+- Table-driven test suite passing unit and contract tests across all 6 presets, Ostris backend, and native reference paths.
 - Surgical stabilization pass for 5-layer modular reference architecture (`feat/modular-reference-pipeline-refactor`).
 - Mandatory Qwen visual row processing via `comfy.text_encoders.qwen_vl.process_qwen2vl_images` in production with clear `RuntimeError` failure handling on missing processors or GPU execution failures.
 - Strict half-open vision span validation `(start >= 0, end > start, end <= sequence_length, no overlap, physical order)` preventing invalid or out-of-order token stream spans.
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exact Auto Visual Reference Fit outcomes documented (`exact`, `crop_only`, `crop_and_resize`, `fit`).
 - Corrected Indirect Style explanation clarifying total indirect Style visual row removal via keep-mask without mandatory retained Style spans.
 - Replaced workflow strategy table with five-column matrix (`Workflow filename`, `Target Content`, `Target Geometry`, `References`, `Main objective`).
-- Documented README Favor Subject connection requirement (prepared image to Target Latent `subject_image`).
+
 - Added integrated Qwen token-to-span mapping test (`test_integrated_qwen_token_to_span_mapping`).
 - Strengthened workflow contract tests to enforce required non-widget linked socket presence and declared vs serialized type parity.
 - Corrected obsolete `crop_and_resize` `/16` dimension comment in `ccc_krea2/krea2edit_geometry.py`.
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed ComfyUI custom node package import error by converting internal ccc_krea2 absolute imports to package-relative imports.
 - Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.
 - Corrected `edit_info` anchor reporting to accurately output `Anchor Implementation Type: Vision directive only` and list active directive-only controls for Subject, Scene, and Outfit roles.
-- Canonicalized modular workflow collection (`01_t2i_basic.json` through `12_full_pipeline_composition.json`) using current socket types (`PREPARED_VISION_IMAGE`, `REFERENCE_CHAIN`, `LATENT`, `CCC_KREA2_PROMPT_AUGMENTATION`) and input names (`reference_chain`, `visual_fit_mode`).
+- Canonicalized modular workflow collection using current socket types (`PREPARED_VISION_IMAGE`, `REFERENCE_CHAIN`, `LATENT`, `CCC_KREA2_PROMPT_AUGMENTATION`) and input names (`reference_chain`, `visual_fit_mode`).
 - Reorganized superseded workflow files into `workflows/legacy/` with explanatory migration README.
 - Synchronized `NODES.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` with current Python node interface definitions and canonical workflow contracts.
 

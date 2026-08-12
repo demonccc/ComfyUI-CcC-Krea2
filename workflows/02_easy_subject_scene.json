@@ -1,6 +1,6 @@
 {
-  "last_node_id": 12,
-  "last_link_id": 107,
+  "last_node_id": 7,
+  "last_link_id": 6,
   "nodes": [
     {
       "id": 1,
@@ -11,40 +11,7 @@
       ],
       "size": [
         315,
-        82
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "MODEL",
-          "type": "MODEL",
-          "links": [
-            107
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "UNETLoader"
-      },
-      "widgets_values": [
-        "krea2_unet.safetensors",
-        "default"
-      ]
-    },
-    {
-      "id": 2,
-      "type": "CLIPLoader",
-      "pos": [
-        100,
-        220
-      ],
-      "size": [
-        315,
-        82
+        80
       ],
       "flags": {},
       "order": 1,
@@ -52,33 +19,28 @@
       "inputs": [],
       "outputs": [
         {
-          "name": "CLIP",
-          "type": "CLIP",
+          "name": "MODEL",
+          "type": "MODEL",
           "links": [
-            2
-          ],
-          "slot_index": 0
+            1
+          ]
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPLoader"
+        "Node name for S&R": "UNETLoader"
       },
-      "widgets_values": [
-        "qwen3_vl.safetensors",
-        "krea2",
-        "default"
-      ]
+      "widgets_values": []
     },
     {
-      "id": 3,
-      "type": "VAELoader",
+      "id": 2,
+      "type": "CLIPLoader",
       "pos": [
         100,
-        340
+        200
       ],
       "size": [
         315,
-        82
+        80
       ],
       "flags": {},
       "order": 2,
@@ -86,20 +48,75 @@
       "inputs": [],
       "outputs": [
         {
-          "name": "VAE",
-          "type": "VAE",
-          "links": [
-            3,
-            10
-          ],
-          "slot_index": 0
+          "name": "CLIP",
+          "type": "CLIP"
         }
       ],
       "properties": {
-        "Node name for S&R": "VAELoader"
+        "Node name for S&R": "CLIPLoader"
       },
       "widgets_values": [
-        "krea2_vae.safetensors"
+        "clip_l.safetensors",
+        "krea2",
+        false
+      ]
+    },
+    {
+      "id": 3,
+      "type": "CcCKrea2LoRAStack",
+      "pos": [
+        550,
+        100
+      ],
+      "size": [
+        315,
+        200
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "prompt_augmentation",
+          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LoRAStack"
+      },
+      "widgets_values": [
+        true,
+        "krea2_edit_lora.safetensors",
+        1.0,
+        false,
+        "None",
+        1.0,
+        false,
+        "None",
+        1.0,
+        false,
+        "None",
+        1.0,
+        false,
+        "None",
+        1.0
       ]
     },
     {
@@ -107,14 +124,14 @@
       "type": "LoadImage",
       "pos": [
         100,
-        460
+        370
       ],
       "size": [
         315,
-        314
+        315
       ],
       "flags": {},
-      "order": 3,
+      "order": 4,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -123,14 +140,11 @@
           "type": "IMAGE",
           "links": [
             4
-          ],
-          "slot_index": 0
+          ]
         },
         {
           "name": "MASK",
-          "type": "MASK",
-          "links": [],
-          "slot_index": 1
+          "type": "MASK"
         }
       ],
       "properties": {
@@ -142,18 +156,18 @@
       ]
     },
     {
-      "id": 6,
+      "id": 5,
       "type": "LoadImage",
       "pos": [
         100,
-        800
+        720
       ],
       "size": [
         315,
-        314
+        315
       ],
       "flags": {},
-      "order": 4,
+      "order": 5,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -162,14 +176,11 @@
           "type": "IMAGE",
           "links": [
             5
-          ],
-          "slot_index": 0
+          ]
         },
         {
           "name": "MASK",
-          "type": "MASK",
-          "links": [],
-          "slot_index": 1
+          "type": "MASK"
         }
       ],
       "properties": {
@@ -181,508 +192,198 @@
       ]
     },
     {
-      "id": 7,
-      "type": "LoadImage",
-      "pos": [
-        100,
-        1140
-      ],
-      "size": [
-        315,
-        314
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            6
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": [],
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "outfit.jpg",
-        "image"
-      ]
-    },
-    {
-      "id": 8,
-      "type": "LoadImage",
-      "pos": [
-        100,
-        1480
-      ],
-      "size": [
-        315,
-        314
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            7
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": [],
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "style.jpg",
-        "image"
-      ]
-    },
-    {
-      "id": 5,
+      "id": 6,
       "type": "CcCKrea2EasyEdit",
       "pos": [
-        500,
-        100
+        550,
+        370
       ],
       "size": [
         400,
         300
       ],
       "flags": {},
-      "order": 10,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
-          "name": "model",
-          "type": "MODEL",
-          "link": 1
-        },
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 2
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 3
-        },
-        {
-          "name": "negative_prompt",
-          "type": "STRING",
-          "link": null
-        },
-        {
-          "name": "subject",
+          "name": "subject_image",
           "type": "IMAGE",
           "link": 4
         },
         {
-          "name": "scene",
+          "name": "scene_image",
           "type": "IMAGE",
           "link": 5
         },
         {
-          "name": "outfit",
-          "type": "IMAGE",
-          "link": 6
+          "name": "outfit_image",
+          "type": "IMAGE"
         },
         {
-          "name": "style",
-          "type": "IMAGE",
-          "link": 7
+          "name": "style_image",
+          "type": "IMAGE"
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        },
+        {
+          "name": "prompt_augmentation",
+          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
+          "link": 3
         }
       ],
       "outputs": [
         {
-          "name": "patched_model",
+          "name": "MODEL",
           "type": "MODEL",
           "links": [
-            101
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "links": [
-            102
-          ],
-          "slot_index": 1
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "links": [
-            103
-          ],
-          "slot_index": 2
-        },
-        {
-          "name": "latent",
-          "type": "LATENT",
-          "links": [
-            104
-          ],
-          "slot_index": 3
-        },
-        {
-          "name": "edit_info",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 4
+            6
+          ]
         }
       ],
       "properties": {
         "Node name for S&R": "CcCKrea2EasyEdit"
       },
       "widgets_values": [
-        "A portrait of subject in studio lighting",
         "balanced",
         "outfit image",
         "style image",
         true,
-        "blurry, distorted"
-      ]
-    },
-    {
-      "id": 9,
-      "type": "KSampler",
-      "pos": [
-        950,
-        100
-      ],
-      "size": [
-        315,
-        262
-      ],
-      "flags": {},
-      "order": 11,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 101
-        },
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "link": 102
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "link": 103
-        },
-        {
-          "name": "latent_image",
-          "type": "LATENT",
-          "link": 104
-        }
-      ],
-      "outputs": [
-        {
-          "name": "LATENT",
-          "type": "LATENT",
-          "links": [
-            105
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "KSampler"
-      },
-      "widgets_values": [
-        12345,
-        "fixed",
-        20,
-        4.5,
-        "euler",
-        "simple",
         1.0
       ]
     },
     {
-      "id": 10,
-      "type": "VAEDecode",
+      "id": 7,
+      "type": "KSampler",
       "pos": [
-        1300,
-        100
-      ],
-      "size": [
-        210,
-        46
-      ],
-      "flags": {},
-      "order": 12,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "samples",
-          "type": "LATENT",
-          "link": 105
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 10
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            106
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VAEDecode"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 11,
-      "type": "SaveImage",
-      "pos": [
-        1550,
-        100
-      ],
-      "size": [
-        315,
-        270
-      ],
-      "flags": {},
-      "order": 13,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 106
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "SaveImage"
-      },
-      "widgets_values": [
-        "CcC_Krea2_Easy"
-      ]
-    },
-    {
-      "id": 12,
-      "type": "CcCKrea2LoRAStack",
-      "pos": [
-        350,
-        100
+        1200,
+        370
       ],
       "size": [
         315,
         200
       ],
       "flags": {},
-      "order": 1,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 107
+          "link": 6
         }
       ],
-      "outputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "links": [
-            1
-          ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
-        }
-      ],
-      "widgets_values": [
-        true,
-        1.0,
-        false,
-        "None",
-        1.0,
-        false,
-        "None",
-        1.0,
-        false,
-        "None",
-        1.0,
-        false,
-        "None",
-        1.0
-      ]
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
     [
       1,
-      12,
+      1,
       0,
-      5,
+      3,
       0,
       "MODEL"
     ],
     [
       2,
-      2,
-      0,
-      5,
-      1,
-      "CLIP"
-    ],
-    [
-      3,
       3,
       0,
-      5,
-      2,
-      "VAE"
-    ],
-    [
-      4,
-      4,
-      0,
-      5,
-      4,
-      "IMAGE"
-    ],
-    [
-      5,
       6,
-      0,
-      5,
-      5,
-      "IMAGE"
-    ],
-    [
-      6,
-      7,
-      0,
-      5,
-      6,
-      "IMAGE"
-    ],
-    [
-      7,
-      8,
-      0,
-      5,
-      7,
-      "IMAGE"
-    ],
-    [
-      101,
-      5,
-      0,
-      9,
-      0,
+      4,
       "MODEL"
     ],
     [
-      102,
-      5,
-      1,
-      9,
-      1,
-      "CONDITIONING"
-    ],
-    [
-      103,
-      5,
-      2,
-      9,
-      2,
-      "CONDITIONING"
-    ],
-    [
-      104,
-      5,
       3,
-      9,
       3,
-      "LATENT"
-    ],
-    [
-      105,
-      9,
-      0,
-      10,
-      0,
-      "LATENT"
-    ],
-    [
-      10,
-      3,
-      0,
-      10,
       1,
-      "VAE"
+      6,
+      5,
+      "CCC_KREA2_PROMPT_AUGMENTATION"
     ],
     [
-      106,
-      10,
+      4,
+      4,
       0,
-      11,
+      6,
       0,
       "IMAGE"
     ],
     [
-      107,
-      1,
+      5,
+      5,
       0,
-      12,
+      6,
+      1,
+      "IMAGE"
+    ],
+    [
+      6,
+      6,
+      0,
+      7,
       0,
       "MODEL"
     ]
   ],
   "groups": [
     {
-      "title": "CcC Krea2 Edit Pipeline",
+      "title": "Models",
       "bounding": [
         50,
         50,
-        2000,
-        1000
+        400,
+        200
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "LoRA",
+      "bounding": [
+        500,
+        50,
+        400,
+        250
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Images / References",
+      "bounding": [
+        50,
+        320,
+        400,
+        1500
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Easy Edit + Sampling",
+      "bounding": [
+        500,
+        320,
+        600,
+        800
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        1150,
+        320,
+        400,
+        300
       ],
       "color": "#3f789e"
     }
   ],
-  "config": {},
-  "extra": {},
   "version": 0.4
 }

@@ -327,26 +327,29 @@ def route_easy_preset(
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", S
             refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
-            refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         elif not has_s and has_sc and has_o:
             # Balanced fallback: Sc+Ou without S
             target_content_mode = "image"
             target_content_source = Sc
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
-                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+                refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
             else:
                 refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
-                refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
+                refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         else:
             # S + Sc + Ou
-            target_content_mode = "image"
-            target_content_source = Sc
-            target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
             if outfit_is_scene_physically:
+                target_content_mode = "empty"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
                 refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
-            elif outfit_is_distinct:
+                refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+            else:
+                target_content_mode = "image"
+                target_content_source = Sc
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+                refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
                 refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
 
     elif preset == "max_identity":
@@ -375,8 +378,8 @@ def route_easy_preset(
             refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         elif has_s and has_sc and not has_o:
             target_content_mode = "image"
-            target_content_source = Sc
-            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            target_content_source = S
+            target_geometry_mode, target_geometry_source = "favor_image", S
             refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
             refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
         elif has_s and not has_sc and has_o:
@@ -391,20 +394,20 @@ def route_easy_preset(
             target_content_source = Sc
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
-                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+                refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
             else:
                 refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
-                refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
+                refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         else:
             # S + Sc + Ou
             target_content_mode = "image"
-            target_content_source = Sc
-            target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+            target_content_source = S
+            target_geometry_mode, target_geometry_source = "favor_image", S
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
             elif outfit_is_distinct:
                 refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
 
     elif preset == "preserve_scene":
         if not has_sc:
@@ -450,11 +453,14 @@ def route_easy_preset(
             target_content_mode = "image"
             target_content_source = Sc
             target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(Sc, PRESERVE_SCENE_BOOST, "scene"))
-            refs.append(_ref(S, NORMAL_BOOST, "subject"))
             if outfit_is_scene_physically:
-                pass  # already combined in scene ref semantically via combined ref above
-            elif outfit_is_distinct:
+                refs.append(_combined_scene_outfit_ref(Sc, PRESERVE_SCENE_BOOST))
+            else:
+                refs.append(_ref(Sc, PRESERVE_SCENE_BOOST, "scene"))
+
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+
+            if outfit_is_distinct:
                 semantic_only_refs.append((Ou, "outfit"))
 
     elif preset == "outfit_transfer":

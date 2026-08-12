@@ -38,8 +38,8 @@ graph TD
 ```
 
 - **Layer 1 (Qwen Vision Image Prep)**: Resizes raw image into a lightweight Qwen-optimized derivative (`vision_image`) aligned to patch boundaries (`32x32`), while retaining the untouched raw source image (`original_image`) intact for VAE processing.
-- **Layer 2 (Target Latent)**: Resolves the target latent tensor (`[B, 16, H//8, W//8]`), independently configuring Latent Content Source (`empty`, `subject`, `scene`) and Target Geometry (`favor_subject`, `favor_scene`, `fixed`).
-- **Layer 3 (Declarative References)**: Defines per-reference specs (`Subject`, `Scene`, `Outfit`, `Style`), configuring visual fit modes (`auto`, `fit`, `crop`), attention boosts, masks, and style processing mode.
+- **Layer 2 (Target Latent)**: Resolves the target latent tensor (`[B, 16, H//8, W//8]`), independently configuring Latent Content Source (`empty`, `image`) and Target Geometry (`favor_image`, `fixed`).
+- **Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image), configuring visual fit modes (`auto`, `fit`, `crop`), attention boosts, masks, and style processing mode. ADVANCED = INFRASTRUCTURE.
 - **Layer 4 (Reference Chain)**: Maintains an immutable linked chain of reference specifications (`REFERENCE_CHAIN`). Reference definition nodes accept an optional `reference_chain` input and produce an updated `reference_chain` output.
 - **Layer 5 (Edit Orchestrator)**: Consumes the resolved reference chain via its `references` input, resolves physical Qwen indices and VAE frame numbers, executes Qwen text/vision encoding, applies Moodboard statistical transforms, patches diffusion model attention hooks, and formats `edit_info`.
 
@@ -75,10 +75,10 @@ In this architecture, an input image exists in up to three distinct representati
 
 `CcCKrea2TargetLatent` separates **Target Latent Content** from **Target Geometry**:
 
-- **Target Latent Content**: `empty` (`Empty`, zeros tensor), `subject` (`Subject`, VAE-encoded Subject image), or `scene` (`Scene`, VAE-encoded Scene image).
-- **Target Geometry**: `favor_subject` (`Favor Subject`, dimensions derived from Subject reference), `favor_scene` (`Favor Scene`, dimensions derived from Scene reference), or `fixed` (`Fixed`, dimensions derived from fixed megapixel / aspect ratio selection).
+- **Target Latent Content**: `empty` (`Empty`, zeros tensor) or `image` (`Image`, VAE-encoded geometry image).
+- **Target Geometry**: `favor_image` (`Favor Image`, dimensions derived from the connected geometry image) or `fixed` (`Fixed`, dimensions derived from fixed megapixel / aspect ratio selection).
 
-Inputs: `target_content`, `geometry_mode`, `target_megapixels`, `fixed_megapixels`, `aspect_ratio`, `batch_size`. Optional inputs: `vae`, `subject_image`, `scene_image`. VAE, Subject image, and Scene image are required at runtime based on the selected content and geometry options.
+Inputs: `target_content`, `geometry_mode`, `target_megapixels`, `fixed_megapixels`, `aspect_ratio`, `batch_size`. Optional inputs: `vae`, `geometry_image`. VAE and Geometry image are required at runtime based on the selected content and geometry options.
 
 Outputs:
 - `latent` — `LATENT`
@@ -86,27 +86,19 @@ Outputs:
 
 ---
 
-## 6. Target Latent Combinations & Workflow Strategy Matrix
+## 6. Workflow Strategy & Target Latent Matrix
 
-The five-column strategy matrix covering all nine Content and Geometry combinations across canonical workflows:
+The four combinations of Target Content and Geometry define the canonical target initialization for the pipeline:
 
-| Workflow filename | Target Content | Target Geometry | References | Main objective |
-|---|---|---|---|---|
-| `workflows/03_subject_edit.json` | `subject` | `favor_subject` | Subject | Maximum identity continuity & subtle character retouching (requires VAE & Subject `subject_image` connection) |
-| `workflows/04_subject_scene_edit.json` | `scene` | `favor_scene` | Scene, Subject | Scene-preserving subject replacement (requires VAE & Scene `scene_image` connection) |
-| `workflows/05_subject_outfit_edit.json` | `empty` | `favor_subject` | Subject, Outfit | Subject + Outfit competition & garment transfer with freer pose generation (requires Subject `subject_image` connection) |
-| `workflows/06_subject_scene_outfit_edit.json` | `empty` | `favor_subject` | Scene, Subject, Outfit | Triple-reference editing pipeline with freer pose generation (requires Subject `subject_image` connection) |
-| `workflows/07_style_moodboard_edit.json` | `empty` | `fixed` | Subject, Style | Subject + Style 2x2 indirect Moodboard statistical style transfer at fixed output resolution |
-| `workflows/08_inpaint_subject_edit.json` | `subject` | `fixed` | Subject | Inpaint-masked Subject identity editing at fixed dimensions (requires VAE & Subject `subject_image` connection) |
-| `workflows/09_inpaint_scene_edit.json` | `scene` | `fixed` | Scene | Scene inpainting reference workflow at fixed dimensions (requires VAE & Scene `scene_image` connection) |
-| `workflows/10_multi_subject_chasing_slots.json` | `empty` | `favor_subject` | Subject 1, Subject 2 | Multi-Subject chasing slots with sequential slot resolution (requires Subject 1 `subject_image` connection) |
-| `workflows/11_advanced_directives_fit_modes.json` | `empty` | `favor_subject` | Subject | Custom directives and fit modes demonstration (requires Subject `subject_image` connection) |
-| `workflows/12_full_pipeline_composition.json` | `empty` | `favor_subject` | Scene, Subject, Outfit, Style | Full composite modular pipeline with 2x2 indirect Style transfer (requires Subject `subject_image` connection) |
-| `workflows/01_t2i_basic.json` | `empty` | `fixed` | None | Native text-to-image basic generation at fixed target resolution |
-| `workflows/02_t2i_lora_stack.json` | `empty` | `fixed` | None | T2I + 4-slot LoRA Stack generation at fixed target resolution |
-| `workflows/04_subject_scene_edit.json` (configurable) | `empty` | `favor_scene` | Scene, Subject | Free restaging of Subject into Scene-proportioned layout (requires Scene `scene_image` connection) |
-| `workflows/04_subject_scene_edit.json` (configurable) | `subject` | `favor_scene` | Scene slot 1, Subject slot 2 | Initialize denoising from Subject pixels, preserve Scene-compatible output geometry, and adapt Subject initialization to Scene framing (requires Subject `subject_image`, Scene `scene_image`, and VAE connections) |
-| `workflows/04_subject_scene_edit.json` (configurable) | `scene` | `favor_subject` | Scene slot 1, Subject slot 2 | Initialize denoising from Scene pixels, favor Subject-compatible output geometry, and accept possible Scene reframing for lower Subject-reference adaptation (requires Scene `scene_image`, Subject `subject_image`, and VAE connections) |
+| Target Content | Target Geometry | References Required | Main objective |
+|---|---|---|---|
+| `image` | `favor_image` | Geometry Image | Maximum identity/scene continuity (e.g. `PRESERVE_IDENTITY`). Denoising starts from VAE-encoded pixels at exact image proportions. |
+| `empty` | `favor_image` | Geometry Image | Free text-driven generation but strictly constrained to the aspect ratio and dimensional properties of the geometry image. |
+| `image` | `fixed` | Geometry Image | Fixed-resolution generation (e.g. 1024x1024) initializing denoising from the geometry image. Requires `auto` or `crop` scaling. |
+| `empty` | `fixed` | None | Pure text-to-image or unconstrained generation at fixed target resolution (e.g. `MAX_IDENTITY` fallback without image). |
+
+> [!NOTE]
+> **Compatibility**: Legacy modes (`target_content`: `subject`, `scene`; `geometry_mode`: `favor_subject`, `favor_scene`) remain supported for backward compatibility with older workflows but are transparently routed to `image` and `favor_image` utilizing their respective connected inputs. Modern workflows should use the generic `geometry_image` socket and `favor_image` mode.
 
 ---
 
