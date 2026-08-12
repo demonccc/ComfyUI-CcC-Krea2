@@ -80,3 +80,21 @@ def test_qwen_vision_prep_node_execution():
     )
     assert vis_img.shape[0] == 1
     assert "Prepared Size:" in info_str
+
+
+def test_vision_prep_import_and_prepare_image_for_qwen():
+    import ccc_krea2.vision_prep
+    from ccc_krea2.vision_prep import prepare_image_for_qwen
+
+    original = torch.rand(1, 1080, 1920, 3)
+    vision_derivative = torch.rand(1, 768, 1344, 3)
+
+    prepared = prepare_image_for_qwen(
+        image=vision_derivative,
+        clip=None,
+        original_image=original,
+    )
+
+    assert prepared.original_image is original
+    assert prepared.vision_image.shape[-1] == 3
+

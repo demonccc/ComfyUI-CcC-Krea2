@@ -122,3 +122,98 @@ def test_internal_masked_anchor_dataclass_defaults():
     )
     assert explicit_scene.masked_region_anchor == 0.9
 
+
+def test_target_vision_context_ordering_and_vae_frames():
+    from ccc_krea2.target_latent import TargetVisionContext, should_include_target_in_vision
+    from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=None, mode="native")
+
+    target_vctx = TargetVisionContext(
+        include_in_vision="yes",
+        target_vision_slot=None,
+        target_alias="target",
+        target_image=prep,
+    )
+
+    subj_spec = ReferenceSpec(reference_path="edit", prepared_image=prep, alias="subject", appearance_reference=True)
+    chain = ReferenceChain((subj_spec,))
+
+    target_spec = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=target_vctx.target_image,
+        requested_vision_slot=target_vctx.target_vision_slot,
+        alias="target",
+        appearance_reference=False,
+    )
+
+    effective_chain = ReferenceChain((target_spec,) + chain.references)
+    resolved, warnings = resolve_reference_slots_and_aliases(effective_chain)
+
+    assert len(resolved) == 2
+    # Target is slot 1, appearance_reference False -> VAE frame None
+    assert resolved[0]["resolved_slot"] == 1
+    assert resolved[0]["vae_frame"] is None
+    # Subject is slot 2, appearance_reference True -> VAE frame 1
+    assert resolved[1]["resolved_slot"] == 2
+    assert resolved[1]["vae_frame"] == 1
+
+
+def test_target_vision_context_style_ordering():
+    from ccc_krea2.target_latent import TargetVisionContext
+    from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=None, mode="native")
+
+    target_spec = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        requested_vision_slot=None,
+        alias="target",
+        appearance_reference=False,
+    )
+    style_spec = ReferenceSpec(
+        reference_path="style",
+        prepared_image=prep,
+        requested_vision_slot=None,
+        alias="style",
+        appearance_reference=False,
+    )
+
+    # Prepending target_spec before Style maintains Target slot 1, Style slot 2 without failing "Style last" rule
+    effective_chain = ReferenceChain((target_spec, style_spec))
+    resolved, warnings = resolve_reference_slots_and_aliases(effective_chain)
+
+    assert len(resolved) == 2
+    assert resolved[0]["resolved_slot"] == 1
+    assert resolved[1]["resolved_slot"] == 2
+
+
+def test_target_manual_slot_collision_raises():
+    from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=None, mode="native")
+
+    target_spec = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        requested_vision_slot=1,
+        alias="target",
+        appearance_reference=False,
+    )
+    subj_spec = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        requested_vision_slot=1,
+        alias="subject",
+        appearance_reference=True,
+    )
+
+    effective_chain = ReferenceChain((target_spec, subj_spec))
+    with pytest.raises(ValueError, match="Duplicate vision slot 1 specified"):
+        resolve_reference_slots_and_aliases(effective_chain)
+
+

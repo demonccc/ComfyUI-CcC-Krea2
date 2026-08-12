@@ -31,7 +31,6 @@ class CcCKrea2ReferenceImage:
                 "style_fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "style_processing": (["full", "2x2", "4x4"], {"default": "2x2"}),
                 "indirect_style_transfer": ("BOOLEAN", {"default": True}),
-                "style_directive": ("BOOLEAN", {"default": False}),
             },
 
             "optional": {
@@ -53,10 +52,13 @@ class CcCKrea2ReferenceImage:
         style_fidelity: float = 0.5,
         style_processing: str = "2x2",
         indirect_style_transfer: bool = True,
-        style_directive: bool = True,
+        style_directive: bool = False,
         previous_references: Optional[ReferenceChain] = None,
         attention_mask: Optional[torch.Tensor] = None,
+        **kwargs
     ) -> Tuple[ReferenceChain]:
+        if "style_directive" in kwargs:
+            style_directive = kwargs["style_directive"]
         chain = previous_references if previous_references is not None else ReferenceChain()
 
         slot_int = None

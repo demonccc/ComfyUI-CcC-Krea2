@@ -67,9 +67,13 @@ def run_krea2_edit_orchestrator(
                 requested_vision_slot=target_vctx.target_vision_slot,
                 alias=target_vctx.target_alias or "target",
                 vision_instruction=target_vctx.target_vision_instruction,
+                appearance_reference=False,
                 _legacy_role="target",
             )
-            effective_chain = effective_chain.append(target_spec)
+            if target_spec.requested_vision_slot is None or target_spec.requested_vision_slot == 0:
+                effective_chain = ReferenceChain((target_spec,) + references.references)
+            else:
+                effective_chain = effective_chain.append(target_spec)
 
     resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(effective_chain)
     for i in range(len(resolved_refs) - 1):

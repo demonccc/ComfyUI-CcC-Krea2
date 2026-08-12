@@ -41,7 +41,6 @@ app.registerExtension({
             const geomWidget = node.widgets?.find(w => w.name === "geometry_mode");
 
             const updateTargetState = () => {
-                const isContentImage = (contentWidget?.value === "image");
                 const isGeomFixed = (geomWidget?.value === "fixed");
 
                 const targetMpWidget = node.widgets?.find(w => w.name === "target_megapixels");
@@ -63,6 +62,38 @@ app.registerExtension({
                 }
             });
             setTimeout(updateTargetState, 20);
+        }
+
+        // Dynamic widget graying for CcCKrea2Edit & CcCKrea2EasyEdit
+        if (node.comfyClass === "CcCKrea2Edit" || node.comfyClass === "CcCKrea2EasyEdit") {
+            const methodWidget = node.widgets?.find(w => w.name === "reference_method");
+            const patchWidget = node.widgets?.find(w => w.name === "apply_model_patch");
+            const kvCacheWidget = node.widgets?.find(w => w.name === "ostris_kv_cache");
+
+            const updateEditState = () => {
+                const method = methodWidget?.value || "krea2_edit";
+
+                // Native does not support model patching
+                if (method === "native") {
+                    if (patchWidget) patchWidget.disabled = true;
+                } else {
+                    if (patchWidget) patchWidget.disabled = false;
+                }
+
+                // ostris_kv_cache is currently unsupported in runtime environment
+                if (kvCacheWidget) {
+                    kvCacheWidget.disabled = true;
+                }
+            };
+
+            if (methodWidget) {
+                const origCb = methodWidget.callback;
+                methodWidget.callback = function () {
+                    if (origCb) origCb.apply(this, arguments);
+                    updateEditState();
+                };
+            }
+            setTimeout(updateEditState, 20);
         }
     }
 });

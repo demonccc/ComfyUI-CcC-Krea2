@@ -1,7 +1,7 @@
 import torch
 import math
 from dataclasses import dataclass
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any, List, Optional
 from .reference_specs import VisionPrepSpec, PreparedVisionImage
 from .geometry import resize_tensor
 

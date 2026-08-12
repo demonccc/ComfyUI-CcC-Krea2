@@ -20,11 +20,28 @@ class StyleSpanOperation:
     indirect_style_transfer: bool
 
 
+VALID_STYLE_PROCESSING_MODES = ("full", "2x2", "4x4")
+
+
+def get_style_processing_image_count(mode: str) -> int:
+    """Return physical vision image count for a given style_processing mode."""
+    if mode == "full":
+        return 1
+    elif mode == "2x2":
+        return 4
+    elif mode == "4x4":
+        return 16
+    raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
+
+
 def slice_style_image(
     image: torch.Tensor,
     mode: str = "2x2"
 ) -> List[torch.Tensor]:
     """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using upstream Moodboard shuffled orders."""
+    if mode not in VALID_STYLE_PROCESSING_MODES:
+        raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
+
     if image.ndim == 3:
         image = image.unsqueeze(0)
 
@@ -53,7 +70,7 @@ def slice_style_image(
     elif mode == "4x4":
         shuffled = [crops[i] for i in SHUFFLE_4X4]
     else:
-        shuffled = crops
+        raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
 
     return shuffled
 

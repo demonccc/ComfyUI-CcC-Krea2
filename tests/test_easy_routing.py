@@ -169,9 +169,31 @@ def test_style_active_for_all_presets(dummy_sources):
         r = route_easy_preset(sources, preset=p)
         assert r.style_active is True
         assert r.style_source is St
-        assert r.style_strength == 1.0
+        assert r.style_config.style_fidelity == 1.0
+        assert r.style_config.style_processing == "2x2"
+        assert r.style_config.indirect_style_transfer is False
+        assert r.style_config.vision_instruction == ""
 
     r_st = route_easy_preset(sources, preset="style_transfer")
     assert r_st.style_active is True
     assert r_st.style_source is St
-    assert r_st.style_strength == 2.0
+    assert r_st.style_config.style_fidelity == 1.0
+    assert r_st.style_config.style_processing == "2x2"
+    assert r_st.style_config.indirect_style_transfer is True
+    assert "artistic style" in r_st.style_config.vision_instruction
+
+
+def test_semantic_only_references_routing(dummy_sources):
+    S, Sc, O, _ = dummy_sources
+    # 3 sources in balanced mode routes S and O to edit_references (max 2 appearance refs) and Sc to target_content_source
+    sources = resolve_easy_sources(subject=S, scene=Sc, outfit=O)
+    route = route_easy_preset(sources, preset="balanced")
+
+    # In 3-source balanced: target_content_source is Sc, edit_references are S and O
+    # All 3 sources are accounted for
+    assert route.target_content_source is Sc
+    assert len(route.edit_references) == 2
+    assert (S, BALANCED_SUBJECT_BOOST, "subject") in route.edit_references
+    assert (O, NORMAL_BOOST, "outfit") in route.edit_references
+    assert isinstance(route.semantic_only_references, tuple)
+

@@ -4,6 +4,9 @@ from typing import List, Tuple, Dict, Any
 from .reference_specs import ReferenceChain
 
 
+from .style_processing import get_style_processing_image_count
+
+
 def parse_aliases(raw_aliases: str) -> Tuple[str, ...]:
     """Parse comma-separated alias strings, trimming whitespace and discarding duplicates."""
     if not raw_aliases:
@@ -123,7 +126,7 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
         if ref_path == "style" or spec.role.lower() == "style":
             vae_frame = None
             style_proc = getattr(spec, "style_processing", "2x2")
-            span_len = 1 if style_proc == "full" else (4 if style_proc == "2x2" else 16)
+            span_len = get_style_processing_image_count(style_proc)
             physical_qwen_range = (physical_qwen_index, physical_qwen_index + span_len - 1)
             physical_qwen_index += span_len
         elif not is_appearance:

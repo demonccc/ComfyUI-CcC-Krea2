@@ -34,21 +34,27 @@ class EasyResolvedSources:
 class EasyStyleConfig:
     """Config for Easy Edit style reference parameters using valid range values."""
     style_fidelity: float = 1.0
-    style_processing: str = "slice_grid"
+    style_processing: str = "2x2"
     indirect_style_transfer: bool = False
     vision_instruction: str = ""
+
+    def __post_init__(self):
+        if not (0.0 <= self.style_fidelity <= 1.0):
+            raise ValueError(f"style_fidelity must be between 0.0 and 1.0, got {self.style_fidelity}")
+        if self.style_processing not in ("full", "2x2", "4x4"):
+            raise ValueError(f"Invalid style_processing '{self.style_processing}'. Must be 'full', '2x2', or '4x4'.")
 
 
 DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0,
-    style_processing="slice_grid",
+    style_processing="2x2",
     indirect_style_transfer=False,
     vision_instruction=""
 )
 
 STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0,
-    style_processing="slice_grid",
+    style_processing="2x2",
     indirect_style_transfer=True,
     vision_instruction="Adopt the artistic style, color palette, texture, and visual mood of this style reference."
 )

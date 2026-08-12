@@ -487,3 +487,19 @@ def test_integrated_qwen_token_to_span_mapping(monkeypatch):
 
     # No overlap and physical order
     assert s2 >= e1
+
+
+def test_attach_reference_latents_appends_to_existing():
+    from ccc_krea2.conditioning import attach_reference_latents_to_conditioning
+
+    existing_ref = torch.rand(1, 16, 64, 64)
+    new_ref = torch.rand(1, 16, 64, 64)
+
+    cond = [("tensor", {"reference_latents": [existing_ref]})]
+    updated = attach_reference_latents_to_conditioning(cond, [new_ref])
+
+    attached_refs = updated[0][1]["reference_latents"]
+    assert len(attached_refs) == 2
+    assert attached_refs[0] is existing_ref
+    assert attached_refs[1] is new_ref
+

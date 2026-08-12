@@ -42,20 +42,20 @@ This document provides the complete specification of all public nodes in the `Co
 - **Category**: `CcC/Krea2`
 - **Description**: Creates the target latent container, independently specifying Latent Content Source and Target Geometry strategy.
 - **Required Inputs**:
-  - `target_content` (`["empty", "subject", "scene"]`, default: `"empty"`): Latent content source.
-  - `geometry_mode` (`["favor_subject", "favor_scene", "fixed"]`, default: `"fixed"`): Latent output resolution geometry strategy.
-  - `target_megapixels` (`FLOAT`, default: `2.0`, min: `0.1`, max: `12.0`, step: `0.01`): Target megapixels for geometry resolution when favoring subject or scene.
+  - `target_content` (`["empty", "image"]`, default: `"empty"`): Latent content source (`empty` pure noise or VAE-encoded `image`).
+  - `geometry_mode` (`["fixed", "favor_image"]`, default: `"fixed"`): Latent output resolution geometry strategy.
+  - `target_megapixels` (`FLOAT`, default: `2.0`, min: `0.1`, max: `12.0`, step: `0.01`): Target megapixels for geometry resolution when favoring image geometry.
   - `fixed_megapixels` (`FLOAT`, default: `2.0`, min: `0.1`, max: `12.0`, step: `0.01`): Output megapixels when target geometry is `fixed`.
   - `aspect_ratio` (`["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"]`, default: `"1:1"`): Output aspect ratio when target geometry is `fixed`.
   - `batch_size` (`INT`, default: `1`, min: `1`, max: `64`, step: `1`): Latent batch size.
 - **Optional Inputs**:
-  - `vae` (`VAE`): VAE model for encoding content image if content is `subject` or `scene`.
-  - `subject_image` (`PREPARED_VISION_IMAGE`): Image used when content is `subject` or geometry is `favor_subject`.
-  - `scene_image` (`PREPARED_VISION_IMAGE`): Image used when content is `scene` or geometry is `favor_scene`.
-- **Runtime Requirements**:
-  - `vae` is required at execution time whenever `target_content` is `subject` or `scene`.
-  - `subject_image` is required at execution time whenever `target_content` is `subject` or `geometry_mode` is `favor_subject`.
-  - `scene_image` is required at execution time whenever `target_content` is `scene` or `geometry_mode` is `favor_scene`.
+  - `vae` (`VAE`): VAE model for encoding content image if content is `image`.
+  - `target_image` (`PREPARED_VISION_IMAGE`): Image used when content is `image` or geometry is `favor_image`.
+  - `geometry_image` (`PREPARED_VISION_IMAGE`): Optional explicit image for geometry resolution.
+  - `include_in_vision` (`["auto", "yes", "no"]`, default: `"auto"`): Semantic Target Vision Context inclusion control (semantic-only, `appearance_reference=False`).
+  - `target_vision_slot` (`["auto", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]`, default: `"auto"`): Logical slot assignment.
+  - `target_alias` (`STRING`, default: `""`): Target alias for Qwen prompt.
+  - `target_vision_instruction` (`STRING`, default: `""`): Custom Qwen vision instruction for target image.
 - **Outputs**:
   - `target_latent` (`LATENT`): Standard ComfyUI latent dictionary format.
   - `latent_info` (`STRING`): Text summary of target latent dimensions.
