@@ -16,7 +16,7 @@ The following features are project-specific extensions designed for modular Comf
 - `crop_only` zero-interpolation center crop optimization in Auto visual fit mode.
 - Declarative Reference Chain (`REFERENCE_CHAIN`) node abstraction.
 - Independent Target Latent Content (`target_content`) and Target Geometry (`geometry_mode`) creation.
-- System-wide `global_vision_directive` and slot-level `extra_vision_directive` support.
+- System-wide `global_vision_directive` and node-level `vision_instruction` support.
 - Independent `masked_attention_boost` controls.
 - Multi-reference single-source reference chain orchestration.
 
@@ -50,7 +50,7 @@ In this architecture, an input image exists in up to three distinct representati
 3. **VAE Reference Latent**: The fitted pixel image cropped, scaled, and encoded via VAE into spatial reference latents (`[B, 16, H//8, W//8]`). Used for spatial cross-attention patching in the diffusion model.
 
 > [!NOTE]
-> `CcCKrea2QwenVisionImagePrep` does **not** perform grounding itself. Grounding occurs when Qwen processes prepared images, aliases, automatic role directives, Extra Vision Directives, Global Vision Directives, and positive or negative prompts during orchestration in Layer 5.
+> `CcCKrea2QwenVisionImagePrep` does **not** perform grounding itself. Grounding occurs when Qwen processes prepared images, aliases, vision instructions, global vision directives, and positive or negative prompts during orchestration in Layer 5.
 
 ---
 
@@ -141,8 +141,8 @@ The single source of truth for reference ordering is `easy_routing.py` for Easy 
 
 ## 10. Positive and Negative Conditioning
 
-- **Positive Qwen Context**: Includes Subject, Scene, Outfit, expanded Style images/directives, Global Vision Directive, positive prompt, and prompt augmentation.
-- **Negative Qwen Context**: Includes Subject, Scene, Outfit, negative prompt, and negative prompt augmentation. **Strictly excludes all Style images, crops, tiles, Style automatic directives, Moodboard operations, and Global Vision Directives.**
+- **Positive Qwen Context**: Includes Easy logical role images or Advanced generic references, expanded Style images/directives, global vision directive, positive prompt, and prompt augmentation.
+- **Negative Qwen Context**: Includes Easy logical role images or Advanced generic references, negative prompt, and negative prompt augmentation. **Strictly excludes all Style images, crops, tiles, Style instructions, Moodboard operations, and global vision directives.**
 
 ---
 

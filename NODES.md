@@ -38,7 +38,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `target_content` (`["empty", "image"]`, default: `"empty"`).
   - `geometry_mode` (`["fixed", "favor_image"]`, default: `"fixed"`).
   - `target_megapixels`, `fixed_megapixels`, `aspect_ratio`, `batch_size`.
-- **Outputs**: `latent`, `latent_info`.
+- **Outputs**: `target_latent`, `latent_info`.
 
 ### 2.3 CcC Krea2 - Reference Image
 - **Class Name**: `CcCKrea2ReferenceImage`
@@ -46,8 +46,8 @@ This document provides the complete specification of all public nodes in the `Co
 - **Description**: Generic reference configuration for edit (appearance/semantic) and style paths.
 - **Required Inputs**:
   - `prepared_image` (`PREPARED_VISION_IMAGE`).
-  - `reference_path` (`["edit", "style"]`).
-  - `alias`, `vision_instruction`, `attention_boost`, `style_processing`.
+  - `reference_path` (`CHOICE`).
+  - `vision_slot` (`CHOICE`), `alias` (`STRING`), `vision_instruction` (`STRING`), `attention_boost` (`FLOAT`), `masked_attention_boost` (`FLOAT`), `visual_reference_fit` (`CHOICE`), `style_fidelity` (`FLOAT`), `style_processing` (`CHOICE`), `indirect_style_transfer` (`BOOLEAN`).
 - **Outputs**: `reference_chain`.
 
 ### 2.4 CcC Krea2 - Edit Orchestrator

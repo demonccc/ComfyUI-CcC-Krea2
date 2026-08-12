@@ -63,7 +63,8 @@
       },
       "widgets_values": [
         "qwen3_vl.safetensors",
-        "krea2"
+        "krea2",
+        "default"
       ]
     },
     {
@@ -115,6 +116,7 @@
       "inputs": [
         {
           "name": "model",
+          "type": "MODEL",
           "link": 1
         }
       ],
@@ -169,18 +171,22 @@
       "inputs": [
         {
           "name": "model",
+          "type": "MODEL",
           "link": 11
         },
         {
           "name": "positive",
+          "type": "CONDITIONING",
           "link": 12
         },
         {
           "name": "negative",
+          "type": "CONDITIONING",
           "link": 13
         },
         {
           "name": "latent_image",
+          "type": "LATENT",
           "link": 14
         }
       ],
@@ -197,6 +203,8 @@
         "Node name for S&R": "KSampler"
       },
       "widgets_values": [
+        0,
+        "randomize",
         20,
         1.0,
         "euler",
@@ -221,10 +229,12 @@
       "inputs": [
         {
           "name": "samples",
+          "type": "LATENT",
           "link": 2
         },
         {
           "name": "vae",
+          "type": "VAE",
           "link": 3
         }
       ],
@@ -259,6 +269,7 @@
       "inputs": [
         {
           "name": "images",
+          "type": "IMAGE",
           "link": 4
         }
       ],
@@ -287,26 +298,32 @@
       "inputs": [
         {
           "name": "model",
+          "type": "MODEL",
           "link": 5
         },
         {
           "name": "clip",
+          "type": "CLIP",
           "link": 6
         },
         {
           "name": "vae",
+          "type": "VAE",
           "link": 7
         },
         {
           "name": "subject",
+          "type": "IMAGE",
           "link": 8
         },
         {
           "name": "scene",
+          "type": "IMAGE",
           "link": 9
         },
         {
           "name": "outfit",
+          "type": "IMAGE",
           "link": 10
         }
       ],
@@ -349,11 +366,11 @@
         "Node name for S&R": "CcCKrea2EasyEdit"
       },
       "widgets_values": [
+        "A photo of a person",
         "balanced",
         "outfit image",
         "style image",
         true,
-        "A photo of a person",
         "bad quality"
       ]
     },

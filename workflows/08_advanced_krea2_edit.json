@@ -65,7 +65,8 @@
       },
       "widgets_values": [
         "qwen3_vl.safetensors",
-        "krea2"
+        "krea2",
+        "default"
       ]
     },
     {
@@ -118,6 +119,7 @@
       "inputs": [
         {
           "name": "model",
+          "type": "MODEL",
           "link": 1
         }
       ],
@@ -172,18 +174,22 @@
       "inputs": [
         {
           "name": "model",
+          "type": "MODEL",
           "link": 19
         },
         {
           "name": "positive",
+          "type": "CONDITIONING",
           "link": 20
         },
         {
           "name": "negative",
+          "type": "CONDITIONING",
           "link": 21
         },
         {
           "name": "latent_image",
+          "type": "LATENT",
           "link": 22
         }
       ],
@@ -200,6 +206,8 @@
         "Node name for S&R": "KSampler"
       },
       "widgets_values": [
+        0,
+        "randomize",
         20,
         1.0,
         "euler",
@@ -224,10 +232,12 @@
       "inputs": [
         {
           "name": "samples",
+          "type": "LATENT",
           "link": 2
         },
         {
           "name": "vae",
+          "type": "VAE",
           "link": 3
         }
       ],
@@ -262,6 +272,7 @@
       "inputs": [
         {
           "name": "images",
+          "type": "IMAGE",
           "link": 4
         }
       ],
@@ -326,10 +337,12 @@
       "inputs": [
         {
           "name": "clip",
+          "type": "CLIP",
           "link": 5
         },
         {
           "name": "image",
+          "type": "IMAGE",
           "link": 6
         }
       ],
@@ -382,6 +395,7 @@
       "inputs": [
         {
           "name": "prepared_image",
+          "type": "PREPARED_VISION_IMAGE",
           "link": 7
         }
       ],
@@ -399,9 +413,9 @@
       },
       "widgets_values": [
         "edit",
-        0,
+        "auto",
         "subject",
-        "",
+        "Use this reference for subject identity, facial features, hair, anatomy, body shape and body proportions.",
         1.0,
         1.0,
         "auto",
@@ -463,10 +477,12 @@
       "inputs": [
         {
           "name": "clip",
+          "type": "CLIP",
           "link": 8
         },
         {
           "name": "image",
+          "type": "IMAGE",
           "link": 9
         }
       ],
@@ -518,10 +534,12 @@
       "inputs": [
         {
           "name": "prepared_image",
+          "type": "PREPARED_VISION_IMAGE",
           "link": 10
         },
         {
           "name": "previous_references",
+          "type": "REFERENCE_CHAIN",
           "link": 11
         }
       ],
@@ -539,9 +557,9 @@
       },
       "widgets_values": [
         "edit",
-        0,
+        "auto",
         "outfit",
-        "",
+        "Use this reference for clothing, garments and accessories.\nDo not use the wearer's identity as the subject identity.",
         1.0,
         1.0,
         "auto",
@@ -567,10 +585,12 @@
       "inputs": [
         {
           "name": "vae",
+          "type": "VAE",
           "link": 12
         },
         {
           "name": "geometry_image",
+          "type": "PREPARED_VISION_IMAGE",
           "link": 13
         }
       ],
@@ -621,22 +641,27 @@
       "inputs": [
         {
           "name": "model",
+          "type": "MODEL",
           "link": 14
         },
         {
           "name": "clip",
+          "type": "CLIP",
           "link": 15
         },
         {
           "name": "vae",
+          "type": "VAE",
           "link": 16
         },
         {
           "name": "references",
+          "type": "REFERENCE_CHAIN",
           "link": 17
         },
         {
           "name": "target_latent",
+          "type": "LATENT",
           "link": 18
         }
       ],
@@ -679,12 +704,11 @@
         "Node name for S&R": "CcCKrea2Edit"
       },
       "widgets_values": [
-        "krea2_edit",
-        true,
-        false,
-        "A photo",
+        "A photo of a person",
         "bad quality",
-        ""
+        "",
+        "krea2_edit",
+        false
       ]
     }
   ],

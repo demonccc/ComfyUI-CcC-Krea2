@@ -67,6 +67,11 @@ def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     assert "prompt_augmentation" not in content
     assert "appearance_reference" not in content
 
+    # Check updated schemas
+    assert "target_latent" in content, "target_latent output missing from NODES.md"
+    assert "vision_slot" in content, "vision_slot missing from CcCKrea2ReferenceImage in NODES.md"
+    assert "masked_attention_boost" in content, "masked_attention_boost missing from CcCKrea2ReferenceImage in NODES.md"
+
     required_nodes = [
         "CcCKrea2EasyEdit",
         "CcCKrea2EasyEditOstris",

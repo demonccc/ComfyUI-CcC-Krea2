@@ -6,6 +6,57 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
+try:
+    import nodes as comfy_nodes
+    CORE_MAPPINGS = comfy_nodes.NODE_CLASS_MAPPINGS
+except ImportError:
+    # Explicit schema fixture ONLY for the standard nodes used by these ten workflows
+    class MockUNETLoader:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
+        RETURN_TYPES = ("MODEL",)
+    class MockCLIPLoader:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"clip_name": (["qwen3_vl.safetensors"],), "type": (["krea2", "sdxl", "sd3"],), "device": (["default", "cpu"],)}}
+        RETURN_TYPES = ("CLIP",)
+    class MockVAELoader:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"vae_name": (["ae.safetensors"],)}}
+        RETURN_TYPES = ("VAE",)
+    class MockLoadImage:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"image": (["subject.jpg", "scene.jpg", "outfit.jpg", "style.jpg"],)}}
+        RETURN_TYPES = ("IMAGE", "MASK")
+    class MockKSampler:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"model": ("MODEL",), "seed": ("INT", {"default": 0}), "control_after_generate": (["randomize", "fixed", "increment", "decrement"],), "steps": ("INT", {"default": 20}), "cfg": ("FLOAT", {"default": 1.0}), "sampler_name": (["euler", "euler_ancestral"],), "scheduler": (["normal", "karras"],), "positive": ("CONDITIONING",), "negative": ("CONDITIONING",), "latent_image": ("LATENT",), "denoise": ("FLOAT", {"default": 1.0})}}
+        RETURN_TYPES = ("LATENT",)
+    class MockVAEDecode:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"samples": ("LATENT",), "vae": ("VAE",)}}
+        RETURN_TYPES = ("IMAGE",)
+    class MockSaveImage:
+        @classmethod
+        def INPUT_TYPES(s): return {"required": {"images": ("IMAGE",), "filename_prefix": ("STRING", {"default": "CcCKrea2"})}}
+        RETURN_TYPES = tuple()
+
+    CORE_MAPPINGS = {
+        "UNETLoader": MockUNETLoader,
+        "CLIPLoader": MockCLIPLoader,
+        "VAELoader": MockVAELoader,
+        "LoadImage": MockLoadImage,
+        "KSampler": MockKSampler,
+        "VAEDecode": MockVAEDecode,
+        "SaveImage": MockSaveImage
+    }
+
+def get_node_class(node_type):
+    if node_type in NODE_CLASS_MAPPINGS:
+        return NODE_CLASS_MAPPINGS[node_type]
+    if node_type in CORE_MAPPINGS:
+        return CORE_MAPPINGS[node_type]
+    return None
+
 CANONICAL_NAMES = [
     "01_easy_subject.json",
     "02_easy_subject_scene.json",
@@ -34,52 +85,67 @@ class WorkflowBuilder:
 
     def add_node(self, node_type, pos, size, inputs=None, widgets_values=None):
         inputs = inputs or {}
-        widgets_values = widgets_values or []
+        values_by_name = widgets_values or {}
 
-        # Schema awareness
-        if node_type in NODE_CLASS_MAPPINGS:
-            cls = NODE_CLASS_MAPPINGS[node_type]
-            in_types = cls.INPUT_TYPES()
-            req = in_types.get("required", {})
-            opt = in_types.get("optional", {})
-            all_in = {**req, **opt}
+        cls = get_node_class(node_type)
+        if not cls:
+            raise ValueError(f"Unknown node type: {node_type}")
 
-            # Format inputs
-            formatted_inputs = []
-            for name in inputs:
-                if name not in all_in:
-                    raise ValueError(f"Invalid input '{name}' for node '{node_type}'. Valid: {list(all_in.keys())}")
-                formatted_inputs.append({"name": name})
+        in_types = cls.INPUT_TYPES()
+        req = in_types.get("required", {})
+        opt = in_types.get("optional", {})
+        all_in = {**req, **opt}
 
-            # Format outputs
-            formatted_outputs = []
-            if hasattr(cls, "RETURN_TYPES"):
-                for i, t in enumerate(cls.RETURN_TYPES):
-                    name = cls.RETURN_NAMES[i] if hasattr(cls, "RETURN_NAMES") and i < len(cls.RETURN_NAMES) else t
-                    formatted_outputs.append({"name": name, "type": t, "links": []})
-        else:
-            # Fallback for standard ComfyUI nodes (LoadImage, UNETLoader, etc)
-            formatted_inputs = [{"name": k} for k in inputs.keys()]
-            if node_type == "UNETLoader":
-                formatted_outputs = [{"name": "MODEL", "type": "MODEL", "links": []}]
-            elif node_type == "CLIPLoader":
-                formatted_outputs = [{"name": "CLIP", "type": "CLIP", "links": []}]
-            elif node_type == "VAELoader":
-                formatted_outputs = [{"name": "VAE", "type": "VAE", "links": []}]
-            elif node_type == "LoadImage":
-                formatted_outputs = [{"name": "IMAGE", "type": "IMAGE", "links": []}, {"name": "MASK", "type": "MASK", "links": []}]
-            elif node_type == "KSampler":
-                formatted_outputs = [{"name": "LATENT", "type": "LATENT", "links": []}]
-            elif node_type == "VAEDecode":
-                formatted_outputs = [{"name": "IMAGE", "type": "IMAGE", "links": []}]
-            elif node_type == "SaveImage":
-                formatted_outputs = []
-            elif node_type == "EmptyLatentImage":
-                formatted_outputs = [{"name": "LATENT", "type": "LATENT", "links": []}]
-            elif node_type == "CLIPTextEncode":
-                formatted_outputs = [{"name": "CONDITIONING", "type": "CONDITIONING", "links": []}]
+        # Format inputs
+        formatted_inputs = []
+        for name in inputs:
+            if name not in all_in:
+                raise ValueError(f"Invalid input '{name}' for node '{node_type}'. Valid: {list(all_in.keys())}")
+            # Derive type
+            expected_type = all_in[name][0]
+            if isinstance(expected_type, list) or expected_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]:
+                raise ValueError(f"'{name}' is a widget, not a socket on {node_type}")
+            formatted_inputs.append({"name": name, "type": expected_type})
+
+        # Format outputs
+        formatted_outputs = []
+        if hasattr(cls, "RETURN_TYPES"):
+            for i, t in enumerate(cls.RETURN_TYPES):
+                name = getattr(cls, "RETURN_NAMES", cls.RETURN_TYPES)[i]
+                formatted_outputs.append({"name": name, "type": t, "links": []})
+
+        # Serialize widgets
+        serialized_widgets = []
+        for name, schema_val in all_in.items():
+            val_type = schema_val[0]
+            is_widget = isinstance(val_type, list) or isinstance(val_type, tuple) or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+            if not is_widget:
+                continue
+
+            if name in values_by_name:
+                val = values_by_name[name]
+                # Validate primitive type/combo membership
+                if isinstance(val_type, list) or isinstance(val_type, tuple):
+                    if val not in val_type and not (isinstance(val, str) and val.endswith(".safetensors")):
+                        raise ValueError(f"Value '{val}' not in choices {val_type} for '{name}' on '{node_type}'")
+                elif val_type == "BOOLEAN":
+                    if not isinstance(val, bool):
+                        raise ValueError(f"Expected bool for '{name}', got {type(val)}")
+                elif val_type == "STRING":
+                    if not isinstance(val, str):
+                        raise ValueError(f"Expected str for '{name}', got {type(val)}")
+                elif val_type == "INT":
+                    if not isinstance(val, int):
+                        raise ValueError(f"Expected int for '{name}', got {type(val)}")
+                elif val_type == "FLOAT":
+                    if not isinstance(val, (int, float)):
+                        raise ValueError(f"Expected float for '{name}', got {type(val)}")
+
+                serialized_widgets.append(val)
+            elif len(schema_val) > 1 and "default" in schema_val[1]:
+                serialized_widgets.append(schema_val[1]["default"])
             else:
-                formatted_outputs = []
+                raise ValueError(f"Missing required widget '{name}' for node '{node_type}'")
 
         node = {
             "id": self.node_id,
@@ -92,7 +158,7 @@ class WorkflowBuilder:
             "inputs": formatted_inputs,
             "outputs": formatted_outputs,
             "properties": {"Node name for S&R": node_type},
-            "widgets_values": widgets_values
+            "widgets_values": serialized_widgets
         }
         self.nodes.append(node)
         self.node_id += 1
@@ -107,9 +173,15 @@ class WorkflowBuilder:
         if to_idx is None:
             raise ValueError(f"Input {to_in_name} not found on node {to_node['type']}")
 
-        type_name = from_node["outputs"][from_idx]["type"]
+        out_type = from_node["outputs"][from_idx]["type"]
+        in_type = to_node["inputs"][to_idx]["type"]
 
-        lnk = [self.link_id, from_node["id"], from_idx, to_node["id"], to_idx, type_name]
+        if out_type != in_type and in_type != "*" and out_type != "*":
+            # Just ignore if any is "*" (ComfyUI generic). For strict checking, exact match:
+            if out_type != in_type:
+                raise ValueError(f"Link type mismatch: {from_node['type']}.{from_out_name} ({out_type}) -> {to_node['type']}.{to_in_name} ({in_type})")
+
+        lnk = [self.link_id, from_node["id"], from_idx, to_node["id"], to_idx, out_type]
         self.links.append(lnk)
 
         to_node["inputs"][to_idx]["link"] = self.link_id
@@ -136,27 +208,33 @@ class WorkflowBuilder:
         }
 
 def build_base_graph(b: WorkflowBuilder, is_ostris=False):
-    unet = b.add_node("UNETLoader", [0, 0], [300, 100], widgets_values=["krea2_model.safetensors", "default"])
-    clip = b.add_node("CLIPLoader", [0, 150], [300, 100], widgets_values=["qwen3_vl.safetensors", "krea2"])
-    vae = b.add_node("VAELoader", [0, 300], [300, 100], widgets_values=["ae.safetensors"])
+    unet = b.add_node("UNETLoader", [0, 0], [300, 100], widgets_values={"unet_name": "krea2_model.safetensors", "weight_dtype": "default"})
+    clip = b.add_node("CLIPLoader", [0, 150], [300, 100], widgets_values={"clip_name": "qwen3_vl.safetensors", "type": "krea2", "device": "default"})
+    vae = b.add_node("VAELoader", [0, 300], [300, 100], widgets_values={"vae_name": "ae.safetensors"})
 
     lora_name = "krea2_ostris_edit_lora.safetensors" if is_ostris else "krea2_edit_lora.safetensors"
 
-    # Correct LoRA Stack widget ordering:
-    # enabled (bool), global_strength (float), lora_1_enabled (bool), lora_1_name (str), lora_1_strength (float)...
-    lora = b.add_node("CcCKrea2LoRAStack", [350, 0], [300, 250], inputs={"model": None}, widgets_values=[
-        True, 1.0,
-        True, lora_name, 1.0,
-        False, "None", 1.0,
-        False, "None", 1.0,
-        False, "None", 1.0
-    ])
+    lora = b.add_node("CcCKrea2LoRAStack", [350, 0], [300, 250], inputs={"model": None}, widgets_values={
+        "enabled": True,
+        "global_strength": 1.0,
+        "lora_1_enabled": True,
+        "lora_1_name": lora_name,
+        "lora_1_strength": 1.0
+    })
 
     b.link(unet, "MODEL", lora, "model")
 
-    sampler = b.add_node("KSampler", [1500, 0], [300, 200], inputs={"model": None, "positive": None, "negative": None, "latent_image": None}, widgets_values=[20, 1.0, "euler", "normal", 1.0])
+    sampler = b.add_node("KSampler", [1500, 0], [300, 200], inputs={"model": None, "positive": None, "negative": None, "latent_image": None}, widgets_values={
+        "seed": 0,
+        "control_after_generate": "randomize",
+        "steps": 20,
+        "cfg": 1.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1.0
+    })
     decode = b.add_node("VAEDecode", [1850, 0], [300, 100], inputs={"samples": None, "vae": None})
-    save = b.add_node("SaveImage", [2200, 0], [300, 200], inputs={"images": None}, widgets_values=["CcCKrea2"])
+    save = b.add_node("SaveImage", [2200, 0], [300, 200], inputs={"images": None}, widgets_values={"filename_prefix": "CcCKrea2"})
 
     b.link(sampler, "LATENT", decode, "samples")
     b.link(vae, "VAE", decode, "vae")
@@ -184,14 +262,19 @@ def build_easy_workflow(filename, preset, outfit_source, style_source, is_ostris
     if has_style:
         easy_inputs["style"] = None
 
-    easy_widgets = [preset, outfit_source, style_source, True] # apply patch = True
-    if is_ostris:
-        easy_widgets.append(False) # ostris_kv_cache
+    easy_widgets = {
+        "positive_prompt": "A photo of a person",
+        "preset": preset,
+        "outfit_source": outfit_source,
+        "style_source": style_source,
+        "negative_prompt": "bad quality"
+    }
 
-    # positive_prompt
-    easy_widgets.append("A photo of a person")
-    # negative_prompt
-    easy_widgets.append("bad quality")
+    if is_ostris:
+        easy_widgets["apply_ostris_edit_patch"] = True
+        easy_widgets["ostris_kv_cache"] = False
+    else:
+        easy_widgets["apply_krea2_edit_patch"] = True
 
     easy = b.add_node(easy_type, [800, 0], [400, 400], inputs=easy_inputs, widgets_values=easy_widgets)
 
@@ -201,19 +284,19 @@ def build_easy_workflow(filename, preset, outfit_source, style_source, is_ostris
 
     y = 500
     if has_subj:
-        sub = b.add_node("LoadImage", [0, y], [300, 200], widgets_values=["subject.jpg"])
+        sub = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "subject.jpg"})
         b.link(sub, "IMAGE", easy, "subject")
         y += 250
     if has_scene:
-        scn = b.add_node("LoadImage", [0, y], [300, 200], widgets_values=["scene.jpg"])
+        scn = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "scene.jpg"})
         b.link(scn, "IMAGE", easy, "scene")
         y += 250
     if has_outfit:
-        outf = b.add_node("LoadImage", [0, y], [300, 200], widgets_values=["outfit.jpg"])
+        outf = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "outfit.jpg"})
         b.link(outf, "IMAGE", easy, "outfit")
         y += 250
     if has_style:
-        sty = b.add_node("LoadImage", [0, y], [300, 200], widgets_values=["style.jpg"])
+        sty = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "style.jpg"})
         b.link(sty, "IMAGE", easy, "style")
 
     b.link(easy, "patched_model", sampler, "model")
@@ -233,18 +316,54 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     unet, clip, vae, lora, sampler = build_base_graph(b, is_ostris)
 
     # Subject ref
-    sub_img = b.add_node("LoadImage", [0, 550], [300, 200], widgets_values=["subject.jpg"])
-    sub_prep = b.add_node("CcCKrea2QwenVisionImagePrep", [350, 550], [300, 200], inputs={"clip": None, "image": None}, widgets_values=["native", 0.0, 1.0, 1.0, "auto", "auto"])
-    sub_ref = b.add_node("CcCKrea2ReferenceImage", [700, 550], [300, 200], inputs={"prepared_image": None}, widgets_values=["edit", 0, "subject", "", 1.0, 1.0, "auto", 0.5, "2x2", True])
+    sub_img = b.add_node("LoadImage", [0, 550], [300, 200], widgets_values={"image": "subject.jpg"})
+    sub_prep = b.add_node("CcCKrea2QwenVisionImagePrep", [350, 550], [300, 200], inputs={"clip": None, "image": None}, widgets_values={
+        "mode": "native",
+        "min_mp": 0.0,
+        "max_mp": 1.0,
+        "fixed_mp": 1.0,
+        "downscale_method": "auto",
+        "upscale_method": "auto"
+    })
+    sub_ref = b.add_node("CcCKrea2ReferenceImage", [700, 550], [300, 200], inputs={"prepared_image": None}, widgets_values={
+        "reference_path": "edit",
+        "vision_slot": "auto",
+        "alias": "subject",
+        "vision_instruction": "Use this reference for subject identity, facial features, hair, anatomy, body shape and body proportions.",
+        "attention_boost": 1.0,
+        "masked_attention_boost": 1.0,
+        "visual_reference_fit": "auto",
+        "style_fidelity": 0.5,
+        "style_processing": "2x2",
+        "indirect_style_transfer": True
+    })
 
     b.link(clip, "CLIP", sub_prep, "clip")
     b.link(sub_img, "IMAGE", sub_prep, "image")
     b.link(sub_prep, "prepared_image", sub_ref, "prepared_image")
 
     # Outfit ref
-    outf_img = b.add_node("LoadImage", [0, 800], [300, 200], widgets_values=["outfit.jpg"])
-    outf_prep = b.add_node("CcCKrea2QwenVisionImagePrep", [350, 800], [300, 200], inputs={"clip": None, "image": None}, widgets_values=["native", 0.0, 1.0, 1.0, "auto", "auto"])
-    outf_ref = b.add_node("CcCKrea2ReferenceImage", [700, 800], [300, 200], inputs={"prepared_image": None, "previous_references": None}, widgets_values=["edit", 0, "outfit", "", 1.0, 1.0, "auto", 0.5, "2x2", True])
+    outf_img = b.add_node("LoadImage", [0, 800], [300, 200], widgets_values={"image": "outfit.jpg"})
+    outf_prep = b.add_node("CcCKrea2QwenVisionImagePrep", [350, 800], [300, 200], inputs={"clip": None, "image": None}, widgets_values={
+        "mode": "native",
+        "min_mp": 0.0,
+        "max_mp": 1.0,
+        "fixed_mp": 1.0,
+        "downscale_method": "auto",
+        "upscale_method": "auto"
+    })
+    outf_ref = b.add_node("CcCKrea2ReferenceImage", [700, 800], [300, 200], inputs={"prepared_image": None, "previous_references": None}, widgets_values={
+        "reference_path": "edit",
+        "vision_slot": "auto",
+        "alias": "outfit",
+        "vision_instruction": "Use this reference for clothing, garments and accessories.\nDo not use the wearer's identity as the subject identity.",
+        "attention_boost": 1.0,
+        "masked_attention_boost": 1.0,
+        "visual_reference_fit": "auto",
+        "style_fidelity": 0.5,
+        "style_processing": "2x2",
+        "indirect_style_transfer": True
+    })
 
     b.link(clip, "CLIP", outf_prep, "clip")
     b.link(outf_img, "IMAGE", outf_prep, "image")
@@ -252,7 +371,18 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     b.link(sub_ref, "reference_chain", outf_ref, "previous_references")
 
     # Target Latent
-    t_latent = b.add_node("CcCKrea2TargetLatent", [1050, 550], [300, 250], inputs={"vae": None, "geometry_image": None}, widgets_values=["empty", "favor_image", 2.0, 2.0, "1:1", 1, "auto", "auto", "", ""])
+    t_latent = b.add_node("CcCKrea2TargetLatent", [1050, 550], [300, 250], inputs={"vae": None, "geometry_image": None}, widgets_values={
+        "target_content": "empty",
+        "geometry_mode": "favor_image",
+        "target_megapixels": 2.0,
+        "fixed_megapixels": 2.0,
+        "aspect_ratio": "1:1",
+        "batch_size": 1,
+        "include_in_vision": "auto",
+        "target_vision_slot": "auto",
+        "target_alias": "",
+        "target_vision_instruction": ""
+    })
     b.link(vae, "VAE", t_latent, "vae")
     b.link(sub_prep, "prepared_image", t_latent, "geometry_image")
 
@@ -265,7 +395,13 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     elif is_ostris:
         ref_method = "ostris_edit"
 
-    edit_widgets = [ref_method, True, False, "A photo", "bad quality", ""] # method, apply_patch, ostris_kv, pos, neg, global
+    edit_widgets = {
+        "positive_prompt": "A photo of a person",
+        "negative_prompt": "bad quality",
+        "global_vision_directive": "",
+        "reference_method": ref_method,
+        "ostris_kv_cache": False
+    }
     edit = b.add_node("CcCKrea2Edit", [1500, 0], [400, 400], inputs=edit_inputs, widgets_values=edit_widgets)
 
     b.link(lora, "model", edit, "model")
