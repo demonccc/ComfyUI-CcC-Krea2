@@ -23,7 +23,9 @@ ROLE_ORDER_INPAINT_SUBJECT_SCENE = [ReferenceRole.SCENE, ReferenceRole.SUBJECT]
 GROUNDING_RESIZE_MODES = ["normalize", "downscale_only", "clamp", "none"]
 GROUNDING_PRESETS = ["balanced", "max_identity", "custom"]
 SAMPLING_RESIZE_MODES = ["fit", "crop", "stretch"]
-REFERENCE_FIT_MODES = ["auto", "fit", "crop"]
+LEGACY_REFERENCE_FIT_MODES = ["fit", "crop"]
+GENERIC_REFERENCE_FIT_MODES = ["auto", "fit", "crop"]
+REFERENCE_FIT_MODES = LEGACY_REFERENCE_FIT_MODES
 ATTENTION_MASK_MODES = ["hard", "soft"]
 
 DEFAULT_GROUNDING_PX_SUBJECT = 768

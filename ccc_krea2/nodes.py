@@ -12,7 +12,7 @@ from .constants import (
     ROLE_ORDER_INPAINT_SUBJECT_SCENE,
     GROUNDING_RESIZE_MODES,
     SAMPLING_RESIZE_MODES,
-    REFERENCE_FIT_MODES,
+    LEGACY_REFERENCE_FIT_MODES,
     ATTENTION_MASK_MODES,
 )
 from .settings import (
@@ -67,7 +67,7 @@ class CcCKrea2ImageAdvancedSettings:
                 "grounding_min_px": ("INT", {"default": 512, "min": 128, "max": 4096, "step": 16}),
                 "grounding_max_px": ("INT", {"default": 1024, "min": 128, "max": 4096, "step": 16}),
                 "grounding_resize_method": (RESIZE_METHODS, {"default": "auto"}),
-                "reference_fit_mode": (REFERENCE_FIT_MODES, {"default": "fit"}),
+                "reference_fit_mode": (LEGACY_REFERENCE_FIT_MODES, {"default": "fit"}),
                 "reference_resize_method": (RESIZE_METHODS, {"default": "auto"}),
             },
             "optional": {

@@ -74,8 +74,8 @@ DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
 
 STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0,
-    style_processing="2x2",
-    indirect_style_transfer=True,
+    style_processing="4x4",
+    indirect_style_transfer=False,
     vision_instruction="Adopt the artistic style, color palette, texture, and visual mood of this style reference."
 )
 

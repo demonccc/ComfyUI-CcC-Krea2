@@ -292,20 +292,40 @@ def _execute_easy_edit(
         ostris_kv_cache=ostris_kv_cache,
     )
 
-    # Prepend Easy routing report header to edit_info
+    app_refs = [f"{alias}" for _, _, alias in route.edit_references]
+    sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
+
     easy_header = [
         "=== Easy Edit Routing Report ===",
         f"Preset: {preset}",
-        f"Backend Method: {backend_method}",
+        f"Reference Contract: {backend_method}",
         f"Outfit Source Selector: {outfit_source}",
         f"Style Source Selector: {style_source}",
+        f"Resolved Subject: {'present' if resolved_sources.subject is not None else 'missing'}",
+        f"Resolved Scene: {'present' if resolved_sources.scene is not None else 'missing'}",
+        f"Resolved Outfit Source: {outfit_source} ({'present' if resolved_sources.effective_outfit is not None else 'missing'})",
+        f"Resolved Style Source: {style_source} ({'present' if resolved_sources.effective_style is not None else 'missing'})",
         f"Target Content Mode: {route.target_content_mode}",
+        f"Target Content Source: {'present' if route.target_content_source is not None else 'none'}",
         f"Target Geometry Mode: {route.target_geometry_mode}",
+        f"Target Geometry Source: {'present' if route.target_geometry_source is not None else 'none'}",
+        f"Appearance Ref 1: {app_refs[0] if len(app_refs) > 0 else 'none'}",
+        f"Appearance Ref 2: {app_refs[1] if len(app_refs) > 1 else 'none'}",
+        f"Semantic-only Sources: {', '.join(sem_refs) if sem_refs else 'none'}",
         f"Style Active: {'yes' if route.style_active else 'no'}",
-        f"Model Patch Applied: {'yes' if apply_patch else 'no (native reference latents)'}",
+    ]
+
+    if backend_method == "krea2_edit":
+        easy_header.append(f"CcC Krea2 Model Patch Applied: {'yes' if apply_patch else 'no'}")
+    elif backend_method == "ostris_edit":
+        easy_header.append(f"Ostris Reference Method Explicitly Applied: {'yes (conditioning metadata)' if apply_patch else 'no (external runtime expected)'}")
+    else:
+        easy_header.append(f"Model Patch Applied: {'yes' if apply_patch else 'no'}")
+
+    easy_header.extend([
         f"Warnings: {'; '.join(route.warnings) if route.warnings else 'none'}",
         "",
-    ]
+    ])
 
     combined_info = "\n".join(easy_header) + "\n" + orchestrator_info
     return (patched_model, pos, neg, lat, combined_info)

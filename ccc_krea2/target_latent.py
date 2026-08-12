@@ -53,6 +53,15 @@ def calculate_target_latent_resolution(
     source_dims = None
     geometry_source = "custom_aspect_ratio"
 
+    if geometry_mode == "favor_subject":
+        if geometry_image is None:
+            geometry_image = subject_image
+        geometry_mode = "favor_image"
+    elif geometry_mode == "favor_scene":
+        if geometry_image is None:
+            geometry_image = scene_image
+        geometry_mode = "favor_image"
+
     ref_img = geometry_image or target_image or subject_image or scene_image
 
     if geometry_mode in ("favor_image", "favor_subject", "favor_scene") and ref_img is not None:
@@ -309,10 +318,34 @@ def build_target_latent(
         target_megapixels = kwargs["maximum_mp"]
     if "fixed_mp" in kwargs:
         fixed_megapixels = kwargs["fixed_mp"]
-    if "fixed_aspect_ratio" in kwargs:
-        aspect_ratio = kwargs["fixed_aspect_ratio"]
+    orig_target_content = target_content
+    orig_geometry_mode = geometry_mode
 
-    active_target_image = target_image or subject_image or scene_image
+    if target_content == "subject":
+        if target_image is None:
+            target_image = subject_image
+        target_content = "image"
+    elif target_content == "scene":
+        if target_image is None:
+            target_image = scene_image
+        target_content = "image"
+
+    if geometry_mode == "favor_subject":
+        if geometry_image is None:
+            geometry_image = subject_image
+        geometry_mode = "favor_image"
+    elif geometry_mode == "favor_scene":
+        if geometry_image is None:
+            geometry_image = scene_image
+        geometry_mode = "favor_image"
+
+    if orig_target_content == "subject":
+        active_target_image = target_image or subject_image
+    elif orig_target_content == "scene":
+        active_target_image = target_image or scene_image
+    else:
+        active_target_image = target_image or subject_image or scene_image
+
     active_geometry_image = geometry_image or active_target_image
 
     target_h, target_w, geom_src, active_mp, src_dims, warnings = calculate_target_latent_resolution(
@@ -336,12 +369,12 @@ def build_target_latent(
         samples = torch.zeros((batch_size, 16, latent_h, latent_w), dtype=torch.float32)
     elif target_content in ("image", "subject", "scene"):
         if active_target_image is None:
-            if target_content == "subject":
+            if orig_target_content == "subject":
                 raise ValueError("Subject image is required when target_content is 'subject'.")
-            elif target_content == "scene":
+            elif orig_target_content == "scene":
                 raise ValueError("Scene image is required when target_content is 'scene'.")
             else:
-                raise ValueError(f"Target image is required when target_content is '{target_content}'.")
+                raise ValueError("Target image is required when target_content is 'image'.")
 
         if vae is None:
             raise ValueError(f"VAE is required when target_content is '{target_content}'.")
@@ -376,8 +409,8 @@ def build_target_latent(
     actual_mp = (target_h * target_w) / 1_000_000.0
 
     lines = [
-        f"Latent Content: {target_content}",
-        f"Geometry Strategy: {geometry_mode}",
+        f"Latent Content: {orig_target_content}",
+        f"Geometry Strategy: {orig_geometry_mode}",
         f"Geometry Source: {geom_src}",
         f"Content Source: {content_src_name}",
         f"Content Source Size: {f'{transform_info.source_size[0]} x {transform_info.source_size[1]}' if transform_info else src_size_str}",

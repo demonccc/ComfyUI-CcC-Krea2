@@ -174,3 +174,24 @@ def test_normalize_vae_output_invalid_dimensions_raises():
     tensor_6d = torch.zeros((1, 16, 1, 1, 144, 216))
     with pytest.raises(ValueError, match="Normalized VAE latent must be a 4D or 5D tensor"):
         normalize_vae_output(tensor_6d, batch_size=1)
+
+
+def test_target_latent_legacy_translation_precedence():
+    img_subj = torch.rand(1, 500, 300, 3)
+    img_scene = torch.rand(1, 800, 600, 3)
+    subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="scene",
+        subject_image=subj_prep,
+        scene_image=scene_prep,
+        target_geometry="favor_scene",
+        maximum_mp=1.0,
+        batch_size=1
+    )
+    assert lat_dict["target_vision_context"].target_image is scene_prep
+

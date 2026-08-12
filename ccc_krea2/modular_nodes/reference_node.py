@@ -3,7 +3,7 @@
 from typing import Optional, Dict, Any, Tuple
 import torch
 from ..reference_specs import ReferenceSpec, ReferenceChain, PreparedVisionImage
-from ..constants import REFERENCE_FIT_MODES
+from ..constants import GENERIC_REFERENCE_FIT_MODES
 
 
 class CcCKrea2ReferenceImage:
@@ -27,7 +27,7 @@ class CcCKrea2ReferenceImage:
                 "vision_instruction": ("STRING", {"multiline": True, "default": "", "tooltip": "Optional explicit instruction describing what Qwen should use from this reference."}),
                 "attention_boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 8.0, "step": 0.05, "tooltip": "CcC Krea2 Edit only. Multiplies target-to-reference attention. 1.0 is neutral."}),
                 "masked_attention_boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 8.0, "step": 0.05, "tooltip": "CcC Krea2 Edit only. Additional multiplier inside the attention mask."}),
-                "visual_reference_fit": (REFERENCE_FIT_MODES, {"default": "auto", "tooltip": "Specifies fit mode for Krea2 geometry scaling: auto, fit, or crop."}),
+                "visual_reference_fit": (GENERIC_REFERENCE_FIT_MODES, {"default": "auto", "tooltip": "Specifies fit mode for Krea2 geometry scaling: auto, fit, or crop."}),
                 "style_fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Style path only. Controls style fidelity blending."}),
                 "style_processing": (["full", "2x2", "4x4"], {"default": "2x2", "tooltip": "Style path only. Moodboard tile grid resolution."}),
                 "indirect_style_transfer": ("BOOLEAN", {"default": True, "tooltip": "Style path only. Removes style vision rows post-encoding when True."}),

@@ -178,8 +178,8 @@ def test_style_active_for_all_presets(dummy_sources):
     assert r_st.style_active is True
     assert r_st.style_source is St
     assert r_st.style_config.style_fidelity == 1.0
-    assert r_st.style_config.style_processing == "2x2"
-    assert r_st.style_config.indirect_style_transfer is True
+    assert r_st.style_config.style_processing == "4x4"
+    assert r_st.style_config.indirect_style_transfer is False
     assert "artistic style" in r_st.style_config.vision_instruction
 
 

@@ -47,3 +47,107 @@ def test_preprocess_ostris_ref_pixel_image_snaps_16():
     assert h * w <= 1024 * 1024 + 100
     assert h % 16 == 0
     assert w % 16 == 0
+
+
+class DummyModel:
+    def clone(self):
+        return DummyModel()
+
+
+class DummyClip:
+    def tokenize(self, prompt, images=None, **kwargs):
+        tok_pairs = []
+        if images:
+            for img in images:
+                tok_pairs.append([{"type": "image", "data": img}, None])
+        else:
+            tok_pairs.append([100, None])
+        return {"qwen3vl": [tok_pairs]}
+
+    def encode_from_tokens_scheduled(self, tokens):
+        return [[torch.randn(1, 257, 1536), {}]]
+
+
+class DummyVAE:
+    def encode(self, image):
+        return {"samples": torch.zeros((1, 16, 1, 32, 32))}
+
+
+def test_ostris_backend_execution_path():
+    from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+    from ccc_krea2.reference_specs import ReferenceChain, ReferenceSpec
+    from ccc_krea2.vision_prep import prepare_image_for_qwen
+
+    model = DummyModel()
+    clip = DummyClip()
+    vae = DummyVAE()
+
+    img = torch.zeros((1, 256, 256, 3))
+    prep = prepare_image_for_qwen(img, clip)
+
+    spec = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        alias="subject",
+    )
+    chain = ReferenceChain().append(spec)
+    target_latent = {"samples": torch.zeros((1, 16, 1, 32, 32))}
+
+    # Case 1: apply_model_patch=True
+    out_model, pos, neg, lat, info = run_krea2_edit_orchestrator(
+        model=model,
+        clip=clip,
+        vae=vae,
+        references=chain,
+        target_latent=target_latent,
+        positive_prompt="test prompt",
+        negative_prompt="neg prompt",
+        reference_method="ostris_edit",
+        apply_model_patch=True,
+    )
+
+    assert out_model is model
+    assert "Negative Physical Qwen Image Count: 0" in info
+    assert "Reference Latents Method: index_timestep_zero" in info
+    assert "Ostris Reference Method: explicitly applied via conditioning" in info
+
+    # Case 2: apply_model_patch=False
+    _, _, _, _, info_unpatched = run_krea2_edit_orchestrator(
+        model=model,
+        clip=clip,
+        vae=vae,
+        references=chain,
+        target_latent=target_latent,
+        positive_prompt="test prompt",
+        negative_prompt="neg prompt",
+        reference_method="ostris_edit",
+        apply_model_patch=False,
+    )
+    assert "Ostris reference method was not explicitly applied" in info_unpatched
+
+
+def test_ostris_kv_cache_raises_not_implemented():
+    from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+    from ccc_krea2.reference_specs import ReferenceChain
+
+    model = DummyModel()
+    clip = DummyClip()
+    vae = DummyVAE()
+    target_latent = {"samples": torch.zeros((1, 16, 1, 32, 32))}
+
+    with pytest.raises(NotImplementedError, match="ostris_kv_cache=True is currently unsupported"):
+        run_krea2_edit_orchestrator(
+            model=model,
+            clip=clip,
+            vae=vae,
+            references=ReferenceChain(),
+            target_latent=target_latent,
+            positive_prompt="test prompt",
+            negative_prompt="",
+            reference_method="ostris_edit",
+            ostris_kv_cache=True,
+        )
+
+    with pytest.raises(NotImplementedError, match="ostris_kv_cache=True is not supported"):
+        patch_ostris_model(model, ostris_kv_cache=True)
+

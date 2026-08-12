@@ -33,6 +33,24 @@ from .ostris_backend import (
 from .target_latent import should_include_target_in_vision, TargetVisionContext
 
 
+def detect_model_default_ref_method(model: Any) -> Optional[str]:
+    """Safely inspect connected model patcher for default_ref_method without mutating."""
+    if model is None:
+        return None
+    try:
+        model_obj = model.get_model_object("diffusion_model") if hasattr(model, "get_model_object") else getattr(model, "model", None)
+        if model_obj is not None:
+            if hasattr(model_obj, "default_ref_method") and getattr(model_obj, "default_ref_method") is not None:
+                return str(getattr(model_obj, "default_ref_method"))
+            if hasattr(model_obj, "ref_latents_method") and getattr(model_obj, "ref_latents_method") is not None:
+                return str(getattr(model_obj, "ref_latents_method"))
+        if hasattr(model, "default_ref_method") and getattr(model, "default_ref_method") is not None:
+            return str(getattr(model, "default_ref_method"))
+    except Exception:
+        pass
+    return None
+
+
 def run_krea2_edit_orchestrator(
     model: Any,
     clip: Any,
@@ -48,6 +66,11 @@ def run_krea2_edit_orchestrator(
     **kwargs: Any
 ) -> Tuple[Any, Any, Any, Dict[str, torch.Tensor], str]:
     """Execute the modular Krea 2 Edit orchestrator pipeline."""
+    if ostris_kv_cache or kwargs.get("ostris_kv_cache", False):
+        raise NotImplementedError(
+            "[CcC Krea2] ostris_kv_cache=True is currently unsupported in the CcC Ostris backend. "
+            "Intended only for LoRAs trained with ai-toolkit kv_cache."
+        )
     if ostris_kv_cache:
         raise NotImplementedError(
             "ostris_kv_cache is currently unsupported in the CcC Ostris backend. "
@@ -114,6 +137,7 @@ def run_krea2_edit_orchestrator(
 
     vae_ref_specs: List[Dict[str, Any]] = []
     style_ref_specs: List[Dict[str, Any]] = []
+    semantic_ref_specs: List[Dict[str, Any]] = []
     ostris_pic_counter = 1
 
     for ref_item in resolved_refs:
@@ -202,6 +226,14 @@ def run_krea2_edit_orchestrator(
                         "spec": spec,
                         "ref_item": ref_item
                     })
+            else:
+                semantic_ref_specs.append({
+                    "role": ref_role,
+                    "slot": slot,
+                    "spec": spec,
+                    "ref_item": ref_item,
+                    "has_instruction": bool(getattr(spec, "vision_instruction", "").strip())
+                })
 
             # Vision image enters positive Qwen list
             pos_idx = len(pos_qwen_images) + 1
@@ -322,11 +354,15 @@ def run_krea2_edit_orchestrator(
     # Step 7: Apply model patches or native reference latents
     apply_model_patch = kwargs.get("apply_model_patch", kwargs.get("apply_patch", True))
 
+    native_def_method = None
     if reference_method == "native":
         check_patch_safety(model, "native")
         patched_model = model
         pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
         neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_transport)
+        native_def_method = detect_model_default_ref_method(model)
+        if vae_latents_for_transport and native_def_method is None:
+            slot_warnings.append("reference_latents were attached, but no native default reference method was detected; the connected MODEL/runtime must provide compatible reference behavior.")
     elif reference_method == "ostris_edit":
         check_patch_safety(model, "ostris_edit")
         pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
@@ -346,10 +382,12 @@ def run_krea2_edit_orchestrator(
             patched_model = model
             pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
             neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_transport)
+            slot_warnings.append("CcC Krea2 model patch was skipped; reference latents attached to conditioning require compatible runtime support.")
 
     # Step 8: Build edit_info report
-    patch_text = "applied" if apply_model_patch else "skipped"
-    if reference_method == "native":
+    if reference_method == "krea2_edit":
+        patch_text = "applied" if apply_model_patch else "skipped"
+    else:
         patch_text = "not applicable"
 
     ref_transport_text = "CcC Krea2 wrapper"
@@ -360,16 +398,28 @@ def run_krea2_edit_orchestrator(
     elif not apply_model_patch:
         ref_transport_text = "standard ComfyUI reference_latents"
 
-    ostris_applied_str = "yes" if (reference_method == "ostris_edit" and apply_model_patch) else "no"
+    ostris_applied_str = "yes (conditioning metadata)" if (reference_method == "ostris_edit" and apply_model_patch) else ("no (external runtime expected)" if reference_method == "ostris_edit" else "no")
     kv_cache_str = "disabled (feature currently unsupported)" if reference_method == "ostris_edit" else "not applicable"
 
     info_lines = [
         "=== CcC Krea2 Edit Pipeline Report ===",
         f"Reference Contract: {reference_method}",
-        f"CcC Patch: {patch_text}",
+        f"CcC Model Patch: {patch_text}",
         f"Reference Transport: {ref_transport_text}",
-        f"Ostris Reference Method Applied: {ostris_applied_str}",
-        f"Ostris KV Cache: {kv_cache_str}",
+    ]
+    if reference_method == "native":
+        info_lines.append(f"Native Default Reference Method: {native_def_method if native_def_method is not None else 'none'}")
+    elif reference_method == "ostris_edit":
+        ostris_method_status = "explicitly applied via conditioning" if apply_model_patch else "not injected; external runtime expected"
+        info_lines.extend([
+            f"Ostris Reference Method: {ostris_method_status}",
+            f"Ostris Reference Method Applied: {ostris_applied_str}",
+            f"Ostris KV Cache: {kv_cache_str}",
+        ])
+        if apply_model_patch:
+            info_lines.append("Reference Latents Method: index_timestep_zero")
+
+    info_lines.extend([
         f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
         f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
         "",
@@ -383,7 +433,7 @@ def run_krea2_edit_orchestrator(
         f"  Global Vision Directive Active: {'yes' if global_vision_directive.strip() else 'no'}",
         f"  Prompt Augmentation Active: {'yes' if prompt_augmentation is not None else 'no'}",
         ""
-    ]
+    ])
 
     for ref in vae_ref_specs:
         sp = ref["spec"]
@@ -433,6 +483,26 @@ def run_krea2_edit_orchestrator(
                 f"  VAE Pixels: {ref.get('vae_size', (0,0))[0]} x {ref.get('vae_size', (0,0))[1]}",
             ])
         info_lines.append("")
+
+    for sem in semantic_ref_specs:
+        sp = sem["spec"]
+        ref_item = sem["ref_item"]
+        aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
+        phys_idx = ref_item.get("physical_qwen_range", (1, 1))[0]
+        span_str = str(pos_qwen_context.vision_row_spans[phys_idx - 1]) if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans) else "N/A"
+
+        info_lines.extend([
+            f"Semantic-only Reference [Slot {sem['slot']} - {sem['role'].capitalize()}]:",
+            f"  Logical Vision Slot: {sem['slot']}",
+            f"  Physical Qwen Image Index: {phys_idx}",
+            f"  Actual Conditioning Row Span: {span_str}",
+            f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
+            f"  Vision Instruction Active: {'yes' if sem.get('has_instruction') else 'no'}",
+            f"  Appearance Reference: no",
+            f"  VAE Reference Frame: none",
+            f"  Negative Conditioning Included: no",
+            ""
+        ])
 
     for st in style_ref_specs:
         sp = st["spec"]
