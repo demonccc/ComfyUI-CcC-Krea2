@@ -4,32 +4,72 @@ from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 class MockUNETLoader:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
+    def INPUT_TYPES(cls):
+        return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
+
     RETURN_TYPES = ("MODEL",)
+
+
 class MockCLIPLoader:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"clip_name": (["qwen3_vl.safetensors"],), "type": (["krea2", "sdxl", "sd3"],), "device": (["default", "cpu"],)}}
+    def INPUT_TYPES(cls):
+        return {"required": {"clip_name": (["qwen3_vl.safetensors"],), "type": (["krea2", "sdxl", "sd3"],), "device": (["default", "cpu"],)}}
+
     RETURN_TYPES = ("CLIP",)
+
+
 class MockVAELoader:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"vae_name": (["ae.safetensors"],)}}
+    def INPUT_TYPES(cls):
+        return {"required": {"vae_name": (["ae.safetensors"],)}}
+
     RETURN_TYPES = ("VAE",)
+
+
 class MockLoadImage:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"image": (["subject.jpg", "scene.jpg", "outfit.jpg", "style.jpg"],)}}
+    def INPUT_TYPES(cls):
+        return {"required": {"image": (["subject.jpg", "scene.jpg", "outfit.jpg", "style.jpg"],)}}
+
     RETURN_TYPES = ("IMAGE", "MASK")
+
+
 class MockKSampler:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"model": ("MODEL",), "seed": ("INT", {"default": 0}), "steps": ("INT", {"default": 20}), "cfg": ("FLOAT", {"default": 1.0}), "sampler_name": (["euler", "euler_ancestral"],), "scheduler": (["normal", "karras"],), "positive": ("CONDITIONING",), "negative": ("CONDITIONING",), "latent_image": ("LATENT",), "denoise": ("FLOAT", {"default": 1.0})}}
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "seed": ("INT", {"default": 0}),
+                "steps": ("INT", {"default": 20}),
+                "cfg": ("FLOAT", {"default": 1.0}),
+                "sampler_name": (["euler", "euler_ancestral"],),
+                "scheduler": (["normal", "karras"],),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
+                "latent_image": ("LATENT",),
+                "denoise": ("FLOAT", {"default": 1.0}),
+            }
+        }
+
     RETURN_TYPES = ("LATENT",)
+
+
 class MockVAEDecode:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"samples": ("LATENT",), "vae": ("VAE",)}}
+    def INPUT_TYPES(cls):
+        return {"required": {"samples": ("LATENT",), "vae": ("VAE",)}}
+
     RETURN_TYPES = ("IMAGE",)
+
+
 class MockSaveImage:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"images": ("IMAGE",), "filename_prefix": ("STRING", {"default": "CcCKrea2"})}}
+    def INPUT_TYPES(cls):
+        return {"required": {"images": ("IMAGE",), "filename_prefix": ("STRING", {"default": "CcCKrea2"})}}
+
     RETURN_TYPES = tuple()
+
 
 try:
     import nodes as comfy_nodes
@@ -42,7 +82,7 @@ except ImportError:
         "LoadImage": MockLoadImage,
         "KSampler": MockKSampler,
         "VAEDecode": MockVAEDecode,
-        "SaveImage": MockSaveImage
+        "SaveImage": MockSaveImage,
     }
 
 def get_node_class(node_type):
@@ -404,27 +444,30 @@ def test_builder_validation():
         builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"reference_method": "invalid.safetensors"})
 
 def test_builder_duplicate_link_rejection():
+    import copy
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
     import build_canonical_workflows
 
     builder = build_canonical_workflows.WorkflowBuilder()
-    n1 = builder.add_node("CcCKrea2TargetLatent", pos=[0,0], size=[1,1])
-    n2 = builder.add_node("CcCKrea2Edit", pos=[0,0], size=[1,1], inputs=["target_latent"])
+    n1 = builder.add_node("CcCKrea2TargetLatent", pos=[0, 0], size=[1, 1])
+    n2 = builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[1, 1], inputs=["target_latent"])
 
     # First link should succeed
     builder.link(n1, "target_latent", n2, "target_latent")
 
-    links_before = len(builder.links)
-    out_links_before = len(n1["outputs"][0]["links"])
+    links_before = copy.deepcopy(builder.links)
+    source_links_before = copy.deepcopy(n1["outputs"][0]["links"])
+    destination_link_before = n2["inputs"][0]["link"]
 
     # Second link to the same input should fail
     import pytest
     with pytest.raises(ValueError, match="already has a link"):
         builder.link(n1, "target_latent", n2, "target_latent")
 
-    assert len(builder.links) == links_before
-    assert len(n1["outputs"][0]["links"]) == out_links_before
+    assert builder.links == links_before
+    assert n1["outputs"][0]["links"] == source_links_before
+    assert n2["inputs"][0]["link"] == destination_link_before
 
 
 def test_orphan_link_rejection():
@@ -482,7 +525,6 @@ def test_orphan_link_rejection():
     # Case E: MISSING TARGET DECLARATION
     wf_e = copy.deepcopy(wf)
     valid_link = wf_e["links"][0]
-    link_id = valid_link[0]
     target_node_id = valid_link[3]
     target_slot = valid_link[4]
     for node in wf_e["nodes"]:
@@ -501,8 +543,11 @@ def test_validator_regression_all_nodes():
     # Case A: Unconnected output contract
     wf_a = copy.deepcopy(wf)
     for node in wf_a["nodes"]:
-        if node["type"] == "LoadImage":
-            node["outputs"][0]["type"] = "INVALID_TYPE"
+        if node["type"] == "CcCKrea2LoRAStack":
+            for out in node["outputs"]:
+                if out["name"] == "prompt_augmentation":
+                    out["type"] = "INVALID_TYPE"
+                    break
             break
     with pytest.raises(AssertionError):
         validate_workflow_schema(wf_a, "Case A")
@@ -525,19 +570,20 @@ def test_validator_regression_all_nodes():
     with pytest.raises(AssertionError):
         validate_workflow_schema(wf_c, "Case C")
 
+
 def test_validate_workflow_schema_does_not_mutate_workflow():
     import copy
 
     with open(f"workflows/{MODERN_CANONICAL[0]}", "r", encoding="utf-8") as f:
         wf = json.load(f)
 
-    wf_before = copy.deepcopy(wf)
-    validate_workflow_schema(wf, MODERN_CANONICAL[0])
+    before = copy.deepcopy(wf)
 
-    assert wf == wf_before, "Workflow was mutated by validation!"
-
-    # Validate a second time to ensure it still works (no cached state affecting it)
     validate_workflow_schema(wf, MODERN_CANONICAL[0])
+    assert wf == before, "Workflow was mutated by validation on first run!"
+
+    validate_workflow_schema(wf, MODERN_CANONICAL[0])
+    assert wf == before, "Workflow was mutated by validation on second run!"
 
 def test_validator_handles_none_links():
     import copy
