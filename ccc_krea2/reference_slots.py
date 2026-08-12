@@ -118,12 +118,18 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
                     )
 
         ref_path = getattr(spec, "reference_path", spec.role.lower())
+        is_appearance = getattr(spec, "appearance_reference", True)
+
         if ref_path == "style" or spec.role.lower() == "style":
             vae_frame = None
             style_proc = getattr(spec, "style_processing", "2x2")
             span_len = 1 if style_proc == "full" else (4 if style_proc == "2x2" else 16)
             physical_qwen_range = (physical_qwen_index, physical_qwen_index + span_len - 1)
             physical_qwen_index += span_len
+        elif not is_appearance:
+            vae_frame = None
+            physical_qwen_range = (physical_qwen_index, physical_qwen_index)
+            physical_qwen_index += 1
         else:
             vae_frame = vae_frame_counter
             vae_frame_counter += 1

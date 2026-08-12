@@ -34,6 +34,7 @@ def calculate_target_latent_resolution(
     fixed_megapixels: float = 2.0,
     aspect_ratio: str = "1:1",
     target_image: Optional[PreparedVisionImage] = None,
+    geometry_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
     **kwargs: Any
@@ -52,13 +53,13 @@ def calculate_target_latent_resolution(
     source_dims = None
     geometry_source = "custom_aspect_ratio"
 
-    ref_img = target_image or subject_image or scene_image
+    ref_img = geometry_image or target_image or subject_image or scene_image
 
     if geometry_mode in ("favor_image", "favor_subject", "favor_scene") and ref_img is not None:
         ih, iw = get_image_dims(ref_img.original_image)
         source_dims = (ih, iw)
         src_ar = iw / float(ih)
-        geometry_source = "target_original_image"
+        geometry_source = "geometry_original_image" if geometry_image else "target_original_image"
         src_mp = (ih * iw) / 1_000_000.0
         active_mp = min(src_mp, target_megapixels)
     elif geometry_mode in ("fixed", "crop_subject"):
@@ -80,7 +81,7 @@ def calculate_target_latent_resolution(
             ih, iw = get_image_dims(ref_img.original_image)
             source_dims = (ih, iw)
             src_ar = iw / float(ih)
-            geometry_source = "target_original_image"
+            geometry_source = "geometry_original_image" if geometry_image else "target_original_image"
             active_mp = min((ih * iw) / 1_000_000.0, target_megapixels)
         else:
             geometry_source = "fixed_megapixels"
@@ -243,6 +244,7 @@ def create_target_latent(
     target_latent_content: str = "empty",
     target_geometry: str = "fixed",
     target_image: Optional[PreparedVisionImage] = None,
+    geometry_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
     maximum_mp: float = 2.0,
@@ -269,6 +271,7 @@ def create_target_latent(
         aspect_ratio=aspect,
         batch_size=batch_size,
         target_image=target_image,
+        geometry_image=geometry_image,
         subject_image=subject_image,
         scene_image=scene_image,
         include_in_vision=include_in_vision,
@@ -288,6 +291,7 @@ def build_target_latent(
     aspect_ratio: str = "1:1",
     batch_size: int = 1,
     target_image: Optional[PreparedVisionImage] = None,
+    geometry_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
     include_in_vision: str = "auto",
@@ -309,6 +313,7 @@ def build_target_latent(
         aspect_ratio = kwargs["fixed_aspect_ratio"]
 
     active_target_image = target_image or subject_image or scene_image
+    active_geometry_image = geometry_image or active_target_image
 
     target_h, target_w, geom_src, active_mp, src_dims, warnings = calculate_target_latent_resolution(
         geometry_mode=geometry_mode,
@@ -316,6 +321,7 @@ def build_target_latent(
         fixed_megapixels=fixed_megapixels,
         aspect_ratio=aspect_ratio,
         target_image=active_target_image,
+        geometry_image=geometry_image,
         subject_image=subject_image,
         scene_image=scene_image
     )

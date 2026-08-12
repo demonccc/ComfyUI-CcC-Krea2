@@ -17,18 +17,19 @@ def resolve_grounding_px(preset: str, custom_px: int) -> int:
 def prepare_easy_krea_vision_image(
     image: torch.Tensor,
     preset: str = "balanced",
+    role: str = "subject",
 ) -> torch.Tensor:
-    """Preprocesses reference images for Easy Krea based on longest-edge preset targets.
+    """Preprocesses reference images for Easy Krea based on role/function and preset targets.
 
-    - max_identity: longest edge ~1024px
-    - all other presets: longest edge ~768px
+    - max_identity + subject: normalize longest edge to 1024px
+    - all other edit refs (scene, outfit, or balanced subject): normalize longest edge to 768px
 
     Original image is never altered.
     """
-    target_px = 1024 if preset == "max_identity" else 768
+    target_px = 1024 if (preset == "max_identity" and role == "subject") else 768
     return resize_grounding_image(
         image=image,
-        resize_mode="downscale_only",
+        resize_mode="normalize",
         grounding_px=target_px,
         grounding_preset="custom",
     )

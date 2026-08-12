@@ -202,53 +202,78 @@ def _execute_easy_edit(
         if is_ostris:
             vlm_img = preprocess_ostris_vision_image(item_img)
         else:
-            vlm_img = prepare_easy_krea_vision_image(item_img, preset)
+            vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
-        prep = prepare_image_for_qwen(clip, vlm_img, original_image=item_img)
+        prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
             alias=alias_role,
             attention_boost=boost,
+            appearance_reference=True,
+            _legacy_role=alias_role,
+        )
+        chain = chain.append(spec)
+
+    for item_img, alias_role in route.semantic_only_references:
+        if is_ostris:
+            vlm_img = preprocess_ostris_vision_image(item_img)
+        else:
+            vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
+
+        prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
+        spec = ReferenceSpec(
+            reference_path="edit",
+            prepared_image=prep,
+            alias=alias_role,
+            appearance_reference=False,
             _legacy_role=alias_role,
         )
         chain = chain.append(spec)
 
     if route.style_active and route.style_source is not None:
-        if is_ostris:
-            style_vlm = preprocess_ostris_vision_image(route.style_source)
-        else:
-            style_vlm = prepare_easy_krea_vision_image(route.style_source, preset)
-
-        prep_style = prepare_image_for_qwen(clip, style_vlm, original_image=route.style_source)
+        style_vlm = prepare_easy_krea_vision_image(route.style_source, preset=preset, role="style")
+        prep_style = prepare_image_for_qwen(image=style_vlm, clip=clip, original_image=route.style_source)
         style_spec = StyleReferenceSpec(
             reference_path="style",
             prepared_image=prep_style,
             alias="style",
-            style_fidelity=route.style_strength,
+            style_fidelity=route.style_config.style_fidelity,
+            style_processing=route.style_config.style_processing,
+            indirect_style_transfer=route.style_config.indirect_style_transfer,
+            vision_instruction=route.style_config.vision_instruction,
             _legacy_role="style",
         )
         chain = chain.append(style_spec)
 
     # Phase 3.5: Build Target Latent
-    target_prep = None
+    target_content_prep = None
     if route.target_content_source is not None:
         if is_ostris:
             t_vlm = preprocess_ostris_vision_image(route.target_content_source)
         else:
-            t_vlm = prepare_easy_krea_vision_image(route.target_content_source, preset)
-        target_prep = prepare_image_for_qwen(clip, t_vlm, original_image=route.target_content_source)
+            t_vlm = prepare_easy_krea_vision_image(route.target_content_source, preset=preset, role="target_content")
+        target_content_prep = prepare_image_for_qwen(image=t_vlm, clip=clip, original_image=route.target_content_source)
+
+    geometry_prep = None
+    if route.target_geometry_source is not None:
+        if route.target_geometry_source is route.target_content_source:
+            geometry_prep = target_content_prep
+        else:
+            if is_ostris:
+                g_vlm = preprocess_ostris_vision_image(route.target_geometry_source)
+            else:
+                g_vlm = prepare_easy_krea_vision_image(route.target_geometry_source, preset=preset, role="target_geometry")
+            geometry_prep = prepare_image_for_qwen(image=g_vlm, clip=clip, original_image=route.target_geometry_source)
 
     latent_dict, latent_info = build_target_latent(
         vae=vae,
         target_content=route.target_content_mode,
         geometry_mode=route.target_geometry_mode,
-        target_image=target_prep,
+        target_image=target_content_prep,
+        geometry_image=geometry_prep,
         batch_size=1,
     )
-
-    # Effective reference method: if apply_patch is False, switch to native reference mode
-    effective_method = backend_method if apply_patch else "native"
 
     # Delegate to canonical shared orchestrator
     patched_model, pos, neg, lat, orchestrator_info = run_krea2_edit_orchestrator(
@@ -259,7 +284,8 @@ def _execute_easy_edit(
         target_latent=latent_dict,
         positive_prompt=positive_prompt,
         negative_prompt=negative_prompt,
-        reference_method=effective_method,
+        reference_method=backend_method,
+        apply_model_patch=apply_patch,
         ostris_kv_cache=ostris_kv_cache,
     )
 

@@ -210,11 +210,14 @@ def prepare_vision_image(
     max_mp: float = 1.0,
     fixed_mp: float = 1.0,
     downscale_method: str = "auto",
-    upscale_method: str = "auto"
+    upscale_method: str = "auto",
+    original_image: Optional[torch.Tensor] = None,
 ) -> PreparedVisionImage:
     """Prepare a derivative vision image for Qwen Vision while keeping the original image intact."""
     if image.ndim == 3:
         image = image.unsqueeze(0)
+    if original_image is not None and original_image.ndim == 3:
+        original_image = original_image.unsqueeze(0)
 
     bs, ih, iw, c = image.shape
     config = resolve_qwen_encoder_config(clip)
@@ -267,8 +270,10 @@ def prepare_vision_image(
         "upscale_method_requested": upscale_method,
     }
 
+    effective_original = original_image if original_image is not None else image
+
     return PreparedVisionImage(
-        original_image=image,
+        original_image=effective_original,
         vision_image=vision_image,
         prep_spec=prep_spec,
         debug_metadata=debug_meta

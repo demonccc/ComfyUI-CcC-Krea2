@@ -30,6 +30,7 @@ class CcCKrea2TargetLatent:
                 "target_vision_instruction": ("STRING", {"multiline": True, "default": ""}),
                 "vae": ("VAE",),
                 "target_image": ("PREPARED_VISION_IMAGE",),
+                "geometry_image": ("PREPARED_VISION_IMAGE",),
                 # Deprecated compatibility inputs
                 "subject_image": ("PREPARED_VISION_IMAGE",),
                 "scene_image": ("PREPARED_VISION_IMAGE",),
@@ -50,6 +51,7 @@ class CcCKrea2TargetLatent:
         target_alias="",
         target_vision_instruction="",
         target_image=None,
+        geometry_image=None,
         subject_image=None,
         scene_image=None,
         **kwargs
@@ -78,6 +80,7 @@ class CcCKrea2TargetLatent:
             target_alias=target_alias,
             target_vision_instruction=target_vision_instruction,
             target_image=target_image,
+            geometry_image=geometry_image,
             subject_image=subject_image,
             scene_image=scene_image,
         )

@@ -31,6 +31,30 @@ class EasyResolvedSources:
 
 
 @dataclass(frozen=True)
+class EasyStyleConfig:
+    """Config for Easy Edit style reference parameters using valid range values."""
+    style_fidelity: float = 1.0
+    style_processing: str = "slice_grid"
+    indirect_style_transfer: bool = False
+    vision_instruction: str = ""
+
+
+DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
+    style_fidelity=1.0,
+    style_processing="slice_grid",
+    indirect_style_transfer=False,
+    vision_instruction=""
+)
+
+STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
+    style_fidelity=1.0,
+    style_processing="slice_grid",
+    indirect_style_transfer=True,
+    vision_instruction="Adopt the artistic style, color palette, texture, and visual mood of this style reference."
+)
+
+
+@dataclass(frozen=True)
 class EasyPresetRoute:
     """Phase 2 & 3: Preset routing decision containing target content, target geometry, references, and style config."""
     preset: str
@@ -39,9 +63,10 @@ class EasyPresetRoute:
     target_geometry_mode: str  # "fixed" or "favor_image"
     target_geometry_source: Optional[Any]
     edit_references: Tuple[Tuple[Any, float, str], ...]  # Tuple of (image, boost, alias_role)
+    semantic_only_references: Tuple[Tuple[Any, str], ...]  # Tuple of (image, alias_role) for non-appearance semantic context
     style_active: bool
     style_source: Optional[Any]
-    style_strength: float  # 1.0 for normal, 2.0 (high) for style_transfer
+    style_config: EasyStyleConfig
     warnings: Tuple[str, ...]
 
 
@@ -148,6 +173,7 @@ def route_easy_preset(
     target_geometry_mode = "fixed"
     target_geometry_source: Optional[Any] = None
     refs: List[Tuple[Any, float, str]] = []
+    semantic_only_refs: List[Tuple[Any, str]] = []
     preset_warnings: List[str] = list(sources.warnings)
 
     if preset in ("balanced", "style_transfer"):
@@ -266,8 +292,12 @@ def route_easy_preset(
             if has_s:
                 refs.append((Sc, PRESERVE_SCENE_BOOST, "scene"))
                 refs.append((S, NORMAL_BOOST, "subject"))
+                if is_o_distinct_sc:
+                    semantic_only_refs.append((O, "outfit"))
             else:
                 refs.append((Sc, PRESERVE_SCENE_BOOST, "scene"))
+                if is_o_distinct_sc:
+                    semantic_only_refs.append((O, "outfit"))
         elif has_s and has_o and not has_sc:
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = ("favor_image", S)
@@ -317,7 +347,7 @@ def route_easy_preset(
 
     # Style configuration: active for ALL presets whenever effective_style is present
     style_active = has_st
-    style_strength = 2.0 if preset == "style_transfer" else 1.0
+    style_config = STRONG_EASY_STYLE_CONFIG if preset == "style_transfer" else DEFAULT_EASY_STYLE_CONFIG
 
     return EasyPresetRoute(
         preset=preset,
@@ -326,8 +356,9 @@ def route_easy_preset(
         target_geometry_mode=target_geometry_mode,
         target_geometry_source=target_geometry_source,
         edit_references=tuple(refs),
+        semantic_only_references=tuple(semantic_only_refs),
         style_active=style_active,
         style_source=St,
-        style_strength=style_strength,
+        style_config=style_config,
         warnings=tuple(preset_warnings),
     )

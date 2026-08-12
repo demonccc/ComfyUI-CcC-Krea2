@@ -25,7 +25,7 @@ OSTRIS_VAE_MAX_PIXELS = 1024 * 1024
 def preprocess_ostris_vision_image(image_tensor: torch.Tensor) -> torch.Tensor:
     """Preprocess vision image for Ostris backend: area-constrained to ~384x384, never upscaled.
 
-    NO /16 snapping is performed on vision input images.
+    Uses AREA downscaling. NO /16 snapping is performed on vision input images.
     """
     if image_tensor is None:
         return image_tensor
@@ -40,7 +40,7 @@ def preprocess_ostris_vision_image(image_tensor: torch.Tensor) -> torch.Tensor:
         scale = math.sqrt(OSTRIS_VISION_PIXEL_BUDGET / float(curr_area))
         new_h = max(1, int(round(h * scale)))
         new_w = max(1, int(round(w * scale)))
-        resized = resize_tensor(image_tensor, target_h=new_h, target_w=new_w, method="bicubic")
+        resized = resize_tensor(image_tensor, target_h=new_h, target_w=new_w, method="area")
         return torch.clamp(resized, 0.0, 1.0)
 
     return image_tensor
@@ -67,7 +67,8 @@ def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tenso
     snapped_w = max(16, int(round(target_w / 16.0)) * 16)
 
     if (snapped_h, snapped_w) != (h, w):
-        resized = resize_tensor(image_tensor, target_h=snapped_h, target_w=snapped_w, method="bicubic")
+        method = "area" if curr_area > OSTRIS_VAE_MAX_PIXELS else "auto"
+        resized = resize_tensor(image_tensor, target_h=snapped_h, target_w=snapped_w, method=method)
         return torch.clamp(resized, 0.0, 1.0)
 
     return image_tensor
@@ -110,12 +111,14 @@ def patch_ostris_model(
 
     Contract: patch_ostris_model(model, prepared_refs, ostris_kv_cache=False)
     """
+    if ostris_kv_cache:
+        raise NotImplementedError(
+            "[CcC Krea2] ostris_kv_cache=True is not safely supported in the current ComfyUI runtime environment. "
+            "Set ostris_kv_cache=False to proceed."
+        )
+
     if is_model_already_patched(model, "ccc_ostris_edit"):
         return model
-
-    if ostris_kv_cache:
-        # Verify environment support for Ostris KV Cache or raise explicit error
-        pass
 
     patched_model = model.clone()
     patched_model._ccc_patch_key = "ccc_ostris_edit"

@@ -103,43 +103,81 @@ def run_krea2_edit_orchestrator(
         slot = ref_item["resolved_slot"]
         ref_path = getattr(spec, "reference_path", spec.role.lower())
         ref_role = spec.role.lower()
+        is_appearance = getattr(spec, "appearance_reference", True)
 
         if ref_path == "edit":
             src_img = spec.prepared_image.original_image
             src_h, src_w = src_img.shape[1], src_img.shape[2]
 
-            fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
-            geom = resolve_krea2edit_geometry(
-                src_h=src_h,
-                src_w=src_w,
-                tgt_h=target_h,
-                tgt_w=target_w,
-                fit_mode=fit_mode
-            )
+            if is_appearance:
+                if reference_method == "ostris_edit":
+                    proc_img = preprocess_ostris_ref_pixel_image(src_img)
+                    fit_mask = getattr(spec, "attention_mask", None)
+                    encoded = vae.encode(proc_img) if vae is not None else None
+                    lat_tokens = None
+                    if encoded is not None:
+                        lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
+                    
+                    fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
+                    geom = resolve_krea2edit_geometry(src_h=src_h, src_w=src_w, tgt_h=target_h, tgt_w=target_w, fit_mode=fit_mode)
+                    vae_ref_specs.append({
+                        "role": ref_role,
+                        "slot": slot,
+                        "latent_tokens": lat_tokens,
+                        "mask": fit_mask,
+                        "geom": geom,
+                        "spec": spec,
+                        "ref_item": ref_item
+                    })
+                elif reference_method == "native":
+                    encoded = vae.encode(src_img) if vae is not None else None
+                    lat_tokens = None
+                    if encoded is not None:
+                        lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
+                    
+                    fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
+                    geom = resolve_krea2edit_geometry(src_h=src_h, src_w=src_w, tgt_h=target_h, tgt_w=target_w, fit_mode=fit_mode)
+                    vae_ref_specs.append({
+                        "role": ref_role,
+                        "slot": slot,
+                        "latent_tokens": lat_tokens,
+                        "mask": getattr(spec, "attention_mask", None),
+                        "geom": geom,
+                        "spec": spec,
+                        "ref_item": ref_item
+                    })
+                else: # krea2_edit
+                    fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
+                    geom = resolve_krea2edit_geometry(
+                        src_h=src_h,
+                        src_w=src_w,
+                        tgt_h=target_h,
+                        tgt_w=target_w,
+                        fit_mode=fit_mode
+                    )
 
-            fit_img, fit_mask = process_image_and_mask_geometry(
-                image=src_img,
-                mask=getattr(spec, "attention_mask", None),
-                geom=geom
-            )
+                    fit_img, fit_mask = process_image_and_mask_geometry(
+                        image=src_img,
+                        mask=getattr(spec, "attention_mask", None),
+                        geom=geom
+                    )
 
-            # VAE encode reference latent
-            encoded = vae.encode(fit_img) if vae is not None else None
-            lat_tokens = None
-            if encoded is not None:
-                lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
+                    encoded = vae.encode(fit_img) if vae is not None else None
+                    lat_tokens = None
+                    if encoded is not None:
+                        lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
 
-            vae_ref_specs.append({
-                "role": ref_role,
-                "slot": slot,
-                "latent_tokens": lat_tokens,
-                "mask": fit_mask,
-                "geom": geom,
-                "spec": spec,
-                "ref_item": ref_item
-            })
+                    vae_ref_specs.append({
+                        "role": ref_role,
+                        "slot": slot,
+                        "latent_tokens": lat_tokens,
+                        "mask": fit_mask,
+                        "geom": geom,
+                        "spec": spec,
+                        "ref_item": ref_item
+                    })
 
-            # Non-style images enter both positive and negative Qwen lists
+            # Vision image enters positive Qwen list
             pos_idx = len(pos_qwen_images) + 1
             pos_qwen_images.append(spec.prepared_image.vision_image)
             pos_qwen_image_map.append({
@@ -155,20 +193,22 @@ def run_krea2_edit_orchestrator(
                 "spec": spec
             })
 
-            neg_idx = len(neg_qwen_images) + 1
-            neg_qwen_images.append(spec.prepared_image.vision_image)
-            neg_qwen_image_map.append({
-                "role": ref_role,
-                "slot": slot,
-                "logical_reference_id": slot,
-                "logical_role": ref_role,
-                "logical_vision_slot": slot,
-                "physical_qwen_image_index": neg_idx,
-                "style_group_id": None,
-                "crop_tile_index": None,
-                "image": spec.prepared_image.vision_image,
-                "spec": spec
-            })
+            # Negative Qwen images: empty for Ostris edit (text-only negative), active for Krea2/native
+            if reference_method != "ostris_edit":
+                neg_idx = len(neg_qwen_images) + 1
+                neg_qwen_images.append(spec.prepared_image.vision_image)
+                neg_qwen_image_map.append({
+                    "role": ref_role,
+                    "slot": slot,
+                    "logical_reference_id": slot,
+                    "logical_role": ref_role,
+                    "logical_vision_slot": slot,
+                    "physical_qwen_image_index": neg_idx,
+                    "style_group_id": None,
+                    "crop_tile_index": None,
+                    "image": spec.prepared_image.vision_image,
+                    "spec": spec
+                })
 
         elif ref_path == "style":
             assert isinstance(spec, StyleReferenceSpec) or getattr(spec, "reference_path", "") == "style"
@@ -253,7 +293,9 @@ def run_krea2_edit_orchestrator(
     pos_conditioning = pos_qwen_context.conditioning
     neg_conditioning = neg_qwen_context.conditioning
 
-    if reference_method == "native":
+    apply_model_patch = kwargs.get("apply_model_patch", kwargs.get("apply_patch", True))
+
+    if reference_method == "native" or not apply_model_patch:
         patched_model = model
         pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_native)
         neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_native)
