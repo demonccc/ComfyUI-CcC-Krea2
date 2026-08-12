@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Grounding & Semantic Image Prep Recipes (`grounding.py`).
 - Thin resolver architecture for `easy_edit_node.py` delegating to shared orchestrator `run_krea2_edit_orchestrator`.
 - Unified Target Vision Context slot resolution in single-pass reference chain sorting.
-- Native ComfyUI reference latents support (`reference_method = "native"` and `apply_krea2_edit_patch = False`).
+- Native ComfyUI reference latents support (`reference_method = "native"`), bypassing the CcCKrea2LoRAStack entirely in canonical Advanced workflows.
 - Upstream-aligned Ostris backend rebuild (`ostris_backend.py`) with MIT attribution, `Picture N:` Qwen prompt formatting, 384² VLM area downscale without `/16` snapping, 1MP VAE reference prep, and Ostris KV cache remains unsupported and raises NotImplementedError when requested.
 - ComfyUI frontend web extension (`web/ccc_krea2.js`) for dynamic presentation widget graying.
 - Table-driven test suite passing unit and contract tests across all 6 presets, Ostris backend, and native reference paths.
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed ComfyUI custom node package import error by converting internal ccc_krea2 absolute imports to package-relative imports.
 - Aligned internal dataclass defaults (`masked_identity_anchor = 0.0` in `SubjectReferenceSpec` and `masked_region_anchor = 0.0` in `SceneReferenceSpec`) to match node UI defaults.
 - Corrected `edit_info` anchor reporting to accurately output `Anchor Implementation Type: Vision directive only` and list active directive-only controls for Subject, Scene, and Outfit roles.
-- Canonicalized modular workflow collection using current socket types (`PREPARED_VISION_IMAGE`, `REFERENCE_CHAIN`, `LATENT`, `CCC_KREA2_PROMPT_AUGMENTATION`) and input names (`reference_chain`, `visual_fit_mode`).
+- Canonicalized modular workflow collection ensuring strict schema parity with ComfyUI frontend validation for all 10 standard JSON configurations.
 - Reorganized superseded workflow files into `workflows/legacy/` with explanatory migration README.
 - Synchronized `NODES.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` with current Python node interface definitions and canonical workflow contracts.
 

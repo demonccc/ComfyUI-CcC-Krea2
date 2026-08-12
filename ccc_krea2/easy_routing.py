@@ -96,6 +96,7 @@ class EasyPresetRoute:
     target_content_source: Optional[Any]
     target_geometry_mode: str  # "fixed" or "favor_image"
     target_geometry_source: Optional[Any]
+    target_content_role: str
     # 4-tuple: (image, boost, alias_role, instruction)
     edit_references: Tuple[Tuple[Any, float, str, str], ...]
     # 2-tuple: (image, alias_role)
@@ -236,6 +237,7 @@ def route_easy_preset(
 
     target_content_mode = "empty"
     target_content_source: Optional[Any] = None
+    target_content_role = ""
     target_geometry_mode = "fixed"
     target_geometry_source: Optional[Any] = None
     refs: List[Tuple[Any, float, str, str]] = []
@@ -278,6 +280,7 @@ def route_easy_preset(
             # Sc + Ou
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
@@ -288,6 +291,7 @@ def route_easy_preset(
             # S + Sc + Ou
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
             if outfit_is_scene_physically:
@@ -332,6 +336,7 @@ def route_easy_preset(
             # Balanced fallback: Sc+Ou without S
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
@@ -348,6 +353,7 @@ def route_easy_preset(
             else:
                 target_content_mode = "image"
                 target_content_source = Sc
+                target_content_role = "scene"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
                 refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
                 refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
@@ -389,9 +395,10 @@ def route_easy_preset(
             refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
             refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         elif not has_s and has_sc and has_o:
-            # Balanced fallback: Sc+Ou without S
+            # Balanced fallback
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
@@ -402,6 +409,7 @@ def route_easy_preset(
             # S + Sc + Ou
             target_content_mode = "image"
             target_content_source = S
+            target_content_role = "subject"
             target_geometry_mode, target_geometry_source = "favor_image", S
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
@@ -452,6 +460,7 @@ def route_easy_preset(
             # S + Sc + Ou
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, PRESERVE_SCENE_BOOST))
@@ -483,19 +492,21 @@ def route_easy_preset(
         elif not has_s and not has_sc and has_o:
             target_content_mode = "image"
             target_content_source = Ou
+            target_content_role = "outfit"
             target_geometry_mode, target_geometry_source = "favor_image", Ou
             refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
         elif has_s and has_sc and not has_o:
-            # No outfit: warn
             preset_warnings.append("preset 'outfit_transfer': no Outfit source (Subject+Scene present).")
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
             refs.append(_ref(S, NORMAL_BOOST, "subject"))
         elif has_s and not has_sc and has_o:
             target_content_mode = "image"
             target_content_source = Ou
+            target_content_role = "outfit"
             target_geometry_mode, target_geometry_source = "favor_image", Ou
             refs.append(_ref(S, NORMAL_BOOST, "subject"))
             refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
@@ -503,6 +514,7 @@ def route_easy_preset(
             # Sc + Ou without Subject
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_TRANSFER_BOOST))
@@ -513,6 +525,7 @@ def route_easy_preset(
             # S + Sc + Ou
             target_content_mode = "image"
             target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             refs.append(_ref(S, NORMAL_BOOST, "subject"))
             if outfit_is_scene_physically:
@@ -534,6 +547,7 @@ def route_easy_preset(
         target_content_source=target_content_source,
         target_geometry_mode=target_geometry_mode,
         target_geometry_source=target_geometry_source,
+        target_content_role=target_content_role,
         edit_references=tuple(refs),
         semantic_only_references=tuple(semantic_only_refs),
         style_active=style_active,

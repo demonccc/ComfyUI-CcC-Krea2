@@ -6,49 +6,46 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
-try:
-    import nodes as comfy_nodes
-    CORE_MAPPINGS = comfy_nodes.NODE_CLASS_MAPPINGS
-except ImportError:
-    # Explicit schema fixture ONLY for the standard nodes used by these ten workflows
-    class MockUNETLoader:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
-        RETURN_TYPES = ("MODEL",)
-    class MockCLIPLoader:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"clip_name": (["qwen3_vl.safetensors"],), "type": (["krea2", "sdxl", "sd3"],), "device": (["default", "cpu"],)}}
-        RETURN_TYPES = ("CLIP",)
-    class MockVAELoader:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"vae_name": (["ae.safetensors"],)}}
-        RETURN_TYPES = ("VAE",)
-    class MockLoadImage:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"image": (["subject.jpg", "scene.jpg", "outfit.jpg", "style.jpg"],)}}
-        RETURN_TYPES = ("IMAGE", "MASK")
-    class MockKSampler:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"model": ("MODEL",), "seed": ("INT", {"default": 0}), "control_after_generate": (["randomize", "fixed", "increment", "decrement"],), "steps": ("INT", {"default": 20}), "cfg": ("FLOAT", {"default": 1.0}), "sampler_name": (["euler", "euler_ancestral"],), "scheduler": (["normal", "karras"],), "positive": ("CONDITIONING",), "negative": ("CONDITIONING",), "latent_image": ("LATENT",), "denoise": ("FLOAT", {"default": 1.0})}}
-        RETURN_TYPES = ("LATENT",)
-    class MockVAEDecode:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"samples": ("LATENT",), "vae": ("VAE",)}}
-        RETURN_TYPES = ("IMAGE",)
-    class MockSaveImage:
-        @classmethod
-        def INPUT_TYPES(s): return {"required": {"images": ("IMAGE",), "filename_prefix": ("STRING", {"default": "CcCKrea2"})}}
-        RETURN_TYPES = tuple()
+# Explicit schema fixture ONLY for the standard nodes used by these ten workflows
+class MockUNETLoader:
+    @classmethod
+    def INPUT_TYPES(s): return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
+    RETURN_TYPES = ("MODEL",)
+class MockCLIPLoader:
+    @classmethod
+    def INPUT_TYPES(s): return {"required": {"clip_name": (["qwen3_vl.safetensors"],), "type": (["krea2", "sdxl", "sd3"],), "device": (["default", "cpu"],)}}
+    RETURN_TYPES = ("CLIP",)
+class MockVAELoader:
+    @classmethod
+    def INPUT_TYPES(s): return {"required": {"vae_name": (["ae.safetensors"],)}}
+    RETURN_TYPES = ("VAE",)
+class MockLoadImage:
+    @classmethod
+    def INPUT_TYPES(s): return {"required": {"image": (["subject.jpg", "scene.jpg", "outfit.jpg", "style.jpg"],)}}
+    RETURN_TYPES = ("IMAGE", "MASK")
+class MockKSampler:
+    @classmethod
+    # NOTE: 'control_after_generate' is a FRONTEND ONLY widget in ComfyUI and is intentionally omitted from the Python INPUT_TYPES.
+    def INPUT_TYPES(s): return {"required": {"model": ("MODEL",), "seed": ("INT", {"default": 0}), "steps": ("INT", {"default": 20}), "cfg": ("FLOAT", {"default": 1.0}), "sampler_name": (["euler", "euler_ancestral"],), "scheduler": (["normal", "karras"],), "positive": ("CONDITIONING",), "negative": ("CONDITIONING",), "latent_image": ("LATENT",), "denoise": ("FLOAT", {"default": 1.0})}}
+    RETURN_TYPES = ("LATENT",)
+class MockVAEDecode:
+    @classmethod
+    def INPUT_TYPES(s): return {"required": {"samples": ("LATENT",), "vae": ("VAE",)}}
+    RETURN_TYPES = ("IMAGE",)
+class MockSaveImage:
+    @classmethod
+    def INPUT_TYPES(s): return {"required": {"images": ("IMAGE",), "filename_prefix": ("STRING", {"default": "CcCKrea2"})}}
+    RETURN_TYPES = tuple()
 
-    CORE_MAPPINGS = {
-        "UNETLoader": MockUNETLoader,
-        "CLIPLoader": MockCLIPLoader,
-        "VAELoader": MockVAELoader,
-        "LoadImage": MockLoadImage,
-        "KSampler": MockKSampler,
-        "VAEDecode": MockVAEDecode,
-        "SaveImage": MockSaveImage
-    }
+CORE_MAPPINGS = {
+    "UNETLoader": MockUNETLoader,
+    "CLIPLoader": MockCLIPLoader,
+    "VAELoader": MockVAELoader,
+    "LoadImage": MockLoadImage,
+    "KSampler": MockKSampler,
+    "VAEDecode": MockVAEDecode,
+    "SaveImage": MockSaveImage
+}
 
 def get_node_class(node_type):
     if node_type in NODE_CLASS_MAPPINGS:
@@ -56,6 +53,15 @@ def get_node_class(node_type):
     if node_type in CORE_MAPPINGS:
         return CORE_MAPPINGS[node_type]
     return None
+
+# List of widgets that are permitted to bypass strict combo enum validation because they represent dynamic file lists.
+DYNAMIC_FILE_SELECTORS = ["unet_name", "clip_name", "vae_name", "lora_1_name", "lora_2_name", "lora_3_name", "lora_4_name", "image"]
+
+# Frontend-only widgets mapping: node_type -> list of (widget_name, injection_index, default_value)
+FRONTEND_WIDGETS_MAP = {
+    "KSampler": [("control_after_generate", 1, "randomize")],
+    "LoadImage": [("image_upload", 1, "image")]
+}
 
 CANONICAL_NAMES = [
     "01_easy_subject.json",
@@ -114,6 +120,17 @@ class WorkflowBuilder:
                 name = getattr(cls, "RETURN_NAMES", cls.RETURN_TYPES)[i]
                 formatted_outputs.append({"name": name, "type": t, "links": []})
 
+        # Validate unknown widgets
+        recognized_widget_names = {name for name, schema_val in all_in.items()
+                                   if isinstance(schema_val[0], (list, tuple)) or schema_val[0] in ["STRING", "INT", "FLOAT", "BOOLEAN"]}
+
+        frontend_configs = FRONTEND_WIDGETS_MAP.get(node_type, [])
+        allowed_frontend = {fw[0] for fw in frontend_configs}
+
+        unknown = set(values_by_name.keys()) - recognized_widget_names - allowed_frontend
+        if unknown:
+            raise ValueError(f"Unknown widget values supplied for {node_type}: {unknown}")
+
         # Serialize widgets
         serialized_widgets = []
         for name, schema_val in all_in.items():
@@ -126,8 +143,9 @@ class WorkflowBuilder:
                 val = values_by_name[name]
                 # Validate primitive type/combo membership
                 if isinstance(val_type, list) or isinstance(val_type, tuple):
-                    if val not in val_type and not (isinstance(val, str) and val.endswith(".safetensors")):
-                        raise ValueError(f"Value '{val}' not in choices {val_type} for '{name}' on '{node_type}'")
+                    if val not in val_type:
+                        if name not in DYNAMIC_FILE_SELECTORS:
+                            raise ValueError(f"Value '{val}' not in choices {val_type} for '{name}' on '{node_type}'")
                 elif val_type == "BOOLEAN":
                     if not isinstance(val, bool):
                         raise ValueError(f"Expected bool for '{name}', got {type(val)}")
@@ -146,6 +164,14 @@ class WorkflowBuilder:
                 serialized_widgets.append(schema_val[1]["default"])
             else:
                 raise ValueError(f"Missing required widget '{name}' for node '{node_type}'")
+
+        # Inject frontend-only widgets
+        for fw_name, fw_idx, fw_default in frontend_configs:
+            val = values_by_name.get(fw_name, fw_default)
+            if fw_idx <= len(serialized_widgets):
+                serialized_widgets.insert(fw_idx, val)
+            else:
+                serialized_widgets.append(val)
 
         node = {
             "id": self.node_id,
@@ -207,22 +233,24 @@ class WorkflowBuilder:
             "version": 0.4
         }
 
-def build_base_graph(b: WorkflowBuilder, is_ostris=False):
+def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
     unet = b.add_node("UNETLoader", [0, 0], [300, 100], widgets_values={"unet_name": "krea2_model.safetensors", "weight_dtype": "default"})
     clip = b.add_node("CLIPLoader", [0, 150], [300, 100], widgets_values={"clip_name": "qwen3_vl.safetensors", "type": "krea2", "device": "default"})
     vae = b.add_node("VAELoader", [0, 300], [300, 100], widgets_values={"vae_name": "ae.safetensors"})
 
-    lora_name = "krea2_ostris_edit_lora.safetensors" if is_ostris else "krea2_edit_lora.safetensors"
+    lora = None
+    if not is_native:
+        lora_name = "krea2_ostris_edit_lora.safetensors" if is_ostris else "krea2_edit_lora.safetensors"
 
-    lora = b.add_node("CcCKrea2LoRAStack", [350, 0], [300, 250], inputs={"model": None}, widgets_values={
-        "enabled": True,
-        "global_strength": 1.0,
-        "lora_1_enabled": True,
-        "lora_1_name": lora_name,
-        "lora_1_strength": 1.0
-    })
+        lora = b.add_node("CcCKrea2LoRAStack", [350, 0], [300, 250], inputs={"model": None}, widgets_values={
+            "enabled": True,
+            "global_strength": 1.0,
+            "lora_1_enabled": True,
+            "lora_1_name": lora_name,
+            "lora_1_strength": 1.0
+        })
 
-    b.link(unet, "MODEL", lora, "model")
+        b.link(unet, "MODEL", lora, "model")
 
     sampler = b.add_node("KSampler", [1500, 0], [300, 200], inputs={"model": None, "positive": None, "negative": None, "latent_image": None}, widgets_values={
         "seed": 0,
@@ -313,7 +341,10 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     b.add_group("Edit Orchestrator", [1450, -50, 500, 700])
     b.add_group("Sampling", [2000, -50, 1100, 500])
 
-    unet, clip, vae, lora, sampler = build_base_graph(b, is_ostris)
+    if is_native:
+        b.add_group("Native / compatible reference runtime required", [320, 0, 30, 30])
+
+    unet, clip, vae, lora, sampler = build_base_graph(b, is_ostris, is_native)
 
     # Subject ref
     sub_img = b.add_node("LoadImage", [0, 550], [300, 200], widgets_values={"image": "subject.jpg"})
@@ -404,7 +435,11 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     }
     edit = b.add_node("CcCKrea2Edit", [1500, 0], [400, 400], inputs=edit_inputs, widgets_values=edit_widgets)
 
-    b.link(lora, "model", edit, "model")
+    if is_native:
+        b.link(unet, "MODEL", edit, "model")
+    else:
+        b.link(lora, "model", edit, "model")
+
     b.link(clip, "CLIP", edit, "clip")
     b.link(vae, "VAE", edit, "vae")
     b.link(outf_ref, "reference_chain", edit, "references")

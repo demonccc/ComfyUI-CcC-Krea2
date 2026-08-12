@@ -38,7 +38,7 @@ graph TD
 | Backend | Reference Transport | Qwen Prompt Format | VAE Pixel Prep | Model Patching |
 | :--- | :--- | :--- | :--- | :--- |
 | **Krea2 Edit** | CcC Krea2 Model Wrapper | Canonical `<VISION>` blocks + text | Krea2 geometry & RoPE alignment | `patch_krea2_model` |
-| **Ostris Edit** | `index_timestep_zero` | `Picture N: <VISION>` blocks + text | Ostris 1024x1024 /16 snapped pixels | None for canonical current ComfyUI execution |
+| **Ostris Edit** | `index_timestep_zero` | `Picture N: <VISION>` blocks + text | Aspect-preserving, max 1 MP, /16 snapped | None for canonical current ComfyUI execution |
 | **Native** | Standard `reference_latents` | Canonical `<VISION>` blocks + text | Direct `vae.encode` (unmodified) | None (Unpatched) |
 
 ---

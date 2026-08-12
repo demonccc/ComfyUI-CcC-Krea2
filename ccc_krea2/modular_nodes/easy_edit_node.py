@@ -276,6 +276,8 @@ def _execute_easy_edit(
         target_image=target_content_prep,
         geometry_image=geometry_prep,
         batch_size=1,
+        target_alias=route.target_content_role if route.target_content_role else "",
+        target_vision_instruction=get_easy_instruction_for_role(route.target_content_role) if route.target_content_role else "",
     )
 
     # Delegate to canonical shared orchestrator

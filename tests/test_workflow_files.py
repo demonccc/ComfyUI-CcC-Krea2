@@ -20,7 +20,7 @@ class MockLoadImage:
     RETURN_TYPES = ("IMAGE", "MASK")
 class MockKSampler:
     @classmethod
-    def INPUT_TYPES(s): return {"required": {"model": ("MODEL",), "seed": ("INT", {"default": 0}), "control_after_generate": (["randomize", "fixed", "increment", "decrement"],), "steps": ("INT", {"default": 20}), "cfg": ("FLOAT", {"default": 1.0}), "sampler_name": (["euler", "euler_ancestral"],), "scheduler": (["normal", "karras"],), "positive": ("CONDITIONING",), "negative": ("CONDITIONING",), "latent_image": ("LATENT",), "denoise": ("FLOAT", {"default": 1.0})}}
+    def INPUT_TYPES(s): return {"required": {"model": ("MODEL",), "seed": ("INT", {"default": 0}), "steps": ("INT", {"default": 20}), "cfg": ("FLOAT", {"default": 1.0}), "sampler_name": (["euler", "euler_ancestral"],), "scheduler": (["normal", "karras"],), "positive": ("CONDITIONING",), "negative": ("CONDITIONING",), "latent_image": ("LATENT",), "denoise": ("FLOAT", {"default": 1.0})}}
     RETURN_TYPES = ("LATENT",)
 class MockVAEDecode:
     @classmethod
@@ -91,7 +91,7 @@ def test_canonical_filenames():
     found_files = set(str(p.name) for p in workflows_dir.glob("*.json") if p.name.startswith(("0", "1")))
     expected_files = set(MODERN_CANONICAL)
 
-    assert expected_files.issubset(found_files), f"Missing canonical files. Found: {found_files}, Expected: {expected_files}"
+    assert expected_files == found_files, f"Filename mismatch. Found: {found_files}, Expected: {expected_files}"
 
 def _get_nodes_by_type(workflow, type_name):
     return [n for n in workflow.get("nodes", []) if n.get("type") == type_name]
@@ -107,6 +107,25 @@ def test_strict_workflow_schema():
     for filename in MODERN_CANONICAL:
         with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
             wf = json.load(f)
+
+        # Validate all links
+        nodes_by_id = {n["id"]: n for n in wf.get("nodes", [])}
+        for link in wf.get("links", []):
+            assert len(link) == 6, f"Invalid link format in {filename}: {link}"
+            _, from_id, from_slot, to_id, to_slot, link_type = link
+            assert from_id in nodes_by_id, f"Link source node {from_id} not found in {filename}"
+            assert to_id in nodes_by_id, f"Link target node {to_id} not found in {filename}"
+
+            from_node = nodes_by_id[from_id]
+            to_node = nodes_by_id[to_id]
+
+            assert from_slot < len(from_node.get("outputs", [])), f"Link source slot {from_slot} out of bounds on node {from_id} in {filename}"
+            assert to_slot < len(to_node.get("inputs", [])), f"Link target slot {to_slot} out of bounds on node {to_id} in {filename}"
+
+            out_type = from_node["outputs"][from_slot]["type"]
+            in_type = to_node["inputs"][to_slot]["type"]
+            if out_type != "*" and in_type != "*":
+                assert out_type == in_type or out_type == link_type, f"Link type mismatch in {filename}: {out_type} != {in_type} on {from_id}->{to_id}"
 
         for node in wf.get("nodes", []):
             ntype = node.get("type")
@@ -135,6 +154,15 @@ def test_strict_workflow_schema():
 
             # Validate widget count matches schema exactly
             widget_count_schema = sum(1 for name, schema_val in all_in.items() if isinstance(schema_val[0], list) or isinstance(schema_val[0], tuple) or schema_val[0] in ["STRING", "INT", "FLOAT", "BOOLEAN"])
+
+            # Account for frontend-only injected widgets
+            frontend_extras = 0
+            if ntype == "KSampler":
+                frontend_extras = 1
+            elif ntype == "LoadImage":
+                frontend_extras = 1
+            widget_count_schema += frontend_extras
+
             widgets = node.get("widgets_values", [])
             assert len(widgets) == widget_count_schema, f"Widget count mismatch on {ntype}. Expected {widget_count_schema}, got {len(widgets)}"
 
@@ -229,6 +257,11 @@ def test_lora_serialization():
             wf = json.load(f)
 
         loras = _get_nodes_by_type(wf, "CcCKrea2LoRAStack")
+
+        if "09_advanced_native" in filename:
+            assert not loras, f"Native workflow {filename} must not contain CcCKrea2LoRAStack"
+            continue
+
         if not loras:
             continue
         lora = loras[0]
@@ -238,3 +271,36 @@ def test_lora_serialization():
         assert isinstance(values.get("lora_1_enabled"), bool), "lora_1_enabled must be bool"
         assert isinstance(values.get("lora_1_name"), str), "lora_1_name must be str"
         assert isinstance(values.get("lora_1_strength"), float), "lora_1_strength must be float"
+
+def test_generator_idempotency(tmp_path):
+    import sys
+    import os
+
+    # Import the workflow generator
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
+    import build_canonical_workflows
+
+    # Run generator, saving to a temp directory instead of ./workflows
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        build_canonical_workflows.main()
+    finally:
+        os.chdir(original_cwd)
+
+    # Compare generated files in tmp_path/workflows with original workflows/
+    gen_dir = tmp_path / "workflows"
+    orig_dir = Path("workflows")
+
+    for filename in MODERN_CANONICAL:
+        gen_file = gen_dir / filename
+        orig_file = orig_dir / filename
+
+        assert gen_file.exists(), f"Generator failed to produce {filename}"
+        assert orig_file.exists(), f"Original {filename} is missing"
+
+        with open(gen_file, "r") as gf, open(orig_file, "r") as of:
+            gen_data = json.load(gf)
+            orig_data = json.load(of)
+
+            assert gen_data == orig_data, f"Generator output for {filename} is not idempotent!"

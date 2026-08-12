@@ -14,10 +14,14 @@ This document provides the complete specification of all public nodes in the `Co
   - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`): Core models.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
   - `preset` (`CHOICE`): `balanced`, `style_transfer`, `preserve_identity`, `max_identity`, `preserve_scene`, `outfit_transfer`.
+  - `outfit_source` (`CHOICE`): `outfit image`, `scene image`, `style image` (default: `outfit image`).
+  - `style_source` (`CHOICE`): `style image`, `scene image`, `subject image` (default: `style image`).
+  - `apply_krea2_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEdit`.
+  - `apply_ostris_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEditOstris`.
+  - `ostris_kv_cache` (`BOOLEAN`, default: `False`): For `CcCKrea2EasyEditOstris`.
 - **Optional Inputs**:
   - `subject`, `scene`, `outfit`, `style` (`IMAGE`): Visual references for routing.
   - `negative_prompt` (`STRING`): Negative text prompt.
-  - `ostris_kv_cache` (`BOOLEAN`, default: `False`): Included only in `CcCKrea2EasyEditOstris` to enable unsupported experimental AI-Toolkit kv-cache feature.
 - **Outputs**:
   - `patched_model` (`MODEL`), `positive` (`CONDITIONING`), `negative` (`CONDITIONING`), `latent` (`LATENT`), `edit_info` (`STRING`).
 

@@ -77,7 +77,7 @@ In this architecture, an input image exists in up to three distinct representati
 Inputs: `target_content`, `geometry_mode`, `target_megapixels`, `fixed_megapixels`, `aspect_ratio`, `batch_size`. Optional inputs: `vae`, `geometry_image`. VAE and Geometry image are required at runtime based on the selected content and geometry options.
 
 Outputs:
-- `latent` — `LATENT`
+- `target_latent` — `LATENT`
 - `latent_info` — `STRING`
 
 ---

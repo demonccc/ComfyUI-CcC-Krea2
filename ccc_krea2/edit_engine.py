@@ -95,8 +95,8 @@ def run_krea2_edit_orchestrator(
                 reference_path="edit",
                 prepared_image=target_vctx.target_image,
                 requested_vision_slot=target_vctx.target_vision_slot,
-                alias=target_vctx.target_alias or "target",
-                vision_instruction=target_vctx.target_vision_instruction or "Use this image as the target scene/context.",
+                alias=target_vctx.target_alias,
+                vision_instruction=target_vctx.target_vision_instruction,
                 appearance_reference=False,
                 _legacy_role="target",
             )
