@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
+
 class MockUNETLoader:
     @classmethod
     def INPUT_TYPES(cls):
@@ -13,7 +14,13 @@ class MockUNETLoader:
 class MockCLIPLoader:
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {"clip_name": (["qwen3_vl.safetensors"],), "type": (["krea2", "sdxl", "sd3"],), "device": (["default", "cpu"],)}}
+        return {
+            "required": {
+                "clip_name": (["qwen3_vl.safetensors"],),
+                "type": (["krea2", "sdxl", "sd3"],),
+                "device": (["default", "cpu"],),
+            }
+        }
 
     RETURN_TYPES = ("CLIP",)
 
@@ -73,6 +80,7 @@ class MockSaveImage:
 
 try:
     import nodes as comfy_nodes
+
     CORE_MAPPINGS = comfy_nodes.NODE_CLASS_MAPPINGS
 except ImportError:
     CORE_MAPPINGS = {
@@ -85,12 +93,14 @@ except ImportError:
         "SaveImage": MockSaveImage,
     }
 
+
 def get_node_class(node_type):
     if node_type in NODE_CLASS_MAPPINGS:
         return NODE_CLASS_MAPPINGS[node_type]
     if node_type in CORE_MAPPINGS:
         return CORE_MAPPINGS[node_type]
     return None
+
 
 def get_serialized_widget_values_by_name(node, cls):
     in_types = cls.INPUT_TYPES()
@@ -104,12 +114,17 @@ def get_serialized_widget_values_by_name(node, cls):
     widget_idx = 0
     for name, schema_val in all_in.items():
         val_type = schema_val[0]
-        is_widget = isinstance(val_type, list) or isinstance(val_type, tuple) or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+        is_widget = (
+            isinstance(val_type, list)
+            or isinstance(val_type, tuple)
+            or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+        )
         if is_widget:
             if widget_idx < len(widgets):
                 values_by_name[name] = widgets[widget_idx]
                 widget_idx += 1
     return values_by_name
+
 
 MODERN_CANONICAL = [
     "01_easy_subject.json",
@@ -124,6 +139,7 @@ MODERN_CANONICAL = [
     "10_advanced_ostris.json",
 ]
 
+
 def test_canonical_filenames():
     workflows_dir = Path("workflows")
     assert workflows_dir.exists()
@@ -133,8 +149,10 @@ def test_canonical_filenames():
 
     assert expected_files == found_files, f"Filename mismatch. Found: {found_files}, Expected: {expected_files}"
 
+
 def _get_nodes_by_type(workflow, type_name):
     return [n for n in workflow.get("nodes", []) if n.get("type") == type_name]
+
 
 def _is_connected(workflow, node, input_name):
     inputs = node.get("inputs", [])
@@ -165,17 +183,25 @@ def validate_workflow_schema(wf, filename="<workflow>"):
         from_node = nodes_by_id[from_id]
         to_node = nodes_by_id[to_id]
 
-        assert from_slot < len(from_node.get("outputs", [])), f"Link source slot {from_slot} out of bounds on node {from_id} in {filename}"
-        assert to_slot < len(to_node.get("inputs", [])), f"Link target slot {to_slot} out of bounds on node {to_id} in {filename}"
+        assert from_slot < len(from_node.get("outputs", [])), (
+            f"Link source slot {from_slot} out of bounds on node {from_id} in {filename}"
+        )
+        assert to_slot < len(to_node.get("inputs", [])), (
+            f"Link target slot {to_slot} out of bounds on node {to_id} in {filename}"
+        )
 
         out_type = from_node["outputs"][from_slot]["type"]
         in_type = to_node["inputs"][to_slot]["type"]
 
         # Strict independent assertions
         if out_type != "*":
-            assert link_type == out_type, f"Link type mismatch on source in {filename}: {link_type} != {out_type} on {from_id}->{to_id}"
+            assert link_type == out_type, (
+                f"Link type mismatch on source in {filename}: {link_type} != {out_type} on {from_id}->{to_id}"
+            )
         if in_type != "*":
-            assert link_type == in_type, f"Link type mismatch on destination in {filename}: {link_type} != {in_type} on {from_id}->{to_id}"
+            assert link_type == in_type, (
+                f"Link type mismatch on destination in {filename}: {link_type} != {in_type} on {from_id}->{to_id}"
+            )
 
         # Record that the socket is connected for required checking
         connected_inputs_by_node.setdefault(to_id, set()).add(to_node["inputs"][to_slot]["name"])
@@ -227,17 +253,29 @@ def validate_workflow_schema(wf, filename="<workflow>"):
         # Enforce required non-widget sockets
         for name, schema_val in req.items():
             val_type = schema_val[0]
-            is_widget = isinstance(val_type, list) or isinstance(val_type, tuple) or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+            is_widget = (
+                isinstance(val_type, list)
+                or isinstance(val_type, tuple)
+                or val_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+            )
             if not is_widget:
-                assert name in connected_inputs_by_node.get(node["id"], set()), f"Required socket '{name}' is missing or unconnected on node {ntype} in {filename}"
+                assert name in connected_inputs_by_node.get(node["id"], set()), (
+                    f"Required socket '{name}' is missing or unconnected on node {ntype} in {filename}"
+                )
 
         # Check linked input types match the schema socket types (they shouldn't be widgets)
         for inp in node.get("inputs", []):
             name = inp.get("name")
-            assert name in all_in, f"Invalid input '{name}' on node {ntype} in {filename}. Allowed: {list(all_in.keys())}"
+            assert name in all_in, (
+                f"Invalid input '{name}' on node {ntype} in {filename}. Allowed: {list(all_in.keys())}"
+            )
             expected_type = all_in[name][0]
-            assert not (isinstance(expected_type, list) or expected_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]), f"Input '{name}' is serialized as a linked input but the schema defines it as a widget on {ntype}"
-            assert inp.get("type") == expected_type, f"Input '{name}' type mismatch on {ntype}. Expected {expected_type}, got {inp.get('type')}"
+            assert not (isinstance(expected_type, list) or expected_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]), (
+                f"Input '{name}' is serialized as a linked input but the schema defines it as a widget on {ntype}"
+            )
+            assert inp.get("type") == expected_type, (
+                f"Input '{name}' type mismatch on {ntype}. Expected {expected_type}, got {inp.get('type')}"
+            )
             # Assert link exists in link table
             assert inp.get("link") in link_ids, f"Input link {inp.get('link')} not found in links table in {filename}"
 
@@ -246,7 +284,13 @@ def validate_workflow_schema(wf, filename="<workflow>"):
                 assert link_id in link_ids, f"Output link {link_id} not found in links table in {filename}"
 
         # Validate widget count matches schema exactly
-        widget_count_schema = sum(1 for name, schema_val in all_in.items() if isinstance(schema_val[0], list) or isinstance(schema_val[0], tuple) or schema_val[0] in ["STRING", "INT", "FLOAT", "BOOLEAN"])
+        widget_count_schema = sum(
+            1
+            for name, schema_val in all_in.items()
+            if isinstance(schema_val[0], list)
+            or isinstance(schema_val[0], tuple)
+            or schema_val[0] in ["STRING", "INT", "FLOAT", "BOOLEAN"]
+        )
 
         # Account for frontend-only injected widgets
         frontend_extras = 0
@@ -255,11 +299,15 @@ def validate_workflow_schema(wf, filename="<workflow>"):
         widget_count_schema += frontend_extras
 
         widgets = node.get("widgets_values", [])
-        assert len(widgets) == widget_count_schema, f"Widget count mismatch on {ntype}. Expected {widget_count_schema}, got {len(widgets)}"
+        assert len(widgets) == widget_count_schema, (
+            f"Widget count mismatch on {ntype}. Expected {widget_count_schema}, got {len(widgets)}"
+        )
 
         # Explicit frontend serialization tests
         if ntype == "KSampler":
-            assert widgets == [0, "randomize", 20, 1.0, "euler", "normal", 1.0], f"KSampler widgets do not match frontend spec in {filename}: {widgets}"
+            assert widgets == [0, "randomize", 20, 1.0, "euler", "normal", 1.0], (
+                f"KSampler widgets do not match frontend spec in {filename}: {widgets}"
+            )
         elif ntype == "LoadImage":
             assert len(widgets) == 1, f"LoadImage must have exactly 1 widget, got {widgets} in {filename}"
             assert isinstance(widgets[0], str), "LoadImage widget must be a string filename"
@@ -275,7 +323,9 @@ def validate_workflow_schema(wf, filename="<workflow>"):
         for i, out in enumerate(outputs):
             name = out_names[i] if i < len(out_names) else out_types[i]
             assert out.get("name") == name, f"Output name mismatch on {ntype}, expected {name}, got {out.get('name')}"
-            assert out.get("type") == out_types[i], f"Output type mismatch on {ntype}, expected {out_types[i]}, got {out.get('type')}"
+            assert out.get("type") == out_types[i], (
+                f"Output type mismatch on {ntype}, expected {out_types[i]}, got {out.get('type')}"
+            )
 
     # EVERY GLOBAL LINK MUST EXIST ON BOTH SIDES
     assert set(links_by_id) == target_side_link_ids, f"Not all global links have target endpoints in {filename}"
@@ -287,6 +337,7 @@ def test_strict_workflow_schema():
         with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
             wf = json.load(f)
         validate_workflow_schema(wf, filename)
+
 
 def test_easy_workflows_sockets_and_presets():
     for filename in MODERN_CANONICAL[:7]:
@@ -335,6 +386,7 @@ def test_easy_workflows_sockets_and_presets():
             assert values.get("apply_ostris_edit_patch") is True
             assert values.get("ostris_kv_cache") is False
 
+
 def test_advanced_workflows():
     for filename in MODERN_CANONICAL[7:10]:
         with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
@@ -362,6 +414,7 @@ def test_advanced_workflows():
         for ntype in ["CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"]:
             assert len(_get_nodes_by_type(wf, ntype)) == 0, f"No legacy {ntype} allowed in canonical advanced"
 
+
 def test_lora_serialization():
     for filename in MODERN_CANONICAL:
         with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
@@ -382,6 +435,7 @@ def test_lora_serialization():
         assert isinstance(values.get("lora_1_enabled"), bool), "lora_1_enabled must be bool"
         assert isinstance(values.get("lora_1_name"), str), "lora_1_name must be str"
         assert isinstance(values.get("lora_1_strength"), float), "lora_1_strength must be float"
+
 
 def test_generator_idempotency(tmp_path):
     import sys
@@ -422,10 +476,14 @@ def test_generator_idempotency(tmp_path):
     assert set(run1_contents.keys()) == set(run2_contents.keys()), "Run 2 file set differs from Run 1"
 
     for filename in MODERN_CANONICAL:
-        assert run1_contents[filename] == run2_contents[filename], f"Generator output for {filename} is not idempotent (Run 1 != Run 2)!"
+        assert run1_contents[filename] == run2_contents[filename], (
+            f"Generator output for {filename} is not idempotent (Run 1 != Run 2)!"
+        )
+
 
 def test_builder_validation():
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
     import build_canonical_workflows
 
@@ -433,6 +491,7 @@ def test_builder_validation():
 
     # Test unknown widget rejection
     import pytest
+
     with pytest.raises(ValueError, match="Unknown widget values"):
         builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"apply_patch": True})
 
@@ -441,11 +500,15 @@ def test_builder_validation():
 
     # Test strict combo validation bypass prevention
     with pytest.raises(ValueError, match="not in choices"):
-        builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"reference_method": "invalid.safetensors"})
+        builder.add_node(
+            "CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"reference_method": "invalid.safetensors"}
+        )
+
 
 def test_builder_duplicate_link_rejection():
     import copy
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
     import build_canonical_workflows
 
@@ -462,6 +525,7 @@ def test_builder_duplicate_link_rejection():
 
     # Second link to the same input should fail
     import pytest
+
     with pytest.raises(ValueError, match="already has a link"):
         builder.link(n1, "target_latent", n2, "target_latent")
 
@@ -533,6 +597,7 @@ def test_orphan_link_rejection():
     with pytest.raises(AssertionError):
         validate_workflow_schema(wf_e, "Case E")
 
+
 def test_validator_regression_all_nodes():
     import copy
     import pytest
@@ -585,6 +650,7 @@ def test_validate_workflow_schema_does_not_mutate_workflow():
     validate_workflow_schema(wf, MODERN_CANONICAL[0])
     assert wf == before, "Workflow was mutated by validation on second run!"
 
+
 def test_validator_handles_none_links():
     import copy
 
@@ -606,9 +672,11 @@ def test_validator_handles_none_links():
     # Should not raise exception
     validate_workflow_schema(wf_mutated, "None links test")
 
+
 def test_generator_matches_checked_in_canonical_workflows(tmp_path):
     import sys
     import os
+
     sys.path.insert(0, str(Path(__file__).parent.parent / "scratch"))
     import build_canonical_workflows
 
@@ -626,5 +694,6 @@ def test_generator_matches_checked_in_canonical_workflows(tmp_path):
         with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
             checked_in = json.load(f)
 
-        assert generated == checked_in, f"Generated {filename} does not match checked-in version! Please commit the newly generated workflows."
-
+        assert generated == checked_in, (
+            f"Generated {filename} does not match checked-in version! Please commit the newly generated workflows."
+        )
