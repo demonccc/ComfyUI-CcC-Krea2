@@ -127,10 +127,11 @@ The five-column strategy matrix covering all nine Content and Geometry combinati
 
 ## 8. Reference Roles and Single-Source Ordering
 
-The single source of truth for reference ordering is `reference_slots.py`. All non-Style references (**Subject**, **Scene**, **Outfit**) precede all **Style** references.
+The single source of truth for reference ordering is `easy_routing.py` for Easy Edit nodes and `reference_slots.py` for manual nodes. All non-Style references (**Subject**, **Scene**, **Outfit**) precede all **Style** references.
 
-1. **Non-Style References (Subject, Scene, Outfit)**: Map 1:1 to physical Qwen images and assign sequential 1-based VAE Reference Frames (`Frame 1`, `Frame 2`, etc.).
-2. **Style References**: Expand to 1 (full), 4 (2x2), or 16 (4x4) physical Qwen vision images. Style references receive VAE Reference Frame = `none` and do not participate in spatial VAE latent attention patching or negative conditioning.
+1. **Easy Routing Engine**: For `CcCKrea2EasyEdit` / `CcCKrea2EasyEditOstris`, a unified 8-combination routing matrix dynamically resolves the visual context based on the selected preset (e.g., `balanced`, `style_transfer`, `preserve_identity`, `outfit_transfer`) and the connected image inputs. This matrix automatically builds the internal reference chain, dynamically constructs semantic Scene+Outfit instructions, and filters disconnected references.
+2. **Non-Style References (Subject, Scene, Outfit)**: Map 1:1 to physical Qwen images and assign sequential 1-based VAE Reference Frames (`Frame 1`, `Frame 2`, etc.). Under Ostris Backend, all edit-path references (including semantic-only references) undergo strict VLM Area Preprocessing (<= 384x384) before text/vision encoding.
+3. **Style References**: Expand to 1 (full), 4 (2x2), or 16 (4x4) physical Qwen vision images. Style references receive VAE Reference Frame = `none` and do not participate in spatial VAE latent attention patching or negative conditioning.
 
 ---
 

@@ -1,7 +1,7 @@
 """Easy Edit 3-Phase Routing Engine for opinionated Krea2 Edit and Ostris Edit workflows."""
 
 from dataclasses import dataclass
-from typing import Optional, List, Tuple, Dict, Any, Union
+from typing import Optional, List, Tuple, Any
 
 
 # Centralized boost constants for Easy presets
@@ -19,11 +19,17 @@ EASY_SUBJECT_INSTRUCTION = "Use this reference for the subject identity, facial 
 EASY_SCENE_INSTRUCTION = "Use this reference for scene composition, environment, spatial relationships, camera framing, and lighting."
 EASY_OUTFIT_INSTRUCTION = "Use this reference for the clothing, garments, and accessories. Do not use the wearer's identity as the subject identity."
 EASY_TARGET_SCENE_INSTRUCTION = "Use this image as the target scene/context."
+EASY_SCENE_AND_OUTFIT_INSTRUCTION = (
+    "Use this reference for the scene composition, environment, spatial relationships, "
+    "camera framing and lighting, and also for the clothing, garments and accessories. "
+    "Do not use the clothing wearer's identity as the subject identity."
+)
 
 EASY_ROLE_INSTRUCTIONS = {
     "subject": EASY_SUBJECT_INSTRUCTION,
     "scene": EASY_SCENE_INSTRUCTION,
     "outfit": EASY_OUTFIT_INSTRUCTION,
+    "scene+outfit": EASY_SCENE_AND_OUTFIT_INSTRUCTION,
     "target_scene": EASY_TARGET_SCENE_INSTRUCTION,
     "target": EASY_TARGET_SCENE_INSTRUCTION,
 }
@@ -46,7 +52,9 @@ class EasyResolvedSources:
     effective_outfit: Optional[Any]
     effective_style: Optional[Any]
     outfit_source: str
+    outfit_source_kind: str   # "outfit" | "scene" | "style"
     style_source: str
+    style_source_kind: str    # "style" | "scene" | "subject"
     warnings: Tuple[str, ...]
 
 
@@ -88,8 +96,10 @@ class EasyPresetRoute:
     target_content_source: Optional[Any]
     target_geometry_mode: str  # "fixed" or "favor_image"
     target_geometry_source: Optional[Any]
-    edit_references: Tuple[Tuple[Any, float, str], ...]  # Tuple of (image, boost, alias_role)
-    semantic_only_references: Tuple[Tuple[Any, str], ...]  # Tuple of (image, alias_role) for non-appearance semantic context
+    # 4-tuple: (image, boost, alias_role, instruction)
+    edit_references: Tuple[Tuple[Any, float, str, str], ...]
+    # 2-tuple: (image, alias_role)
+    semantic_only_references: Tuple[Tuple[Any, str], ...]
     style_active: bool
     style_source: Optional[Any]
     style_config: EasyStyleConfig
@@ -111,15 +121,19 @@ def resolve_easy_sources(
     effective_scene = scene
 
     # Resolve outfit_source
+    outfit_source_kind = "outfit"
     if outfit_source == "outfit image":
         effective_outfit = outfit
+        outfit_source_kind = "outfit"
     elif outfit_source == "scene image":
+        outfit_source_kind = "scene"
         if scene is not None:
             effective_outfit = scene
         else:
             effective_outfit = None
             warnings.append("outfit_source set to 'scene image' but scene image is disconnected.")
     elif outfit_source == "style image":
+        outfit_source_kind = "style"
         if style is not None:
             effective_outfit = style
         else:
@@ -129,15 +143,19 @@ def resolve_easy_sources(
         effective_outfit = outfit
 
     # Resolve style_source
+    style_source_kind = "style"
     if style_source == "style image":
         effective_style = style
+        style_source_kind = "style"
     elif style_source == "scene image":
+        style_source_kind = "scene"
         if scene is not None:
             effective_style = scene
         else:
             effective_style = None
             warnings.append("style_source set to 'scene image' but scene image is disconnected.")
     elif style_source == "subject image":
+        style_source_kind = "subject"
         if subject is not None:
             effective_style = subject
         else:
@@ -156,7 +174,9 @@ def resolve_easy_sources(
         effective_outfit=effective_outfit,
         effective_style=effective_style,
         outfit_source=outfit_source,
+        outfit_source_kind=outfit_source_kind,
         style_source=style_source,
+        style_source_kind=style_source_kind,
         warnings=tuple(warnings),
     )
 
@@ -176,200 +196,327 @@ def _resolve_default_geometry_source(
     return ("fixed", None)
 
 
+def _combined_scene_outfit_ref(
+    image: Any,
+    boost: float,
+) -> Tuple[Any, float, str, str]:
+    """Return a 4-tuple for a ref that serves as both Scene and Outfit logically."""
+    return (image, boost, "scene+outfit", EASY_SCENE_AND_OUTFIT_INSTRUCTION)
+
+
+def _ref(image: Any, boost: float, alias: str) -> Tuple[Any, float, str, str]:
+    """Return a 4-tuple for a standard single-role ref."""
+    return (image, boost, alias, get_easy_instruction_for_role(alias))
+
+
 def route_easy_preset(
     sources: EasyResolvedSources,
     preset: str = "balanced",
 ) -> EasyPresetRoute:
-    """Phase 2: Evaluate preset routing matrix across all 6 presets."""
+    """Phase 2: Evaluate preset routing matrix across all 6 presets.
+
+    Exhaustive 8-combination coverage per preset:
+        none, S, Sc, Ou, S+Sc, S+Ou, Sc+Ou, S+Sc+Ou
+    """
     S = sources.effective_subject
     Sc = sources.effective_scene
-    O = sources.effective_outfit
+    Ou = sources.effective_outfit
     St = sources.effective_style
 
     has_s = S is not None
     has_sc = Sc is not None
-    has_o = O is not None
+    has_o = Ou is not None
     has_st = St is not None
 
-    is_o_same_sc = has_o and has_sc and (O is Sc)
-    is_o_distinct_sc = has_o and (not has_sc or O is not Sc)
+    # Detect when outfit and scene are the SAME physical object
+    # This occurs when outfit_source_kind == "scene" (selector redirect) OR Ou is Sc
+    outfit_is_scene_physically = has_o and has_sc and (Ou is Sc)
+    # Distinct outfit = outfit exists and is not the physical scene image
+    outfit_is_distinct = has_o and (not has_sc or Ou is not Sc)
 
     target_content_mode = "empty"
     target_content_source: Optional[Any] = None
     target_geometry_mode = "fixed"
     target_geometry_source: Optional[Any] = None
-    refs: List[Tuple[Any, float, str]] = []
+    refs: List[Tuple[Any, float, str, str]] = []
     semantic_only_refs: List[Tuple[Any, str]] = []
     preset_warnings: List[str] = list(sources.warnings)
 
     if preset in ("balanced", "style_transfer"):
-        if has_s and not has_sc and not has_o:
+        # --- balanced / style_transfer: exact 8-combination matrix ---
+        if not has_s and not has_sc and not has_o:
+            # none: no refs, default geometry
+            pass
+        elif has_s and not has_sc and not has_o:
+            # S only
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, BALANCED_SUBJECT_BOOST, "subject"))
-        elif has_s and has_sc and not is_o_distinct_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+        elif not has_s and has_sc and not has_o:
+            # Sc only
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((Sc, NORMAL_BOOST, "scene"))
-            refs.append((S, BALANCED_SUBJECT_BOOST, "subject"))
-        elif has_s and has_o and not has_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+        elif not has_s and not has_sc and has_o:
+            # Ou only
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, BALANCED_SUBJECT_BOOST, "subject"))
-            refs.append((O, NORMAL_BOOST, "outfit"))
-        elif has_s and has_sc and is_o_distinct_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", Ou
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        elif has_s and has_sc and not has_o:
+            # S + Sc
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+        elif has_s and not has_sc and has_o:
+            # S + Ou
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        elif not has_s and has_sc and has_o:
+            # Sc + Ou
             target_content_mode = "image"
             target_content_source = Sc
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((S, BALANCED_SUBJECT_BOOST, "subject"))
-            refs.append((O, NORMAL_BOOST, "outfit"))
-        elif has_sc and not has_s and not is_o_distinct_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((Sc, NORMAL_BOOST, "scene"))
-        elif has_o and not has_s and not has_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", O)
-            refs.append((O, NORMAL_BOOST, "outfit"))
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
+            else:
+                refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+                refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        else:
+            # S + Sc + Ou
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
+            else:
+                refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
 
     elif preset == "preserve_identity":
         if not has_s:
-            preset_warnings.append("preset 'preserve_identity' selected but Subject source is missing.")
+            preset_warnings.append(
+                "preset 'preserve_identity' selected but Subject source is missing; "
+                "falling back to balanced appearance routing."
+            )
 
-        if has_s and not has_sc and not has_o:
+        if not has_s and not has_sc and not has_o:
+            pass
+        elif has_s and not has_sc and not has_o:
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
-        elif has_s and has_sc and not is_o_distinct_sc:
-            if is_o_same_sc:
-                target_content_mode = "empty"
-                target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-                refs.append((Sc, OUTFIT_EMPHASIS_BOOST, "scene"))
-                refs.append((S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
-            else:
-                target_content_mode = "empty"
-                target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-                refs.append((Sc, NORMAL_BOOST, "scene"))
-                refs.append((S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
-        elif has_s and has_o and not has_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+        elif not has_s and has_sc and not has_o:
+            # Balanced fallback
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
-            refs.append((O, NORMAL_BOOST, "outfit"))
-        elif has_s and has_sc and is_o_distinct_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+        elif not has_s and not has_sc and has_o:
+            # Balanced fallback
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", Ou
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        elif has_s and has_sc and not has_o:
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+        elif has_s and not has_sc and has_o:
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
+        elif not has_s and has_sc and has_o:
+            # Balanced fallback: Sc+Ou without S
             target_content_mode = "image"
             target_content_source = Sc
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
-            refs.append((O, OUTFIT_EMPHASIS_BOOST, "outfit"))
-        elif has_sc and not has_s and not is_o_distinct_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((Sc, NORMAL_BOOST, "scene"))
-        elif has_o and not has_s and not has_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", O)
-            refs.append((O, NORMAL_BOOST, "outfit"))
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+            else:
+                refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+                refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
+        else:
+            # S + Sc + Ou
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+            elif outfit_is_distinct:
+                refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
 
     elif preset == "max_identity":
         if not has_s:
-            preset_warnings.append("preset 'max_identity' selected but Subject source is missing.")
+            preset_warnings.append(
+                "preset 'max_identity' selected but Subject source is missing; "
+                "falling back to balanced appearance routing."
+            )
 
-        if has_s and not has_sc and not has_o:
+        if not has_s and not has_sc and not has_o:
+            pass
+        elif has_s and not has_sc and not has_o:
             target_content_mode = "image"
             target_content_source = S
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
-        elif has_s and has_sc and not is_o_distinct_sc:
-            target_content_mode = "image"
-            target_content_source = S
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((Sc, NORMAL_BOOST, "scene"))
-            refs.append((S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
-        elif has_s and has_o and not has_sc:
-            target_content_mode = "image"
-            target_content_source = S
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
-            refs.append((O, NORMAL_BOOST, "outfit"))
-        elif has_s and has_sc and is_o_distinct_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+        elif not has_s and has_sc and not has_o:
+            # Balanced fallback
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+        elif not has_s and not has_sc and has_o:
+            # Balanced fallback
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", Ou
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        elif has_s and has_sc and not has_o:
             target_content_mode = "image"
             target_content_source = Sc
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
-            refs.append((O, NORMAL_BOOST, "outfit"))
-        elif has_sc and not has_s and not is_o_distinct_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((Sc, NORMAL_BOOST, "scene"))
-        elif has_o and not has_s and not has_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", O)
-            refs.append((O, NORMAL_BOOST, "outfit"))
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+        elif has_s and not has_sc and has_o:
+            target_content_mode = "image"
+            target_content_source = S
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        elif not has_s and has_sc and has_o:
+            # Balanced fallback: Sc+Ou without S
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+            else:
+                refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+                refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
+        else:
+            # S + Sc + Ou
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
+            elif outfit_is_distinct:
+                refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
 
     elif preset == "preserve_scene":
         if not has_sc:
             preset_warnings.append("preset 'preserve_scene' selected but Scene source is missing.")
 
-        if has_sc:
-            target_content_mode = "image"
-            target_content_source = Sc
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            if has_s:
-                refs.append((Sc, PRESERVE_SCENE_BOOST, "scene"))
-                refs.append((S, NORMAL_BOOST, "subject"))
-                if is_o_distinct_sc:
-                    semantic_only_refs.append((O, "outfit"))
-            else:
-                refs.append((Sc, PRESERVE_SCENE_BOOST, "scene"))
-                if is_o_distinct_sc:
-                    semantic_only_refs.append((O, "outfit"))
-        elif has_s and has_o and not has_sc:
-            target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-            refs.append((S, NORMAL_BOOST, "subject"))
-            refs.append((O, NORMAL_BOOST, "outfit"))
+        if not has_s and not has_sc and not has_o:
+            pass
         elif has_s and not has_sc and not has_o:
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", S)
-        elif has_o and not has_s and not has_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", S
+        elif not has_s and has_sc and not has_o:
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, PRESERVE_SCENE_BOOST, "scene"))
+        elif not has_s and not has_sc and has_o:
             target_content_mode = "empty"
-            target_geometry_mode, target_geometry_source = ("favor_image", O)
+            target_geometry_mode, target_geometry_source = "favor_image", Ou
+        elif has_s and has_sc and not has_o:
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, PRESERVE_SCENE_BOOST, "scene"))
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+        elif has_s and not has_sc and has_o:
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+            refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        elif not has_s and has_sc and has_o:
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, PRESERVE_SCENE_BOOST))
+            else:
+                refs.append(_ref(Sc, PRESERVE_SCENE_BOOST, "scene"))
+                # Outfit becomes semantic-only when scene fills 2 appearance slots... but we only have scene here
+                # With no Subject, add Outfit as second appearance ref (we have room)
+                refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
+        else:
+            # S + Sc + Ou
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, PRESERVE_SCENE_BOOST, "scene"))
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+            if outfit_is_scene_physically:
+                pass  # already combined in scene ref semantically via combined ref above
+            elif outfit_is_distinct:
+                semantic_only_refs.append((Ou, "outfit"))
 
     elif preset == "outfit_transfer":
         if not has_o:
             preset_warnings.append("preset 'outfit_transfer' selected but Outfit source is missing.")
 
-        if has_o and not has_s and not has_sc:
+        if not has_s and not has_sc and not has_o:
+            pass
+        elif has_s and not has_sc and not has_o:
+            # No outfit: warn, do subject only
+            preset_warnings.append("preset 'outfit_transfer': no Outfit source; using Subject-only route.")
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+        elif not has_s and has_sc and not has_o:
+            # No outfit, no subject: Scene only
+            target_content_mode = "empty"
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+        elif not has_s and not has_sc and has_o:
             target_content_mode = "image"
-            target_content_source = O
-            target_geometry_mode, target_geometry_source = ("favor_image", O)
-            refs.append((O, OUTFIT_TRANSFER_BOOST, "outfit"))
-        elif has_s and has_o and not has_sc:
-            target_content_mode = "image"
-            target_content_source = O
-            target_geometry_mode, target_geometry_source = ("favor_image", O)
-            refs.append((S, NORMAL_BOOST, "subject"))
-            refs.append((O, OUTFIT_TRANSFER_BOOST, "outfit"))
-        elif has_s and has_sc and is_o_distinct_sc:
+            target_content_source = Ou
+            target_geometry_mode, target_geometry_source = "favor_image", Ou
+            refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
+        elif has_s and has_sc and not has_o:
+            # No outfit: warn
+            preset_warnings.append("preset 'outfit_transfer': no Outfit source (Subject+Scene present).")
             target_content_mode = "image"
             target_content_source = Sc
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            refs.append((S, NORMAL_BOOST, "subject"))
-            refs.append((O, OUTFIT_TRANSFER_BOOST, "outfit"))
-        elif is_o_same_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+        elif has_s and not has_sc and has_o:
+            target_content_mode = "image"
+            target_content_source = Ou
+            target_geometry_mode, target_geometry_source = "favor_image", Ou
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+            refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
+        elif not has_s and has_sc and has_o:
+            # Sc + Ou without Subject
             target_content_mode = "image"
             target_content_source = Sc
-            target_geometry_mode, target_geometry_source = ("favor_image", Sc)
-            if has_s:
-                refs.append((Sc, OUTFIT_TRANSFER_BOOST, "scene"))
-                refs.append((S, NORMAL_BOOST, "subject"))
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_TRANSFER_BOOST))
             else:
-                refs.append((Sc, OUTFIT_TRANSFER_BOOST, "scene"))
+                refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+                refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
+        else:
+            # S + Sc + Ou
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_TRANSFER_BOOST))
+            elif outfit_is_distinct:
+                refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
 
     # Default geometry fallback if geometry source was not explicitly assigned
     if target_geometry_source is None:
-        target_geometry_mode, target_geometry_source = _resolve_default_geometry_source(Sc, S, O)
+        target_geometry_mode, target_geometry_source = _resolve_default_geometry_source(Sc, S, Ou)
 
     # Style configuration: active for ALL presets whenever effective_style is present
     style_active = has_st

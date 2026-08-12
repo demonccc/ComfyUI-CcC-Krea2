@@ -83,7 +83,6 @@ def test_qwen_vision_prep_node_execution():
 
 
 def test_vision_prep_import_and_prepare_image_for_qwen():
-    import ccc_krea2.vision_prep
     from ccc_krea2.vision_prep import prepare_image_for_qwen
 
     original = torch.rand(1, 1080, 1920, 3)

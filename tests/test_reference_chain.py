@@ -124,7 +124,7 @@ def test_internal_masked_anchor_dataclass_defaults():
 
 
 def test_target_vision_context_ordering_and_vae_frames():
-    from ccc_krea2.target_latent import TargetVisionContext, should_include_target_in_vision
+    from ccc_krea2.target_latent import TargetVisionContext
     from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
 
     img = torch.rand(1, 512, 512, 3)
@@ -161,7 +161,6 @@ def test_target_vision_context_ordering_and_vae_frames():
 
 
 def test_target_vision_context_style_ordering():
-    from ccc_krea2.target_latent import TargetVisionContext
     from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
 
     img = torch.rand(1, 512, 512, 3)

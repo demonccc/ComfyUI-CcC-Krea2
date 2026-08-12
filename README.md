@@ -60,18 +60,18 @@ graph TD
 
 Find pre-built workflow JSON files in the `workflows/` directory:
 
-- ⚡ [`01_easy_edit_balanced.json`](workflows/01_easy_edit_balanced.json): Opinionated Easy Edit Preset Pipeline
-- 🧪 [`02_easy_edit_ostris.json`](workflows/02_easy_edit_ostris.json): Ostris Easy Edit Pipeline
-- 👤 [`03_subject_edit.json`](workflows/03_subject_edit.json): Single Subject Reference Editing
-- 🏞️ [`04_scene_edit.json`](workflows/04_scene_edit.json): Single Scene Reference Editing
-- 🎭 [`05_subject_and_scene_edit.json`](workflows/05_subject_and_scene_edit.json): Dual Reference Composition (Subject + Scene)
-- 👗 [`06_outfit_transfer.json`](workflows/06_outfit_transfer.json): Garment & Outfit Transfer Workflow
-- 🖼️ [`07_style_transfer.json`](workflows/07_style_transfer.json): Style Moodboard Tile Transfer Workflow
-- 🏛️ [`08_native_reference_edit.json`](workflows/08_native_reference_edit.json): Standard ComfyUI Native `reference_latents` Workflow
-- ⚙️ [`09_advanced_multi_reference.json`](workflows/09_advanced_multi_reference.json): Advanced Multi-Reference Chain & Target Vision Context
-- 🎨 [`10_t2i_generation.json`](workflows/10_t2i_generation.json): Text-to-Image Generation & LoRA Stacking
+- ⚡ [`01_easy_subject.json`](workflows/01_easy_subject.json): Single Subject Easy Edit
+- 🏞️ [`02_easy_subject_scene.json`](workflows/02_easy_subject_scene.json): Subject + Scene Easy Edit
+- 👗 [`03_easy_subject_outfit.json`](workflows/03_easy_subject_outfit.json): Subject + Outfit Easy Edit
+- 🎨 [`04_easy_subject_scene_outfit.json`](workflows/04_easy_subject_scene_outfit.json): Subject + Scene + Outfit Easy Edit
+- 👕 [`05_easy_outfit_from_scene.json`](workflows/05_easy_outfit_from_scene.json): Extract Outfit from Scene Context
+- 🖼️ [`06_easy_style_transfer.json`](workflows/06_easy_style_transfer.json): Easy Style Transfer
+- 🧪 [`07_easy_ostris.json`](workflows/07_easy_ostris.json): Easy Edit using Ostris Backend
+- ⚙️ [`08_advanced_krea2_edit.json`](workflows/08_advanced_krea2_edit.json): Advanced Reference Chain (Krea2 Edit)
+- 🏛️ [`09_advanced_native.json`](workflows/09_advanced_native.json): Advanced Reference Chain (Native ComfyUI backend)
+- 🧪 [`10_advanced_ostris.json`](workflows/10_advanced_ostris.json): Advanced Reference Chain (Ostris backend)
 
-Legacy workflow files targeting earlier role-node contracts are stored in [`workflows/legacy/`](workflows/legacy/).
+Legacy workflow files targeting earlier role-node contracts are stored in [`workflows/additional/`](workflows/additional/) and [`workflows/legacy/`](workflows/legacy/).
 
 ---
 

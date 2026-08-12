@@ -25,7 +25,6 @@ from .conditioning import (
 )
 from .patch import patch_krea2_model, check_patch_safety
 from .ostris_backend import (
-    patch_ostris_model,
     preprocess_ostris_ref_pixel_image,
     preprocess_ostris_vision_image,
     build_ostris_qwen_prompt,
@@ -68,12 +67,7 @@ def run_krea2_edit_orchestrator(
     """Execute the modular Krea 2 Edit orchestrator pipeline."""
     if ostris_kv_cache or kwargs.get("ostris_kv_cache", False):
         raise NotImplementedError(
-            "[CcC Krea2] ostris_kv_cache=True is currently unsupported in the CcC Ostris backend. "
-            "Intended only for LoRAs trained with ai-toolkit kv_cache."
-        )
-    if ostris_kv_cache:
-        raise NotImplementedError(
-            "ostris_kv_cache is currently unsupported in the CcC Ostris backend. "
+            "[CcC Krea2] ostris_kv_cache=True is currently unsupported. "
             "Intended only for LoRAs trained with ai-toolkit kv_cache."
         )
 
@@ -163,7 +157,7 @@ def run_krea2_edit_orchestrator(
                     lat_tokens = None
                     if encoded is not None:
                         lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
-                    
+
                     vae_ref_specs.append({
                         "backend": "ostris_edit",
                         "role": ref_role,
@@ -183,7 +177,7 @@ def run_krea2_edit_orchestrator(
                     lat_tokens = None
                     if encoded is not None:
                         lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
-                    
+
                     vae_ref_specs.append({
                         "backend": "native",
                         "role": ref_role,
@@ -237,7 +231,13 @@ def run_krea2_edit_orchestrator(
 
             # Vision image enters positive Qwen list
             pos_idx = len(pos_qwen_images) + 1
-            vis_img = vlm_img if (reference_method == "ostris_edit" and is_appearance) else spec.prepared_image.vision_image
+            # For Ostris: apply VLM preprocessing to ALL edit-path refs (appearance + semantic-only)
+            # For other backends: use prepared vision_image
+            if reference_method == "ostris_edit":
+                raw_img = spec.prepared_image.original_image
+                vis_img = preprocess_ostris_vision_image(raw_img)
+            else:
+                vis_img = spec.prepared_image.vision_image
             pos_qwen_images.append(vis_img)
             pos_qwen_image_map.append({
                 "role": ref_role,
@@ -329,7 +329,7 @@ def run_krea2_edit_orchestrator(
 
     for ref_dict in vae_ref_specs:
         sp = ref_dict["spec"]
-        r_role = ReferenceRole(ref_dict["role"]) if ref_dict["role"] in [r.value for r in ReferenceRole] else ReferenceRole.SUBJECT
+        r_role = ReferenceRole(ref_dict["role"]) if ref_dict["role"] in [r.value for r in ReferenceRole] else ref_dict["role"]
         base_boost = getattr(sp, "attention_boost", 1.0)
         masked_boost = getattr(sp, "masked_attention_boost", 1.0)
 
@@ -498,9 +498,9 @@ def run_krea2_edit_orchestrator(
             f"  Actual Conditioning Row Span: {span_str}",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             f"  Vision Instruction Active: {'yes' if sem.get('has_instruction') else 'no'}",
-            f"  Appearance Reference: no",
-            f"  VAE Reference Frame: none",
-            f"  Negative Conditioning Included: no",
+            "  Appearance Reference: no",
+            "  VAE Reference Frame: none",
+            "  Negative Conditioning Included: no",
             ""
         ])
 
@@ -530,7 +530,7 @@ def run_krea2_edit_orchestrator(
             f"  Crop Shuffle Order: {shuffle_str}",
             f"  Style Fidelity: {sp.style_fidelity:.2f}",
             f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
-            f"  VAE Reference Frame: none",
+            "  VAE Reference Frame: none",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             ""
         ])

@@ -1,6 +1,6 @@
 {
   "last_node_id": 12,
-  "last_link_id": 22,
+  "last_link_id": 107,
   "nodes": [
     {
       "id": 1,
@@ -22,7 +22,7 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            21
+            107
           ],
           "slot_index": 0
         }
@@ -55,8 +55,7 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            2,
-            5
+            2
           ],
           "slot_index": 0
         }
@@ -91,8 +90,7 @@
           "type": "VAE",
           "links": [
             3,
-            4,
-            20
+            10
           ],
           "slot_index": 0
         }
@@ -124,7 +122,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            6
+            4
           ],
           "slot_index": 0
         },
@@ -144,200 +142,127 @@
       ]
     },
     {
-      "id": 5,
-      "type": "CcCKrea2QwenVisionImagePrep",
+      "id": 6,
+      "type": "LoadImage",
       "pos": [
-        450,
-        460
+        100,
+        800
       ],
       "size": [
         315,
-        200
+        314
       ],
       "flags": {},
       "order": 4,
       "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 5
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 6
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
-          "name": "prepared_image",
-          "type": "PREPARED_VISION_IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "scene.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "LoadImage",
+      "pos": [
+        100,
+        1140
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "outfit.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "pos": [
+        100,
+        1480
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
           "links": [
             7
           ],
           "slot_index": 0
         },
         {
-          "name": "vision_image",
-          "type": "IMAGE",
-          "links": [],
-          "slot_index": 1
-        },
-        {
-          "name": "vision_info",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 2
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2QwenVisionImagePrep"
-      },
-      "widgets_values": [
-        "native",
-        0.0,
-        1.0,
-        1.0,
-        "auto",
-        "auto"
-      ]
-    },
-    {
-      "id": 6,
-      "type": "CcCKrea2ReferenceImage",
-      "pos": [
-        800,
-        460
-      ],
-      "size": [
-        315,
-        250
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "prepared_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": 7
-        },
-        {
-          "name": "previous_references",
-          "type": "REFERENCE_CHAIN",
-          "link": null
-        },
-        {
-          "name": "attention_mask",
+          "name": "MASK",
           "type": "MASK",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "reference_chain",
-          "type": "REFERENCE_CHAIN",
-          "links": [
-            8
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2ReferenceImage"
-      },
-      "widgets_values": [
-        "edit",
-        "auto",
-        "subject",
-        "Use for subject identity.",
-        1.0,
-        1.0,
-        "auto",
-        1.0,
-        "full",
-        false
-      ]
-    },
-    {
-      "id": 7,
-      "type": "CcCKrea2TargetLatent",
-      "pos": [
-        1150,
-        100
-      ],
-      "size": [
-        315,
-        220
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 4
-        },
-        {
-          "name": "target_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": null
-        },
-        {
-          "name": "geometry_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": null
-        },
-        {
-          "name": "subject_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": null
-        },
-        {
-          "name": "scene_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "target_latent",
-          "type": "LATENT",
-          "links": [
-            9
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "latent_info",
-          "type": "STRING",
           "links": [],
           "slot_index": 1
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2TargetLatent"
+        "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "empty",
-        "fixed",
-        2.0,
-        2.0,
-        "1:1",
-        1,
-        "auto",
-        "auto",
-        "",
-        ""
+        "style.jpg",
+        "image"
       ]
     },
     {
-      "id": 8,
-      "type": "CcCKrea2Edit",
+      "id": 5,
+      "type": "CcCKrea2EasyEdit",
       "pos": [
-        1500,
+        500,
         100
       ],
       "size": [
@@ -345,7 +270,7 @@
         300
       ],
       "flags": {},
-      "order": 16,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -364,24 +289,29 @@
           "link": 3
         },
         {
-          "name": "references",
-          "type": "REFERENCE_CHAIN",
-          "link": 8
-        },
-        {
-          "name": "target_latent",
-          "type": "LATENT",
-          "link": 9
-        },
-        {
-          "name": "global_vision_directive",
+          "name": "negative_prompt",
           "type": "STRING",
           "link": null
         },
         {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "link": 22
+          "name": "subject",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "scene",
+          "type": "IMAGE",
+          "link": 5
+        },
+        {
+          "name": "outfit",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "style",
+          "type": "IMAGE",
+          "link": 7
         }
       ],
       "outputs": [
@@ -389,7 +319,7 @@
           "name": "patched_model",
           "type": "MODEL",
           "links": [
-            10
+            101
           ],
           "slot_index": 0
         },
@@ -397,7 +327,7 @@
           "name": "positive",
           "type": "CONDITIONING",
           "links": [
-            11
+            102
           ],
           "slot_index": 1
         },
@@ -405,7 +335,7 @@
           "name": "negative",
           "type": "CONDITIONING",
           "links": [
-            12
+            103
           ],
           "slot_index": 2
         },
@@ -413,7 +343,7 @@
           "name": "latent",
           "type": "LATENT",
           "links": [
-            13
+            104
           ],
           "slot_index": 3
         },
@@ -425,21 +355,22 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2Edit"
+        "Node name for S&R": "CcCKrea2EasyEdit"
       },
       "widgets_values": [
-        "A photo of subject",
-        "blurry, distorted",
-        "",
-        "ostris_edit",
-        false
+        "A portrait of subject in studio lighting",
+        "balanced",
+        "outfit image",
+        "style image",
+        true,
+        "blurry, distorted"
       ]
     },
     {
       "id": 9,
       "type": "KSampler",
       "pos": [
-        1950,
+        950,
         100
       ],
       "size": [
@@ -447,28 +378,28 @@
         262
       ],
       "flags": {},
-      "order": 17,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 10
+          "link": 101
         },
         {
           "name": "positive",
           "type": "CONDITIONING",
-          "link": 11
+          "link": 102
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
-          "link": 12
+          "link": 103
         },
         {
           "name": "latent_image",
           "type": "LATENT",
-          "link": 13
+          "link": 104
         }
       ],
       "outputs": [
@@ -476,7 +407,7 @@
           "name": "LATENT",
           "type": "LATENT",
           "links": [
-            14
+            105
           ],
           "slot_index": 0
         }
@@ -498,7 +429,7 @@
       "id": 10,
       "type": "VAEDecode",
       "pos": [
-        2300,
+        1300,
         100
       ],
       "size": [
@@ -506,18 +437,18 @@
         46
       ],
       "flags": {},
-      "order": 18,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
           "name": "samples",
           "type": "LATENT",
-          "link": 14
+          "link": 105
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": 20
+          "link": 10
         }
       ],
       "outputs": [
@@ -525,7 +456,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            15
+            106
           ],
           "slot_index": 0
         }
@@ -539,7 +470,7 @@
       "id": 11,
       "type": "SaveImage",
       "pos": [
-        2550,
+        1550,
         100
       ],
       "size": [
@@ -547,13 +478,13 @@
         270
       ],
       "flags": {},
-      "order": 19,
+      "order": 13,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 15
+          "link": 106
         }
       ],
       "outputs": [],
@@ -561,7 +492,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "CcC_Krea2_Advanced"
+        "CcC_Krea2_Easy"
       ]
     },
     {
@@ -582,7 +513,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 21
+          "link": 107
         }
       ],
       "outputs": [
@@ -596,9 +527,7 @@
         {
           "name": "prompt_augmentation",
           "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": [
-            22
-          ]
+          "links": []
         }
       ],
       "widgets_values": [
@@ -624,7 +553,7 @@
       1,
       12,
       0,
-      8,
+      5,
       0,
       "MODEL"
     ],
@@ -632,7 +561,7 @@
       2,
       2,
       0,
-      8,
+      5,
       1,
       "CLIP"
     ],
@@ -640,100 +569,76 @@
       3,
       3,
       0,
-      8,
+      5,
       2,
       "VAE"
     ],
     [
       4,
-      3,
+      4,
       0,
-      7,
-      0,
-      "VAE"
+      5,
+      4,
+      "IMAGE"
     ],
     [
       5,
-      2,
+      6,
       0,
       5,
-      0,
-      "CLIP"
+      5,
+      "IMAGE"
     ],
     [
       6,
-      4,
+      7,
       0,
       5,
-      1,
+      6,
       "IMAGE"
     ],
     [
       7,
+      8,
+      0,
       5,
-      0,
-      6,
-      0,
-      "PREPARED_VISION_IMAGE"
-    ],
-    [
-      8,
-      6,
-      0,
-      8,
-      3,
-      "REFERENCE_CHAIN"
-    ],
-    [
-      9,
       7,
-      0,
-      8,
-      4,
-      "LATENT"
+      "IMAGE"
     ],
     [
-      20,
-      3,
-      0,
-      10,
-      1,
-      "VAE"
-    ],
-    [
-      10,
-      8,
+      101,
+      5,
       0,
       9,
       0,
       "MODEL"
     ],
     [
-      11,
-      8,
+      102,
+      5,
       1,
       9,
       1,
       "CONDITIONING"
     ],
     [
-      12,
-      8,
+      103,
+      5,
       2,
       9,
       2,
       "CONDITIONING"
     ],
     [
-      13,
-      8,
+      104,
+      5,
       3,
       9,
       3,
       "LATENT"
     ],
     [
-      14,
+      105,
       9,
       0,
       10,
@@ -741,7 +646,15 @@
       "LATENT"
     ],
     [
-      15,
+      10,
+      3,
+      0,
+      10,
+      1,
+      "VAE"
+    ],
+    [
+      106,
       10,
       0,
       11,
@@ -749,20 +662,12 @@
       "IMAGE"
     ],
     [
-      21,
+      107,
       1,
       0,
       12,
       0,
       "MODEL"
-    ],
-    [
-      22,
-      12,
-      1,
-      8,
-      6,
-      "CCC_KREA2_PROMPT_AUGMENTATION"
     ]
   ],
   "groups": [

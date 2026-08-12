@@ -172,6 +172,24 @@ This document provides the complete specification of all public nodes in the `Co
 
 ---
 
+### 2.8 CcC Krea2 - Easy Edit & Ostris Easy Edit
+- **Class Name**: `CcCKrea2EasyEdit` / `CcCKrea2EasyEditOstris`
+- **Category**: `CcC/Krea2`
+- **Description**: Opinionated all-in-one nodes that bypass manual Reference Chain construction. Implements a unified preset routing matrix to automatically assemble semantic instructions, style processing, and identity preservation based on a single workflow preset.
+- **Required Inputs**:
+  - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`): Core models.
+  - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
+  - `preset` (`CHOICE`): `balanced`, `style_transfer`, `preserve_identity`, `max_identity`, `preserve_scene`, `outfit_transfer`.
+- **Optional Inputs**:
+  - `subject`, `scene`, `outfit`, `style` (`IMAGE`): Visual references for routing.
+  - `negative_prompt` (`STRING`): Negative text prompt.
+  - `prompt_augmentation` (`CCC_KREA2_PROMPT_AUGMENTATION`): Optional LoRA prompt settings stack.
+  - `ostris_kv_cache` (`BOOLEAN`, default: `False`): Included only in `CcCKrea2EasyEditOstris` to enable unsupported experimental AI-Toolkit kv-cache feature.
+- **Outputs**:
+  - `patched_model` (`MODEL`), `positive` (`CONDITIONING`), `negative` (`CONDITIONING`), `latent` (`LATENT`), `edit_info` (`STRING`).
+
+---
+
 ## 3. Visual Reference Fit Modes
 
 Public modes: `auto`, `fit`, `crop`.

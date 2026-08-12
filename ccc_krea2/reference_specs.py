@@ -1,6 +1,6 @@
 """Typed data structures for Qwen Vision preparation, reference specifications, and reference chains."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple
 import torch
 

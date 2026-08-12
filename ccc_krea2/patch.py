@@ -60,7 +60,11 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
     Contract: patch_krea2_model(model, prepared_refs)
     """
     if is_model_already_patched(model, "ccc_krea2_edit"):
-        return model
+        raise RuntimeError(
+            "[CcC Krea2] Input MODEL is already patched by CcC Krea2 Edit. "
+            "Chaining CcC Edit nodes is unsupported because each wrapper captures reference "
+            "latents in a closure. Connect this Edit node to the unpatched upstream MODEL instead."
+        )
 
     patched_model = model.clone()
     patched_model._ccc_patch_key = "ccc_krea2_edit"

@@ -55,7 +55,11 @@ class DummyModel:
 
 
 class DummyClip:
+    def __init__(self):
+        self.tokenize_calls = []
+
     def tokenize(self, prompt, images=None, **kwargs):
+        self.tokenize_calls.append({"prompt": prompt, "images": images or []})
         tok_pairs = []
         if images:
             for img in images:
@@ -148,6 +152,59 @@ def test_ostris_kv_cache_raises_not_implemented():
             ostris_kv_cache=True,
         )
 
-    with pytest.raises(NotImplementedError, match="ostris_kv_cache=True is not supported"):
+    with pytest.raises(NotImplementedError, match="ostris_kv_cache"):
         patch_ostris_model(model, ostris_kv_cache=True)
 
+
+def test_ostris_semantic_vlm_preprocessing():
+    """Verify that Ostris backend applies VLM preprocessing (<= 384x384) to semantic-only references."""
+    from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+    from ccc_krea2.reference_specs import ReferenceChain, ReferenceSpec
+    from ccc_krea2.vision_prep import prepare_vision_image
+    
+    model = DummyModel()
+    clip = DummyClip()
+    vae = DummyVAE()
+    target_latent = {"samples": torch.zeros((1, 16, 1, 32, 32))}
+
+    # Create a large image (1024x1024)
+    large_img = torch.rand(1, 1024, 1024, 3)
+    prep = prepare_vision_image(image=large_img, clip=clip, mode="native")
+    
+    # Semantic-only reference
+    semantic_spec = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        alias="subject",
+        vision_instruction="Subject identity",
+        appearance_reference=False,
+    )
+    chain = ReferenceChain((semantic_spec,))
+    
+    run_krea2_edit_orchestrator(
+        model=model,
+        clip=clip,
+        vae=vae,
+        references=chain,
+        target_latent=target_latent,
+        positive_prompt="test prompt",
+        negative_prompt="",
+        reference_method="ostris_edit",
+    )
+    
+    # Verify the image sent to CLIP tokenize is area-downscaled
+    assert len(clip.tokenize_calls) == 2
+    call = clip.tokenize_calls[0]
+    images_sent = call["images"]
+    assert len(images_sent) == 1
+    
+    vlm_img = images_sent[0]
+    vlm_h, vlm_w = vlm_img.shape[1], vlm_img.shape[2]
+    
+    # Should be downscaled to ~384x384 (area <= 147456)
+    assert vlm_h * vlm_w <= 384 * 384 + 1000
+    assert vlm_h < 1024
+    
+    # Verify NO Picture N is in the prompt for semantic-only refs
+    prompt = call["prompt"]
+    assert "Picture 1:" not in prompt

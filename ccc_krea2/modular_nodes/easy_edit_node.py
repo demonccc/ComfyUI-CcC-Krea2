@@ -198,7 +198,7 @@ def _execute_easy_edit(
     # Phase 3: Construct Generic ReferenceChain
     chain = ReferenceChain()
 
-    for item_img, boost, alias_role in route.edit_references:
+    for item_img, boost, alias_role, instruction in route.edit_references:
         if is_ostris:
             vlm_img = preprocess_ostris_vision_image(item_img)
         else:
@@ -209,7 +209,7 @@ def _execute_easy_edit(
             reference_path="edit",
             prepared_image=prep,
             alias=alias_role,
-            vision_instruction=get_easy_instruction_for_role(alias_role),
+            vision_instruction=instruction,
             attention_boost=boost,
             appearance_reference=True,
             _legacy_role=alias_role,
@@ -292,7 +292,7 @@ def _execute_easy_edit(
         ostris_kv_cache=ostris_kv_cache,
     )
 
-    app_refs = [f"{alias}" for _, _, alias in route.edit_references]
+    app_refs = [f"{alias}" for _, _, alias, _ in route.edit_references]
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 
     easy_header = [

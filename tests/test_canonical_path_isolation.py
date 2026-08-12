@@ -70,10 +70,13 @@ def test_legacy_functions_not_called_in_canonical_path():
         )
         assert pos_out is not None
 
-        # Execute Easy Edit (canonical path)
+        # Execute Easy Edit with a FRESH model (not the already-patched one)
+        # Chaining would raise RuntimeError — we test that separately below
+        fresh_model = MagicMock()
+        fresh_model.clone.return_value = fresh_model
         easy_node = CcCKrea2EasyEdit()
         easy_out = easy_node.process(
-            model=mock_model,
+            model=fresh_model,
             clip=mock_clip,
             vae=mock_vae,
             positive_prompt="a photo",
@@ -81,6 +84,31 @@ def test_legacy_functions_not_called_in_canonical_path():
             subject=img
         )
         assert easy_out[0] is not None
+
+
+def test_patch_krea2_model_raises_on_already_patched():
+    """Verify that patch_krea2_model raises RuntimeError when MODEL is already patched."""
+    from ccc_krea2.patch import patch_krea2_model, is_model_already_patched
+
+    mock_model = MagicMock()
+    mock_model.clone.return_value = mock_model
+
+    img = torch.rand(1, 64, 64, 3)
+    prep = prepare_vision_image(image=img, clip=MagicMock(), mode="native")
+    from ccc_krea2.references import PreparedReference, ReferenceRole
+    dummy_ref = PreparedReference(
+        role=ReferenceRole.SUBJECT,
+        grounding_image=img,
+        vae_latent=torch.zeros((1, 16, 8, 8)),
+        spatial_attention_mask=None,
+        boost=1.0,
+    )
+
+    # First patch succeeds
+    patched = patch_krea2_model(mock_model, [dummy_ref])
+    # Second patch attempt on the already-patched model must raise
+    with pytest.raises(RuntimeError, match="already patched"):
+        patch_krea2_model(patched, [dummy_ref])
 
 
 def test_physical_image_count_matches_vision_markers():

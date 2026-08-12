@@ -14,20 +14,28 @@ app.registerExtension({
                     const minMpWidget = node.widgets?.find(w => w.name === "min_mp");
                     const maxMpWidget = node.widgets?.find(w => w.name === "max_mp");
                     const fixedMpWidget = node.widgets?.find(w => w.name === "fixed_mp");
+                    const downscaleWidget = node.widgets?.find(w => w.name === "downscale_method");
+                    const upscaleWidget = node.widgets?.find(w => w.name === "upscale_method");
 
                     if (mode === "native") {
                         if (minMpWidget) minMpWidget.disabled = true;
                         if (maxMpWidget) maxMpWidget.disabled = true;
                         if (fixedMpWidget) fixedMpWidget.disabled = true;
+                        if (downscaleWidget) downscaleWidget.disabled = true;
+                        if (upscaleWidget) upscaleWidget.disabled = true;
                     } else if (mode === "fixed") {
                         if (minMpWidget) minMpWidget.disabled = true;
                         if (maxMpWidget) maxMpWidget.disabled = true;
                         if (fixedMpWidget) fixedMpWidget.disabled = false;
+                        if (downscaleWidget) downscaleWidget.disabled = false;
+                        if (upscaleWidget) upscaleWidget.disabled = false;
                     } else {
                         // adaptive (default)
                         if (minMpWidget) minMpWidget.disabled = false;
                         if (maxMpWidget) maxMpWidget.disabled = false;
                         if (fixedMpWidget) fixedMpWidget.disabled = true;
+                        if (downscaleWidget) downscaleWidget.disabled = false;
+                        if (upscaleWidget) upscaleWidget.disabled = false;
                     }
                 };
 

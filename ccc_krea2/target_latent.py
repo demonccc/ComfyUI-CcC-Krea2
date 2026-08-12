@@ -3,8 +3,8 @@
 import torch
 import math
 from dataclasses import dataclass
-from typing import Dict, Any, Tuple, Optional, List
-from .reference_specs import PreparedVisionImage, ReferenceSpec, ReferenceChain
+from typing import Dict, Any, Tuple, Optional
+from .reference_specs import PreparedVisionImage, ReferenceChain
 from .geometry import resize_tensor
 
 
@@ -346,7 +346,7 @@ def build_target_latent(
     else:
         active_target_image = target_image or subject_image or scene_image
 
-    active_geometry_image = geometry_image or active_target_image
+
 
     target_h, target_w, geom_src, active_mp, src_dims, warnings = calculate_target_latent_resolution(
         geometry_mode=geometry_mode,

@@ -1,7 +1,6 @@
 """Test suite for native ComfyUI reference latents plumbing."""
 
 import torch
-import pytest
 from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
 from ccc_krea2.reference_specs import ReferenceChain, ReferenceSpec
 from ccc_krea2.vision_prep import prepare_image_for_qwen

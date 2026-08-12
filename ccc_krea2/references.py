@@ -1,7 +1,7 @@
 """Dual-path reference image preprocessor with process_latent_in support."""
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Union
 import torch
 
 from .constants import ReferenceRole
@@ -28,7 +28,7 @@ class ReferenceConfig:
 
 @dataclass
 class PreparedReference:
-    role: ReferenceRole
+    role: Union[ReferenceRole, str]
     grounding_image: Optional[torch.Tensor]
     vae_latent: Optional[torch.Tensor]
     spatial_attention_mask: Optional[torch.Tensor]

@@ -1,6 +1,6 @@
 """CcC Krea2 - Reference Image node (Generic Reference Node)."""
 
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Tuple
 import torch
 from ..reference_specs import ReferenceSpec, ReferenceChain, PreparedVisionImage
 from ..constants import GENERIC_REFERENCE_FIT_MODES

@@ -18,14 +18,14 @@ EDITING_WORKFLOW_FILES = LEGACY_WORKFLOW_FILES[:6]
 
 MODULAR_WORKFLOW_FILES = [
     "workflows/01_easy_subject.json",
-    "workflows/02_easy_scene.json",
-    "workflows/03_easy_outfit.json",
-    "workflows/04_easy_style.json",
-    "workflows/05_easy_multiref.json",
-    "workflows/06_advanced_subject.json",
-    "workflows/07_advanced_scene.json",
-    "workflows/08_advanced_outfit.json",
-    "workflows/09_advanced_style.json",
+    "workflows/02_easy_subject_scene.json",
+    "workflows/03_easy_subject_outfit.json",
+    "workflows/04_easy_subject_scene_outfit.json",
+    "workflows/05_easy_outfit_from_scene.json",
+    "workflows/06_easy_style_transfer.json",
+    "workflows/07_easy_ostris.json",
+    "workflows/08_advanced_krea2_edit.json",
+    "workflows/09_advanced_native.json",
     "workflows/10_advanced_ostris.json",
 ]
 

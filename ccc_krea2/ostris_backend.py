@@ -6,13 +6,10 @@ Licensed under the MIT License.
 """
 
 import math
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import torch
-import torch.nn.functional as F
-from einops import rearrange
 
-from .references import PreparedReference, _process_latent_in_if_available
-from .patch import is_model_already_patched, _pad_to_patch_size, _repeat_to_batch_size, _timestep_embedding
+from .style_processing import get_style_processing_image_count
 from .geometry import resize_tensor
 
 
@@ -66,9 +63,6 @@ def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tenso
         return torch.clamp(resized, 0.0, 1.0)
 
     return image_tensor
-
-
-from .style_processing import get_style_processing_image_count
 
 
 def build_ostris_qwen_prompt(
@@ -127,7 +121,7 @@ def build_ostris_qwen_prompt(
 
 def patch_ostris_model(
     model: Any,
-    prepared_refs: Optional[List[PreparedReference]] = None,
+    prepared_refs: Optional[Any] = None,
     ostris_kv_cache: bool = False
 ) -> Any:
     """Deprecated compatibility shim.
@@ -141,4 +135,3 @@ def patch_ostris_model(
             "Intended only for LoRAs trained with ai-toolkit kv_cache."
         )
     return model
-
