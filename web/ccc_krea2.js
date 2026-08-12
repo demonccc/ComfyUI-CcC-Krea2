@@ -5,7 +5,42 @@ app.registerExtension({
     async nodeCreated(node) {
         if (!node || !node.comfyClass) return;
 
-        // Dynamic widget graying for CcCKrea2ReferenceImage
+        // Dynamic widget management for CcCKrea2QwenVisionPrep
+        if (node.comfyClass === "CcCKrea2QwenVisionPrep") {
+            const modeWidget = node.widgets?.find(w => w.name === "mode");
+            if (modeWidget) {
+                const updatePrepState = () => {
+                    const mode = modeWidget.value;
+                    const minMpWidget = node.widgets?.find(w => w.name === "min_mp");
+                    const maxMpWidget = node.widgets?.find(w => w.name === "max_mp");
+                    const fixedMpWidget = node.widgets?.find(w => w.name === "fixed_mp");
+
+                    if (mode === "native") {
+                        if (minMpWidget) minMpWidget.disabled = true;
+                        if (maxMpWidget) maxMpWidget.disabled = true;
+                        if (fixedMpWidget) fixedMpWidget.disabled = true;
+                    } else if (mode === "fixed") {
+                        if (minMpWidget) minMpWidget.disabled = true;
+                        if (maxMpWidget) maxMpWidget.disabled = true;
+                        if (fixedMpWidget) fixedMpWidget.disabled = false;
+                    } else {
+                        // adaptive (default)
+                        if (minMpWidget) minMpWidget.disabled = false;
+                        if (maxMpWidget) maxMpWidget.disabled = false;
+                        if (fixedMpWidget) fixedMpWidget.disabled = true;
+                    }
+                };
+
+                const origCb = modeWidget.callback;
+                modeWidget.callback = function () {
+                    if (origCb) origCb.apply(this, arguments);
+                    updatePrepState();
+                };
+                setTimeout(updatePrepState, 20);
+            }
+        }
+
+        // Dynamic widget management for CcCKrea2ReferenceImage
         if (node.comfyClass === "CcCKrea2ReferenceImage") {
             const refPathWidget = node.widgets?.find(w => w.name === "reference_path");
             if (refPathWidget) {
@@ -14,7 +49,7 @@ app.registerExtension({
                     const isEdit = (mode === "edit");
 
                     const editWidgets = ["attention_boost", "masked_attention_boost", "visual_reference_fit"];
-                    const styleWidgets = ["style_fidelity", "style_processing", "indirect_style_transfer", "style_directive"];
+                    const styleWidgets = ["style_fidelity", "style_processing", "indirect_style_transfer"];
 
                     node.widgets?.forEach(w => {
                         if (editWidgets.includes(w.name)) {
@@ -35,24 +70,34 @@ app.registerExtension({
             }
         }
 
-        // Dynamic widget graying for CcCKrea2TargetLatent
+        // Dynamic widget management for CcCKrea2TargetLatent
         if (node.comfyClass === "CcCKrea2TargetLatent") {
             const contentWidget = node.widgets?.find(w => w.name === "target_content");
             const geomWidget = node.widgets?.find(w => w.name === "geometry_mode");
+            const visionWidget = node.widgets?.find(w => w.name === "include_in_vision");
 
             const updateTargetState = () => {
                 const isGeomFixed = (geomWidget?.value === "fixed");
+                const isVisionIncluded = (visionWidget?.value !== "no");
 
                 const targetMpWidget = node.widgets?.find(w => w.name === "target_megapixels");
                 const fixedMpWidget = node.widgets?.find(w => w.name === "fixed_megapixels");
                 const aspectWidget = node.widgets?.find(w => w.name === "aspect_ratio");
 
+                const slotWidget = node.widgets?.find(w => w.name === "target_vision_slot");
+                const aliasWidget = node.widgets?.find(w => w.name === "target_alias");
+                const instructionWidget = node.widgets?.find(w => w.name === "target_vision_instruction");
+
                 if (fixedMpWidget) fixedMpWidget.disabled = !isGeomFixed;
                 if (targetMpWidget) targetMpWidget.disabled = isGeomFixed;
                 if (aspectWidget) aspectWidget.disabled = !isGeomFixed;
+
+                if (slotWidget) slotWidget.disabled = !isVisionIncluded;
+                if (aliasWidget) aliasWidget.disabled = !isVisionIncluded;
+                if (instructionWidget) instructionWidget.disabled = !isVisionIncluded;
             };
 
-            [contentWidget, geomWidget].forEach(w => {
+            [contentWidget, geomWidget, visionWidget].forEach(w => {
                 if (w) {
                     const origCb = w.callback;
                     w.callback = function () {
@@ -64,14 +109,14 @@ app.registerExtension({
             setTimeout(updateTargetState, 20);
         }
 
-        // Dynamic widget graying for CcCKrea2Edit & CcCKrea2EasyEdit
-        if (node.comfyClass === "CcCKrea2Edit" || node.comfyClass === "CcCKrea2EasyEdit") {
+        // Dynamic widget management for Edit and Easy Edit nodes
+        if (["CcCKrea2Edit", "CcCKrea2EasyEdit", "CcCKrea2EasyEditOstris"].includes(node.comfyClass)) {
             const methodWidget = node.widgets?.find(w => w.name === "reference_method");
-            const patchWidget = node.widgets?.find(w => w.name === "apply_model_patch");
+            const patchWidget = node.widgets?.find(w => w.name === "apply_model_patch" || w.name === "apply_krea2_edit_patch" || w.name === "apply_ostris_edit_patch");
             const kvCacheWidget = node.widgets?.find(w => w.name === "ostris_kv_cache");
 
             const updateEditState = () => {
-                const method = methodWidget?.value || "krea2_edit";
+                const method = methodWidget?.value || (node.comfyClass === "CcCKrea2EasyEditOstris" ? "ostris_edit" : "krea2_edit");
 
                 // Native does not support model patching
                 if (method === "native") {
@@ -83,6 +128,7 @@ app.registerExtension({
                 // ostris_kv_cache is currently unsupported in runtime environment
                 if (kvCacheWidget) {
                     kvCacheWidget.disabled = true;
+                    kvCacheWidget.tooltip = "Currently unavailable in the CcC Ostris backend. Intended only for LoRAs trained with ai-toolkit kv_cache.";
                 }
             };
 

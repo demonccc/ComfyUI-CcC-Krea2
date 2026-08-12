@@ -91,19 +91,33 @@ def attach_reference_latents_to_conditioning(
     conditioning: List[Any],
     reference_latents: List[torch.Tensor]
 ) -> List[Any]:
-    """Attach standard ComfyUI reference_latents metadata to conditioning list."""
+    """Attach standard ComfyUI reference_latents metadata to conditioning list with append semantics."""
     if not conditioning or not reference_latents:
         return conditioning
 
-    updated_cond = []
-    for cond_tuple in conditioning:
-        if isinstance(cond_tuple, (list, tuple)) and len(cond_tuple) >= 2:
-            t, d = cond_tuple[0], dict(cond_tuple[1])
-            d["reference_latents"] = reference_latents
-            updated_cond.append((t, d))
-        else:
-            updated_cond.append(cond_tuple)
-    return updated_cond
+    try:
+        import node_helpers
+        return node_helpers.conditioning_set_values(
+            conditioning,
+            {"reference_latents": reference_latents},
+            append=True
+        )
+    except (ImportError, AttributeError):
+        # Fallback for isolated environments without node_helpers
+        updated_cond = []
+        for cond_tuple in conditioning:
+            if isinstance(cond_tuple, (list, tuple)) and len(cond_tuple) >= 2:
+                t, d = cond_tuple[0], dict(cond_tuple[1])
+                existing_refs = d.get("reference_latents", [])
+                if isinstance(existing_refs, (list, tuple)):
+                    d["reference_latents"] = list(existing_refs) + list(reference_latents)
+                else:
+                    d["reference_latents"] = list(reference_latents)
+                updated_cond.append((t, d))
+            else:
+                updated_cond.append(cond_tuple)
+        return updated_cond
+
 
 
 
@@ -421,11 +435,8 @@ def encode_krea2_qwen_context(
         raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
 
     warnings_list: List[str] = []
-    num_images = len(physical_images)
-    dynamic_template = build_krea2_qwen_template(num_images=num_images, system_prompt=system_prompt)
-
     try:
-        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=dynamic_template)
+        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_TEMPLATE)
     except TypeError:
         tokens = clip.tokenize(prompt or "", images=physical_images)
     except Exception as e:

@@ -15,8 +15,8 @@ class CcCKrea2TargetLatent:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "target_content": (["empty", "image"], {"default": "empty"}),
-                "geometry_mode": (["fixed", "favor_image"], {"default": "fixed"}),
+                "target_content": (["empty", "image", "subject", "scene"], {"default": "empty"}),
+                "geometry_mode": (["fixed", "favor_image", "favor_subject", "favor_scene"], {"default": "fixed"}),
 
                 "target_megapixels": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 12.0, "step": 0.01}),
                 "fixed_megapixels": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 12.0, "step": 0.01}),

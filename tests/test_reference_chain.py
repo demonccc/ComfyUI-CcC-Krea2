@@ -154,10 +154,10 @@ def test_target_vision_context_ordering_and_vae_frames():
     assert len(resolved) == 2
     # Target is slot 1, appearance_reference False -> VAE frame None
     assert resolved[0]["resolved_slot"] == 1
-    assert resolved[0]["vae_frame"] is None
+    assert resolved[0]["vae_reference_frame"] is None
     # Subject is slot 2, appearance_reference True -> VAE frame 1
     assert resolved[1]["resolved_slot"] == 2
-    assert resolved[1]["vae_frame"] == 1
+    assert resolved[1]["vae_reference_frame"] == 1
 
 
 def test_target_vision_context_style_ordering():

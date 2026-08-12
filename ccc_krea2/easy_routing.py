@@ -14,6 +14,26 @@ OUTFIT_TRANSFER_BOOST = 4.0
 NORMAL_BOOST = 1.0
 
 
+# Centralized explicit instruction constants for Easy Edit
+EASY_SUBJECT_INSTRUCTION = "Use this reference for the subject identity, facial features, hair, anatomy, body shape, and body proportions."
+EASY_SCENE_INSTRUCTION = "Use this reference for scene composition, environment, spatial relationships, camera framing, and lighting."
+EASY_OUTFIT_INSTRUCTION = "Use this reference for the clothing, garments, and accessories. Do not use the wearer's identity as the subject identity."
+EASY_TARGET_SCENE_INSTRUCTION = "Use this image as the target scene/context."
+
+EASY_ROLE_INSTRUCTIONS = {
+    "subject": EASY_SUBJECT_INSTRUCTION,
+    "scene": EASY_SCENE_INSTRUCTION,
+    "outfit": EASY_OUTFIT_INSTRUCTION,
+    "target_scene": EASY_TARGET_SCENE_INSTRUCTION,
+    "target": EASY_TARGET_SCENE_INSTRUCTION,
+}
+
+
+def get_easy_instruction_for_role(role: str) -> str:
+    return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
+
+
+
 @dataclass(frozen=True)
 class EasyResolvedSources:
     """Phase 1: Resolved input sources with strict no-fallback rules."""

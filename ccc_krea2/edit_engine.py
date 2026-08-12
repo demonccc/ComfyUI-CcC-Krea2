@@ -18,11 +18,16 @@ from .style_processing import expand_style_reference_spans
 from .prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
 from .conditioning import (
     encode_krea2_qwen_context,
-    build_annotated_user_prompt,
+    build_krea2_user_content,
     attach_reference_latents_to_conditioning,
 )
 from .patch import patch_krea2_model, check_patch_safety
-from .ostris_backend import patch_ostris_model
+from .ostris_backend import (
+    patch_ostris_model,
+    preprocess_ostris_ref_pixel_image,
+    preprocess_ostris_vision_image,
+    build_ostris_qwen_prompt,
+)
 from .target_latent import should_include_target_in_vision, TargetVisionContext
 
 
@@ -41,6 +46,12 @@ def run_krea2_edit_orchestrator(
     **kwargs: Any
 ) -> Tuple[Any, Any, Any, Dict[str, torch.Tensor], str]:
     """Execute the modular Krea 2 Edit orchestrator pipeline."""
+    if ostris_kv_cache:
+        raise NotImplementedError(
+            "ostris_kv_cache is currently unsupported in the CcC Ostris backend. "
+            "Intended only for LoRAs trained with ai-toolkit kv_cache."
+        )
+
     # Step 1: Target latent geometry inspection
     samples = target_latent["samples"]
     if not isinstance(samples, torch.Tensor) or samples.ndim not in (4, 5):
@@ -66,7 +77,7 @@ def run_krea2_edit_orchestrator(
                 prepared_image=target_vctx.target_image,
                 requested_vision_slot=target_vctx.target_vision_slot,
                 alias=target_vctx.target_alias or "target",
-                vision_instruction=target_vctx.target_vision_instruction,
+                vision_instruction=target_vctx.target_vision_instruction or "Use this image as the target scene/context.",
                 appearance_reference=False,
                 _legacy_role="target",
             )
@@ -101,6 +112,7 @@ def run_krea2_edit_orchestrator(
 
     vae_ref_specs: List[Dict[str, Any]] = []
     style_ref_specs: List[Dict[str, Any]] = []
+    ostris_pic_counter = 1
 
     for ref_item in resolved_refs:
         spec = ref_item["spec"]
@@ -116,37 +128,44 @@ def run_krea2_edit_orchestrator(
             if is_appearance:
                 if reference_method == "ostris_edit":
                     proc_img = preprocess_ostris_ref_pixel_image(src_img)
+                    proc_h, proc_w = proc_img.shape[1], proc_img.shape[2]
+                    vlm_img = preprocess_ostris_vision_image(src_img)
+                    vlm_h, vlm_w = vlm_img.shape[1], vlm_img.shape[2]
+
                     fit_mask = getattr(spec, "attention_mask", None)
                     encoded = vae.encode(proc_img) if vae is not None else None
                     lat_tokens = None
                     if encoded is not None:
                         lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
                     
-                    fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
-                    geom = resolve_krea2edit_geometry(src_h=src_h, src_w=src_w, tgt_h=target_h, tgt_w=target_w, fit_mode=fit_mode)
                     vae_ref_specs.append({
+                        "backend": "ostris_edit",
                         "role": ref_role,
                         "slot": slot,
+                        "picture_number": ostris_pic_counter,
                         "latent_tokens": lat_tokens,
                         "mask": fit_mask,
-                        "geom": geom,
+                        "source_size": (src_w, src_h),
+                        "vlm_size": (vlm_w, vlm_h),
+                        "vae_prep_size": (proc_w, proc_h),
                         "spec": spec,
                         "ref_item": ref_item
                     })
+                    ostris_pic_counter += 1
                 elif reference_method == "native":
                     encoded = vae.encode(src_img) if vae is not None else None
                     lat_tokens = None
                     if encoded is not None:
                         lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
                     
-                    fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
-                    geom = resolve_krea2edit_geometry(src_h=src_h, src_w=src_w, tgt_h=target_h, tgt_w=target_w, fit_mode=fit_mode)
                     vae_ref_specs.append({
+                        "backend": "native",
                         "role": ref_role,
                         "slot": slot,
                         "latent_tokens": lat_tokens,
                         "mask": getattr(spec, "attention_mask", None),
-                        "geom": geom,
+                        "source_size": (src_w, src_h),
+                        "vae_size": (src_w, src_h),
                         "spec": spec,
                         "ref_item": ref_item
                     })
@@ -172,6 +191,7 @@ def run_krea2_edit_orchestrator(
                         lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
 
                     vae_ref_specs.append({
+                        "backend": "krea2_edit",
                         "role": ref_role,
                         "slot": slot,
                         "latent_tokens": lat_tokens,
@@ -197,8 +217,8 @@ def run_krea2_edit_orchestrator(
                 "spec": spec
             })
 
-            # Negative Qwen images: empty for Ostris edit (text-only negative), active for Krea2/native
-            if reference_method != "ostris_edit":
+            # Negative Qwen images: empty for Ostris edit (text-only negative), active for Krea2/native appearance refs
+            if reference_method != "ostris_edit" and is_appearance:
                 neg_idx = len(neg_qwen_images) + 1
                 neg_qwen_images.append(spec.prepared_image.vision_image)
                 neg_qwen_image_map.append({
@@ -243,16 +263,16 @@ def run_krea2_edit_orchestrator(
                 "ref_item": ref_item
             })
 
-    # Format user prompt with slot annotations (no prepended automatic system role directives)
-    annotated_prompt = build_annotated_user_prompt(
-        resolved_references=resolved_refs,
-        user_prompt=pos_base,
-    )
+    # Format user content using canonical Qwen prompt formatters
+    if reference_method == "ostris_edit":
+        user_content = build_ostris_qwen_prompt(resolved_references=resolved_refs, user_prompt=pos_base)
+    else:
+        user_content = build_krea2_user_content(resolved_references=resolved_refs, user_prompt=pos_base)
 
     # Step 5: Encode Qwen Contexts for positive and negative
     pos_qwen_context = encode_krea2_qwen_context(
         clip=clip,
-        prompt=annotated_prompt,
+        prompt=user_content,
         physical_images=pos_qwen_images,
         physical_image_map=pos_qwen_image_map,
         is_positive=True
@@ -266,9 +286,9 @@ def run_krea2_edit_orchestrator(
         is_positive=False
     )
 
-    # Step 6: Prepare model patching references
+    # Step 6: Prepare model patching references and VAE latents list
     prepared_refs: List[PreparedReference] = []
-    vae_latents_for_native: List[torch.Tensor] = []
+    vae_latents_for_transport: List[torch.Tensor] = []
 
     for ref_dict in vae_ref_specs:
         sp = ref_dict["spec"]
@@ -276,47 +296,70 @@ def run_krea2_edit_orchestrator(
         base_boost = getattr(sp, "attention_boost", 1.0)
         masked_boost = getattr(sp, "masked_attention_boost", 1.0)
 
-        if ref_dict["latent_tokens"] is not None:
-            vae_latents_for_native.append(ref_dict["latent_tokens"])
+        if ref_dict.get("latent_tokens") is not None:
+            vae_latents_for_transport.append(ref_dict["latent_tokens"])
 
-        pr = PreparedReference(
-            role=r_role,
-            grounding_image=sp.prepared_image.vision_image,
-            vae_latent=ref_dict["latent_tokens"],
-            spatial_attention_mask=ref_dict["mask"],
-            boost=base_boost,
-            masked_boost=masked_boost,
-            spatial_hw=ref_dict["geom"].vae_input_pixel_size,
-            lat_hw=ref_dict["geom"].vae_latent_grid_size,
-            mask_mode="hard",
-            ref_fit_meta={"geom": ref_dict["geom"]}
-        )
-        prepared_refs.append(pr)
+        if reference_method == "krea2_edit":
+            pr = PreparedReference(
+                role=r_role,
+                grounding_image=sp.prepared_image.vision_image,
+                vae_latent=ref_dict["latent_tokens"],
+                spatial_attention_mask=ref_dict.get("mask"),
+                boost=base_boost,
+                masked_boost=masked_boost,
+                spatial_hw=ref_dict["geom"].vae_input_pixel_size,
+                lat_hw=ref_dict["geom"].vae_latent_grid_size,
+                mask_mode="hard",
+                ref_fit_meta={"geom": ref_dict["geom"]}
+            )
+            prepared_refs.append(pr)
 
     # Step 7: Apply model patches or native reference latents
-    pos_conditioning = pos_qwen_context.conditioning
-    neg_conditioning = neg_qwen_context.conditioning
-
     apply_model_patch = kwargs.get("apply_model_patch", kwargs.get("apply_patch", True))
 
-    if reference_method == "native" or not apply_model_patch:
+    if reference_method == "native":
+        check_patch_safety(model, "native")
         patched_model = model
-        pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_native)
-        neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_native)
+        pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
+        neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_transport)
     elif reference_method == "ostris_edit":
         check_patch_safety(model, "ostris_edit")
-        patched_model = patch_ostris_model(model=model, prepared_refs=prepared_refs, ostris_kv_cache=ostris_kv_cache)
-    else:
-        # Default: "krea2_edit"
+        pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
+        neg_conditioning = neg_qwen_context.conditioning # TEXT-ONLY negative, no reference_latents
+        if apply_model_patch:
+            patched_model = patch_ostris_model(model=model, prepared_refs=prepared_refs, ostris_kv_cache=ostris_kv_cache)
+        else:
+            patched_model = model
+    else: # krea2_edit
         check_patch_safety(model, "krea2_edit")
-        patched_model = patch_krea2_model(model=model, prepared_refs=prepared_refs)
+        if apply_model_patch:
+            patched_model = patch_krea2_model(model=model, prepared_refs=prepared_refs)
+            pos_conditioning = pos_qwen_context.conditioning
+            neg_conditioning = neg_qwen_context.conditioning
+        else:
+            patched_model = model
+            pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_transport)
+            neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_transport)
 
     # Step 8: Build edit_info report
+    patch_text = "applied" if apply_model_patch else "skipped"
+    if reference_method == "native":
+        patch_text = "not applicable"
+
+    ref_transport_text = "CcC Krea2 wrapper"
+    if reference_method == "native":
+        ref_transport_text = "standard ComfyUI reference_latents"
+    elif reference_method == "ostris_edit":
+        ref_transport_text = "Ostris index_timestep_zero" if apply_model_patch else "standard ComfyUI reference_latents"
+    elif not apply_model_patch:
+        ref_transport_text = "standard ComfyUI reference_latents"
+
     info_lines = [
         "=== CcC Krea2 Edit Pipeline Report ===",
-        f"Reference Method: {reference_method}",
-        f"Model Patch Status: {'skipped (native reference latents)' if reference_method == 'native' else 'applied'}",
-        f"Ostris KV Cache: {'yes' if ostris_kv_cache else 'no'}",
+        f"Reference Contract: {reference_method}",
+        f"CcC Patch: {patch_text}",
+        f"Reference Transport: {ref_transport_text}",
+        f"Ostris KV Cache: {'yes' if ostris_kv_cache else 'unsupported'}",
         f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
         f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
         "",
@@ -334,32 +377,52 @@ def run_krea2_edit_orchestrator(
 
     for ref in vae_ref_specs:
         sp = ref["spec"]
-        geom = ref["geom"]
         ref_item = ref["ref_item"]
         b_boost = getattr(sp, "attention_boost", 1.0)
         m_boost = getattr(sp, "masked_attention_boost", 1.0)
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_idx = ref_item.get("physical_qwen_range", (1, 1))[0]
         span_str = str(pos_qwen_context.vision_row_spans[phys_idx - 1]) if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans) else "N/A"
+        is_appearance = getattr(sp, "appearance_reference", True)
 
         info_lines.extend([
             f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
             f"  Logical Vision Slot: {ref['slot']}",
             f"  Physical Qwen Image Index: {phys_idx}",
             f"  Actual Conditioning Row Span: {span_str}",
-            f"  VAE Reference Frame: {ref_item.get('vae_reference_frame')}",
+            f"  VAE Reference Frame: {ref_item.get('vae_reference_frame') if is_appearance else 'none'}",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
-            f"  Requested Visual Reference Fit: {geom.mode_requested}",
-            f"  Resolved Visual Reference Fit: {geom.mode_resolved}",
-            f"  Source Crop Rectangle: {geom.crop_rectangle}",
-            f"  VAE Input Size: {geom.vae_input_pixel_size[0]} x {geom.vae_input_pixel_size[1]}",
-            f"  VAE Latent Grid: {geom.vae_latent_grid_size[0]} x {geom.vae_latent_grid_size[1]}",
-            f"  Target Grid: {geom.target_grid_size[0]} x {geom.target_grid_size[1]}",
-            f"  RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
-            f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
-            f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
-            ""
         ])
+
+        if reference_method == "krea2_edit":
+            geom = ref.get("geom")
+            if geom:
+                info_lines.extend([
+                    f"  Requested Visual Reference Fit: {geom.mode_requested}",
+                    f"  Resolved Visual Reference Fit: {geom.mode_resolved}",
+                    f"  Source Crop Rectangle: {geom.crop_rectangle}",
+                    f"  VAE Input Size: {geom.vae_input_pixel_size[0]} x {geom.vae_input_pixel_size[1]}",
+                    f"  VAE Latent Grid: {geom.vae_latent_grid_size[0]} x {geom.vae_latent_grid_size[1]}",
+                    f"  Target Grid: {geom.target_grid_size[0]} x {geom.target_grid_size[1]}",
+                    f"  RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
+                ])
+            info_lines.extend([
+                f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
+                f"  Has Attention Mask: {'yes' if ref.get('mask') is not None else 'no'}",
+            ])
+        elif reference_method == "ostris_edit":
+            info_lines.extend([
+                f"  Ostris Picture Number: {ref.get('picture_number', phys_idx)}",
+                f"  Source Pixels: {ref.get('source_size', (0,0))[0]} x {ref.get('source_size', (0,0))[1]}",
+                f"  VLM Pixels: {ref.get('vlm_size', (0,0))[0]} x {ref.get('vlm_size', (0,0))[1]}",
+                f"  VAE Prep Pixels: {ref.get('vae_prep_size', (0,0))[0]} x {ref.get('vae_prep_size', (0,0))[1]}",
+            ])
+        else: # native
+            info_lines.extend([
+                f"  Source Pixels: {ref.get('source_size', (0,0))[0]} x {ref.get('source_size', (0,0))[1]}",
+                f"  VAE Pixels: {ref.get('vae_size', (0,0))[0]} x {ref.get('vae_size', (0,0))[1]}",
+            ])
+        info_lines.append("")
 
     for st in style_ref_specs:
         sp = st["spec"]
@@ -401,3 +464,4 @@ def run_krea2_edit_orchestrator(
     edit_info = "\n".join(info_lines)
 
     return patched_model, pos_conditioning, neg_conditioning, target_latent, edit_info
+

@@ -74,42 +74,71 @@ def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tenso
     return image_tensor
 
 
+from .style_processing import get_style_processing_image_count
+
+
 def build_ostris_qwen_prompt(
     resolved_references: List[Dict[str, Any]],
     user_prompt: str = "",
 ) -> str:
-    """Format Qwen text prompt for Ostris backend using 'Picture 1: <vision block>' style layout."""
+    """Format Qwen text prompt for Ostris backend using 'Picture N: <vision block>' layout.
+
+    Picture N numbering corresponds ONLY to actual Ostris appearance edit references.
+    Non-appearance and Style references render as standard vision blocks without 'Picture N:'.
+    """
     lines = []
-    for idx, item in enumerate(resolved_references, start=1):
+    picture_counter = 1
+    for item in resolved_references:
         spec = item.get("spec")
-        expanded_aliases = item.get("expanded_aliases", ())
-        alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
-        instruction = getattr(spec, "vision_instruction", "") if spec else ""
+        ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower()) if spec else "edit"
+        is_appearance = getattr(spec, "appearance_reference", True) if spec else True
 
-        annotation = ""
-        if alias_str and instruction:
-            annotation = f" ({alias_str}): {instruction}"
-        elif alias_str:
-            annotation = f" ({alias_str})"
-        elif instruction:
-            annotation = f": {instruction}"
+        if ref_path == "style":
+            style_proc = getattr(spec, "style_processing", "2x2") if spec else "2x2"
+            num_crops = get_style_processing_image_count(style_proc)
+            for _ in range(num_crops):
+                lines.append("<|vision_start|><|image_pad|><|vision_end|>")
+        elif not is_appearance:
+            expanded_aliases = item.get("expanded_aliases", ())
+            alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+            instruction = getattr(spec, "vision_instruction", "") if spec else ""
+            annotation = ""
+            if alias_str and instruction:
+                annotation = f" ({alias_str}): {instruction}"
+            elif alias_str:
+                annotation = f" ({alias_str})"
+            elif instruction:
+                annotation = f": {instruction}"
+            lines.append(f"<|vision_start|><|image_pad|><|vision_end|>{annotation}")
+        else:
+            expanded_aliases = item.get("expanded_aliases", ())
+            alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+            instruction = getattr(spec, "vision_instruction", "") if spec else ""
+            annotation = ""
+            if alias_str and instruction:
+                annotation = f" ({alias_str}): {instruction}"
+            elif alias_str:
+                annotation = f" ({alias_str})"
+            elif instruction:
+                annotation = f": {instruction}"
 
-        lines.append(f"Picture {idx}: <|vision_start|><|image_pad|><|vision_end|>{annotation}")
+            lines.append(f"Picture {picture_counter}: <|vision_start|><|image_pad|><|vision_end|>{annotation}")
+            picture_counter += 1
 
     body = "\n".join(lines)
     if body and user_prompt:
-        return f"{body}\n\n{user_prompt}"
+        return f"{body}\n{user_prompt}"
     return body or (user_prompt or "")
 
 
 def patch_ostris_model(
     model: Any,
-    prepared_refs: List[PreparedReference],
+    prepared_refs: Optional[List[PreparedReference]] = None,
     ostris_kv_cache: bool = False
 ) -> Any:
-    """Clone MODEL and register canonical Ostris DIFFUSION_MODEL wrapper.
+    """Clone MODEL and configure index_timestep_zero reference runtime behavior on the cloned MODEL patcher.
 
-    Contract: patch_ostris_model(model, prepared_refs, ostris_kv_cache=False)
+    Contract: patch_ostris_model(model, prepared_refs=None, ostris_kv_cache=False)
     """
     if ostris_kv_cache:
         raise NotImplementedError(
@@ -117,44 +146,24 @@ def patch_ostris_model(
             "Set ostris_kv_cache=False to proceed."
         )
 
+    if model is None:
+        return None
+
     if is_model_already_patched(model, "ccc_ostris_edit"):
         return model
 
-    patched_model = model.clone()
-    patched_model._ccc_patch_key = "ccc_ostris_edit"
+    patched_model = model.clone() if hasattr(model, "clone") else model
+    if hasattr(patched_model, "_ccc_patch_key"):
+        patched_model._ccc_patch_key = "ccc_ostris_edit"
 
-    processed_ref_latents: List[torch.Tensor] = []
+    if hasattr(patched_model, "add_object_patch"):
+        try:
+            patched_model.add_object_patch("default_ref_method", "index_timestep_zero")
+        except Exception:
+            pass
 
-    for ref in prepared_refs:
-        if ref.vae_latent is not None:
-            proc_lat = _process_latent_in_if_available(patched_model, ref.vae_latent)
-            processed_ref_latents.append(proc_lat)
-
-    def ostris_edit_wrapper(executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any) -> torch.Tensor:
-        """Ostris DIFFUSION_MODEL wrapper signature."""
-        dit_model = getattr(executor, "class_obj", None)
-
-        transformer_options = {}
-        if wargs and isinstance(wargs[-1], dict):
-            transformer_options = wargs[-1]
-        elif "transformer_options" in kwargs:
-            transformer_options = kwargs["transformer_options"]
-
-        if not processed_ref_latents or dit_model is None:
-            return executor(x, timesteps, context, *wargs, **kwargs)
-
-        return ostris_dit_forward(
-            dit_model=dit_model,
-            x=x,
-            timesteps=timesteps,
-            context=context,
-            ref_latents=processed_ref_latents,
-            ostris_kv_cache=ostris_kv_cache,
-            transformer_options=transformer_options,
-        )
-
-    _register_ostris_wrapper(patched_model, ostris_edit_wrapper)
     return patched_model
+
 
 
 def _register_ostris_wrapper(patched_model: Any, wrapper: Any) -> None:

@@ -3,7 +3,7 @@
 from typing import Tuple, Optional, Dict, Any
 import torch
 
-from ..easy_routing import resolve_easy_sources, route_easy_preset
+from ..easy_routing import resolve_easy_sources, route_easy_preset, get_easy_instruction_for_role
 from ..grounding import prepare_easy_krea_vision_image
 from ..vision_prep import prepare_image_for_qwen
 from ..reference_specs import ReferenceSpec, StyleReferenceSpec, ReferenceChain
@@ -209,6 +209,7 @@ def _execute_easy_edit(
             reference_path="edit",
             prepared_image=prep,
             alias=alias_role,
+            vision_instruction=get_easy_instruction_for_role(alias_role),
             attention_boost=boost,
             appearance_reference=True,
             _legacy_role=alias_role,
@@ -226,10 +227,12 @@ def _execute_easy_edit(
             reference_path="edit",
             prepared_image=prep,
             alias=alias_role,
+            vision_instruction=get_easy_instruction_for_role(alias_role),
             appearance_reference=False,
             _legacy_role=alias_role,
         )
         chain = chain.append(spec)
+
 
     if route.style_active and route.style_source is not None:
         style_vlm = prepare_easy_krea_vision_image(route.style_source, preset=preset, role="style")
