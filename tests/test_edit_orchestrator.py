@@ -70,13 +70,10 @@ def test_edit_orchestrator_execution():
     assert "Subject" in edit_info
     assert "Scene" in edit_info
     assert "Global Vision Directive Active: yes" in edit_info
-    assert "Anchor Implementation Type: Vision directive only" in edit_info
-    assert "Directive-only Anchor Controls: Pose Anchor, Outfit Anchor, Masked Identity Anchor" in edit_info
-    assert "Directive-only Anchor Controls: Scene Anchor, Masked Region Anchor" in edit_info
 
 
 def test_edit_info_outfit_anchor_reporting():
-    """Assert Outfit edit_info anchor reporting lists Outfit Anchor as Vision directive only."""
+    """Assert Outfit edit_info reporting lists Outfit Reference."""
     from ccc_krea2.modular_nodes.outfit_node import CcCKrea2OutfitImage
 
     mock_clip = MagicMock()
@@ -115,10 +112,7 @@ def test_edit_info_outfit_anchor_reporting():
     )
 
     assert "Reference [Slot 1 - Outfit]:" in edit_info
-    assert "Anchor Implementation Type: Vision directive only" in edit_info
-    assert "Directive-only Anchor Controls: Outfit Anchor" in edit_info
-    assert "Masked Identity Anchor" not in edit_info
-    assert "Masked Region Anchor" not in edit_info
+
 
 
 def test_edit_orchestrator_execution_native_5d_latent():

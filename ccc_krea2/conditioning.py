@@ -29,6 +29,84 @@ class EncodedQwenContext:
     removed_row_indices: List[int] = field(default_factory=list)
 
 
+try:
+    from comfy.text_encoders.krea2 import KREA2_TEMPLATE
+except ImportError:
+    KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
+
+
+
+def build_krea2_user_content(
+    resolved_references: List[Dict[str, Any]],
+    user_prompt: str = "",
+) -> str:
+    """Build canonical Qwen user content in physical image order.
+
+    Layout per physical vision entry:
+    <VISION_PAD_TOKEN>[ (alias)][: instruction]
+
+    Followed directly by RAW USER POSITIVE PROMPT.
+    If alias and instruction are empty, reduces to vision blocks followed directly by user prompt.
+    """
+    blocks = []
+    for item in resolved_references:
+        spec = item.get("spec")
+        expanded_aliases = item.get("expanded_aliases", ())
+        alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+        instruction = getattr(spec, "vision_instruction", "") if spec else ""
+
+        ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower()) if spec else "edit"
+
+        if ref_path == "style":
+            style_proc = getattr(spec, "style_processing", "2x2")
+            num_crops = 1 if style_proc == "full" else (4 if style_proc == "2x2" else 16)
+            for c_idx in range(num_crops):
+                marker = VISION_PAD_TOKEN
+                adj = ""
+                if alias_str and instruction:
+                    adj = f" (Style Tile {c_idx+1}, {alias_str}): {instruction}"
+                elif alias_str:
+                    adj = f" (Style Tile {c_idx+1}, {alias_str})"
+                elif instruction:
+                    adj = f" (Style Tile {c_idx+1}): {instruction}"
+                blocks.append(f"{marker}{adj}")
+        else:
+            marker = VISION_PAD_TOKEN
+            adj = ""
+            if alias_str and instruction:
+                adj = f" ({alias_str}): {instruction}"
+            elif alias_str:
+                adj = f" ({alias_str})"
+            elif instruction:
+                adj = f": {instruction}"
+            blocks.append(f"{marker}{adj}")
+
+    joined_blocks = "\n".join(blocks) if blocks else ""
+    if joined_blocks and user_prompt:
+        return f"{joined_blocks}\n{user_prompt}"
+    return joined_blocks or (user_prompt or "")
+
+
+def attach_reference_latents_to_conditioning(
+    conditioning: List[Any],
+    reference_latents: List[torch.Tensor]
+) -> List[Any]:
+    """Attach standard ComfyUI reference_latents metadata to conditioning list."""
+    if not conditioning or not reference_latents:
+        return conditioning
+
+    updated_cond = []
+    for cond_tuple in conditioning:
+        if isinstance(cond_tuple, (list, tuple)) and len(cond_tuple) >= 2:
+            t, d = cond_tuple[0], dict(cond_tuple[1])
+            d["reference_latents"] = reference_latents
+            updated_cond.append((t, d))
+        else:
+            updated_cond.append(cond_tuple)
+    return updated_cond
+
+
+
 def build_annotated_user_prompt(
     resolved_references: List[Dict[str, Any]],
     user_prompt: str = "",

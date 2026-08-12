@@ -9,9 +9,30 @@ def resolve_grounding_px(preset: str, custom_px: int) -> int:
     """Resolves grounding resolution based on preset selection."""
     if preset == "balanced":
         return 768
-    elif preset == "max_identity":
+    elif preset in ("max_identity", "preserve_identity"):
         return 1024
     return custom_px
+
+
+def prepare_easy_krea_vision_image(
+    image: torch.Tensor,
+    preset: str = "balanced",
+) -> torch.Tensor:
+    """Preprocesses reference images for Easy Krea based on longest-edge preset targets.
+
+    - max_identity: longest edge ~1024px
+    - all other presets: longest edge ~768px
+
+    Original image is never altered.
+    """
+    target_px = 1024 if preset == "max_identity" else 768
+    return resize_grounding_image(
+        image=image,
+        resize_mode="downscale_only",
+        grounding_px=target_px,
+        grounding_preset="custom",
+    )
+
 
 
 def resize_grounding_image(

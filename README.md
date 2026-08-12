@@ -88,6 +88,7 @@ Restart ComfyUI after cloning.
 
 Built upon architectural concepts, reference implementations, and design patterns from:
 - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) (GPL-3.0)
+- [ai-toolkit](https://github.com/ostris/ai-toolkit) by Ostris (MIT)
 - [ComfyUI-Krea2Edit](https://github.com/lbouaraba/comfyui-krea2edit) by lbouaraba (Apache-2.0 / GPL-3.0)
 - [ComfyUI-Krea2Moodboard](https://github.com/RedNodeAI/ComfyUI-Krea2Moodboard) by RedNodeAI (GPL-3.0)
 - [ComfyUI-EditUtils](https://github.com/lrzjason/ComfyUI-EditUtils) by lrzjason (GPL-3.0)

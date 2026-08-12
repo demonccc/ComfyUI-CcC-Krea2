@@ -39,6 +39,21 @@ def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> b
     return False
 
 
+def check_patch_safety(model: Any, target_patch: str) -> None:
+    """Ensure model does not contain conflicting or incompatible patch wrappers."""
+    if target_patch in ("krea2_edit", "ccc_krea2_edit"):
+        if is_model_already_patched(model, "ccc_ostris_edit"):
+            raise ValueError(
+                "[CcC Krea2] Conflict detected: Cannot apply 'krea2_edit' patch to a model already patched with 'ccc_ostris_edit'."
+            )
+    elif target_patch in ("ostris_edit", "ccc_ostris_edit"):
+        if is_model_already_patched(model, "ccc_krea2_edit"):
+            raise ValueError(
+                "[CcC Krea2] Conflict detected: Cannot apply 'ostris_edit' patch to a model already patched with 'ccc_krea2_edit'."
+            )
+
+
+
 def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any:
     """Clone MODEL and register canonical DIFFUSION_MODEL wrapper with closure transport.
 

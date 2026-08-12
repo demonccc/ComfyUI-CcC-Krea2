@@ -23,5 +23,10 @@ This project incorporates architectural concepts, reference implementations, and
    Commit reference: a7d83f12469a918a252277d34cd0e035070081d6 (token-span mapping, statistical style fidelity, multi-span indirect style transfer)
    Licensed under the GNU General Public License v3.0 (GPL-3.0).
 
+5. ai-toolkit by Ostris
+   https://github.com/ostris/ai-toolkit
+   (Ostris edit backend architecture, timestep 0 reference token modulation, Picture N prompt structure)
+   Licensed under the MIT License.
+
 This package is licensed under the GNU General Public License v3.0 (GPL-3.0).
 Model weights (Krea 2 checkpoints, Qwen3-VL text encoder, VAE, edit LoRAs) are separate works with their own respective licenses and are not distributed as part of this software package.

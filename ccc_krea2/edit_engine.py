@@ -6,18 +6,22 @@ from .references import PreparedReference
 from .constants import ReferenceRole
 from .reference_specs import (
     ReferenceChain,
+    ReferenceSpec,
     StyleReferenceSpec
 )
 from .reference_slots import resolve_reference_slots_and_aliases
-from .reference_directives import build_automatic_role_directive
 from .krea2edit_geometry import (
     resolve_krea2edit_geometry,
     process_image_and_mask_geometry
 )
 from .style_processing import expand_style_reference_spans
 from .prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
-from .conditioning import encode_krea2_qwen_context, build_annotated_user_prompt
-from .patch import patch_krea2_model
+from .conditioning import (
+    encode_krea2_qwen_context,
+    build_annotated_user_prompt,
+    attach_reference_latents_to_conditioning,
+)
+from .patch import patch_krea2_model, check_patch_safety
 from .ostris_backend import patch_ostris_model
 from .target_latent import should_include_target_in_vision, TargetVisionContext
 
@@ -53,8 +57,21 @@ def run_krea2_edit_orchestrator(
     # Target Vision Context inspection
     target_vctx: Optional[TargetVisionContext] = target_latent.get("target_vision_context")
 
-    # Step 2: Resolve reference slots, aliases, VAE frames, and physical Qwen indices
-    resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(references)
+    # Step 2: Unified slot resolution for Target Vision Context and References
+    effective_chain = references
+    if target_vctx is not None and should_include_target_in_vision(target_vctx, references):
+        if target_vctx.target_image is not None:
+            target_spec = ReferenceSpec(
+                reference_path="edit",
+                prepared_image=target_vctx.target_image,
+                requested_vision_slot=target_vctx.target_vision_slot,
+                alias=target_vctx.target_alias or "target",
+                vision_instruction=target_vctx.target_vision_instruction,
+                _legacy_role="target",
+            )
+            effective_chain = effective_chain.append(target_spec)
+
+    resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(effective_chain)
     for i in range(len(resolved_refs) - 1):
         if resolved_refs[i]["resolved_slot"] >= resolved_refs[i + 1]["resolved_slot"]:
             raise ValueError(
@@ -69,6 +86,9 @@ def run_krea2_edit_orchestrator(
         augmentation=prompt_augmentation
     )
 
+    if global_vision_directive.strip():
+        pos_base = f"Global Vision Directive:\n{global_vision_directive.strip()}\n\n{pos_base}"
+
     # Step 4: Build Qwen vision image maps and reference specs
     pos_qwen_images: List[torch.Tensor] = []
     neg_qwen_images: List[torch.Tensor] = []
@@ -78,44 +98,13 @@ def run_krea2_edit_orchestrator(
     vae_ref_specs: List[Dict[str, Any]] = []
     style_ref_specs: List[Dict[str, Any]] = []
 
-    role_directives_pos: List[str] = []
-    role_directives_neg: List[str] = []
-
-    if global_vision_directive.strip():
-        pos_dir_str = f"Global Vision Directive:\n{global_vision_directive.strip()}"
-        role_directives_pos.append(pos_dir_str)
-        role_directives_neg.append(pos_dir_str)
-
-    # Add Target Vision Context image if enabled and non-duplicate
-    if target_vctx is not None and should_include_target_in_vision(target_vctx, references):
-        if target_vctx.target_image is not None:
-            t_prep = target_vctx.target_image
-            pos_idx = len(pos_qwen_images) + 1
-            pos_qwen_images.append(t_prep.vision_image)
-            pos_qwen_image_map.append({
-                "role": "target",
-                "slot": target_vctx.target_vision_slot or (len(resolved_refs) + 1),
-                "logical_reference_id": "target",
-                "logical_role": "target",
-                "logical_vision_slot": target_vctx.target_vision_slot or (len(resolved_refs) + 1),
-                "physical_qwen_image_index": pos_idx,
-                "image": t_prep.vision_image,
-                "spec": None
-            })
-
     for ref_item in resolved_refs:
         spec = ref_item["spec"]
         slot = ref_item["resolved_slot"]
         ref_path = getattr(spec, "reference_path", spec.role.lower())
         ref_role = spec.role.lower()
 
-        auto_dir = build_automatic_role_directive(ref_item)
-
         if ref_path == "edit":
-            if auto_dir:
-                role_directives_pos.append(auto_dir)
-                role_directives_neg.append(auto_dir)
-
             src_img = spec.prepared_image.original_image
             src_h, src_w = src_img.shape[1], src_img.shape[2]
 
@@ -135,8 +124,10 @@ def run_krea2_edit_orchestrator(
             )
 
             # VAE encode reference latent
-            encoded = vae.encode(fit_img)
-            lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
+            encoded = vae.encode(fit_img) if vae is not None else None
+            lat_tokens = None
+            if encoded is not None:
+                lat_tokens = encoded["samples"] if isinstance(encoded, dict) else (encoded.sample() if hasattr(encoded, "sample") else encoded)
 
             vae_ref_specs.append({
                 "role": ref_role,
@@ -181,8 +172,6 @@ def run_krea2_edit_orchestrator(
 
         elif ref_path == "style":
             assert isinstance(spec, StyleReferenceSpec) or getattr(spec, "reference_path", "") == "style"
-            if auto_dir:
-                role_directives_pos.append(auto_dir)
 
             prep_crops, s_start, s_end = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
             phys_range = ref_item.get("physical_qwen_range", (s_start, s_end))
@@ -210,23 +199,16 @@ def run_krea2_edit_orchestrator(
                 "ref_item": ref_item
             })
 
-    # Format user prompt with slot annotations
+    # Format user prompt with slot annotations (no prepended automatic system role directives)
     annotated_prompt = build_annotated_user_prompt(
         resolved_references=resolved_refs,
         user_prompt=pos_base,
-        target_vision_context=target_vctx,
     )
-
-    pos_dir_block = "\n\n".join(role_directives_pos)
-    neg_dir_block = "\n\n".join(role_directives_neg)
-
-    full_positive_prompt = f"{pos_dir_block}\n\n{annotated_prompt}".strip() if pos_dir_block else annotated_prompt
-    full_negative_prompt = f"{neg_dir_block}\n\n{neg_base}".strip() if neg_dir_block else neg_base
 
     # Step 5: Encode Qwen Contexts for positive and negative
     pos_qwen_context = encode_krea2_qwen_context(
         clip=clip,
-        prompt=full_positive_prompt,
+        prompt=annotated_prompt,
         physical_images=pos_qwen_images,
         physical_image_map=pos_qwen_image_map,
         is_positive=True
@@ -234,7 +216,7 @@ def run_krea2_edit_orchestrator(
 
     neg_qwen_context = encode_krea2_qwen_context(
         clip=clip,
-        prompt=full_negative_prompt,
+        prompt=neg_base,
         physical_images=neg_qwen_images,
         physical_image_map=neg_qwen_image_map,
         is_positive=False
@@ -242,11 +224,16 @@ def run_krea2_edit_orchestrator(
 
     # Step 6: Prepare model patching references
     prepared_refs: List[PreparedReference] = []
+    vae_latents_for_native: List[torch.Tensor] = []
+
     for ref_dict in vae_ref_specs:
         sp = ref_dict["spec"]
         r_role = ReferenceRole(ref_dict["role"]) if ref_dict["role"] in [r.value for r in ReferenceRole] else ReferenceRole.SUBJECT
         base_boost = getattr(sp, "attention_boost", 1.0)
         masked_boost = getattr(sp, "masked_attention_boost", 1.0)
+
+        if ref_dict["latent_tokens"] is not None:
+            vae_latents_for_native.append(ref_dict["latent_tokens"])
 
         pr = PreparedReference(
             role=r_role,
@@ -262,19 +249,27 @@ def run_krea2_edit_orchestrator(
         )
         prepared_refs.append(pr)
 
-    # Step 7: Apply model patches according to reference_method
+    # Step 7: Apply model patches or native reference latents
+    pos_conditioning = pos_qwen_context.conditioning
+    neg_conditioning = neg_qwen_context.conditioning
+
     if reference_method == "native":
         patched_model = model
+        pos_conditioning = attach_reference_latents_to_conditioning(pos_qwen_context.conditioning, vae_latents_for_native)
+        neg_conditioning = attach_reference_latents_to_conditioning(neg_qwen_context.conditioning, vae_latents_for_native)
     elif reference_method == "ostris_edit":
+        check_patch_safety(model, "ostris_edit")
         patched_model = patch_ostris_model(model=model, prepared_refs=prepared_refs, ostris_kv_cache=ostris_kv_cache)
     else:
         # Default: "krea2_edit"
+        check_patch_safety(model, "krea2_edit")
         patched_model = patch_krea2_model(model=model, prepared_refs=prepared_refs)
 
     # Step 8: Build edit_info report
     info_lines = [
         "=== CcC Krea2 Edit Pipeline Report ===",
         f"Reference Method: {reference_method}",
+        f"Model Patch Status: {'skipped (native reference latents)' if reference_method == 'native' else 'applied'}",
         f"Ostris KV Cache: {'yes' if ostris_kv_cache else 'no'}",
         f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
         f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
@@ -286,7 +281,6 @@ def run_krea2_edit_orchestrator(
         f"  Positive Physical Qwen Image Count: {len(pos_qwen_images)}",
         f"  Negative Physical Qwen Image Count: {len(neg_qwen_images)}",
         f"  Token Stream Key: {pos_qwen_context.token_stream_key}",
-        f"  Template Prefix Rows Removed: {pos_qwen_context.template_prefix_rows_removed}",
         f"  Global Vision Directive Active: {'yes' if global_vision_directive.strip() else 'no'}",
         f"  Prompt Augmentation Active: {'yes' if prompt_augmentation is not None else 'no'}",
         ""
@@ -301,15 +295,6 @@ def run_krea2_edit_orchestrator(
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_idx = ref_item.get("physical_qwen_range", (1, 1))[0]
         span_str = str(pos_qwen_context.vision_row_spans[phys_idx - 1]) if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans) else "N/A"
-        role_name = ref["role"].lower()
-        if role_name == "subject":
-            dir_controls_str = "Pose Anchor, Outfit Anchor, Masked Identity Anchor"
-        elif role_name == "outfit":
-            dir_controls_str = "Outfit Anchor"
-        elif role_name == "scene":
-            dir_controls_str = "Scene Anchor, Masked Region Anchor"
-        else:
-            dir_controls_str = "none"
 
         info_lines.extend([
             f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
@@ -318,8 +303,6 @@ def run_krea2_edit_orchestrator(
             f"  Actual Conditioning Row Span: {span_str}",
             f"  VAE Reference Frame: {ref_item.get('vae_reference_frame')}",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
-            "  Anchor Implementation Type: Vision directive only",
-            f"  Directive-only Anchor Controls: {dir_controls_str}",
             f"  Requested Visual Reference Fit: {geom.mode_requested}",
             f"  Resolved Visual Reference Fit: {geom.mode_resolved}",
             f"  Source Crop Rectangle: {geom.crop_rectangle}",
@@ -331,8 +314,6 @@ def run_krea2_edit_orchestrator(
             f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
             ""
         ])
-
-
 
     for st in style_ref_specs:
         sp = st["spec"]
@@ -360,8 +341,7 @@ def run_krea2_edit_orchestrator(
             f"  Crop Shuffle Order: {shuffle_str}",
             f"  Style Fidelity: {sp.style_fidelity:.2f}",
             f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
-            f"  Style Directive: {sp.style_directive}",
-            "  VAE Reference Frame: none",
+            f"  VAE Reference Frame: none",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             ""
         ])
@@ -374,4 +354,4 @@ def run_krea2_edit_orchestrator(
 
     edit_info = "\n".join(info_lines)
 
-    return patched_model, pos_qwen_context.conditioning, neg_qwen_context.conditioning, target_latent, edit_info
+    return patched_model, pos_conditioning, neg_conditioning, target_latent, edit_info

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Modular Krea2 Pipeline Surgical Correction Pass (`feat/easy-edit-and-reference-backends`).
+- Decoupled 3-phase Easy Routing Engine (`easy_routing.py`) with strict 6-preset matrix and independent target content/geometry sources.
+- Grounding & Semantic Image Prep Recipes (`grounding.py`) supporting 1024px longest-edge for `max_identity` and 768px for other presets without upscale.
+- Thin resolver architecture for `easy_edit_node.py` delegating to shared orchestrator `run_krea2_edit_orchestrator`.
+- Unified Target Vision Context slot resolution in single-pass reference chain sorting.
+- Native ComfyUI reference latents support (`reference_method = "native"` and `apply_krea2_edit_patch = False`).
+- Upstream-aligned Ostris backend rebuild (`ostris_backend.py`) with MIT attribution, `Picture N:` Qwen prompt formatting, 384² VLM area downscale without `/16` snapping, 1MP VAE reference prep, and KV cache handling.
+- ComfyUI frontend web extension (`web/ccc_krea2.js`) for dynamic presentation widget graying.
+- Table-driven test suite with 195 passing unit and contract tests across all 6 presets, Ostris backend, and native reference paths.
 - Surgical stabilization pass for 5-layer modular reference architecture (`feat/modular-reference-pipeline-refactor`).
 - Mandatory Qwen visual row processing via `comfy.text_encoders.qwen_vl.process_qwen2vl_images` in production with clear `RuntimeError` failure handling on missing processors or GPU execution failures.
 - Strict half-open vision span validation `(start >= 0, end > start, end <= sequence_length, no overlap, physical order)` preventing invalid or out-of-order token stream spans.

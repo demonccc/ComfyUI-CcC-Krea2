@@ -14,6 +14,8 @@ class CcCKrea2ReferenceImage:
     RETURN_NAMES = ("reference_chain",)
     FUNCTION = "process"
 
+    DESCRIPTION = "Generic Reference Image node for edit (spatial VAE + Qwen vision) and style (Moodboard grid) references."
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -29,8 +31,9 @@ class CcCKrea2ReferenceImage:
                 "style_fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "style_processing": (["full", "2x2", "4x4"], {"default": "2x2"}),
                 "indirect_style_transfer": ("BOOLEAN", {"default": True}),
-                "style_directive": ("BOOLEAN", {"default": True}),
+                "style_directive": ("BOOLEAN", {"default": False}),
             },
+
             "optional": {
                 "previous_references": ("REFERENCE_CHAIN",),
                 "attention_mask": ("MASK",),

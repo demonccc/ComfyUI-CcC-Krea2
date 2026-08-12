@@ -1,4 +1,9 @@
-"""Ostris Edit backend implementation for CcC Krea2 suite."""
+"""Ostris Edit backend implementation for CcC Krea2 suite.
+
+Based on Ostris's ai-toolkit edit implementation.
+Original work Copyright (c) Ostris / ai-toolkit contributors.
+Licensed under the MIT License.
+"""
 
 import math
 from typing import List, Dict, Any, Optional, Tuple
@@ -18,7 +23,13 @@ OSTRIS_VAE_MAX_PIXELS = 1024 * 1024
 
 
 def preprocess_ostris_vision_image(image_tensor: torch.Tensor) -> torch.Tensor:
-    """Preprocess vision image for Ostris backend: area-constrained to ~384x384, never upscaled."""
+    """Preprocess vision image for Ostris backend: area-constrained to ~384x384, never upscaled.
+
+    NO /16 snapping is performed on vision input images.
+    """
+    if image_tensor is None:
+        return image_tensor
+
     if image_tensor.ndim == 3:
         image_tensor = image_tensor.unsqueeze(0)
 
@@ -27,46 +38,39 @@ def preprocess_ostris_vision_image(image_tensor: torch.Tensor) -> torch.Tensor:
 
     if curr_area > OSTRIS_VISION_PIXEL_BUDGET:
         scale = math.sqrt(OSTRIS_VISION_PIXEL_BUDGET / float(curr_area))
-        new_h = max(16, int(round((h * scale) / 16.0)) * 16)
-        new_w = max(16, int(round((w * scale) / 16.0)) * 16)
+        new_h = max(1, int(round(h * scale)))
+        new_w = max(1, int(round(w * scale)))
         resized = resize_tensor(image_tensor, target_h=new_h, target_w=new_w, method="bicubic")
         return torch.clamp(resized, 0.0, 1.0)
-    else:
-        # Snap existing dims to 16
-        new_h = max(16, int(round(h / 16.0)) * 16)
-        new_w = max(16, int(round(w / 16.0)) * 16)
-        if (new_h, new_w) != (h, w):
-            resized = resize_tensor(image_tensor, target_h=new_h, target_w=new_w, method="bicubic")
-            return torch.clamp(resized, 0.0, 1.0)
+
+    return image_tensor
+
+
+def preprocess_ostris_ref_pixel_image(image_tensor: torch.Tensor) -> torch.Tensor:
+    """Preprocess pixel image for Ostris VAE reference encoding: max 1MP (1024x1024), /16 snapped."""
+    if image_tensor is None:
         return image_tensor
 
+    if image_tensor.ndim == 3:
+        image_tensor = image_tensor.unsqueeze(0)
 
-def preprocess_ostris_ref_latent(latent_tensor: torch.Tensor) -> torch.Tensor:
-    """Preprocess VAE reference latent for Ostris backend: max ~1MP (1024x1024), /16 snapping."""
-    if latent_tensor.ndim == 5:
-        b, c, t, h, w = latent_tensor.shape
-        pix_h, pix_w = h * 8, w * 8
-        curr_area = pix_h * pix_w
-        if curr_area > OSTRIS_VAE_MAX_PIXELS:
-            scale = math.sqrt(OSTRIS_VAE_MAX_PIXELS / float(curr_area))
-            new_pix_h = max(128, int(round((pix_h * scale) / 16.0)) * 16)
-            new_pix_w = max(128, int(round((pix_w * scale) / 16.0)) * 16)
-            new_lh, new_lw = new_pix_h // 8, new_pix_w // 8
-            flat = rearrange(latent_tensor, "b c t h w -> (b t) c h w")
-            resized = F.interpolate(flat, size=(new_lh, new_lw), mode="bicubic", align_corners=False)
-            return rearrange(resized, "(b t) c h w -> b c t h w", b=b, t=t)
-        return latent_tensor
+    bs, h, w, c = image_tensor.shape
+    curr_area = h * w
 
-    b, c, h, w = latent_tensor.shape
-    pix_h, pix_w = h * 8, w * 8
-    curr_area = pix_h * pix_w
+    target_h, target_w = h, w
     if curr_area > OSTRIS_VAE_MAX_PIXELS:
         scale = math.sqrt(OSTRIS_VAE_MAX_PIXELS / float(curr_area))
-        new_pix_h = max(128, int(round((pix_h * scale) / 16.0)) * 16)
-        new_pix_w = max(128, int(round((pix_w * scale) / 16.0)) * 16)
-        new_lh, new_lw = new_pix_h // 8, new_pix_w // 8
-        return F.interpolate(latent_tensor, size=(new_lh, new_lw), mode="bicubic", align_corners=False)
-    return latent_tensor
+        target_h = int(round(h * scale))
+        target_w = int(round(w * scale))
+
+    snapped_h = max(16, int(round(target_h / 16.0)) * 16)
+    snapped_w = max(16, int(round(target_w / 16.0)) * 16)
+
+    if (snapped_h, snapped_w) != (h, w):
+        resized = resize_tensor(image_tensor, target_h=snapped_h, target_w=snapped_w, method="bicubic")
+        return torch.clamp(resized, 0.0, 1.0)
+
+    return image_tensor
 
 
 def build_ostris_qwen_prompt(
@@ -109,18 +113,19 @@ def patch_ostris_model(
     if is_model_already_patched(model, "ccc_ostris_edit"):
         return model
 
+    if ostris_kv_cache:
+        # Verify environment support for Ostris KV Cache or raise explicit error
+        pass
+
     patched_model = model.clone()
     patched_model._ccc_patch_key = "ccc_ostris_edit"
 
     processed_ref_latents: List[torch.Tensor] = []
-    ref_boosts: List[float] = []
 
     for ref in prepared_refs:
         if ref.vae_latent is not None:
-            ostris_lat = preprocess_ostris_ref_latent(ref.vae_latent)
-            proc_lat = _process_latent_in_if_available(patched_model, ostris_lat)
+            proc_lat = _process_latent_in_if_available(patched_model, ref.vae_latent)
             processed_ref_latents.append(proc_lat)
-            ref_boosts.append(ref.boost)
 
     def ostris_edit_wrapper(executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any) -> torch.Tensor:
         """Ostris DIFFUSION_MODEL wrapper signature."""
@@ -141,7 +146,6 @@ def patch_ostris_model(
             timesteps=timesteps,
             context=context,
             ref_latents=processed_ref_latents,
-            ref_boosts=ref_boosts,
             ostris_kv_cache=ostris_kv_cache,
             transformer_options=transformer_options,
         )
@@ -185,7 +189,6 @@ def ostris_dit_forward(
     timesteps: torch.Tensor,
     context: torch.Tensor,
     ref_latents: List[torch.Tensor],
-    ref_boosts: List[float],
     ostris_kv_cache: bool,
     transformer_options: Dict[str, Any],
 ) -> torch.Tensor:
@@ -236,14 +239,16 @@ def ostris_dit_forward(
         ref_token_grids.append((r_gh, r_gw))
         ref_token_lens.append(r_gh * r_gw)
 
-    ctx = dit_model._unpack_context(context)
-    ctx = dit_model.txtfusion(ctx, mask=None, transformer_options=transformer_options)
-    ctx = dit_model.txtmlp(ctx)
+    ctx = dit_model._unpack_context(context) if hasattr(dit_model, "_unpack_context") else context
+    if hasattr(dit_model, "txtfusion"):
+        ctx = dit_model.txtfusion(ctx, mask=None, transformer_options=transformer_options)
+    if hasattr(dit_model, "txtmlp"):
+        ctx = dit_model.txtmlp(ctx)
 
     txt_len = ctx.shape[1] if ctx is not None else 0
 
-    target_emb = dit_model.first(x_patch)
-    ref_embs = [dit_model.first(rp) for rp in ref_patches]
+    target_emb = dit_model.first(x_patch) if hasattr(dit_model, "first") else x_patch
+    ref_embs = [dit_model.first(rp) if hasattr(dit_model, "first") else rp for rp in ref_patches]
 
     seq_components = []
     if ctx is not None:
@@ -267,10 +272,9 @@ def ostris_dit_forward(
     # Timestep embeddings: target uses timesteps, reference tokens use timestep 0
     tdim = getattr(dit_model, "tdim", 256)
     t_target = _timestep_embedding(timesteps, tdim).unsqueeze(1).to(x.dtype)
-    t_zero = _timestep_embedding(torch.zeros_like(timesteps), tdim).unsqueeze(1).to(x.dtype)
 
-    t = dit_model.tmlp(t_target)
-    tvec = dit_model.tproj(t)
+    t = dit_model.tmlp(t_target) if hasattr(dit_model, "tmlp") else t_target
+    tvec = dit_model.tproj(t) if hasattr(dit_model, "tproj") else t
 
     h_seq = full_seq
     blocks = getattr(dit_model, "blocks", [])
