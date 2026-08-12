@@ -9,12 +9,46 @@ from einops import rearrange
 from .references import PreparedReference, _process_latent_in_if_available
 
 
+def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> bool:
+    """Check if model object has already been patched with the given wrapper key."""
+    if getattr(model, "_ccc_patch_key", None) == patch_key:
+        return True
+
+    if hasattr(model, "wrappers"):
+        w_dict = getattr(model, "wrappers", {})
+        if isinstance(w_dict, dict):
+            for k, wrappers_list in w_dict.items():
+                if isinstance(wrappers_list, dict) and patch_key in wrappers_list:
+                    return True
+                if isinstance(wrappers_list, list):
+                    for w in wrappers_list:
+                        if getattr(w, "__name__", "") == patch_key or getattr(w, "wrapper_key", "") == patch_key:
+                            return True
+
+    if hasattr(model, "model_options"):
+        opts = getattr(model, "model_options", {})
+        if isinstance(opts, dict):
+            t_opts = opts.get("transformer_options", {})
+            if isinstance(t_opts, dict):
+                wrappers = t_opts.get("wrappers", {})
+                if isinstance(wrappers, dict):
+                    for k, diff_w in wrappers.items():
+                        if isinstance(diff_w, dict) and patch_key in diff_w:
+                            return True
+
+    return False
+
+
 def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any:
     """Clone MODEL and register canonical DIFFUSION_MODEL wrapper with closure transport.
 
     Contract: patch_krea2_model(model, prepared_refs)
     """
+    if is_model_already_patched(model, "ccc_krea2_edit"):
+        return model
+
     patched_model = model.clone()
+    patched_model._ccc_patch_key = "ccc_krea2_edit"
 
     processed_ref_latents: List[torch.Tensor] = []
     ref_boosts: List[float] = []
@@ -186,17 +220,14 @@ def krea2_dit_incontext_forward(
 
     bs, c, target_h, target_w = x_4d.shape
 
-    # Read patch_size & channels from model
     patch_size = getattr(dit_model, "patch", 2)
     if not isinstance(patch_size, int):
         patch_size = getattr(patch_size, "patch_size", 2)
 
     channels = getattr(dit_model, "channels", c)
 
-    # Store original spatial dimensions before padding
     orig_tgt_h, orig_tgt_w = target_h, target_w
 
-    # Pad target to patch_size returning single padded tensor
     x_padded = _pad_to_patch_size(x_4d, patch_size)
     padded_h, padded_w = x_padded.shape[-2], x_padded.shape[-1]
 
@@ -204,10 +235,8 @@ def krea2_dit_incontext_forward(
     target_gw = padded_w // patch_size
     tgt_n_toks = target_gh * target_gw
 
-    # Patchify target
     x_patch = rearrange(x_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
 
-    # Patchify references
     ref_patches: List[torch.Tensor] = []
     ref_token_grids: List[Tuple[int, int]] = []
     ref_token_lens: List[int] = []
@@ -229,18 +258,15 @@ def krea2_dit_incontext_forward(
         ref_token_grids.append((r_gh, r_gw))
         ref_token_lens.append(r_gh * r_gw)
 
-    # Process Qwen context: _unpack_context -> txtfusion -> txtmlp
     ctx = dit_model._unpack_context(context)
     ctx = dit_model.txtfusion(ctx, mask=None, transformer_options=transformer_options)
     ctx = dit_model.txtmlp(ctx)
 
     txt_len = ctx.shape[1] if ctx is not None else 0
 
-    # Pass target and references through m.first
     target_emb = dit_model.first(x_patch)
     ref_embs = [dit_model.first(rp) for rp in ref_patches]
 
-    # Assemble sequence: [text | ref_1 | ... | ref_N | target]
     seq_components = []
     if ctx is not None:
         seq_components.append(ctx)
@@ -249,7 +275,6 @@ def krea2_dit_incontext_forward(
 
     full_seq = torch.cat(seq_components, dim=1)
 
-    # 3D RoPE position IDs with shape [batch_size, seq_len, 3]
     rope_pos_ids = _build_incontext_3d_rope_pos_ids(
         batch_size=bs,
         txt_len=txt_len,
@@ -260,7 +285,6 @@ def krea2_dit_incontext_forward(
 
     freqs = dit_model.pe_embedder(rope_pos_ids) if hasattr(dit_model, "pe_embedder") else None
 
-    # Compute attention logit bias (mask limits boost application; unmasked regions retain 0 bias)
     attn_bias = _compute_ref_attention_bias_patchified(
         boosts=ref_boosts,
         masked_boosts=ref_masked_boosts or [1.0] * len(ref_boosts),
@@ -274,13 +298,11 @@ def krea2_dit_incontext_forward(
         dtype=x.dtype
     )
 
-    # Compute timestep vector embedding (t, tvec)
     tdim = getattr(dit_model, "tdim", 256)
     t_emb_val = _timestep_embedding(timesteps, tdim).unsqueeze(1).to(x.dtype)
     t = dit_model.tmlp(t_emb_val)
     tvec = dit_model.tproj(t)
 
-    # Pass sequence through transformer blocks preserving block metadata
     h_seq = full_seq
     blocks = getattr(dit_model, "blocks", [])
     total_blocks = len(blocks)
@@ -301,13 +323,10 @@ def krea2_dit_incontext_forward(
             transformer_options=t_opts
         )
 
-    # Final projection layer m.last(combined, t)
     out_seq = dit_model.last(h_seq, t) if hasattr(dit_model, "last") else h_seq
 
-    # Slice target tokens only
     tgt_tokens = out_seq[:, -tgt_n_toks:, :]
 
-    # Unpatchify using patch_size & channels
     out_4d = rearrange(
         tgt_tokens,
         "b (h w) (c p1 p2) -> b c (h p1) (w p2)",
@@ -318,7 +337,6 @@ def krea2_dit_incontext_forward(
         c=channels
     )
 
-    # Crop to original unpadded target dimensions
     out_cropped = out_4d[:, :, :orig_tgt_h, :orig_tgt_w]
 
     if orig_ndim == 5:
@@ -380,12 +398,7 @@ def _compute_ref_attention_bias_patchified(
     dtype: torch.dtype,
     masked_boosts: Optional[List[float]] = None
 ) -> Optional[torch.Tensor]:
-    """Compute additive attention logit bias covering full sequence.
-
-    Effective boost = base_boost * (masked_boost if inside mask else 1.0)
-    Logit bias: base_bias = log(base_boost), masked_extra_bias = mask * log(masked_boost)
-    Inside mask, biases add: log(base_boost) + log(masked_boost) = log(base_boost * masked_boost).
-    """
+    """Compute additive attention logit bias covering full sequence."""
     resolved_base_boosts = []
     resolved_masked_boosts = []
 
@@ -398,11 +411,9 @@ def _compute_ref_attention_bias_patchified(
             resolved_masked_boosts.append(masked_boosts[i])
         else:
             if m is not None:
-                # Legacy single-boost with mask: boost applies inside mask
                 resolved_base_boosts.append(1.0)
                 resolved_masked_boosts.append(b)
             else:
-                # Legacy single-boost without mask: boost applies across whole reference
                 resolved_base_boosts.append(b)
                 resolved_masked_boosts.append(1.0)
 
@@ -431,11 +442,9 @@ def _compute_ref_attention_bias_patchified(
         safe_masked_boost = max(1e-4, min(100.0, float(masked_boost)))
         masked_extra_bias = math.log(safe_masked_boost)
 
-        # Base bias applies across entire reference
         if base_bias != 0.0:
             bias[0, 0, target_start:, ref_start:ref_end] += base_bias
 
-        # Masked extra bias applies inside spatial mask
         if spatial_mask is not None and masked_extra_bias != 0.0:
             m_bchw = spatial_mask[:1].float()
             if m_bchw.ndim == 2:

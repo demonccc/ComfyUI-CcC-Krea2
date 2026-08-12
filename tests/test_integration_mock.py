@@ -221,7 +221,10 @@ def test_all_node_registrations():
         "CcCKrea2SceneImage",
         "CcCKrea2OutfitImage",
         "CcCKrea2StyleImage",
+        "CcCKrea2ReferenceImage",
         "CcCKrea2Edit",
+        "CcCKrea2EasyEdit",
+        "CcCKrea2EasyEditOstris",
         "CcCKrea2Subject",
         "CcCKrea2SubjectOutfit",
         "CcCKrea2SubjectScene",
@@ -236,3 +239,4 @@ def test_all_node_registrations():
         "CcCKrea2TextToImage",
     }
     assert set(NODE_CLASS_MAPPINGS.keys()) == expected
+

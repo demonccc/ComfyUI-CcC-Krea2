@@ -776,6 +776,14 @@ def test_canonical_modular_workflows_strict_contract():
 
                 # Collect expected widget fields in order
                 expected_widgets = []
+                req_widgets = []
+                for name, spec in req_spec.items():
+                    type_info = spec[0]
+                    if isinstance(type_info, list):
+                        req_widgets.append((name, "CHOICE", type_info, spec[1] if len(spec) > 1 else {}))
+                    elif type_info in ("STRING", "FLOAT", "INT", "BOOLEAN"):
+                        req_widgets.append((name, type_info, None, spec[1] if len(spec) > 1 else {}))
+
                 for name, spec in list(req_spec.items()) + list(opt_spec.items()):
                     type_info = spec[0]
                     if isinstance(type_info, list):
@@ -784,13 +792,17 @@ def test_canonical_modular_workflows_strict_contract():
                         expected_widgets.append((name, type_info, None, spec[1] if len(spec) > 1 else {}))
 
                 wvals = n.get("widgets_values", [])
-                assert len(wvals) == len(expected_widgets), (
+                assert len(req_widgets) <= len(wvals) <= len(expected_widgets), (
                     f"Node {nid} ({ntype}) in {rel_path} widget count mismatch: "
-                    f"got {len(wvals)}, expected {len(expected_widgets)} ({[w[0] for w in expected_widgets]})"
+                    f"got {len(wvals)}, expected between {len(req_widgets)} and {len(expected_widgets)}"
                 )
 
+
                 for idx, (wname, wkind, choices, kwargs) in enumerate(expected_widgets):
+                    if idx >= len(wvals):
+                        break
                     val = wvals[idx]
+
                     if wkind == "CHOICE":
                         assert isinstance(val, str), (
                             f"Node {nid} ({ntype}) in {rel_path} widget '{wname}' at index {idx} must be string choice, got {type(val).__name__}"

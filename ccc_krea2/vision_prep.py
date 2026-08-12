@@ -327,3 +327,8 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
 
     return "\n".join(lines)
 
+
+# Alias for prepared vision image creation
+prepare_image_for_qwen = prepare_vision_image
+
+

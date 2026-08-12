@@ -31,6 +31,8 @@ from .engine import Krea2EditEngine, NodeExecutionRequest
 from .t2i import CcCKrea2TextToImage
 from .modular_nodes.vision_prep_node import CcCKrea2QwenVisionImagePrep
 from .modular_nodes.target_latent_node import CcCKrea2TargetLatent
+from .modular_nodes.reference_node import CcCKrea2ReferenceImage
+from .modular_nodes.easy_edit_node import CcCKrea2EasyEdit, CcCKrea2EasyEditOstris
 from .modular_nodes.subject_node import CcCKrea2SubjectImage
 from .modular_nodes.scene_node import CcCKrea2SceneImage
 from .modular_nodes.outfit_node import CcCKrea2OutfitImage
@@ -276,7 +278,7 @@ class CcCKrea2SubjectScene(BaseKrea2Node):
                 "subject_image": ("IMAGE",),
                 "scene_image": ("IMAGE",),
                 "preset": (PRESET_CHOICES, {"default": "balanced"}),
-                "output_resolution": (["scene", "subject", "custom"], {"default": "scene"}),
+                "output_resolution": (["scene", "custom"], {"default": "scene"}),
                 "megapixels": ("FLOAT", {"default": 1.0, "min": 0.25, "max": 4.0, "step": 0.05}),
             },
             "optional": {
@@ -329,7 +331,7 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
                 "scene_image": ("IMAGE",),
                 "outfit_image": ("IMAGE",),
                 "preset": (PRESET_CHOICES, {"default": "balanced"}),
-                "output_resolution": (["scene", "subject", "custom"], {"default": "scene"}),
+                "output_resolution": (["scene", "custom"], {"default": "scene"}),
                 "megapixels": ("FLOAT", {"default": 1.0, "min": 0.25, "max": 4.0, "step": 0.05}),
             },
             "optional": {
@@ -371,7 +373,7 @@ class CcCKrea2SubjectSceneOutfit(BaseKrea2Node):
 
 
 class CcCKrea2Inpaint(BaseKrea2Node):
-    """CcC Krea2 - Inpaint node (Single Source Image Editing)."""
+    """CcC Krea2 - Inpaint node (Single-Reference Inpainting Workflow)."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -382,13 +384,13 @@ class CcCKrea2Inpaint(BaseKrea2Node):
                 "vae": ("VAE",),
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
                 "source_image": ("IMAGE",),
+                "inpaint_mask": ("MASK",),
                 "preset": (PRESET_CHOICES, {"default": "balanced"}),
                 "output_resolution": (["source", "custom"], {"default": "source"}),
                 "megapixels": ("FLOAT", {"default": 1.0, "min": 0.25, "max": 4.0, "step": 0.05}),
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "inpaint_mask": ("MASK",),
                 "source_attention_mask": ("MASK",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
@@ -396,7 +398,7 @@ class CcCKrea2Inpaint(BaseKrea2Node):
             },
         }
 
-    def process(self, model, clip, vae, prompt, source_image, **kwargs):
+    def process(self, model, clip, vae, prompt, source_image, inpaint_mask, **kwargs):
         request = NodeExecutionRequest(
             node_name="CcC Krea2 - Inpaint",
             model=model,
@@ -411,7 +413,7 @@ class CcCKrea2Inpaint(BaseKrea2Node):
             image_advanced_settings=kwargs.get("image_advanced_settings", None),
             edit_advanced_settings=kwargs.get("edit_advanced_settings", None),
             source_image=source_image,
-            inpaint_mask=kwargs.get("inpaint_mask", None),
+            inpaint_mask=inpaint_mask,
             source_attention_mask=kwargs.get("source_attention_mask", None),
             latent_source="source",
             inpaint_base_role=ReferenceRole.SOURCE,
@@ -529,14 +531,21 @@ class CcCKrea2InpaintSubjectScene(BaseKrea2Node):
 
 
 NODE_CLASS_MAPPINGS = {
+    # Modular Easy Nodes
+    "CcCKrea2EasyEdit": CcCKrea2EasyEdit,
+    "CcCKrea2EasyEditOstris": CcCKrea2EasyEditOstris,
+
     # Modular Reference Pipeline Nodes
     "CcCKrea2QwenVisionImagePrep": CcCKrea2QwenVisionImagePrep,
     "CcCKrea2TargetLatent": CcCKrea2TargetLatent,
+    "CcCKrea2ReferenceImage": CcCKrea2ReferenceImage,
+    "CcCKrea2Edit": CcCKrea2Edit,
+
+    # Compatibility Nodes
     "CcCKrea2SubjectImage": CcCKrea2SubjectImage,
     "CcCKrea2SceneImage": CcCKrea2SceneImage,
     "CcCKrea2OutfitImage": CcCKrea2OutfitImage,
     "CcCKrea2StyleImage": CcCKrea2StyleImage,
-    "CcCKrea2Edit": CcCKrea2Edit,
 
     # Existing & Utility Nodes
     "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
@@ -556,14 +565,21 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    # Modular Easy Nodes
+    "CcCKrea2EasyEdit": "CcC Krea2 - Easy Edit",
+    "CcCKrea2EasyEditOstris": "CcC Krea2 - Easy Edit Ostris",
+
     # Modular Reference Pipeline Nodes
     "CcCKrea2QwenVisionImagePrep": "CcC Krea2 - Qwen Vision Image Prep",
     "CcCKrea2TargetLatent": "CcC Krea2 - Target Latent",
-    "CcCKrea2SubjectImage": "CcC Krea2 - Subject Image",
-    "CcCKrea2SceneImage": "CcC Krea2 - Scene Image",
-    "CcCKrea2OutfitImage": "CcC Krea2 - Outfit Image",
-    "CcCKrea2StyleImage": "CcC Krea2 - Style Image",
+    "CcCKrea2ReferenceImage": "CcC Krea2 - Reference Image",
     "CcCKrea2Edit": "CcC Krea2 - Edit",
+
+    # Compatibility Nodes
+    "CcCKrea2SubjectImage": "CcC Krea2 - Subject Image (Legacy)",
+    "CcCKrea2SceneImage": "CcC Krea2 - Scene Image (Legacy)",
+    "CcCKrea2OutfitImage": "CcC Krea2 - Outfit Image (Legacy)",
+    "CcCKrea2StyleImage": "CcC Krea2 - Style Image (Legacy)",
 
     # Existing & Utility Nodes
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",

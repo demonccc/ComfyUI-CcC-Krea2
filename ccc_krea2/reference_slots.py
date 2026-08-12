@@ -77,14 +77,14 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
     # Phase 3.5: Enforce non-Style references before Style
     seen_style = False
     for item in resolved_sorted:
-        role = item["spec"].role.lower()
-        if role == "style":
+        ref_path = getattr(item["spec"], "reference_path", item["spec"].role.lower())
+        if ref_path == "style" or item["spec"].role.lower() == "style":
             seen_style = True
-        elif seen_style and role in ("subject", "scene", "outfit"):
+        elif seen_style:
             raise ValueError(
                 "Invalid reference chain order: Style references expand into multiple physical Qwen images; "
-                "placing Style first makes Image N aliases ambiguous; "
-                "place all Subject, Scene, and Outfit references before Style."
+                "placing Style before edit references makes Image N aliases ambiguous; "
+                "place all edit references before Style."
             )
 
     # Phase 5: Expand aliases and assign physical indices/ranges in sorted logical slot order
@@ -98,7 +98,11 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
         slot = item["resolved_slot"]
         expanded_aliases = []
 
-        for alias in spec.parsed_aliases:
+        parsed_aliases = spec.parsed_aliases
+        if not parsed_aliases and spec.alias:
+            parsed_aliases = parse_aliases(spec.alias)
+
+        for alias in parsed_aliases:
             exp_alias = alias.replace("{slot}", str(slot))
             if exp_alias in global_aliases:
                 raise ValueError(f"Duplicate alias '{exp_alias}' specified across references in chain.")
@@ -113,10 +117,9 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
                         f"Conflicting literal positional alias '{exp_alias}': physical Qwen index is {physical_qwen_index}."
                     )
 
-        role = spec.role.lower()
-        if role == "style":
+        ref_path = getattr(spec, "reference_path", spec.role.lower())
+        if ref_path == "style" or spec.role.lower() == "style":
             vae_frame = None
-            # Style physical span length depends on style_processing mode
             style_proc = getattr(spec, "style_processing", "2x2")
             span_len = 1 if style_proc == "full" else (4 if style_proc == "2x2" else 16)
             physical_qwen_range = (physical_qwen_index, physical_qwen_index + span_len - 1)
@@ -131,7 +134,7 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
             "spec": spec,
             "resolved_slot": slot,
             "logical_reference_id": slot,
-            "logical_role": role,
+            "logical_role": getattr(spec, "reference_path", spec.role.lower()),
             "logical_vision_slot": slot,
             "expanded_aliases": tuple(expanded_aliases),
             "vae_reference_frame": vae_frame,

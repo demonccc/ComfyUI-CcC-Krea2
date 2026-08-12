@@ -16,8 +16,10 @@ from .krea2edit_geometry import (
 )
 from .style_processing import expand_style_reference_spans
 from .prompt_augmentation import apply_prompt_augmentation, PromptAugmentation
-from .conditioning import encode_krea2_qwen_context
+from .conditioning import encode_krea2_qwen_context, build_annotated_user_prompt
 from .patch import patch_krea2_model
+from .ostris_backend import patch_ostris_model
+from .target_latent import should_include_target_in_vision, TargetVisionContext
 
 
 def run_krea2_edit_orchestrator(
@@ -28,10 +30,13 @@ def run_krea2_edit_orchestrator(
     target_latent: Dict[str, torch.Tensor],
     positive_prompt: str,
     negative_prompt: str,
+    reference_method: str = "krea2_edit",
+    ostris_kv_cache: bool = False,
     prompt_augmentation: Optional[PromptAugmentation] = None,
-    global_vision_directive: str = ""
+    global_vision_directive: str = "",
+    **kwargs: Any
 ) -> Tuple[Any, Any, Any, Dict[str, torch.Tensor], str]:
-    """Execute the full 19-step modular Krea 2 Edit orchestrator pipeline."""
+    """Execute the modular Krea 2 Edit orchestrator pipeline."""
     # Step 1: Target latent geometry inspection
     samples = target_latent["samples"]
     if not isinstance(samples, torch.Tensor) or samples.ndim not in (4, 5):
@@ -44,6 +49,9 @@ def run_krea2_edit_orchestrator(
     lh, lw = samples.shape[-2:]
     target_h = lh * 8
     target_w = lw * 8
+
+    # Target Vision Context inspection
+    target_vctx: Optional[TargetVisionContext] = target_latent.get("target_vision_context")
 
     # Step 2: Resolve reference slots, aliases, VAE frames, and physical Qwen indices
     resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(references)
@@ -61,7 +69,7 @@ def run_krea2_edit_orchestrator(
         augmentation=prompt_augmentation
     )
 
-    # Step 4: Build role directives and Qwen vision image maps
+    # Step 4: Build Qwen vision image maps and reference specs
     pos_qwen_images: List[torch.Tensor] = []
     neg_qwen_images: List[torch.Tensor] = []
     pos_qwen_image_map: List[Dict[str, Any]] = []
@@ -78,15 +86,32 @@ def run_krea2_edit_orchestrator(
         role_directives_pos.append(pos_dir_str)
         role_directives_neg.append(pos_dir_str)
 
+    # Add Target Vision Context image if enabled and non-duplicate
+    if target_vctx is not None and should_include_target_in_vision(target_vctx, references):
+        if target_vctx.target_image is not None:
+            t_prep = target_vctx.target_image
+            pos_idx = len(pos_qwen_images) + 1
+            pos_qwen_images.append(t_prep.vision_image)
+            pos_qwen_image_map.append({
+                "role": "target",
+                "slot": target_vctx.target_vision_slot or (len(resolved_refs) + 1),
+                "logical_reference_id": "target",
+                "logical_role": "target",
+                "logical_vision_slot": target_vctx.target_vision_slot or (len(resolved_refs) + 1),
+                "physical_qwen_image_index": pos_idx,
+                "image": t_prep.vision_image,
+                "spec": None
+            })
+
     for ref_item in resolved_refs:
         spec = ref_item["spec"]
         slot = ref_item["resolved_slot"]
+        ref_path = getattr(spec, "reference_path", spec.role.lower())
         ref_role = spec.role.lower()
 
-        # Automatic & extra vision directives
         auto_dir = build_automatic_role_directive(ref_item)
 
-        if ref_role in ("subject", "scene", "outfit"):
+        if ref_path == "edit":
             if auto_dir:
                 role_directives_pos.append(auto_dir)
                 role_directives_neg.append(auto_dir)
@@ -94,7 +119,7 @@ def run_krea2_edit_orchestrator(
             src_img = spec.prepared_image.original_image
             src_h, src_w = src_img.shape[1], src_img.shape[2]
 
-            fit_mode = getattr(spec, "visual_fit_mode", "auto")
+            fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
             geom = resolve_krea2edit_geometry(
                 src_h=src_h,
                 src_w=src_w,
@@ -154,14 +179,13 @@ def run_krea2_edit_orchestrator(
                 "spec": spec
             })
 
-        elif ref_role == "style":
-            assert isinstance(spec, StyleReferenceSpec)
+        elif ref_path == "style":
+            assert isinstance(spec, StyleReferenceSpec) or getattr(spec, "reference_path", "") == "style"
             if auto_dir:
                 role_directives_pos.append(auto_dir)
-                # Style directives excluded from negative context!
 
             prep_crops, s_start, s_end = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
-            phys_range = ref_item["physical_qwen_range"]
+            phys_range = ref_item.get("physical_qwen_range", (s_start, s_end))
             for crop_idx, crop_prep in enumerate(prep_crops):
                 pos_idx = len(pos_qwen_images) + 1
                 pos_qwen_images.append(crop_prep.vision_image)
@@ -181,15 +205,22 @@ def run_krea2_edit_orchestrator(
             style_ref_specs.append({
                 "role": "style",
                 "slot": slot,
-                "spans": phys_range,  # Section 8: draw physical range directly from ref_item
+                "spans": phys_range,
                 "spec": spec,
                 "ref_item": ref_item
             })
 
+    # Format user prompt with slot annotations
+    annotated_prompt = build_annotated_user_prompt(
+        resolved_references=resolved_refs,
+        user_prompt=pos_base,
+        target_vision_context=target_vctx,
+    )
+
     pos_dir_block = "\n\n".join(role_directives_pos)
     neg_dir_block = "\n\n".join(role_directives_neg)
 
-    full_positive_prompt = f"{pos_dir_block}\n\n{pos_base}".strip() if pos_dir_block else pos_base
+    full_positive_prompt = f"{pos_dir_block}\n\n{annotated_prompt}".strip() if pos_dir_block else annotated_prompt
     full_negative_prompt = f"{neg_dir_block}\n\n{neg_base}".strip() if neg_dir_block else neg_base
 
     # Step 5: Encode Qwen Contexts for positive and negative
@@ -231,12 +262,20 @@ def run_krea2_edit_orchestrator(
         )
         prepared_refs.append(pr)
 
-    # Step 7: Apply model patches
-    patched_model = patch_krea2_model(model=model, prepared_refs=prepared_refs)
+    # Step 7: Apply model patches according to reference_method
+    if reference_method == "native":
+        patched_model = model
+    elif reference_method == "ostris_edit":
+        patched_model = patch_ostris_model(model=model, prepared_refs=prepared_refs, ostris_kv_cache=ostris_kv_cache)
+    else:
+        # Default: "krea2_edit"
+        patched_model = patch_krea2_model(model=model, prepared_refs=prepared_refs)
 
     # Step 8: Build edit_info report
     info_lines = [
         "=== CcC Krea2 Edit Pipeline Report ===",
+        f"Reference Method: {reference_method}",
+        f"Ostris KV Cache: {'yes' if ostris_kv_cache else 'no'}",
         f"Target Pixel Geometry: {target_w} x {target_h} (Target MP: {(target_h * target_w) / 1_000_000.0:.3f} MP)",
         f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
         "",
@@ -265,30 +304,12 @@ def run_krea2_edit_orchestrator(
         role_name = ref["role"].lower()
         if role_name == "subject":
             dir_controls_str = "Pose Anchor, Outfit Anchor, Masked Identity Anchor"
-            anchor_vals = []
-            if getattr(sp, "pose_anchor", 0.0) > 0:
-                anchor_vals.append(f"pose={sp.pose_anchor:.2f}")
-            if getattr(sp, "outfit_anchor", 0.0) > 0:
-                anchor_vals.append(f"outfit={sp.outfit_anchor:.2f}")
-            if getattr(sp, "masked_identity_anchor", 0.0) > 0:
-                anchor_vals.append(f"masked_identity={sp.masked_identity_anchor:.2f}")
-        elif role_name == "scene":
-            dir_controls_str = "Scene Anchor, Masked Region Anchor"
-            anchor_vals = []
-            if getattr(sp, "scene_anchor", 0.0) > 0:
-                anchor_vals.append(f"scene={sp.scene_anchor:.2f}")
-            if getattr(sp, "masked_region_anchor", 0.0) > 0:
-                anchor_vals.append(f"masked_region={sp.masked_region_anchor:.2f}")
         elif role_name == "outfit":
             dir_controls_str = "Outfit Anchor"
-            anchor_vals = []
-            if getattr(sp, "outfit_anchor", 0.0) > 0:
-                anchor_vals.append(f"outfit={sp.outfit_anchor:.2f}")
+        elif role_name == "scene":
+            dir_controls_str = "Scene Anchor, Masked Region Anchor"
         else:
             dir_controls_str = "none"
-            anchor_vals = []
-
-        anchors_str = ", ".join(anchor_vals) if anchor_vals else "none"
 
         info_lines.extend([
             f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
@@ -297,6 +318,8 @@ def run_krea2_edit_orchestrator(
             f"  Actual Conditioning Row Span: {span_str}",
             f"  VAE Reference Frame: {ref_item.get('vae_reference_frame')}",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
+            "  Anchor Implementation Type: Vision directive only",
+            f"  Directive-only Anchor Controls: {dir_controls_str}",
             f"  Requested Visual Reference Fit: {geom.mode_requested}",
             f"  Resolved Visual Reference Fit: {geom.mode_resolved}",
             f"  Source Crop Rectangle: {geom.crop_rectangle}",
@@ -305,12 +328,11 @@ def run_krea2_edit_orchestrator(
             f"  Target Grid: {geom.target_grid_size[0]} x {geom.target_grid_size[1]}",
             f"  RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
             f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
-            f"  Remaining Anchor Values: {anchors_str}",
-            "  Anchor Implementation Type: Vision directive only",
-            f"  Directive-only Anchor Controls: {dir_controls_str}",
             f"  Has Attention Mask: {'yes' if ref['mask'] is not None else 'no'}",
             ""
         ])
+
+
 
     for st in style_ref_specs:
         sp = st["spec"]
@@ -322,7 +344,6 @@ def run_krea2_edit_orchestrator(
         shuffle_str = "SHUFFLE_2X2" if sp.style_processing == "2x2" else ("SHUFFLE_4X4" if sp.style_processing == "4x4" else "identity")
         style_total_rows = sum(e - s for s, e in st_spans)
         rows_rem = style_total_rows if sp.indirect_style_transfer else 0
-
         status_str = "indirect (rows removed post-encoding)" if sp.indirect_style_transfer else "direct (rows preserved)"
 
         info_lines.extend([
@@ -340,7 +361,6 @@ def run_krea2_edit_orchestrator(
             f"  Style Fidelity: {sp.style_fidelity:.2f}",
             f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
             f"  Style Directive: {sp.style_directive}",
-            f"  Extra Vision Directive: {sp.extra_vision_directive or 'none'}",
             "  VAE Reference Frame: none",
             f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
             ""

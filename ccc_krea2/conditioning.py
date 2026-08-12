@@ -29,8 +29,54 @@ class EncodedQwenContext:
     removed_row_indices: List[int] = field(default_factory=list)
 
 
+def build_annotated_user_prompt(
+    resolved_references: List[Dict[str, Any]],
+    user_prompt: str = "",
+    target_vision_context: Optional[Any] = None,
+) -> str:
+    """Build user content string with vision block annotations followed by exact user prompt.
+
+    Preserves original user prompt at the end without prepending system role directives.
+    """
+    annotations = []
+
+    for item in resolved_references:
+        slot = item.get("resolved_slot", 1)
+        spec = item.get("spec")
+        expanded_aliases = item.get("expanded_aliases", ())
+        alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+        instruction = getattr(spec, "vision_instruction", "") if spec else ""
+
+        if alias_str or instruction:
+            if alias_str and instruction:
+                annotations.append(f"Image {slot} ({alias_str}): {instruction}")
+            elif alias_str:
+                annotations.append(f"Image {slot}: {alias_str}")
+            elif instruction:
+                annotations.append(f"Image {slot}: {instruction}")
+
+    if target_vision_context is not None:
+        alias_str = getattr(target_vision_context, "target_alias", "")
+        instruction = getattr(target_vision_context, "target_vision_instruction", "")
+        slot = getattr(target_vision_context, "target_vision_slot", None)
+        slot_str = f"Image {slot}" if slot is not None else "Target Image"
+        if alias_str or instruction:
+            if alias_str and instruction:
+                annotations.append(f"{slot_str} ({alias_str}): {instruction}")
+            elif alias_str:
+                annotations.append(f"{slot_str}: {alias_str}")
+            elif instruction:
+                annotations.append(f"{slot_str}: {instruction}")
+
+    annotated_header = "\n".join(annotations) if annotations else ""
+
+    if annotated_header and user_prompt:
+        return f"{annotated_header}\n\n{user_prompt}"
+    return annotated_header or (user_prompt or "")
+
+
 def build_role_instructions(role_order: List[ReferenceRole]) -> str:
-    """Build Qwen3-VL system prompt role instructions from active image order."""
+    """Legacy helper building Qwen3-VL system prompt role instructions from active image order."""
     if not role_order:
         return ""
 
@@ -80,10 +126,7 @@ def build_krea2_qwen_template(num_images: int, system_prompt: str = DEFAULT_SYST
 
 
 def resolve_qwen_token_stream(tokens: Any, allow_raw_list_test_helper: bool = False) -> Tuple[List[Any], str]:
-    """Explicitly resolve supported token stream from CLIP tokens dictionary.
-
-    Raises ValueError with detailed rejection details if incompatible.
-    """
+    """Explicitly resolve supported token stream from CLIP tokens dictionary."""
     if isinstance(tokens, list):
         if allow_raw_list_test_helper:
             return tokens, "raw_list"
@@ -130,7 +173,7 @@ def calculate_qwen_rows_from_embedded_image(
     clip: Any,
     test_mode: bool = False
 ) -> int:
-    """Calculate Qwen visual output rows directly from embedded token dict 'data' tensor by calling process_qwen2vl_images and computing product(image_grid_thw) // (merge_size * merge_size)."""
+    """Calculate Qwen visual output rows directly from embedded token dict 'data' tensor."""
     if "data" not in elem:
         raise ValueError(f"{LOGGER_PREFIX} Embedded token dictionary missing required 'data' image key.")
 
@@ -152,7 +195,6 @@ def calculate_qwen_rows_from_embedded_image(
         import sys
         is_isolated_test = test_mode or ("comfy" not in sys.modules and "comfy.text_encoders.qwen_vl" not in sys.modules)
         if is_isolated_test:
-            # Fallback ONLY for explicitly marked isolated unit testing without comfy installed
             if image_data.ndim == 4:
                 if image_data.shape[1] in (1, 3, 4):
                     ih, iw = image_data.shape[2], image_data.shape[3]
@@ -216,11 +258,7 @@ def extract_vision_spans_from_tokens(
     allow_raw_list_test_helper: bool = False,
     test_mode: bool = False,
 ) -> Tuple[List[Tuple[int, int]], List[str], str, int]:
-    """Extract vision row spans from Qwen token stream using real Qwen grid geometry after template prefix stripping.
-
-    Returns:
-        (adjusted_spans, warnings, stream_key, template_prefix_rows_removed)
-    """
+    """Extract vision row spans from Qwen token stream using real Qwen grid geometry after template prefix stripping."""
     warnings: List[str] = []
 
     if not tokens and not physical_image_map:
@@ -242,7 +280,6 @@ def extract_vision_spans_from_tokens(
     for v in tok_pairs:
         elem = v[0] if isinstance(v, (list, tuple)) else v
         if isinstance(elem, dict):
-            # embedded image dictionary - calculate rows from real elem["data"]
             n = calculate_qwen_rows_from_embedded_image(elem, clip, test_mode=test_mode)
             spans.append((rows_counter, rows_counter + n))
             ids.append(None)
@@ -266,7 +303,6 @@ def extract_vision_spans_from_tokens(
     template_end = max(template_end, 0)
     adjusted_spans = [(max(s - template_end, 0), e - template_end) for s, e in spans if e > template_end]
 
-    # Section 3.5: Strict span validation
     if physical_image_map:
         if len(adjusted_spans) != len(physical_image_map):
             raise ValueError(
@@ -323,7 +359,6 @@ def encode_krea2_qwen_context(
 
     is_test_env = test_mode or getattr(clip, "is_test_dummy", False) or type(clip).__name__.startswith("Dummy")
 
-    # Extract vision row spans using real Qwen image grid geometry
     vision_row_spans, span_warnings, stream_key, template_end = extract_vision_spans_from_tokens(
         tokens=tokens,
         physical_image_map=physical_image_map,
@@ -350,11 +385,12 @@ def encode_krea2_qwen_context(
                         f"exceeds encoded conditioning sequence length ({pos_rows_before})."
                     )
 
-    # Apply Moodboard style processing (Fidelity & Indirect Transfer) for positive conditioning
+    # Apply Moodboard style processing for positive conditioning
     if is_positive and conditioning and physical_image_map:
         spans_info: List[StyleSpanOperation] = []
         for idx, item in enumerate(physical_image_map):
-            if item.get("role") == "style" and idx < len(vision_row_spans):
+            role_val = item.get("role", "") or item.get("logical_role", "")
+            if str(role_val).lower() == "style" and idx < len(vision_row_spans):
                 spec = item.get("spec")
                 fidelity = getattr(spec, "style_fidelity", 1.0)
                 indirect = getattr(spec, "indirect_style_transfer", False)
@@ -385,7 +421,6 @@ def encode_krea2_qwen_context(
                         removed_row_indices = removed_indices
                         pos_rows_after = transformed_tensor.shape[1]
 
-                        # Metadata repair for attention_mask if indirect rows were removed
                         if indirect_applied and isinstance(new_extras, dict):
                             att_mask = new_extras.get("attention_mask")
                             if isinstance(att_mask, torch.Tensor) and att_mask.shape[-1] == cond_tensor.shape[1]:

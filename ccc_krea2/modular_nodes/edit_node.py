@@ -25,10 +25,13 @@ class CcCKrea2Edit:
                 "negative_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
             },
             "optional": {
-                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
                 "global_vision_directive": ("STRING", {"default": "", "multiline": True}),
+                "reference_method": (["native", "krea2_edit", "ostris_edit"], {"default": "krea2_edit"}),
+                "ostris_kv_cache": ("BOOLEAN", {"default": False}),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
             }
         }
+
 
     def edit(
         self,
@@ -39,8 +42,11 @@ class CcCKrea2Edit:
         target_latent,
         positive_prompt="",
         negative_prompt="",
+        reference_method="krea2_edit",
+        ostris_kv_cache=False,
         prompt_augmentation=None,
-        global_vision_directive=""
+        global_vision_directive="",
+        **kwargs
     ):
         patched_model, pos_cond, neg_cond, out_latent, edit_info = run_krea2_edit_orchestrator(
             model=model,
@@ -50,8 +56,11 @@ class CcCKrea2Edit:
             target_latent=target_latent,
             positive_prompt=positive_prompt,
             negative_prompt=negative_prompt,
+            reference_method=reference_method,
+            ostris_kv_cache=ostris_kv_cache,
             prompt_augmentation=prompt_augmentation,
-            global_vision_directive=global_vision_directive
+            global_vision_directive=global_vision_directive,
+            **kwargs
         )
         return (patched_model, pos_cond, neg_cond, out_latent, edit_info)
 

@@ -1,11 +1,21 @@
-"""Target latent creation and geometry resolution for Krea 2 modular pipeline."""
+"""Target latent creation, target vision context, and geometry resolution for Krea 2 modular pipeline."""
 
 import torch
 import math
 from dataclasses import dataclass
-from typing import Dict, Any, Tuple, Optional
-from .reference_specs import PreparedVisionImage
+from typing import Dict, Any, Tuple, Optional, List
+from .reference_specs import PreparedVisionImage, ReferenceSpec, ReferenceChain
 from .geometry import resize_tensor
+
+
+@dataclass(frozen=True)
+class TargetVisionContext:
+    """Target Vision Context metadata for contributing vision tokens from target source."""
+    include_in_vision: str = "auto"  # "auto", "yes", "no"
+    target_vision_slot: Optional[int] = None  # None ("auto") or int 1..10
+    target_alias: str = ""
+    target_vision_instruction: str = ""
+    target_image: Optional[PreparedVisionImage] = None
 
 
 def get_image_dims(image_tensor: torch.Tensor) -> Tuple[int, int]:
@@ -23,6 +33,7 @@ def calculate_target_latent_resolution(
     target_megapixels: float = 1.0,
     fixed_megapixels: float = 2.0,
     aspect_ratio: str = "1:1",
+    target_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
     **kwargs: Any
@@ -36,36 +47,26 @@ def calculate_target_latent_resolution(
         fixed_megapixels = kwargs["fixed_mp"]
     if "fixed_aspect_ratio" in kwargs:
         aspect_ratio = kwargs["fixed_aspect_ratio"]
-    """Calculate target latent pixel dimensions [H, W] and metadata.
 
-    Returns:
-        (target_h, target_w, geometry_source, active_mp, source_dims, warnings)
-    """
     warnings = []
     source_dims = None
     geometry_source = "custom_aspect_ratio"
 
-    if geometry_mode == "favor_subject" and subject_image is not None:
-        ih, iw = get_image_dims(subject_image.original_image)
+    ref_img = target_image or subject_image or scene_image
+
+    if geometry_mode in ("favor_image", "favor_subject", "favor_scene") and ref_img is not None:
+        ih, iw = get_image_dims(ref_img.original_image)
         source_dims = (ih, iw)
         src_ar = iw / float(ih)
-        geometry_source = "subject_original_image"
+        geometry_source = "target_original_image"
         src_mp = (ih * iw) / 1_000_000.0
         active_mp = min(src_mp, target_megapixels)
-    elif geometry_mode == "favor_scene" and scene_image is not None:
-        ih, iw = get_image_dims(scene_image.original_image)
-        source_dims = (ih, iw)
-        src_ar = iw / float(ih)
-        geometry_source = "scene_original_image"
-        src_mp = (ih * iw) / 1_000_000.0
-        active_mp = min(src_mp, target_megapixels)
-    elif geometry_mode == "fixed" or geometry_mode == "crop_subject":
+    elif geometry_mode in ("fixed", "crop_subject"):
         geometry_source = "fixed_megapixels"
         active_mp = fixed_megapixels
         if fixed_megapixels > 2.0:
             warnings.append(f"Warning: Fixed MP is set to {fixed_megapixels:.2f} MP, exceeding recommended 2.0 MP limit.")
 
-        # Parse aspect ratio string (e.g. "1:1", "16:9", "custom")
         if ":" in aspect_ratio:
             parts = aspect_ratio.split(":")
             try:
@@ -75,18 +76,11 @@ def calculate_target_latent_resolution(
         else:
             src_ar = 1.0
     else:
-        # Fallback to subject or scene if available
-        if subject_image is not None:
-            ih, iw = get_image_dims(subject_image.original_image)
+        if ref_img is not None:
+            ih, iw = get_image_dims(ref_img.original_image)
             source_dims = (ih, iw)
             src_ar = iw / float(ih)
-            geometry_source = "subject_original_image"
-            active_mp = min((ih * iw) / 1_000_000.0, target_megapixels)
-        elif scene_image is not None:
-            ih, iw = get_image_dims(scene_image.original_image)
-            source_dims = (ih, iw)
-            src_ar = iw / float(ih)
-            geometry_source = "scene_original_image"
+            geometry_source = "target_original_image"
             active_mp = min((ih * iw) / 1_000_000.0, target_megapixels)
         else:
             geometry_source = "fixed_megapixels"
@@ -101,8 +95,7 @@ def calculate_target_latent_resolution(
     target_h = max(128, int(round(raw_h / 16.0)) * 16)
     target_w = max(128, int(round(raw_w / 16.0)) * 16)
 
-    # For favor_subject / favor_scene, ensure alignment doesn't materially exceed target_megapixels limit
-    if geometry_mode in ("favor_subject", "favor_scene") and (target_h * target_w) / 1_000_000.0 > target_megapixels + 0.05:
+    if geometry_mode in ("favor_image", "favor_subject", "favor_scene") and (target_h * target_w) / 1_000_000.0 > target_megapixels + 0.05:
         alt_h = max(128, int(math.floor(raw_h / 16.0)) * 16)
         alt_w = max(128, int(math.floor(raw_w / 16.0)) * 16)
         if alt_h >= 128 and alt_w >= 128:
@@ -191,13 +184,65 @@ def normalize_vae_output(encoded: Any, batch_size: int) -> torch.Tensor:
     return latent
 
 
-# Backward-compatibility alias functions
 resolve_target_geometry = calculate_target_latent_resolution
+
+
+def parse_vision_slot_input(slot_input: Any) -> Optional[int]:
+    """Parse vision slot string/int input ('auto' or None -> None, '1'..'10' -> int)."""
+    if slot_input is None or str(slot_input).lower() == "auto":
+        return None
+    try:
+        val = int(slot_input)
+        return val if val > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def should_include_target_in_vision(
+    ctx: TargetVisionContext,
+    existing_chain: Optional[ReferenceChain] = None
+) -> bool:
+    """Evaluate whether target vision context should contribute a Qwen vision block.
+
+    Auto deduplication logic:
+    If include_in_vision == "yes", always True.
+    If include_in_vision == "no", always False.
+    If include_in_vision == "auto":
+      True if target_image is provided and NOT already present in existing_chain edit references.
+    """
+    if ctx.include_in_vision == "no":
+        return False
+    if ctx.include_in_vision == "yes":
+        return ctx.target_image is not None
+
+    # "auto" mode
+    if ctx.target_image is None:
+        return False
+
+    if existing_chain is None or not existing_chain.references:
+        return True
+
+    target_prep = ctx.target_image
+    for ref in existing_chain.references:
+        ref_path = getattr(ref, "reference_path", ref.role.lower())
+        # Exception: Style path references undergo different processing and are NOT deduplicated
+        if ref_path == "style":
+            continue
+
+        ref_prep = ref.prepared_image
+        if ref_prep is target_prep:
+            return False
+        if ref_prep is not None and target_prep is not None:
+            if ref_prep.original_image is target_prep.original_image:
+                return False
+
+    return True
 
 
 def create_target_latent(
     target_latent_content: str = "empty",
-    target_geometry: str = "favor_subject",
+    target_geometry: str = "fixed",
+    target_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
     maximum_mp: float = 2.0,
@@ -207,6 +252,10 @@ def create_target_latent(
     custom_aspect_height: int = 1,
     batch_size: int = 1,
     vae: Any = None,
+    include_in_vision: str = "auto",
+    target_vision_slot: Any = "auto",
+    target_alias: str = "",
+    target_vision_instruction: str = "",
     **kwargs: Any
 ) -> Tuple[Dict[str, Any], str]:
     """Backward compatibility alias for build_target_latent."""
@@ -219,8 +268,13 @@ def create_target_latent(
         fixed_megapixels=fixed_mp,
         aspect_ratio=aspect,
         batch_size=batch_size,
+        target_image=target_image,
         subject_image=subject_image,
         scene_image=scene_image,
+        include_in_vision=include_in_vision,
+        target_vision_slot=target_vision_slot,
+        target_alias=target_alias,
+        target_vision_instruction=target_vision_instruction,
         **kwargs
     )
 
@@ -228,13 +282,18 @@ def create_target_latent(
 def build_target_latent(
     vae: Any = None,
     target_content: str = "empty",
-    geometry_mode: str = "favor_subject",
+    geometry_mode: str = "fixed",
     target_megapixels: float = 2.0,
     fixed_megapixels: float = 2.0,
     aspect_ratio: str = "1:1",
     batch_size: int = 1,
+    target_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
+    include_in_vision: str = "auto",
+    target_vision_slot: Any = "auto",
+    target_alias: str = "",
+    target_vision_instruction: str = "",
     **kwargs: Any
 ) -> Tuple[Dict[str, Any], str]:
     """Build formatted target LATENT dict and latent_info string."""
@@ -249,11 +308,14 @@ def build_target_latent(
     if "fixed_aspect_ratio" in kwargs:
         aspect_ratio = kwargs["fixed_aspect_ratio"]
 
+    active_target_image = target_image or subject_image or scene_image
+
     target_h, target_w, geom_src, active_mp, src_dims, warnings = calculate_target_latent_resolution(
         geometry_mode=geometry_mode,
         target_megapixels=target_megapixels,
         fixed_megapixels=fixed_megapixels,
         aspect_ratio=aspect_ratio,
+        target_image=active_target_image,
         subject_image=subject_image,
         scene_image=scene_image
     )
@@ -266,36 +328,41 @@ def build_target_latent(
 
     if target_content == "empty":
         samples = torch.zeros((batch_size, 16, latent_h, latent_w), dtype=torch.float32)
-    elif target_content == "subject":
-        if subject_image is None:
-            raise ValueError("Subject image is required when target_content is 'subject'.")
-        if vae is None:
-            raise ValueError("VAE is required when target_content is 'subject'.")
+    elif target_content in ("image", "subject", "scene"):
+        if active_target_image is None:
+            if target_content == "subject":
+                raise ValueError("Subject image is required when target_content is 'subject'.")
+            elif target_content == "scene":
+                raise ValueError("Scene image is required when target_content is 'scene'.")
+            else:
+                raise ValueError(f"Target image is required when target_content is '{target_content}'.")
 
-        orig_img = subject_image.original_image
+        if vae is None:
+            raise ValueError(f"VAE is required when target_content is '{target_content}'.")
+
+        orig_img = active_target_image.original_image
         adapted_img, transform_info = adapt_target_content_image(orig_img, target_w=target_w, target_h=target_h)
         raw_encoded = vae.encode(adapted_img)
         samples = normalize_vae_output(raw_encoded, batch_size=batch_size)
         vae_applied = True
-        content_src_name = "Subject original_image"
-    elif target_content == "scene":
-        if scene_image is None:
-            raise ValueError("Scene image is required when target_content is 'scene'.")
-        if vae is None:
-            raise ValueError("VAE is required when target_content is 'scene'.")
-
-        orig_img = scene_image.original_image
-        adapted_img, transform_info = adapt_target_content_image(orig_img, target_w=target_w, target_h=target_h)
-        raw_encoded = vae.encode(adapted_img)
-        samples = normalize_vae_output(raw_encoded, batch_size=batch_size)
-        vae_applied = True
-        content_src_name = "Scene original_image"
+        content_src_name = "Target original_image"
     else:
-        raise ValueError(f"Unknown target_content mode: '{target_content}'. Expected 'empty', 'subject', or 'scene'.")
+        raise ValueError(f"Unknown target_content mode: '{target_content}'. Expected 'empty' or 'image'.")
+
+    slot_val = parse_vision_slot_input(target_vision_slot)
+
+    vision_ctx = TargetVisionContext(
+        include_in_vision=include_in_vision,
+        target_vision_slot=slot_val,
+        target_alias=target_alias,
+        target_vision_instruction=target_vision_instruction,
+        target_image=active_target_image
+    )
 
     latent_dict = {
         "samples": samples,
         "batch_index": list(range(batch_size)),
+        "target_vision_context": vision_ctx,
     }
 
     # Format latent_info string
@@ -312,9 +379,14 @@ def build_target_latent(
         f"Content Target Size: {f'{transform_info.target_size[0]} x {transform_info.target_size[1]}' if transform_info else f'{target_w} x {target_h}'}",
         f"Content Interpolation: {transform_info.interpolation if transform_info else 'none'}",
         f"VAE Encode Applied: {'yes' if vae_applied else 'no'}",
+        f"Include Target in Vision: {include_in_vision}",
+        f"Target Vision Slot: {'auto' if slot_val is None else slot_val}",
     ]
 
-    if geometry_mode in ("favor_subject", "favor_scene"):
+    if target_alias:
+        lines.append(f"Target Alias: {target_alias}")
+
+    if geometry_mode in ("favor_image", "favor_subject", "favor_scene"):
         lines.append(f"Maximum MP: {target_megapixels:.2f} MP")
     elif geometry_mode == "fixed":
         lines.append(f"Fixed MP: {fixed_megapixels:.2f} MP")
