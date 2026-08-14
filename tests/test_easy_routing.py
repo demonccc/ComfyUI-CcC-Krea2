@@ -200,6 +200,9 @@ class TestPreserveIdentityMatrix:
         S, Sc, Ou, _ = dummy_sources
         sources = resolve_easy_sources(subject=S)
         route = route_easy_preset(sources, preset="preserve_identity")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is S
         assert_refs(route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject")])
         assert_no_more_than_2_refs(route)
 
@@ -334,6 +337,70 @@ class TestMaxIdentityMatrix:
         for r in route.edit_references:
             if r[2] != "subject":
                 assert r[1] <= NORMAL_BOOST
+
+
+# ---------------------------------------------------------------------------
+# Subject-only runtime contracts: Balanced vs Preserve Identity vs Max Identity
+# ---------------------------------------------------------------------------
+
+class TestSubjectOnlyPresetContracts:
+    def test_balanced_subject_only_contract(self, dummy_sources):
+        S, _, _, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S)
+        route = route_easy_preset(sources, preset="balanced")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is S
+        assert len(route.edit_references) == 1
+        img, boost, alias, _ = route.edit_references[0]
+        assert img is S
+        assert alias == "subject"
+        assert boost == pytest.approx(2.5)
+
+    def test_preserve_identity_subject_only_contract(self, dummy_sources):
+        S, _, _, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S)
+        route = route_easy_preset(sources, preset="preserve_identity")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is S
+        assert len(route.edit_references) == 1
+        img, boost, alias, _ = route.edit_references[0]
+        assert img is S
+        assert alias == "subject"
+        assert boost == pytest.approx(4.0)
+
+    def test_max_identity_subject_only_contract(self, dummy_sources):
+        S, _, _, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S)
+        route = route_easy_preset(sources, preset="max_identity")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is S
+        assert route.target_geometry_source is S
+        assert len(route.edit_references) == 1
+        img, boost, alias, _ = route.edit_references[0]
+        assert img is S
+        assert alias == "subject"
+        assert boost == pytest.approx(4.0)
+
+    def test_subject_only_presets_distinctness(self, dummy_sources):
+        S, _, _, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S)
+        balanced_route = route_easy_preset(sources, preset="balanced")
+        preserve_route = route_easy_preset(sources, preset="preserve_identity")
+        max_route = route_easy_preset(sources, preset="max_identity")
+
+        # Balanced != Preserve Identity due to boost (2.5 != 4.0)
+        assert balanced_route.edit_references[0][1] == pytest.approx(2.5)
+        assert preserve_route.edit_references[0][1] == pytest.approx(4.0)
+        assert balanced_route.edit_references[0][1] != preserve_route.edit_references[0][1]
+
+        # Preserve Identity != Max Identity due to target_content_mode ("empty" != "image")
+        assert preserve_route.target_content_mode == "empty"
+        assert max_route.target_content_mode == "image"
+        assert preserve_route.target_content_mode != max_route.target_content_mode
+        assert preserve_route.target_content_source is None
+        assert max_route.target_content_source is S
 
 
 # ---------------------------------------------------------------------------
