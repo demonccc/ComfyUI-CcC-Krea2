@@ -76,6 +76,17 @@ The identity presets fall into two distinct structural routing families for Subj
 - **Free Target Content Group** (`Flexible`, `Balanced`, `Consistent`): Sets `Target Content = empty`. Denoising starts from noise, allowing the Subject reference to guide generation via reference attention while keeping target latents free for major creative changes.
 - **Subject-Anchored Target Content Group** (`Preserve Identity`, `Max Identity`): Sets `Target Content = Subject image`. The Subject image acts as both appearance reference and initial target content, providing stronger identity and structural anchoring.
 
+With both **Subject** and **Scene** connected, `Flexible`, `Balanced`, and `Consistent` keep Scene-driven geometry while starting from free target content. `Preserve Identity` and `Max Identity` switch structural anchoring to the Subject. `Preserve Scene` does the opposite, making the Scene the target and geometry anchor.
+
+| Goal | Suggested Preset |
+| --- | --- |
+| Maximum freedom while using a Scene reference | **Flexible** |
+| General Subject + Scene editing | **Balanced** |
+| More stable Subject while keeping Scene geometry | **Consistent** |
+| Strong Subject identity preservation | **Preserve Identity** |
+| Maximum Subject identity anchoring | **Max Identity** |
+| Maximum Scene preservation | **Preserve Scene** |
+
 ### Task-Specific Presets
 
 The identity ladder covers subject preservation tasks. Additional task-specific presets provide targeted capabilities:

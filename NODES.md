@@ -67,6 +67,27 @@ The table below details the technical routing contract resolved when running Eas
 > [!IMPORTANT]
 > **Multi-Reference Routing Warning**: These values describe the Subject-only Easy Edit contract. Multi-reference routing can use different target/reference combinations depending on Scene, Outfit, Style, and source selectors. The 3-phase routing engine in `ccc_krea2/easy_routing.py` remains authoritative.
 
+#### Subject + Scene Routing Contracts
+
+The table below details the technical routing contract resolved when running Easy Edit with both a **Subject** image and a **Scene** image connected (with Outfit and Style disconnected):
+
+| Preset | Target Content | Geometry Source | Scene Attention | Subject Attention | Primary Intent |
+| --- | --- | --- | ---: | ---: | --- |
+| **Flexible** | Empty | Scene | 1.0 | 1.0 | Maximum editing freedom |
+| **Balanced** | Empty | Scene | 1.0 | 2.5 | General balance |
+| **Consistent** | Empty | Scene | 1.0 | 4.0 | Stronger Subject consistency |
+| **Preserve Identity** | Subject image | Subject | 1.0 | 6.0 | Strong identity preservation |
+| **Max Identity** | Subject image | Subject | 1.0 | 10.0 | Maximum identity anchoring |
+| **Preserve Scene** | Scene image | Scene | 2.5 | 1.0 | Preserve Scene composition/context |
+
+- **Structural Target & Geometry Transition**:
+  - `Flexible`, `Balanced`, and `Consistent` use `Target Content = Empty` and `Geometry = Scene`. The Scene image provides output geometry and compositional guidance while target latents start from noise.
+  - `Preserve Identity` and `Max Identity` transition to `Target Content = Subject` and `Geometry = Subject`. The Subject becomes structurally dominant, while the Scene remains available as Slot 1 appearance reference guidance.
+  - `Preserve Scene` sets `Target Content = Scene` and `Geometry = Scene` with amplified Scene attention (`2.5`), prioritizing environmental context while maintaining the Subject as a normal reference.
+
+- **Appearance Reference Ordering**:
+  For all six presets listed above when Subject + Scene are connected, appearance references are assigned in the exact order: **Slot 1 = Scene**, **Slot 2 = Subject**.
+
 ---
 
 ## 2. Advanced Nodes
