@@ -5,13 +5,17 @@ from typing import Optional, List, Tuple, Any
 
 
 # Centralized boost constants for Easy presets
+NORMAL_BOOST = 1.0
+
+FLEXIBLE_SUBJECT_BOOST = 1.0
 BALANCED_SUBJECT_BOOST = 2.5
-MAX_IDENTITY_SUBJECT_BOOST = 4.0
-PRESERVE_IDENTITY_SUBJECT_BOOST = 4.0
+CONSISTENT_SUBJECT_BOOST = 4.0
+PRESERVE_IDENTITY_SUBJECT_BOOST = 6.0
+MAX_IDENTITY_SUBJECT_BOOST = 10.0
+
 PRESERVE_SCENE_BOOST = 2.5
 OUTFIT_EMPHASIS_BOOST = 2.5
 OUTFIT_TRANSFER_BOOST = 4.0
-NORMAL_BOOST = 1.0
 
 
 # Centralized explicit instruction constants for Easy Edit
@@ -214,7 +218,7 @@ def route_easy_preset(
     sources: EasyResolvedSources,
     preset: str = "balanced",
 ) -> EasyPresetRoute:
-    """Phase 2: Evaluate preset routing matrix across all 6 presets.
+    """Phase 2: Evaluate preset routing matrix across all 8 presets.
 
     Exhaustive 8-combination coverage per preset:
         none, S, Sc, Ou, S+Sc, S+Ou, Sc+Ou, S+Sc+Ou
@@ -244,8 +248,9 @@ def route_easy_preset(
     semantic_only_refs: List[Tuple[Any, str]] = []
     preset_warnings: List[str] = list(sources.warnings)
 
-    if preset in ("balanced", "style_transfer"):
-        # --- balanced / style_transfer: exact 8-combination matrix ---
+    if preset in ("flexible", "balanced", "style_transfer"):
+        # --- flexible / balanced / style_transfer: exact 8-combination matrix ---
+        subj_boost = FLEXIBLE_SUBJECT_BOOST if preset == "flexible" else BALANCED_SUBJECT_BOOST
         if not has_s and not has_sc and not has_o:
             # none: no refs, default geometry
             pass
@@ -253,7 +258,7 @@ def route_easy_preset(
             # S only
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
         elif not has_s and has_sc and not has_o:
             # Sc only
             target_content_mode = "empty"
@@ -269,12 +274,12 @@ def route_easy_preset(
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
-            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
         elif has_s and not has_sc and has_o:
             # S + Ou
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
             refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         elif not has_s and has_sc and has_o:
             # Sc + Ou
@@ -293,16 +298,17 @@ def route_easy_preset(
             target_content_source = Sc
             target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(S, BALANCED_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
             else:
                 refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
 
-    elif preset == "preserve_identity":
+    elif preset == "consistent":
+        # --- consistent: strong Subject reference influence (4.0) with target_content_mode = "empty" for S-only ---
         if not has_s:
             preset_warnings.append(
-                "preset 'preserve_identity' selected but Subject source is missing; "
+                "preset 'consistent' selected but Subject source is missing; "
                 "falling back to balanced appearance routing."
             )
 
@@ -311,7 +317,7 @@ def route_easy_preset(
         elif has_s and not has_sc and not has_o:
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, CONSISTENT_SUBJECT_BOOST, "subject"))
         elif not has_s and has_sc and not has_o:
             # Balanced fallback
             target_content_mode = "empty"
@@ -326,11 +332,11 @@ def route_easy_preset(
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
             refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
-            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, CONSISTENT_SUBJECT_BOOST, "subject"))
         elif has_s and not has_sc and has_o:
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, CONSISTENT_SUBJECT_BOOST, "subject"))
             refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         elif not has_s and has_sc and has_o:
             # Balanced fallback: Sc+Ou without S
@@ -349,19 +355,21 @@ def route_easy_preset(
                 target_content_mode = "empty"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
                 refs.append(_combined_scene_outfit_ref(Sc, OUTFIT_EMPHASIS_BOOST))
-                refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+                refs.append(_ref(S, CONSISTENT_SUBJECT_BOOST, "subject"))
             else:
                 target_content_mode = "image"
                 target_content_source = Sc
                 target_content_role = "scene"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
-                refs.append(_ref(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"))
+                refs.append(_ref(S, CONSISTENT_SUBJECT_BOOST, "subject"))
                 refs.append(_ref(Ou, OUTFIT_EMPHASIS_BOOST, "outfit"))
 
-    elif preset == "max_identity":
+    elif preset in ("preserve_identity", "max_identity"):
+        # --- preserve_identity (6.0) / max_identity (10.0): target_content_mode = "image" for S-only ---
+        subj_boost = PRESERVE_IDENTITY_SUBJECT_BOOST if preset == "preserve_identity" else MAX_IDENTITY_SUBJECT_BOOST
         if not has_s:
             preset_warnings.append(
-                "preset 'max_identity' selected but Subject source is missing; "
+                f"preset '{preset}' selected but Subject source is missing; "
                 "falling back to balanced appearance routing."
             )
 
@@ -371,7 +379,7 @@ def route_easy_preset(
             target_content_mode = "image"
             target_content_source = S
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
         elif not has_s and has_sc and not has_o:
             # Balanced fallback
             target_content_mode = "empty"
@@ -387,12 +395,12 @@ def route_easy_preset(
             target_content_source = S
             target_geometry_mode, target_geometry_source = "favor_image", S
             refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
-            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
         elif has_s and not has_sc and has_o:
             target_content_mode = "image"
             target_content_source = S
             target_geometry_mode, target_geometry_source = "favor_image", S
-            refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+            refs.append(_ref(S, subj_boost, "subject"))
             refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
         elif not has_s and has_sc and has_o:
             # Balanced fallback
@@ -413,12 +421,12 @@ def route_easy_preset(
                 target_content_role = "subject"
                 target_geometry_mode, target_geometry_source = "favor_image", S
                 refs.append(_combined_scene_outfit_ref(Sc, NORMAL_BOOST))
-                refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+                refs.append(_ref(S, subj_boost, "subject"))
             elif outfit_is_distinct:
                 target_content_source = Sc
                 target_content_role = "scene"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
-                refs.append(_ref(S, MAX_IDENTITY_SUBJECT_BOOST, "subject"))
+                refs.append(_ref(S, subj_boost, "subject"))
                 refs.append(_ref(Ou, NORMAL_BOOST, "outfit"))
 
     elif preset == "preserve_scene":

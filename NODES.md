@@ -13,7 +13,7 @@ This document provides the complete specification of all public nodes in the `Co
 - **Required Inputs**:
   - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`): Core models.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
-  - `preset` (`CHOICE`): `balanced`, `style_transfer`, `preserve_identity`, `max_identity`, `preserve_scene`, `outfit_transfer`.
+  - `preset` (`CHOICE`): `flexible`, `balanced`, `consistent`, `preserve_identity`, `max_identity`, `preserve_scene`, `outfit_transfer`, `style_transfer`.
   - `outfit_source` (`CHOICE`): `outfit image`, `scene image`, `style image` (default: `outfit image`).
   - `style_source` (`CHOICE`): `style image`, `scene image`, `subject image` (default: `style image`).
   - `apply_krea2_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEdit`.

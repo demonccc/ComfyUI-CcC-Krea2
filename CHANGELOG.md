@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Modular Krea2 Pipeline Surgical Correction Pass (`feat/easy-edit-and-reference-backends`).
-- Decoupled 3-phase Easy Routing Engine (`easy_routing.py`) with strict 6-preset matrix and independent target content/geometry sources.
+- Decoupled 3-phase Easy Routing Engine (`easy_routing.py`) with strict 8-preset matrix and independent target content/geometry sources.
 - Grounding & Semantic Image Prep Recipes (`grounding.py`).
 - Thin resolver architecture for `easy_edit_node.py` delegating to shared orchestrator `run_krea2_edit_orchestrator`.
 - Unified Target Vision Context slot resolution in single-pass reference chain sorting.

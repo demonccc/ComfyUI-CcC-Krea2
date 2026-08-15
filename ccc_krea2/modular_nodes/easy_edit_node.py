@@ -22,7 +22,7 @@ class CcCKrea2EasyEdit:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 6-preset Krea2 Edit node. "
+        "Opinionated 8-preset Krea2 Edit node. "
         "Automatically routes Subject, Scene, Outfit, and Style sources to canonical target and reference channels."
     )
 
@@ -35,7 +35,7 @@ class CcCKrea2EasyEdit:
                 "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
                 "preset": (
-                    ["balanced", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
+                    ["flexible", "balanced", "consistent", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."}
                 ),
                 "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."}),
@@ -95,7 +95,7 @@ class CcCKrea2EasyEditOstris:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 6-preset Ostris Edit node. "
+        "Opinionated 8-preset Ostris Edit node. "
         "Routes Subject, Scene, Outfit, and Style sources to Ostris edit pipeline."
     )
 
@@ -108,7 +108,7 @@ class CcCKrea2EasyEditOstris:
                 "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
                 "preset": (
-                    ["balanced", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
+                    ["flexible", "balanced", "consistent", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."}
                 ),
                 "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."}),
