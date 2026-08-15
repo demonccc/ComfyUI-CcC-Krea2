@@ -15,12 +15,17 @@ MAX_IDENTITY_SUBJECT_BOOST = 10.0
 
 PRESERVE_SCENE_BOOST = 2.5
 OUTFIT_EMPHASIS_BOOST = 2.5
-OUTFIT_TRANSFER_BOOST = 4.0
+OUTFIT_TRANSFER_SUBJECT_BOOST = 8.0
+OUTFIT_TRANSFER_BOOST = 6.0
 
 
 # Centralized explicit instruction constants for Easy Edit
-EASY_SUBJECT_INSTRUCTION = "Use this reference for the subject identity, facial features, hair, anatomy, body shape, and body proportions."
-EASY_SCENE_INSTRUCTION = "Use this reference for scene composition, environment, spatial relationships, camera framing, and lighting."
+EASY_SUBJECT_INSTRUCTION = (
+    "Use this reference for the subject identity, facial features, hair, anatomy, body shape, and body proportions."
+)
+EASY_SCENE_INSTRUCTION = (
+    "Use this reference for scene composition, environment, spatial relationships, camera framing, and lighting."
+)
 EASY_OUTFIT_INSTRUCTION = "Use this reference for the clothing, garments, and accessories. Do not use the wearer's identity as the subject identity."
 EASY_TARGET_SCENE_INSTRUCTION = "Use this image as the target scene/context."
 EASY_SCENE_AND_OUTFIT_INSTRUCTION = (
@@ -43,10 +48,10 @@ def get_easy_instruction_for_role(role: str) -> str:
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
 
 
-
 @dataclass(frozen=True)
 class EasyResolvedSources:
     """Phase 1: Resolved input sources with strict no-fallback rules."""
+
     subject: Optional[Any]
     scene: Optional[Any]
     outfit: Optional[Any]
@@ -56,15 +61,16 @@ class EasyResolvedSources:
     effective_outfit: Optional[Any]
     effective_style: Optional[Any]
     outfit_source: str
-    outfit_source_kind: str   # "outfit" | "scene" | "style"
+    outfit_source_kind: str  # "outfit" | "scene" | "style"
     style_source: str
-    style_source_kind: str    # "style" | "scene" | "subject"
+    style_source_kind: str  # "style" | "scene" | "subject"
     warnings: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class EasyStyleConfig:
     """Config for Easy Edit style reference parameters using valid range values."""
+
     style_fidelity: float = 1.0
     style_processing: str = "2x2"
     indirect_style_transfer: bool = False
@@ -78,23 +84,21 @@ class EasyStyleConfig:
 
 
 DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
-    style_fidelity=1.0,
-    style_processing="2x2",
-    indirect_style_transfer=False,
-    vision_instruction=""
+    style_fidelity=1.0, style_processing="2x2", indirect_style_transfer=False, vision_instruction=""
 )
 
 STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0,
     style_processing="4x4",
     indirect_style_transfer=False,
-    vision_instruction="Adopt the artistic style, color palette, texture, and visual mood of this style reference."
+    vision_instruction="Adopt the artistic style, color palette, texture, and visual mood of this style reference.",
 )
 
 
 @dataclass(frozen=True)
 class EasyPresetRoute:
     """Phase 2 & 3: Preset routing decision containing target content, target geometry, references, and style config."""
+
     preset: str
     target_content_mode: str  # "empty" or "image"
     target_content_source: Optional[Any]
@@ -187,9 +191,7 @@ def resolve_easy_sources(
 
 
 def _resolve_default_geometry_source(
-    scene: Optional[Any],
-    subject: Optional[Any],
-    outfit: Optional[Any]
+    scene: Optional[Any], subject: Optional[Any], outfit: Optional[Any]
 ) -> Tuple[str, Optional[Any]]:
     """Determine default geometry source based on hierarchy: Scene -> Subject -> Outfit."""
     if scene is not None:
@@ -513,10 +515,10 @@ def route_easy_preset(
             target_geometry_mode, target_geometry_source = "favor_image", Sc
         elif has_s and not has_sc and has_o:
             target_content_mode = "image"
-            target_content_source = Ou
-            target_content_role = "outfit"
-            target_geometry_mode, target_geometry_source = "favor_image", Ou
-            refs.append(_ref(S, NORMAL_BOOST, "subject"))
+            target_content_source = S
+            target_content_role = "subject"
+            target_geometry_mode, target_geometry_source = "favor_image", S
+            refs.append(_ref(S, OUTFIT_TRANSFER_SUBJECT_BOOST, "subject"))
             refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
         elif not has_s and has_sc and has_o:
             # Sc + Ou without Subject

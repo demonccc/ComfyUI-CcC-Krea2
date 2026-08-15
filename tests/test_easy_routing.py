@@ -11,6 +11,7 @@ from ccc_krea2.easy_routing import (
     MAX_IDENTITY_SUBJECT_BOOST,
     PRESERVE_SCENE_BOOST,
     OUTFIT_EMPHASIS_BOOST,
+    OUTFIT_TRANSFER_SUBJECT_BOOST,
     OUTFIT_TRANSFER_BOOST,
     NORMAL_BOOST,
     EASY_SCENE_AND_OUTFIT_INSTRUCTION,
@@ -38,6 +39,7 @@ def dummy_sources():
 # Helper assertions
 # ---------------------------------------------------------------------------
 
+
 def assert_refs(refs, expected):
     """Assert edit_references matches list of (img, boost, alias) — ignoring instruction."""
     assert len(refs) == len(expected), f"Expected {len(expected)} refs, got {len(refs)}: {refs}"
@@ -54,6 +56,7 @@ def assert_no_more_than_2_refs(route):
 # ---------------------------------------------------------------------------
 # FLEXIBLE: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
+
 
 class TestFlexibleMatrix:
     def test_none(self, dummy_sources):
@@ -123,6 +126,7 @@ class TestFlexibleMatrix:
 # ---------------------------------------------------------------------------
 # BALANCED + STYLE_TRANSFER: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("preset", ["balanced", "style_transfer"])
 class TestBalancedMatrix:
@@ -244,6 +248,7 @@ class TestBalancedMatrix:
 # CONSISTENT: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
 
+
 class TestConsistentMatrix:
     def test_none(self, dummy_sources):
         sources = resolve_easy_sources()
@@ -301,7 +306,9 @@ class TestConsistentMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset="consistent")
         assert route.target_content_mode == "image"
-        assert_refs(route.edit_references, [(S, CONSISTENT_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_EMPHASIS_BOOST, "outfit")])
+        assert_refs(
+            route.edit_references, [(S, CONSISTENT_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_EMPHASIS_BOOST, "outfit")]
+        )
         assert_no_more_than_2_refs(route)
 
     def test_subject_scene_as_outfit(self, dummy_sources):
@@ -310,12 +317,16 @@ class TestConsistentMatrix:
         route = route_easy_preset(sources, preset="consistent")
         assert route.target_content_mode == "empty"
         assert route.target_geometry_source is Sc
-        assert_refs(route.edit_references, [(Sc, OUTFIT_EMPHASIS_BOOST, "scene+outfit"), (S, CONSISTENT_SUBJECT_BOOST, "subject")])
+        assert_refs(
+            route.edit_references,
+            [(Sc, OUTFIT_EMPHASIS_BOOST, "scene+outfit"), (S, CONSISTENT_SUBJECT_BOOST, "subject")],
+        )
 
 
 # ---------------------------------------------------------------------------
 # PRESERVE_IDENTITY: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
+
 
 class TestPreserveIdentityMatrix:
     def test_none(self, dummy_sources):
@@ -354,7 +365,9 @@ class TestPreserveIdentityMatrix:
         assert route.target_content_mode == "image"
         assert route.target_content_source is S
         assert route.target_geometry_source is S
-        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene"), (S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject")])
+        assert_refs(
+            route.edit_references, [(Sc, NORMAL_BOOST, "scene"), (S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject")]
+        )
 
     def test_subject_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -363,7 +376,9 @@ class TestPreserveIdentityMatrix:
         assert route.target_content_mode == "image"
         assert route.target_content_source is S
         assert route.target_geometry_source is S
-        assert_refs(route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")])
+        assert_refs(
+            route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")]
+        )
 
     def test_scene_outfit_fallback(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -383,7 +398,9 @@ class TestPreserveIdentityMatrix:
         assert route.target_content_source is Sc
         assert route.target_content_role == "scene"
         assert route.target_geometry_source is Sc
-        assert_refs(route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")])
+        assert_refs(
+            route.edit_references, [(S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject"), (Ou, NORMAL_BOOST, "outfit")]
+        )
         assert_no_more_than_2_refs(route)
 
     def test_subject_scene_as_outfit(self, dummy_sources):
@@ -393,12 +410,15 @@ class TestPreserveIdentityMatrix:
         assert route.target_content_mode == "image"
         assert route.target_content_source is S
         assert route.target_geometry_source is S
-        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene+outfit"), (S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject")])
+        assert_refs(
+            route.edit_references, [(Sc, NORMAL_BOOST, "scene+outfit"), (S, PRESERVE_IDENTITY_SUBJECT_BOOST, "subject")]
+        )
 
 
 # ---------------------------------------------------------------------------
 # MAX_IDENTITY: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
+
 
 class TestMaxIdentityMatrix:
     def test_none(self, dummy_sources):
@@ -465,7 +485,9 @@ class TestMaxIdentityMatrix:
         assert route.target_content_source is S
         assert route.target_content_role == "subject"
         assert route.target_geometry_source is S
-        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene+outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")])
+        assert_refs(
+            route.edit_references, [(Sc, NORMAL_BOOST, "scene+outfit"), (S, MAX_IDENTITY_SUBJECT_BOOST, "subject")]
+        )
         sc_ref = next(r for r in route.edit_references if r[2] == "scene+outfit")
         assert sc_ref[3] == EASY_SCENE_AND_OUTFIT_INSTRUCTION
         for r in route.edit_references:
@@ -476,6 +498,7 @@ class TestMaxIdentityMatrix:
 # ---------------------------------------------------------------------------
 # Subject-only runtime contracts: Flexible, Balanced, Consistent, Preserve Identity, Max Identity
 # ---------------------------------------------------------------------------
+
 
 class TestSubjectOnlyPresetContracts:
     def test_flexible_subject_only_contract(self, dummy_sources):
@@ -584,6 +607,7 @@ class TestSubjectOnlyPresetContracts:
 # Flexible All-Reference Attention Boost Neutrality (1.0)
 # ---------------------------------------------------------------------------
 
+
 class TestFlexibleAllReferenceAttention:
     def test_flexible_subject_scene(self, dummy_sources):
         S, Sc, _, _ = dummy_sources
@@ -617,6 +641,7 @@ class TestFlexibleAllReferenceAttention:
 # ---------------------------------------------------------------------------
 # Preserve Identity vs Max Identity Topology Parity
 # ---------------------------------------------------------------------------
+
 
 class TestPreserveIdentityVsMaxIdentityTopology:
     @pytest.mark.parametrize(
@@ -680,6 +705,7 @@ class TestPreserveIdentityVsMaxIdentityTopology:
 # Consistent Regression (verifying old preserve_identity weaker routing)
 # ---------------------------------------------------------------------------
 
+
 class TestConsistentRegression:
     def test_consistent_retains_weak_preserve_identity_topology(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -707,12 +733,15 @@ class TestConsistentRegression:
         r_all = route_easy_preset(sources_all, preset="consistent")
         assert r_all.target_content_mode == "image"
         assert r_all.target_content_source is Sc
-        assert_refs(r_all.edit_references, [(S, CONSISTENT_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_EMPHASIS_BOOST, "outfit")])
+        assert_refs(
+            r_all.edit_references, [(S, CONSISTENT_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_EMPHASIS_BOOST, "outfit")]
+        )
 
 
 # ---------------------------------------------------------------------------
 # Missing Subject Fallbacks
 # ---------------------------------------------------------------------------
+
 
 class TestMissingSubjectFallbacks:
     @pytest.mark.parametrize("preset", ["consistent", "preserve_identity", "max_identity"])
@@ -730,6 +759,7 @@ class TestMissingSubjectFallbacks:
 # ---------------------------------------------------------------------------
 # PRESERVE_SCENE: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
+
 
 class TestPreserveSceneMatrix:
     def test_none(self, dummy_sources):
@@ -810,6 +840,7 @@ class TestPreserveSceneMatrix:
 # OUTFIT_TRANSFER: exhaustive 8-combo matrix
 # ---------------------------------------------------------------------------
 
+
 class TestOutfitTransferMatrix:
     def test_none(self, dummy_sources):
         sources = resolve_easy_sources()
@@ -842,8 +873,16 @@ class TestOutfitTransferMatrix:
         sources = resolve_easy_sources(subject=S, outfit=Ou)
         route = route_easy_preset(sources, preset="outfit_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is Ou
-        assert_refs(route.edit_references, [(S, NORMAL_BOOST, "subject"), (Ou, OUTFIT_TRANSFER_BOOST, "outfit")])
+        assert route.target_content_source is S
+        assert route.target_content_role == "subject"
+        assert route.target_geometry_mode == "favor_image"
+        assert route.target_geometry_source is S
+        assert_refs(
+            route.edit_references,
+            [(S, OUTFIT_TRANSFER_SUBJECT_BOOST, "subject"), (Ou, OUTFIT_TRANSFER_BOOST, "outfit")],
+        )
+        assert route.edit_references[0][1] == 8.0
+        assert route.edit_references[1][1] == 6.0
 
     def test_scene_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -874,11 +913,20 @@ class TestOutfitTransferMatrix:
 # Style configs
 # ---------------------------------------------------------------------------
 
+
 def test_style_active_for_all_presets(dummy_sources):
     S, _, _, St = dummy_sources
     sources = resolve_easy_sources(subject=S, style=St)
 
-    for p in ("flexible", "balanced", "consistent", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer"):
+    for p in (
+        "flexible",
+        "balanced",
+        "consistent",
+        "preserve_identity",
+        "max_identity",
+        "preserve_scene",
+        "outfit_transfer",
+    ):
         r = route_easy_preset(sources, preset=p)
         assert r.style_active is True
         assert r.style_source is St
@@ -899,6 +947,7 @@ def test_style_active_for_all_presets(dummy_sources):
 # ---------------------------------------------------------------------------
 # Selector tests
 # ---------------------------------------------------------------------------
+
 
 class TestSelectors:
     def test_outfit_from_scene(self, dummy_sources):
@@ -961,6 +1010,7 @@ class TestSelectors:
 # Cross-route: same image for multiple logical functions
 # ---------------------------------------------------------------------------
 
+
 class TestCrossRouting:
     def test_outfit_from_style_and_style_active(self, dummy_sources):
         """Same style image used as outfit AND style moodboard simultaneously."""
@@ -989,7 +1039,9 @@ class TestCrossRouting:
         route = route_easy_preset(sources, preset="balanced")
         assert route.target_content_source is Sc
         assert len(route.edit_references) == 2
-        assert (S, BALANCED_SUBJECT_BOOST, "subject") in [(img, boost, alias) for img, boost, alias, _ in route.edit_references]
+        assert (S, BALANCED_SUBJECT_BOOST, "subject") in [
+            (img, boost, alias) for img, boost, alias, _ in route.edit_references
+        ]
         assert (Ou, NORMAL_BOOST, "outfit") in [(img, boost, alias) for img, boost, alias, _ in route.edit_references]
         assert isinstance(route.semantic_only_references, tuple)
 
@@ -998,7 +1050,20 @@ class TestCrossRouting:
 # Never more than 2 appearance refs — all 8 presets, several combinations
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("preset", ["flexible", "balanced", "consistent", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"])
+
+@pytest.mark.parametrize(
+    "preset",
+    [
+        "flexible",
+        "balanced",
+        "consistent",
+        "preserve_identity",
+        "max_identity",
+        "preserve_scene",
+        "outfit_transfer",
+        "style_transfer",
+    ],
+)
 def test_never_more_than_2_refs(dummy_sources, preset):
     S, Sc, Ou, St = dummy_sources
     for args in [
