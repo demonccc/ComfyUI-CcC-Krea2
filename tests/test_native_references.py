@@ -46,9 +46,7 @@ def test_native_reference_method_attaches_reference_latents():
     )
     chain = ReferenceChain().append(spec)
 
-    target_latent = {
-        "samples": torch.zeros((1, 16, 1, 32, 32))
-    }
+    target_latent = {"samples": torch.zeros((1, 16, 1, 32, 32))}
 
     out_model, pos, neg, lat, info = run_krea2_edit_orchestrator(
         model=model,
@@ -99,4 +97,3 @@ def test_native_reference_method_with_model_default_method():
     assert "Native Default Reference Method: index_timestep_zero" in info
     # Should not warn when default method is present
     assert "no native default reference method was detected" not in info
-

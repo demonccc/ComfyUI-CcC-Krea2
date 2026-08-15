@@ -88,7 +88,9 @@ def build_ostris_qwen_prompt(
                 lines.append("<|vision_start|><|image_pad|><|vision_end|>")
         elif not is_appearance:
             expanded_aliases = item.get("expanded_aliases", ())
-            alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+            alias_str = (
+                ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+            )
             instruction = getattr(spec, "vision_instruction", "") if spec else ""
             annotation = ""
             if alias_str and instruction:
@@ -100,7 +102,9 @@ def build_ostris_qwen_prompt(
             lines.append(f"<|vision_start|><|image_pad|><|vision_end|>{annotation}")
         else:
             expanded_aliases = item.get("expanded_aliases", ())
-            alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+            alias_str = (
+                ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
+            )
             instruction = getattr(spec, "vision_instruction", "") if spec else ""
             annotation = ""
             if alias_str and instruction:
@@ -119,11 +123,7 @@ def build_ostris_qwen_prompt(
     return body or (user_prompt or "")
 
 
-def patch_ostris_model(
-    model: Any,
-    prepared_refs: Optional[Any] = None,
-    ostris_kv_cache: bool = False
-) -> Any:
+def patch_ostris_model(model: Any, prepared_refs: Optional[Any] = None, ostris_kv_cache: bool = False) -> Any:
     """Deprecated compatibility shim.
 
     Canonical regular Ostris in CcC Krea2 uses conditioning metadata ('index_timestep_zero')

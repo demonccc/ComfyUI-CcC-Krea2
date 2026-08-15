@@ -42,7 +42,7 @@ class CcCKrea2StyleImage:
             },
             "optional": {
                 "reference_chain": ("REFERENCE_CHAIN",),
-            }
+            },
         }
 
     def process(
@@ -56,7 +56,7 @@ class CcCKrea2StyleImage:
         vision_slot=0,
         aliases="",
         reference_chain=None,
-        **kwargs
+        **kwargs,
     ):
         chain = reference_chain or kwargs.get("previous_references")
         if chain is None:
@@ -74,7 +74,7 @@ class CcCKrea2StyleImage:
             style_processing=style_processing,
             style_fidelity=style_fidelity,
             indirect_style_transfer=indirect_style_transfer,
-            style_directive=style_directive
+            style_directive=style_directive,
         )
 
         return (chain.append(spec),)

@@ -22,7 +22,6 @@ def test_node_mappings_count_and_keys():
         "CcCKrea2Edit",
         "CcCKrea2EasyEdit",
         "CcCKrea2EasyEditOstris",
-
         # Existing Nodes
         "CcCKrea2Subject",
         "CcCKrea2SubjectOutfit",
@@ -80,7 +79,6 @@ def test_t2i_node_interface_contract():
         "edit_advanced_settings",
     ):
         assert forbidden not in all_inputs, f"Forbidden input '{forbidden}' found in CcCKrea2TextToImage"
-
 
 
 def test_main_nodes_widget_signature_refactor():

@@ -35,7 +35,6 @@ def prepare_easy_krea_vision_image(
     )
 
 
-
 def resize_grounding_image(
     image: torch.Tensor,
     resize_mode: str = "normalize",
@@ -43,7 +42,7 @@ def resize_grounding_image(
     grounding_min_px: int = 512,
     grounding_max_px: int = 1024,
     grounding_preset: str = "balanced",
-    resize_method: str = "auto"
+    resize_method: str = "auto",
 ) -> torch.Tensor:
     """Preprocesses reference images for Qwen3-VL semantic grounding.
 

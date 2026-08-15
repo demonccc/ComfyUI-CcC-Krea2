@@ -214,5 +214,3 @@ def test_target_manual_slot_collision_raises():
     effective_chain = ReferenceChain((target_spec, subj_spec))
     with pytest.raises(ValueError, match="Duplicate vision slot 1 specified"):
         resolve_reference_slots_and_aliases(effective_chain)
-
-

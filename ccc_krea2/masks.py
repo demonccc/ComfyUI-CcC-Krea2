@@ -5,12 +5,7 @@ import torch.nn.functional as F
 from typing import Tuple, Optional
 
 
-def process_inpaint_mask(
-    mask: torch.Tensor,
-    invert: bool = False,
-    grow: int = 0,
-    blur: int = 0
-) -> torch.Tensor:
+def process_inpaint_mask(mask: torch.Tensor, invert: bool = False, grow: int = 0, blur: int = 0) -> torch.Tensor:
     """Process an inpainting mask tensor using pure PyTorch operations.
 
     Mask semantics:
@@ -59,10 +54,7 @@ def process_inpaint_mask(
 
 
 def process_attention_mask(
-    mask: Optional[torch.Tensor],
-    invert: bool = False,
-    mode: str = "hard",
-    token_grid: Optional[Tuple[int, int]] = None
+    mask: Optional[torch.Tensor], invert: bool = False, mode: str = "hard", token_grid: Optional[Tuple[int, int]] = None
 ) -> Optional[torch.Tensor]:
     """Process a reference attention mask tensor."""
     if mask is None:

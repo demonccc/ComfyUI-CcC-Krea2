@@ -45,6 +45,7 @@ def test_readme_links_and_quickstart_contract():
     # Canonical Ostris does NOT patch MODEL
     assert "patch_ostris_model (object patch)" not in content
 
+
 def test_architecture_doc_contracts():
     content = read_repo_file("ARCHITECTURE.md")
 
@@ -55,10 +56,19 @@ def test_architecture_doc_contracts():
     assert "favor_image" in content
 
     # Check new requirements
-    assert "Layer 3: Generic Reference Image" in content or "Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image)" in content
-    assert "Advanced pipeline is **generic infrastructure**, while the Easy Edit node provides the **opinionated recipe**." in content
+    assert (
+        "Layer 3: Generic Reference Image" in content
+        or "Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image)" in content
+    )
+    assert (
+        "Advanced pipeline is **generic infrastructure**, while the Easy Edit node provides the **opinionated recipe**."
+        in content
+    )
     assert "VAE-encoded target_image" in content
-    assert "Global Vision Directive, negative prompt" not in content # negative context shouldn't have global vision directive
+    assert (
+        "Global Vision Directive, negative prompt" not in content
+    )  # negative context shouldn't have global vision directive
+
 
 def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     content = read_repo_file("NODES.md")
@@ -101,6 +111,7 @@ def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     for node_name in required_nodes:
         assert node_name in content, f"Node class name {node_name} not found in NODES.md"
 
+
 def test_changelog_contracts():
     changelog = read_repo_file("CHANGELOG.md")
 
@@ -110,13 +121,18 @@ def test_changelog_contracts():
     assert "Documented README Favor Subject subject_image requirement" not in changelog
     assert "768px / 1024px without upscale" not in changelog
 
-    assert "Ostris KV cache remains unsupported and raises NotImplementedError when requested." in changelog or "Ostris KV cache remains unsupported" in changelog
+    assert (
+        "Ostris KV cache remains unsupported and raises NotImplementedError when requested." in changelog
+        or "Ostris KV cache remains unsupported" in changelog
+    )
+
 
 def test_markdown_links():
     import re
+
     # check that all workflow JSON links in README are valid
     content = read_repo_file("README.md")
-    links = re.findall(r'\]\((workflows/[^\)]+\.json)\)', content)
+    links = re.findall(r"\]\((workflows/[^\)]+\.json)\)", content)
     for link in links:
         path = os.path.join(REPO_ROOT, link)
         assert os.path.exists(path), f"Markdown link {link} in README does not point to a valid file."

@@ -34,10 +34,7 @@ def get_style_processing_image_count(mode: str) -> int:
     raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
 
 
-def slice_style_image(
-    image: torch.Tensor,
-    mode: str = "2x2"
-) -> List[torch.Tensor]:
+def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tensor]:
     """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using upstream Moodboard shuffled orders."""
     if mode not in VALID_STYLE_PROCESSING_MODES:
         raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
@@ -76,8 +73,7 @@ def slice_style_image(
 
 
 def apply_statistical_style_fidelity(
-    cond_tensor: torch.Tensor,
-    spans_info: List[Union[StyleSpanOperation, Tuple[Tuple[int, int], float, bool]]]
+    cond_tensor: torch.Tensor, spans_info: List[Union[StyleSpanOperation, Tuple[Tuple[int, int], float, bool]]]
 ) -> Tuple[torch.Tensor, bool, List[int]]:
     """Apply Krea2 Moodboard statistical style fidelity and multi-span indirect row removal.
 
@@ -103,15 +99,17 @@ def apply_statistical_style_fidelity(
             ops.append(item)
         elif isinstance(item, tuple) and len(item) == 3:
             (start, end), fidelity, indirect = item
-            ops.append(StyleSpanOperation(
-                logical_reference_id="style",
-                logical_vision_slot=0,
-                physical_qwen_index=0,
-                row_start=start,
-                row_end=end,
-                style_fidelity=fidelity,
-                indirect_style_transfer=indirect
-            ))
+            ops.append(
+                StyleSpanOperation(
+                    logical_reference_id="style",
+                    logical_vision_slot=0,
+                    physical_qwen_index=0,
+                    row_start=start,
+                    row_end=end,
+                    style_fidelity=fidelity,
+                    indirect_style_transfer=indirect,
+                )
+            )
 
     # Step 1: Apply Style Fidelity to all style spans using original row coordinates
     for op in ops:
@@ -146,9 +144,7 @@ def apply_statistical_style_fidelity(
 
 
 def expand_style_reference_spans(
-    spec: StyleReferenceSpec,
-    start_slot: int,
-    clip: Any
+    spec: StyleReferenceSpec, start_slot: int, clip: Any
 ) -> Tuple[List[PreparedVisionImage], int, int]:
     """Expand a StyleReferenceSpec into contiguous physical vision prep image spans.
 
@@ -170,7 +166,7 @@ def expand_style_reference_spans(
             max_mp=prep_spec.semantic_max_mp,
             fixed_mp=prep_spec.semantic_fixed_mp,
             downscale_method=prep_spec.downscale_method_requested,
-            upscale_method=prep_spec.upscale_method_requested
+            upscale_method=prep_spec.upscale_method_requested,
         )
         prepared_crops.append(prep_crop)
 

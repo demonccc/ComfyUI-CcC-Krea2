@@ -3,11 +3,7 @@
 import math
 import torch
 import torch.nn as nn
-from ccc_krea2.patch import (
-    patch_krea2_model,
-    krea2_dit_incontext_forward,
-    _compute_ref_attention_bias_patchified
-)
+from ccc_krea2.patch import patch_krea2_model, krea2_dit_incontext_forward, _compute_ref_attention_bias_patchified
 from ccc_krea2.references import PreparedReference, ReferenceRole
 from ccc_krea2.latents import generate_krea2_latent
 
@@ -122,7 +118,7 @@ def test_wrappersmp_registration_uses_diffusion_model_key():
         spatial_attention_mask=None,
         boost=2.5,
         spatial_hw=(1024, 1024),
-        lat_hw=(16, 16)
+        lat_hw=(16, 16),
     )
 
     patched = patch_krea2_model(model, [prep_ref])
@@ -152,7 +148,7 @@ def test_real_krea2_member_execution_order_and_signatures():
         ref_boosts=[2.5],
         ref_masks=[None],
         mask_modes=["hard"],
-        transformer_options=opts
+        transformer_options=opts,
     )
 
     # 1. Assert _unpack_context, txtfusion and txtmlp called
@@ -203,7 +199,7 @@ def test_5d_temporal_inputs_preserve_all_frames():
         ref_boosts=[1.0],
         ref_masks=[None],
         mask_modes=["hard"],
-        transformer_options={}
+        transformer_options={},
     )
 
     assert out_5d.ndim == 5
@@ -226,7 +222,7 @@ def test_reference_device_and_dtype_alignment():
         ref_boosts=[2.5],
         ref_masks=[None],
         mask_modes=["hard"],
-        transformer_options={}
+        transformer_options={},
     )
 
     assert dit.first_called_count == 2
@@ -252,14 +248,14 @@ def test_unmasked_reference_regions_retain_zero_bias():
         ref_token_grids=[(8, 8)],
         mask_modes=["hard"],
         device=device,
-        dtype=dtype
+        dtype=dtype,
     )
 
     expected_boost_val = math.log(2.5)
     target_start = 77 + 64
     ref_start = 77
 
-    target_to_ref_bias = bias[0, 0, target_start:, ref_start:ref_start+64]
+    target_to_ref_bias = bias[0, 0, target_start:, ref_start : ref_start + 64]
 
     # Unmasked region must equal 0.0 (NO -1e4 penalty!)
     unmasked_tokens = target_to_ref_bias[:, 32:]
@@ -279,6 +275,7 @@ def test_ksampler_latents_remain_raw_vae_latents():
         class InnerModel:
             def process_latent_in(self, lat):
                 return lat * 100.0
+
         model = InnerModel()
 
     model = DummyModelWithProcessLatentIn()
@@ -286,13 +283,7 @@ def test_ksampler_latents_remain_raw_vae_latents():
     base_img = torch.rand((1, 256, 256, 3))
 
     lat_dict = generate_krea2_latent(
-        model=model,
-        vae=vae,
-        width=256,
-        height=256,
-        batch_size=1,
-        latent_source="image",
-        base_image=base_img
+        model=model, vae=vae, width=256, height=256, batch_size=1, latent_source="image", base_image=base_img
     )
 
     assert torch.allclose(lat_dict["samples"], torch.tensor(0.5))

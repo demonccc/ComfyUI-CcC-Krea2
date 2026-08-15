@@ -10,9 +10,7 @@ from ccc_krea2.modular_nodes.target_latent_node import CcCKrea2TargetLatent
 
 def test_target_geometry_fixed():
     th, tw, geom_src, active_mp, src_dims, warnings = resolve_target_geometry(
-        target_geometry="fixed",
-        fixed_mp=1.0,
-        fixed_aspect_ratio="16:9"
+        target_geometry="fixed", fixed_mp=1.0, fixed_aspect_ratio="16:9"
     )
     assert th % 16 == 0
     assert tw % 16 == 0
@@ -24,9 +22,7 @@ def test_target_geometry_favor_subject():
     img = torch.rand(1, 1200, 800, 3)
     subj_prep = prepare_vision_image(image=img, clip=None, mode="native")
     th, tw, geom_src, active_mp, src_dims, warnings = resolve_target_geometry(
-        target_geometry="favor_subject",
-        subject_image=subj_prep,
-        maximum_mp=2.0
+        target_geometry="favor_subject", subject_image=subj_prep, maximum_mp=2.0
     )
     assert th % 16 == 0
     assert tw % 16 == 0
@@ -36,11 +32,7 @@ def test_target_geometry_favor_subject():
 def test_target_latent_empty_content():
     mock_vae = MagicMock()
     lat_dict, info = create_target_latent(
-        vae=mock_vae,
-        target_latent_content="empty",
-        target_geometry="fixed",
-        fixed_mp=1.0,
-        fixed_aspect_ratio="1:1"
+        vae=mock_vae, target_latent_content="empty", target_geometry="fixed", fixed_mp=1.0, fixed_aspect_ratio="1:1"
     )
     assert "samples" in lat_dict
     assert lat_dict["samples"].shape == (1, 16, 124, 124)
@@ -51,20 +43,12 @@ def test_target_latent_missing_vae_raises():
     img = torch.rand(1, 512, 512, 3)
     subj_prep = prepare_vision_image(image=img, clip=None, mode="native")
     with pytest.raises(ValueError, match="VAE is required"):
-        create_target_latent(
-            vae=None,
-            target_latent_content="subject",
-            subject_image=subj_prep
-        )
+        create_target_latent(vae=None, target_latent_content="subject", subject_image=subj_prep)
 
 
 def test_target_latent_empty_without_vae():
     lat_dict, info = create_target_latent(
-        vae=None,
-        target_latent_content="empty",
-        target_geometry="fixed",
-        fixed_mp=1.0,
-        fixed_aspect_ratio="1:1"
+        vae=None, target_latent_content="empty", target_geometry="fixed", fixed_mp=1.0, fixed_aspect_ratio="1:1"
     )
     assert "samples" in lat_dict
     assert lat_dict["samples"].shape == (1, 16, 124, 124)
@@ -83,7 +67,7 @@ def test_target_latent_subject_content():
         subject_image=subj_prep,
         target_geometry="favor_subject",
         maximum_mp=1.0,
-        batch_size=2
+        batch_size=2,
     )
     assert lat_dict["samples"].shape == (2, 16, 64, 64)
     assert "Latent Content: subject" in info
@@ -93,11 +77,7 @@ def test_target_latent_subject_content():
 
 def test_target_latent_scene_content_missing_raises():
     with pytest.raises(ValueError, match="Scene image is required"):
-        create_target_latent(
-            vae=MagicMock(),
-            target_latent_content="scene",
-            scene_image=None
-        )
+        create_target_latent(vae=MagicMock(), target_latent_content="scene", scene_image=None)
 
 
 def test_target_latent_node_execution():
@@ -108,7 +88,7 @@ def test_target_latent_node_execution():
         geometry_mode="fixed",
         target_megapixels=2.0,
         fixed_megapixels=1.0,
-        aspect_ratio="1:1"
+        aspect_ratio="1:1",
     )
     assert lat_dict["samples"].shape[1] == 16
     assert "Geometry Strategy: fixed" in info
@@ -142,7 +122,7 @@ def test_target_latent_scene_content_5d_latent():
         scene_image=scene_prep,
         target_geometry="favor_scene",
         maximum_mp=1.0,
-        batch_size=1
+        batch_size=1,
     )
     assert lat_dict["samples"].shape == (1, 16, 1, 144, 216)
     assert "Latent Content: scene" in info
@@ -161,7 +141,7 @@ def test_target_latent_subject_content_5d_latent():
         subject_image=subj_prep,
         target_geometry="favor_subject",
         maximum_mp=1.0,
-        batch_size=2
+        batch_size=2,
     )
     assert lat_dict["samples"].shape == (2, 16, 1, 144, 216)
 
@@ -191,14 +171,14 @@ def test_target_latent_legacy_translation_precedence():
         scene_image=scene_prep,
         target_geometry="favor_scene",
         maximum_mp=1.0,
-        batch_size=1
+        batch_size=1,
     )
     assert lat_dict["target_vision_context"].target_image is scene_prep
 
 
 def test_target_latent_legacy_geometry_favor_subject():
-    img_subj = torch.rand(1, 400, 300, 3) # 3:4
-    img_scene = torch.rand(1, 300, 400, 3) # 4:3
+    img_subj = torch.rand(1, 400, 300, 3)  # 3:4
+    img_scene = torch.rand(1, 300, 400, 3)  # 4:3
     subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
     scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
     mock_vae = MagicMock()
@@ -211,14 +191,14 @@ def test_target_latent_legacy_geometry_favor_subject():
         scene_image=scene_prep,
         target_geometry="favor_subject",
         maximum_mp=1.0,
-        batch_size=1
+        batch_size=1,
     )
     assert "Content Source Size: 300 x 400" in info
 
 
 def test_target_latent_legacy_geometry_favor_scene():
-    img_subj = torch.rand(1, 400, 300, 3) # 3:4
-    img_scene = torch.rand(1, 300, 400, 3) # 4:3
+    img_subj = torch.rand(1, 400, 300, 3)  # 3:4
+    img_scene = torch.rand(1, 300, 400, 3)  # 4:3
     subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
     scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
     mock_vae = MagicMock()
@@ -231,7 +211,7 @@ def test_target_latent_legacy_geometry_favor_scene():
         scene_image=scene_prep,
         target_geometry="favor_scene",
         maximum_mp=1.0,
-        batch_size=1
+        batch_size=1,
     )
     assert "Content Source Size: 300 x 400" in info
     assert "Content Target Size: 400 x 304" in info
@@ -250,6 +230,5 @@ def test_target_latent_strict_image_content():
             subject_image=subj_prep,
             target_geometry="favor_image",
             maximum_mp=1.0,
-            batch_size=1
+            batch_size=1,
         )
-

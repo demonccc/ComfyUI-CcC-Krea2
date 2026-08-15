@@ -85,4 +85,3 @@ def test_calculate_t2i_resolution_all_aspect_ratios():
     w_custom, h_custom = calculate_t2i_resolution("custom", 1.0, custom_aspect_width=21, custom_aspect_height=9)
     assert w_custom % 16 == 0 and h_custom % 16 == 0
     assert w_custom > h_custom
-

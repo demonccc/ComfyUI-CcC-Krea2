@@ -20,6 +20,7 @@ def get_lora_names() -> List[str]:
     """Retrieve list of available LoRA filenames from ComfyUI folder_paths, ensuring 'None' is included once."""
     try:
         import folder_paths
+
         raw_list = folder_paths.get_filename_list("loras")
         names = list(raw_list) if raw_list else []
         if "None" not in names:
@@ -38,6 +39,7 @@ class SlotLoraLoader:
         self._cache = {}
         try:
             import nodes
+
             if hasattr(nodes, "LoraLoaderModelOnly"):
                 self.native_loader = nodes.LoraLoaderModelOnly()
         except Exception:
@@ -51,7 +53,9 @@ class SlotLoraLoader:
                     return res[0]
                 return res
             except Exception as e:
-                logger.debug(f"Native LoraLoaderModelOnly call failed in slot {self.slot_index}, falling back to API: {e}")
+                logger.debug(
+                    f"Native LoraLoaderModelOnly call failed in slot {self.slot_index}, falling back to API: {e}"
+                )
 
         # Fallback adapter using ComfyUI APIs
         import folder_paths
@@ -165,12 +169,7 @@ class CcCKrea2LoRAStack:
             effective_strength = l_strength * global_strength
 
             # Active LoRA condition
-            is_active = (
-                l_enabled
-                and l_name is not None
-                and str(l_name) != "None"
-                and effective_strength != 0.0
-            )
+            is_active = l_enabled and l_name is not None and str(l_name) != "None" and effective_strength != 0.0
 
             if is_active:
                 current_model = self.loaders[slot_idx].load(current_model, str(l_name), effective_strength)

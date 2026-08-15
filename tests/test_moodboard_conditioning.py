@@ -5,20 +5,16 @@ import pytest
 from ccc_krea2.conditioning import (
     extract_vision_spans_from_tokens,
     resolve_qwen_token_stream,
-    encode_krea2_qwen_context
+    encode_krea2_qwen_context,
 )
-from ccc_krea2.style_processing import (
-    apply_statistical_style_fidelity,
-    StyleSpanOperation,
-    slice_style_image
-)
+from ccc_krea2.style_processing import apply_statistical_style_fidelity, StyleSpanOperation, slice_style_image
 from ccc_krea2.reference_specs import (
     SubjectReferenceSpec,
     SceneReferenceSpec,
     StyleReferenceSpec,
     ReferenceChain,
     PreparedVisionImage,
-    VisionPrepSpec
+    VisionPrepSpec,
 )
 from ccc_krea2.reference_slots import resolve_reference_slots_and_aliases
 from ccc_krea2.reference_directives import build_automatic_role_directive
@@ -51,11 +47,25 @@ class DummyClip:
 
 def make_dummy_prep_image(shape=(1, 512, 512, 3)):
     tensor = torch.zeros(shape, dtype=torch.float32)
-    spec = VisionPrepSpec("native", 0.0, 1.0, 1.0, "auto", "auto", "Qwen3-VL", 32, {"min_pixels": 3136, "max_pixels": 12845056})
-    return PreparedVisionImage(tensor, tensor, spec, {"src_hw": (shape[1], shape[2]), "prep_hw": (shape[1], shape[2]), "direction": "none", "resolved_method": "none", "config": None})
+    spec = VisionPrepSpec(
+        "native", 0.0, 1.0, 1.0, "auto", "auto", "Qwen3-VL", 32, {"min_pixels": 3136, "max_pixels": 12845056}
+    )
+    return PreparedVisionImage(
+        tensor,
+        tensor,
+        spec,
+        {
+            "src_hw": (shape[1], shape[2]),
+            "prep_hw": (shape[1], shape[2]),
+            "direction": "none",
+            "resolved_method": "none",
+            "config": None,
+        },
+    )
 
 
 # --- 14.1 Real Span Mapping Tests ---
+
 
 def test_real_span_mapping_with_text_prefix_and_bhwc_data():
     img1 = torch.zeros((1, 512, 512, 3), dtype=torch.float32)  # 512/16 = 32, 32*32/4 = 256 rows
@@ -64,7 +74,7 @@ def test_real_span_mapping_with_text_prefix_and_bhwc_data():
     tok_pairs = [
         [100, None],  # Normal text token
         [{"type": "image", "data": img1}, None],
-        [{"type": "image", "data": img2}, None]
+        [{"type": "image", "data": img2}, None],
     ]
     tokens = {"qwen3vl_4b": [tok_pairs]}
 
@@ -72,10 +82,7 @@ def test_real_span_mapping_with_text_prefix_and_bhwc_data():
     assert key == "qwen3vl_4b"
     assert pairs == tok_pairs
 
-    phys_map = [
-        {"image": img1, "role": "subject"},
-        {"image": img2, "role": "scene"}
-    ]
+    phys_map = [{"image": img1, "role": "subject"}, {"image": img2, "role": "scene"}]
 
     spans, warnings, key, t_prefix = extract_vision_spans_from_tokens(tokens, phys_map)
     assert key == "qwen3vl_4b"
@@ -114,13 +121,10 @@ def test_encode_krea2_qwen_context_execution():
     phys_images = [img1, img2]
     phys_map = [
         {"image": img1, "role": "subject", "physical_qwen_image_index": 1},
-        {"image": img2, "role": "scene", "physical_qwen_image_index": 2}
+        {"image": img2, "role": "scene", "physical_qwen_image_index": 2},
     ]
     encoded = encode_krea2_qwen_context(
-        clip=clip,
-        prompt="a test prompt",
-        physical_images=phys_images,
-        physical_image_map=phys_map
+        clip=clip, prompt="a test prompt", physical_images=phys_images, physical_image_map=phys_map
     )
     assert encoded.pos_rows_before == 321
     assert len(encoded.vision_row_spans) == 2
@@ -128,21 +132,32 @@ def test_encode_krea2_qwen_context_execution():
 
 # --- 14.2 Style Fidelity Tests ---
 
+
 def test_style_fidelity_identity_and_statistical_target():
     cond = torch.randn(1, 10, 24)  # 24 is divisible by 12
 
     # Fidelity 1.0 (Exact Identity)
     op_identity = StyleSpanOperation(
-        logical_reference_id="style", logical_vision_slot=1, physical_qwen_index=1,
-        row_start=2, row_end=6, style_fidelity=1.0, indirect_style_transfer=False
+        logical_reference_id="style",
+        logical_vision_slot=1,
+        physical_qwen_index=1,
+        row_start=2,
+        row_end=6,
+        style_fidelity=1.0,
+        indirect_style_transfer=False,
     )
     res_id, _, _ = apply_statistical_style_fidelity(cond, [op_identity])
     assert torch.allclose(cond[:, 2:6], res_id[:, 2:6])
 
     # Fidelity 0.0 (Statistical Target)
     op_target = StyleSpanOperation(
-        logical_reference_id="style", logical_vision_slot=1, physical_qwen_index=1,
-        row_start=2, row_end=6, style_fidelity=0.0, indirect_style_transfer=False
+        logical_reference_id="style",
+        logical_vision_slot=1,
+        physical_qwen_index=1,
+        row_start=2,
+        row_end=6,
+        style_fidelity=0.0,
+        indirect_style_transfer=False,
     )
     res_tgt, _, _ = apply_statistical_style_fidelity(cond, [op_target])
     assert not torch.allclose(cond[:, 2:6], res_tgt[:, 2:6])
@@ -163,16 +178,27 @@ def test_slice_style_image_modes():
 
 # --- 14.3 Indirect Style Transfer Tests ---
 
+
 def test_indirect_style_transfer_single_operation_keep_mask():
     cond = torch.randn(1, 20, 24)
 
     op_dir = StyleSpanOperation(
-        logical_reference_id="style1", logical_vision_slot=1, physical_qwen_index=1,
-        row_start=2, row_end=5, style_fidelity=0.5, indirect_style_transfer=False
+        logical_reference_id="style1",
+        logical_vision_slot=1,
+        physical_qwen_index=1,
+        row_start=2,
+        row_end=5,
+        style_fidelity=0.5,
+        indirect_style_transfer=False,
     )
     op_indir = StyleSpanOperation(
-        logical_reference_id="style2", logical_vision_slot=2, physical_qwen_index=2,
-        row_start=10, row_end=15, style_fidelity=0.0, indirect_style_transfer=True
+        logical_reference_id="style2",
+        logical_vision_slot=2,
+        physical_qwen_index=2,
+        row_start=10,
+        row_end=15,
+        style_fidelity=0.0,
+        indirect_style_transfer=True,
     )
 
     res, indirect_applied, removed_indices = apply_statistical_style_fidelity(cond, [op_dir, op_indir])
@@ -182,6 +208,7 @@ def test_indirect_style_transfer_single_operation_keep_mask():
 
 
 # --- 14.4 Physical Directive Mapping & Slot Ordering Tests ---
+
 
 def test_style_before_non_style_is_rejected():
     prep = make_dummy_prep_image()
@@ -195,9 +222,11 @@ def test_style_before_non_style_is_rejected():
         style_fidelity=0.5,
         style_processing="2x2",
         indirect_style_transfer=True,
-        style_directive="modern"
+        style_directive="modern",
     )
-    s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto")
+    s_subj = SubjectReferenceSpec(
+        "subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto"
+    )
 
     chain = ReferenceChain().append(s_style).append(s_subj)
     with pytest.raises(ValueError) as excinfo:
@@ -207,7 +236,9 @@ def test_style_before_non_style_is_rejected():
 
 def test_conflicting_literal_alias_raises_error():
     prep = make_dummy_prep_image()
-    s_subj = SubjectReferenceSpec("subject", prep, 1, "Image 5", ("Image 5",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto")
+    s_subj = SubjectReferenceSpec(
+        "subject", prep, 1, "Image 5", ("Image 5",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto"
+    )
 
     chain = ReferenceChain().append(s_subj)
     with pytest.raises(ValueError) as excinfo:
@@ -217,8 +248,12 @@ def test_conflicting_literal_alias_raises_error():
 
 def test_physical_automatic_directives_for_expanded_style():
     prep = make_dummy_prep_image()
-    s_scene = SceneReferenceSpec("scene", prep, 1, "scene_image", ("scene_image",), "", 1.0, 0.0, None, 1.0, 0.0, "auto")
-    s_subj = SubjectReferenceSpec("subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto")
+    s_scene = SceneReferenceSpec(
+        "scene", prep, 1, "scene_image", ("scene_image",), "", 1.0, 0.0, None, 1.0, 0.0, "auto"
+    )
+    s_subj = SubjectReferenceSpec(
+        "subject", prep, 2, "subject_image", ("subject_image",), "", 1.0, 0.0, 0.0, None, 1.0, 0.0, "auto"
+    )
     s_style = StyleReferenceSpec(
         role="style",
         prepared_image=prep,
@@ -229,7 +264,7 @@ def test_physical_automatic_directives_for_expanded_style():
         style_fidelity=0.5,
         style_processing="2x2",
         indirect_style_transfer=True,
-        style_directive="vibrant"
+        style_directive="vibrant",
     )
 
     chain = ReferenceChain().append(s_scene).append(s_subj).append(s_style)
@@ -245,6 +280,7 @@ def test_physical_automatic_directives_for_expanded_style():
 
 
 # --- 14.5 Krea2Edit Geometry Parity Tests ---
+
 
 def test_krea2edit_geometry_parity_floor_vs_round():
     # External target: 490 x 245 (divisible by 8)
@@ -277,8 +313,13 @@ def test_unvalidated_raw_list_rejected_when_test_helper_disabled():
 def test_style_fidelity_out_of_bounds_raises_error():
     cond = torch.randn(1, 10, 24)
     op_out_of_bounds = StyleSpanOperation(
-        logical_reference_id="style", logical_vision_slot=1, physical_qwen_index=1,
-        row_start=8, row_end=15, style_fidelity=0.5, indirect_style_transfer=False
+        logical_reference_id="style",
+        logical_vision_slot=1,
+        physical_qwen_index=1,
+        row_start=8,
+        row_end=15,
+        style_fidelity=0.5,
+        indirect_style_transfer=False,
     )
     with pytest.raises(ValueError) as excinfo:
         apply_statistical_style_fidelity(cond, [op_out_of_bounds])
@@ -317,12 +358,14 @@ def test_production_qwen_processor_positive_path_with_image_grid_thw(monkeypatch
     fake_calls = []
 
     def fake_process_qwen2vl_images(image_data, min_pixels=None, max_pixels=None, patch_size=None):
-        fake_calls.append({
-            "image_data": image_data,
-            "min_pixels": min_pixels,
-            "max_pixels": max_pixels,
-            "patch_size": patch_size,
-        })
+        fake_calls.append(
+            {
+                "image_data": image_data,
+                "min_pixels": min_pixels,
+                "max_pixels": max_pixels,
+                "patch_size": patch_size,
+            }
+        )
         # Deliberately return fake grids inconsistent with native dimensions:
         # For 512x512 img1: native grid is 32x32=1024 -> 256 rows. Fake grid [1, 16, 16]=256 -> 64 rows.
         # For 256x256 img2: fake grid [1, 8, 8]=64 -> 16 rows.
@@ -392,12 +435,14 @@ def test_integrated_qwen_token_to_span_mapping(monkeypatch):
     fake_calls = []
 
     def fake_process_qwen2vl_images(image_data, min_pixels=None, max_pixels=None, patch_size=None):
-        fake_calls.append({
-            "image_data": image_data,
-            "min_pixels": min_pixels,
-            "max_pixels": max_pixels,
-            "patch_size": patch_size,
-        })
+        fake_calls.append(
+            {
+                "image_data": image_data,
+                "min_pixels": min_pixels,
+                "max_pixels": max_pixels,
+                "patch_size": patch_size,
+            }
+        )
         if len(fake_calls) == 1:
             grid = torch.tensor([[1, 16, 16]], dtype=torch.int64)
         else:
@@ -502,4 +547,3 @@ def test_attach_reference_latents_appends_to_existing():
     assert len(attached_refs) == 2
     assert attached_refs[0] is existing_ref
     assert attached_refs[1] is new_ref
-

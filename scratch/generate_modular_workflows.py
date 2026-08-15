@@ -1,5 +1,6 @@
 """Generate 12 curated modular workflow JSON files in workflows/."""
 
+
 def create_base_nodes():
     return [
         {
@@ -13,7 +14,7 @@ def create_base_nodes():
             "inputs": [],
             "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1]}],
             "properties": {},
-            "widgets_values": ["krea2_dit.safetensors", "default"]
+            "widgets_values": ["krea2_dit.safetensors", "default"],
         },
         {
             "id": 2,
@@ -26,7 +27,7 @@ def create_base_nodes():
             "inputs": [],
             "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2]}],
             "properties": {},
-            "widgets_values": ["qwen2_5_vl.safetensors", "qwen2_5_vl", "default"]
+            "widgets_values": ["qwen2_5_vl.safetensors", "qwen2_5_vl", "default"],
         },
         {
             "id": 3,
@@ -39,8 +40,9 @@ def create_base_nodes():
             "inputs": [],
             "outputs": [{"name": "VAE", "type": "VAE", "links": [3]}],
             "properties": {},
-            "widgets_values": ["krea2_vae.safetensors"]
-        }
+            "widgets_values": ["krea2_vae.safetensors"],
+        },
     ]
+
 
 print("Generator helper script ready.")

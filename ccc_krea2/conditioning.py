@@ -35,7 +35,6 @@ except ImportError:
     KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
 
 
-
 def build_krea2_user_content(
     resolved_references: List[Dict[str, Any]],
     user_prompt: str = "",
@@ -64,11 +63,11 @@ def build_krea2_user_content(
                 marker = VISION_PAD_TOKEN
                 adj = ""
                 if alias_str and instruction:
-                    adj = f" (Style Tile {c_idx+1}, {alias_str}): {instruction}"
+                    adj = f" (Style Tile {c_idx + 1}, {alias_str}): {instruction}"
                 elif alias_str:
-                    adj = f" (Style Tile {c_idx+1}, {alias_str})"
+                    adj = f" (Style Tile {c_idx + 1}, {alias_str})"
                 elif instruction:
-                    adj = f" (Style Tile {c_idx+1}): {instruction}"
+                    adj = f" (Style Tile {c_idx + 1}): {instruction}"
                 blocks.append(f"{marker}{adj}")
         else:
             marker = VISION_PAD_TOKEN
@@ -131,8 +130,7 @@ def build_krea2_negative_user_content(
 
 
 def attach_reference_latents_to_conditioning(
-    conditioning: List[Any],
-    reference_latents: List[torch.Tensor]
+    conditioning: List[Any], reference_latents: List[torch.Tensor]
 ) -> List[Any]:
     """Attach standard ComfyUI reference_latents metadata to conditioning list with append semantics."""
     if not conditioning or not reference_latents:
@@ -140,11 +138,8 @@ def attach_reference_latents_to_conditioning(
 
     try:
         import node_helpers
-        return node_helpers.conditioning_set_values(
-            conditioning,
-            {"reference_latents": reference_latents},
-            append=True
-        )
+
+        return node_helpers.conditioning_set_values(conditioning, {"reference_latents": reference_latents}, append=True)
     except (ImportError, AttributeError):
         # Fallback for isolated environments without node_helpers
         updated_cond = []
@@ -162,20 +157,15 @@ def attach_reference_latents_to_conditioning(
         return updated_cond
 
 
-def attach_reference_latents_method_to_conditioning(
-    conditioning: List[Any],
-    method: str
-) -> List[Any]:
+def attach_reference_latents_method_to_conditioning(conditioning: List[Any], method: str) -> List[Any]:
     """Attach reference_latents_method metadata to conditioning using node_helpers.conditioning_set_values."""
     if not conditioning or not method:
         return conditioning
 
     try:
         import node_helpers
-        return node_helpers.conditioning_set_values(
-            conditioning,
-            {"reference_latents_method": method}
-        )
+
+        return node_helpers.conditioning_set_values(conditioning, {"reference_latents_method": method})
     except (ImportError, AttributeError):
         # Fallback for isolated environments without node_helpers
         updated_cond = []
@@ -187,8 +177,6 @@ def attach_reference_latents_method_to_conditioning(
             else:
                 updated_cond.append(cond_tuple)
         return updated_cond
-
-
 
 
 def build_annotated_user_prompt(
@@ -251,9 +239,7 @@ def build_role_instructions(role_order: List[ReferenceRole]) -> str:
     instructions = []
 
     if "scene" in role_vals:
-        instructions.append(
-            "Use the scene image for composition, pose, environment, interactions and lighting."
-        )
+        instructions.append("Use the scene image for composition, pose, environment, interactions and lighting.")
 
     if "outfit" in role_vals:
         instructions.append(
@@ -330,23 +316,22 @@ def resolve_qwen_token_stream(tokens: Any, allow_raw_list_test_helper: bool = Fa
     )
 
 
-def calculate_qwen_rows_from_embedded_image(
-    elem: Dict[str, Any],
-    clip: Any,
-    test_mode: bool = False
-) -> int:
+def calculate_qwen_rows_from_embedded_image(elem: Dict[str, Any], clip: Any, test_mode: bool = False) -> int:
     """Calculate Qwen visual output rows directly from embedded token dict 'data' tensor."""
     if "data" not in elem:
         raise ValueError(f"{LOGGER_PREFIX} Embedded token dictionary missing required 'data' image key.")
 
     image_data = elem["data"]
     if not isinstance(image_data, torch.Tensor):
-        raise ValueError(f"{LOGGER_PREFIX} Embedded image 'data' must be a torch.Tensor, got {type(image_data).__name__}.")
+        raise ValueError(
+            f"{LOGGER_PREFIX} Embedded image 'data' must be a torch.Tensor, got {type(image_data).__name__}."
+        )
 
     config = resolve_qwen_encoder_config(clip)
 
     try:
         from comfy.text_encoders.qwen_vl import process_qwen2vl_images
+
         _, image_grid_thw = process_qwen2vl_images(
             image_data,
             min_pixels=config.min_pixels,
@@ -355,7 +340,10 @@ def calculate_qwen_rows_from_embedded_image(
         )
     except ImportError as err:
         import sys
-        is_isolated_test = test_mode or ("comfy" not in sys.modules and "comfy.text_encoders.qwen_vl" not in sys.modules)
+
+        is_isolated_test = test_mode or (
+            "comfy" not in sys.modules and "comfy.text_encoders.qwen_vl" not in sys.modules
+        )
         if is_isolated_test:
             if image_data.ndim == 4:
                 if image_data.shape[1] in (1, 3, 4):
@@ -368,7 +356,9 @@ def calculate_qwen_rows_from_embedded_image(
                 else:
                     ih, iw = image_data.shape[0], image_data.shape[1]
             else:
-                raise ValueError(f"{LOGGER_PREFIX} Unsupported embedded image 'data' tensor shape: {image_data.shape}.") from err
+                raise ValueError(
+                    f"{LOGGER_PREFIX} Unsupported embedded image 'data' tensor shape: {image_data.shape}."
+                ) from err
 
             native_h, native_w = calculate_native_qwen_geometry(ih, iw, config)
             grid_h = native_h // config.patch_size
@@ -380,7 +370,10 @@ def calculate_qwen_rows_from_embedded_image(
             ) from err
     except Exception as err:
         import sys
-        is_isolated_test = test_mode or ("comfy" not in sys.modules and "comfy.text_encoders.qwen_vl" not in sys.modules)
+
+        is_isolated_test = test_mode or (
+            "comfy" not in sys.modules and "comfy.text_encoders.qwen_vl" not in sys.modules
+        )
         if is_isolated_test:
             if image_data.ndim == 4:
                 if image_data.shape[1] in (1, 3, 4):
@@ -393,16 +386,16 @@ def calculate_qwen_rows_from_embedded_image(
                 else:
                     ih, iw = image_data.shape[0], image_data.shape[1]
             else:
-                raise ValueError(f"{LOGGER_PREFIX} Unsupported embedded image 'data' tensor shape: {image_data.shape}.") from err
+                raise ValueError(
+                    f"{LOGGER_PREFIX} Unsupported embedded image 'data' tensor shape: {image_data.shape}."
+                ) from err
 
             native_h, native_w = calculate_native_qwen_geometry(ih, iw, config)
             grid_h = native_h // config.patch_size
             grid_w = native_w // config.patch_size
             image_grid_thw = torch.tensor([[1, grid_h, grid_w]], dtype=torch.int64)
         else:
-            raise RuntimeError(
-                f"{LOGGER_PREFIX} Qwen visual processor failed ({type(err).__name__}: {err})."
-            ) from err
+            raise RuntimeError(f"{LOGGER_PREFIX} Qwen visual processor failed ({type(err).__name__}: {err}).") from err
 
     merge_sq = config.merge_size * config.merge_size
     total_rows = 0
@@ -474,9 +467,13 @@ def extract_vision_spans_from_tokens(
 
         for i, (s, e) in enumerate(adjusted_spans):
             if e <= s:
-                raise ValueError(f"{LOGGER_PREFIX} Vision span validation failed: span {i} has non-positive length ({s}, {e}).")
+                raise ValueError(
+                    f"{LOGGER_PREFIX} Vision span validation failed: span {i} has non-positive length ({s}, {e})."
+                )
             if s < 0:
-                raise ValueError(f"{LOGGER_PREFIX} Vision span validation failed: span {i} start index is negative ({s}).")
+                raise ValueError(
+                    f"{LOGGER_PREFIX} Vision span validation failed: span {i} start index is negative ({s})."
+                )
 
         for i in range(len(adjusted_spans) - 1):
             s1, e1 = adjusted_spans[i]
@@ -484,7 +481,7 @@ def extract_vision_spans_from_tokens(
             if s2 < e1:
                 raise ValueError(
                     f"{LOGGER_PREFIX} Vision span validation failed: overlapping or out-of-order spans detected "
-                    f"at index {i} ({s1}, {e1}) and {i+1} ({s2}, {e2})."
+                    f"at index {i} ({s1}, {e1}) and {i + 1} ({s2}, {e2})."
                 )
 
     return adjusted_spans, warnings, stream_key, template_end
@@ -510,9 +507,7 @@ def encode_krea2_qwen_context(
     except TypeError:
         tokens = clip.tokenize(prompt or "", images=physical_images)
     except Exception as e:
-        raise ValueError(
-            f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}"
-        ) from e
+        raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
     conditioning = clip.encode_from_tokens_scheduled(tokens)
 
@@ -554,15 +549,17 @@ def encode_krea2_qwen_context(
                 fidelity = getattr(spec, "style_fidelity", 1.0)
                 indirect = getattr(spec, "indirect_style_transfer", False)
                 s_start, s_end = vision_row_spans[idx]
-                spans_info.append(StyleSpanOperation(
-                    logical_reference_id=item.get("logical_reference_id", "style"),
-                    logical_vision_slot=item.get("logical_vision_slot", idx + 1),
-                    physical_qwen_index=item.get("physical_qwen_image_index", idx + 1),
-                    row_start=s_start,
-                    row_end=s_end,
-                    style_fidelity=fidelity,
-                    indirect_style_transfer=indirect
-                ))
+                spans_info.append(
+                    StyleSpanOperation(
+                        logical_reference_id=item.get("logical_reference_id", "style"),
+                        logical_vision_slot=item.get("logical_vision_slot", idx + 1),
+                        physical_qwen_index=item.get("physical_qwen_image_index", idx + 1),
+                        row_start=s_start,
+                        row_end=s_end,
+                        style_fidelity=fidelity,
+                        indirect_style_transfer=indirect,
+                    )
+                )
 
         if spans_info:
             new_conditioning = []
@@ -574,8 +571,7 @@ def encode_krea2_qwen_context(
 
                     if isinstance(cond_tensor, torch.Tensor):
                         transformed_tensor, indirect_applied, removed_indices = apply_statistical_style_fidelity(
-                            cond_tensor=cond_tensor,
-                            spans_info=spans_info
+                            cond_tensor=cond_tensor, spans_info=spans_info
                         )
                         removed_row_indices = removed_indices
                         pos_rows_after = transformed_tensor.shape[1]
@@ -638,9 +634,7 @@ def encode_krea2_conditioning(
         except TypeError:
             tokens = clip.tokenize(text, images=grounding_images)
         except Exception as e:
-            raise ValueError(
-                f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}"
-            ) from e
+            raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
         return clip.encode_from_tokens_scheduled(tokens)
 

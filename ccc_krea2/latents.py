@@ -20,7 +20,7 @@ def generate_krea2_latent(
     inpaint_mask_grow: int = 0,
     inpaint_mask_blur: int = 0,
     sampling_resize_mode: str = "fit",
-    sampling_resize_method: str = "auto"
+    sampling_resize_method: str = "auto",
 ) -> Dict[str, Any]:
     """Generate model-driven LATENT dictionary returned to KSampler.
 
@@ -41,7 +41,7 @@ def generate_krea2_latent(
             mode=sampling_resize_mode,
             mask=inpaint_mask,
             mask_interpolation="nearest-exact",
-            resize_method=sampling_resize_method
+            resize_method=sampling_resize_method,
         )
 
         # VAE encode base image directly (RAW VAE latent)
@@ -61,7 +61,7 @@ def generate_krea2_latent(
                 grow=inpaint_mask_grow,
                 blur=inpaint_mask_blur,
                 target_h=height,
-                target_w=width
+                target_w=width,
             )
             processed_mask = _repeat_or_trim_to_batch_size(processed_mask, batch_size)
             latent_dict["noise_mask"] = processed_mask
@@ -72,13 +72,7 @@ def generate_krea2_latent(
     return _generate_empty_latent(model, vae, width, height, batch_size)
 
 
-def _generate_empty_latent(
-    model: Any,
-    vae: Any,
-    width: int,
-    height: int,
-    batch_size: int
-) -> Dict[str, Any]:
+def _generate_empty_latent(model: Any, vae: Any, width: int, height: int, batch_size: int) -> Dict[str, Any]:
     """Generate model-driven empty latent using model.get_empty_latent or latent_format."""
     if hasattr(model, "get_empty_latent"):
         try:
@@ -119,12 +113,7 @@ def _repeat_or_trim_to_batch_size(tensor: torch.Tensor, batch_size: int) -> torc
 
 
 def _process_inpaint_mask(
-    mask: torch.Tensor,
-    invert: bool,
-    grow: int,
-    blur: int,
-    target_h: int,
-    target_w: int
+    mask: torch.Tensor, invert: bool, grow: int, blur: int, target_h: int, target_w: int
 ) -> torch.Tensor:
     """Process inpainting noise_mask tensor using pure PyTorch operations."""
     if mask.is_floating_point():
@@ -150,12 +139,15 @@ def _process_inpaint_mask(
     if blur > 0:
         kernel_size = 2 * blur + 1
         sigma = blur / 2.0
-        coords = torch.arange(
-            kernel_size,
-            device=mask_bchw.device,
-            dtype=mask_bchw.dtype,
-        ) - blur
-        g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
+        coords = (
+            torch.arange(
+                kernel_size,
+                device=mask_bchw.device,
+                dtype=mask_bchw.dtype,
+            )
+            - blur
+        )
+        g = torch.exp(-(coords**2) / (2 * sigma**2))
         kernel_1d = g / g.sum()
 
         kernel_x = kernel_1d.view(1, 1, 1, kernel_size)

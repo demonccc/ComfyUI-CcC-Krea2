@@ -19,8 +19,16 @@ from ccc_krea2.engine import NodeExecutionRequest
 class MockVAE:
     def encode(self, image: torch.Tensor) -> torch.Tensor:
         b = image.shape[0] if image.ndim == 4 else 1
-        h = image.shape[1] if image.ndim == 4 and image.shape[-1] in (1, 3, 4) else (image.shape[-2] if image.ndim == 4 else 16)
-        w = image.shape[2] if image.ndim == 4 and image.shape[-1] in (1, 3, 4) else (image.shape[-1] if image.ndim == 4 else 16)
+        h = (
+            image.shape[1]
+            if image.ndim == 4 and image.shape[-1] in (1, 3, 4)
+            else (image.shape[-2] if image.ndim == 4 else 16)
+        )
+        w = (
+            image.shape[2]
+            if image.ndim == 4 and image.shape[-1] in (1, 3, 4)
+            else (image.shape[-1] if image.ndim == 4 else 16)
+        )
         return torch.ones((b, 16, max(1, h // 8), max(1, w // 8)))
 
 
@@ -45,7 +53,9 @@ def test_grounding_resize_method_wiring(monkeypatch):
     monkeypatch.setattr(geom, "resize_tensor", spy_resize_tensor)
 
     img = torch.rand((1, 512, 512, 3))
-    _ = resize_grounding_image(img, resize_mode="normalize", grounding_preset="custom", grounding_px=256, resize_method="bilinear")
+    _ = resize_grounding_image(
+        img, resize_mode="normalize", grounding_preset="custom", grounding_px=256, resize_method="bilinear"
+    )
 
     assert "bilinear" in called_methods
 
@@ -107,8 +117,12 @@ def test_changing_selected_method_changes_resize_path(monkeypatch):
     monkeypatch.setattr(geom, "resize_tensor", spy_resize_tensor)
 
     img = torch.rand((1, 512, 512, 3))
-    _ = resize_grounding_image(img, resize_mode="normalize", grounding_preset="custom", grounding_px=256, resize_method="bicubic")
-    _ = resize_grounding_image(img, resize_mode="normalize", grounding_preset="custom", grounding_px=256, resize_method="area")
+    _ = resize_grounding_image(
+        img, resize_mode="normalize", grounding_preset="custom", grounding_px=256, resize_method="bicubic"
+    )
+    _ = resize_grounding_image(
+        img, resize_mode="normalize", grounding_preset="custom", grounding_px=256, resize_method="area"
+    )
 
     assert called_methods == ["bicubic", "area"]
 
@@ -118,7 +132,15 @@ def test_hard_attention_mask_uses_nearest_exact(monkeypatch):
     interpolate_modes = []
     orig_interpolate = torch.nn.functional.interpolate
 
-    def spy_interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None, recompute_scale_factor=None, antialias=None):
+    def spy_interpolate(
+        input,
+        size=None,
+        scale_factor=None,
+        mode="nearest",
+        align_corners=None,
+        recompute_scale_factor=None,
+        antialias=None,
+    ):
         interpolate_modes.append(mode)
         kwargs = {}
         if mode in ("bilinear", "bicubic") and antialias is not None:
@@ -142,7 +164,15 @@ def test_soft_attention_mask_uses_bilinear(monkeypatch):
     interpolate_modes = []
     orig_interpolate = torch.nn.functional.interpolate
 
-    def spy_interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None, recompute_scale_factor=None, antialias=None):
+    def spy_interpolate(
+        input,
+        size=None,
+        scale_factor=None,
+        mode="nearest",
+        align_corners=None,
+        recompute_scale_factor=None,
+        antialias=None,
+    ):
         interpolate_modes.append(mode)
         kwargs = {}
         if mode in ("bilinear", "bicubic") and antialias is not None:
@@ -158,7 +188,9 @@ def test_soft_attention_mask_uses_bilinear(monkeypatch):
     _ = prepare_reference(cfg, vae=MockVAE(), model=MockModel(), target_h=256, target_w=256, attention_mask_mode="soft")
 
     assert "bilinear" in interpolate_modes
-    assert "bicubic" not in [m for m in interpolate_modes if "mask" in str(m)]  # mask soft interpolation must be bilinear, not bicubic
+    assert "bicubic" not in [
+        m for m in interpolate_modes if "mask" in str(m)
+    ]  # mask soft interpolation must be bilinear, not bicubic
 
 
 def test_inpainting_mask_uses_nearest_exact(monkeypatch):
@@ -166,7 +198,15 @@ def test_inpainting_mask_uses_nearest_exact(monkeypatch):
     interpolate_modes = []
     orig_interpolate = torch.nn.functional.interpolate
 
-    def spy_interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None, recompute_scale_factor=None, antialias=None):
+    def spy_interpolate(
+        input,
+        size=None,
+        scale_factor=None,
+        mode="nearest",
+        align_corners=None,
+        recompute_scale_factor=None,
+        antialias=None,
+    ):
         interpolate_modes.append(mode)
         kwargs = {}
         if mode in ("bilinear", "bicubic") and antialias is not None:

@@ -22,6 +22,7 @@ class FakeModel:
 
 # --- Tests: LoRA Prompt Settings ---
 
+
 def test_lora_prompt_settings_node_contract():
     node = CcCKrea2LoRAPromptSettings()
     inp = node.INPUT_TYPES()
@@ -86,6 +87,7 @@ def test_lora_prompt_settings_determinism():
 
 
 # --- Tests: LoRA Stack ---
+
 
 def test_lora_stack_node_contract():
     node = CcCKrea2LoRAStack()
@@ -159,6 +161,7 @@ def test_lora_stack_active_loras_applied_in_order_with_effective_strength(monkey
         def fake_load(m, lora_name, strength):
             call_history.append((slot_idx, lora_name, strength))
             return FakeModel(f"{m.name}_{lora_name}_{strength}")
+
         return fake_load
 
     for idx, loader in enumerate(node.loaders):
@@ -213,7 +216,7 @@ def test_lora_stack_duplicate_filenames_applied_independently(monkeypatch):
     call_history = []
 
     for idx, loader in enumerate(node.loaders):
-        monkeypatch.setattr(loader, "load", lambda m, name, s, idx=idx: (call_history.append((idx + 1, name, s)) or m))
+        monkeypatch.setattr(loader, "load", lambda m, name, s, idx=idx: call_history.append((idx + 1, name, s)) or m)
 
     node.apply_loras(
         input_model,

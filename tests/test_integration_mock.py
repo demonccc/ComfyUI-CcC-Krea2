@@ -118,7 +118,7 @@ def test_diffusion_model_wrapper_execution_signature():
         spatial_attention_mask=None,
         boost=2.5,
         spatial_hw=(1024, 1024),
-        lat_hw=(16, 16)
+        lat_hw=(16, 16),
     )
 
     patched = patch_krea2_model(model, [prep_ref])
@@ -165,7 +165,7 @@ def test_explicit_inpaint_base_role_selection():
         vae=MockVAE(),
         source_image=img_src,
         subject_image=img_sub,
-        inpaint_base_role=ReferenceRole.SOURCE
+        inpaint_base_role=ReferenceRole.SOURCE,
     )
     base_src = Krea2EditEngine._resolve_base_image(req_inpaint)
     assert torch.equal(base_src, img_src)
@@ -177,7 +177,7 @@ def test_explicit_inpaint_base_role_selection():
         prompt="test",
         vae=MockVAE(),
         subject_image=img_sub,
-        inpaint_base_role=ReferenceRole.SUBJECT
+        inpaint_base_role=ReferenceRole.SUBJECT,
     )
     base_sub = Krea2EditEngine._resolve_base_image(req_inpaint_sub)
     assert torch.equal(base_sub, img_sub)
@@ -189,7 +189,7 @@ def test_explicit_inpaint_base_role_selection():
         prompt="test",
         vae=MockVAE(),
         scene_image=img_scn,
-        inpaint_base_role=ReferenceRole.SCENE
+        inpaint_base_role=ReferenceRole.SCENE,
     )
     base_scn = Krea2EditEngine._resolve_base_image(req_inpaint_scn)
     assert torch.equal(base_scn, img_scn)
@@ -201,13 +201,7 @@ def test_image_latent_batching_repetition():
     base_img = torch.rand((1, 512, 512, 3))
 
     lat_dict = generate_krea2_latent(
-        model=model,
-        vae=vae,
-        width=1024,
-        height=1024,
-        batch_size=4,
-        latent_source="image",
-        base_image=base_img
+        model=model, vae=vae, width=1024, height=1024, batch_size=4, latent_source="image", base_image=base_img
     )
 
     assert lat_dict["samples"].shape[0] == 4
@@ -239,4 +233,3 @@ def test_all_node_registrations():
         "CcCKrea2TextToImage",
     }
     assert set(NODE_CLASS_MAPPINGS.keys()) == expected
-

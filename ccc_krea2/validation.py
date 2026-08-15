@@ -6,6 +6,7 @@ from .constants import LOGGER_PREFIX
 
 class Krea2ModelValidationError(ValueError):
     """Raised when an incoming model is incompatible with the CcC Krea2 patch."""
+
     pass
 
 
@@ -21,8 +22,7 @@ def validate_krea2_model(model: Any, node_name: str) -> None:
     """
     if model is None:
         raise Krea2ModelValidationError(
-            f"{LOGGER_PREFIX} Error in node '{node_name}': MODEL input is None. "
-            "Please connect a valid Krea 2 model."
+            f"{LOGGER_PREFIX} Error in node '{node_name}': MODEL input is None. Please connect a valid Krea 2 model."
         )
 
     # Check for model object structure

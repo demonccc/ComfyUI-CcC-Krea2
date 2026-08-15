@@ -362,6 +362,7 @@
       },
       "widgets_values": [
         "A photo of a person",
+        true,
         "style_transfer",
         "outfit image",
         "style image",

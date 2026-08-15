@@ -20,12 +20,7 @@ def test_portrait_to_square_crops_top_bottom():
     th, tw = 400, 400
     img, _, _ = make_coordinate_gradient_image(ih, iw)
 
-    res_img, _, meta = apply_reference_fit_transform(
-        image=img,
-        target_h=th,
-        target_w=tw,
-        mode="crop"
-    )
+    res_img, _, meta = apply_reference_fit_transform(image=img, target_h=th, target_w=tw, mode="crop")
 
     # Output spatial dimensions match target
     assert res_img.shape == (1, th, tw, 3)
@@ -51,12 +46,7 @@ def test_landscape_to_square_crops_left_right():
     th, tw = 400, 400
     img, _, _ = make_coordinate_gradient_image(ih, iw)
 
-    res_img, _, _ = apply_reference_fit_transform(
-        image=img,
-        target_h=th,
-        target_w=tw,
-        mode="crop"
-    )
+    res_img, _, _ = apply_reference_fit_transform(image=img, target_h=th, target_w=tw, mode="crop")
 
     assert res_img.shape == (1, th, tw, 3)
 
@@ -83,12 +73,7 @@ def test_crop_dimensions_never_exceed_source():
     ]
     for ih, iw, th, tw in test_cases:
         img = torch.rand((1, ih, iw, 3))
-        res_img, _, _ = apply_reference_fit_transform(
-            image=img,
-            target_h=th,
-            target_w=tw,
-            mode="crop"
-        )
+        res_img, _, _ = apply_reference_fit_transform(image=img, target_h=th, target_w=tw, mode="crop")
         assert res_img.shape == (1, th, tw, 3)
 
 
@@ -101,13 +86,7 @@ def test_image_and_mask_remain_spatially_aligned():
     y_grid = torch.linspace(0.0, 1.0, ih).unsqueeze(1).repeat(1, iw)
     mask = (y_grid >= 0.5).float()
 
-    res_img, res_mask, _ = apply_reference_fit_transform(
-        image=img,
-        target_h=th,
-        target_w=tw,
-        mode="crop",
-        mask=mask
-    )
+    res_img, res_mask, _ = apply_reference_fit_transform(image=img, target_h=th, target_w=tw, mode="crop", mask=mask)
 
     assert res_img.shape == (1, th, tw, 3)
     assert res_mask.shape == (1, th, tw)

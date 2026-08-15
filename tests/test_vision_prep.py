@@ -1,10 +1,7 @@
 """Unit tests for Qwen Vision image prep logic and node."""
 
 import torch
-from ccc_krea2.vision_prep import (
-    prepare_vision_image,
-    format_vision_info
-)
+from ccc_krea2.vision_prep import prepare_vision_image, format_vision_info
 from ccc_krea2.modular_nodes.vision_prep_node import CcCKrea2QwenVisionImagePrep
 
 
@@ -24,26 +21,14 @@ def test_qwen_vision_prep_native_mode():
 
 def test_qwen_vision_prep_adaptive_mode():
     img = torch.rand(1, 4000, 3000, 3)
-    prep = prepare_vision_image(
-        image=img,
-        clip=None,
-        mode="adaptive",
-        min_mp=0.0,
-        max_mp=1.0
-    )
+    prep = prepare_vision_image(image=img, clip=None, mode="adaptive", min_mp=0.0, max_mp=1.0)
     th, tw = prep.debug_metadata["target_hw"]
     assert (th * tw) <= 1_050_000
 
 
 def test_qwen_vision_prep_fixed_mode():
     img = torch.rand(1, 1024, 1024, 3)
-    prep = prepare_vision_image(
-        image=img,
-        clip=None,
-        mode="fixed",
-        fixed_mp=0.5,
-        downscale_method="area"
-    )
+    prep = prepare_vision_image(image=img, clip=None, mode="fixed", fixed_mp=0.5, downscale_method="area")
     th, tw = prep.debug_metadata["target_hw"]
     assert abs((th * tw) - 500_000) < 100_000
 
@@ -62,8 +47,10 @@ def test_qwen_vision_prep_info_formatting():
 
 def test_qwen_vision_prep_introspection_tracking():
     from ccc_krea2.vision_prep import resolve_qwen_encoder_config
+
     class DummyCLIP:
         pass
+
     cfg = resolve_qwen_encoder_config(DummyCLIP())
     assert cfg.introspection_status == "fallback_only"
     assert len(cfg.introspection_warnings) > 0
@@ -73,11 +60,7 @@ def test_qwen_vision_prep_introspection_tracking():
 def test_qwen_vision_prep_node_execution():
     node = CcCKrea2QwenVisionImagePrep()
     img = torch.rand(1, 800, 600, 3)
-    prep_obj, vis_img, info_str = node.process(
-        clip=None,
-        image=img,
-        vision_preparation_mode="native"
-    )
+    prep_obj, vis_img, info_str = node.process(clip=None, image=img, vision_preparation_mode="native")
     assert vis_img.shape[0] == 1
     assert "Prepared Size:" in info_str
 
@@ -96,4 +79,3 @@ def test_vision_prep_import_and_prepare_image_for_qwen():
 
     assert prepared.original_image is original
     assert prepared.vision_image.shape[-1] == 3
-

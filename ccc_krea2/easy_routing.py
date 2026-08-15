@@ -44,6 +44,40 @@ EASY_ROLE_INSTRUCTIONS = {
 }
 
 
+# Centralized default positive prompts for Easy Edit
+EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER = (
+    "Transfer only the outfit and accessories from the outfit reference to the subject. "
+    "Preserve the subject identity, body, pose, framing, and composition. "
+    "Do not preserve the subject clothing. "
+    "Fit the transferred outfit and accessories naturally to the subject. "
+    "Keep accessories physically attached to the subject in a natural way and never floating. "
+    "Do not duplicate accessories."
+)
+
+EASY_DEFAULT_PROMPT_SUBJECT_SCENE = (
+    "Place the subject from the subject reference naturally into the scene reference. "
+    "Preserve the subject identity, body shape, and body proportions. "
+    "Preserve the scene composition, environment, framing, perspective, and spatial layout. "
+    "Adapt the subject naturally to the scene lighting and environment."
+)
+
+EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT = (
+    "Place the subject from the subject reference naturally into the scene reference wearing the outfit and accessories from the outfit reference. "
+    "Preserve the subject identity, body shape, and body proportions. "
+    "Preserve the scene composition, environment, framing, perspective, and spatial layout. "
+    "Do not preserve the subject clothing. "
+    "Fit the transferred outfit and accessories naturally to the subject and the scene. "
+    "Keep accessories physically attached to the subject in a natural way and never floating. "
+    "Do not duplicate accessories."
+)
+
+EASY_DEFAULT_PROMPT_STYLE = (
+    "Apply the visual style from the style reference while preserving the subject identity, content, geometry, framing, and composition. "
+    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. "
+    "Do not copy subjects, objects, or scene content from the style reference."
+)
+
+
 def get_easy_instruction_for_role(role: str) -> str:
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
 
@@ -565,3 +599,85 @@ def route_easy_preset(
         style_config=style_config,
         warnings=tuple(preset_warnings),
     )
+
+
+def resolve_default_positive_prompt(
+    preset: str,
+    has_s: bool,
+    has_sc: bool,
+    has_o: bool,
+    has_st: bool,
+    outfit_source: str = "outfit image",
+    style_source: str = "style image",
+) -> Tuple[bool, str, str]:
+    """Resolve default positive prompt text and internal key for Easy Edit based on preset and connected inputs.
+
+    Returns:
+        (has_default: bool, prompt_text: str, prompt_key: str)
+    """
+    # 1. Subject-only: if only Subject is connected (no Scene, Outfit, or Style), NO default prompt exists.
+    if has_s and not has_sc and not has_o and not has_st:
+        return False, "", "none"
+
+    # 2. No inputs at all: NO default prompt exists.
+    if not has_s and not has_sc and not has_o and not has_st:
+        return False, "", "none"
+
+    base_prompt = ""
+    base_key = ""
+
+    if preset == "outfit_transfer":
+        if has_o:
+            base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+            base_key = "outfit_transfer"
+        elif has_sc:
+            base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+            base_key = "subject_scene"
+    elif preset == "preserve_scene":
+        if has_sc:
+            if has_o:
+                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+                base_key = "subject_scene_outfit"
+            else:
+                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+                base_key = "subject_scene"
+        elif has_o:
+            base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+            base_key = "outfit_transfer"
+    elif preset == "style_transfer":
+        if has_st:
+            base_prompt = EASY_DEFAULT_PROMPT_STYLE
+            base_key = "style"
+        else:
+            if has_sc and has_o:
+                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+                base_key = "subject_scene_outfit"
+            elif has_sc:
+                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+                base_key = "subject_scene"
+            elif has_o:
+                base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+                base_key = "outfit_transfer"
+    else:
+        # Identity presets: flexible, balanced, consistent, preserve_identity, max_identity
+        if has_sc and has_o:
+            base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+            base_key = "subject_scene_outfit"
+        elif has_sc:
+            base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+            base_key = "subject_scene"
+        elif has_o:
+            base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+            base_key = "outfit_transfer"
+
+    # Style clause handling
+    if has_st and preset != "style_transfer":
+        if base_prompt:
+            return True, f"{base_prompt}\n\n{EASY_DEFAULT_PROMPT_STYLE}", f"{base_key}_style"
+        else:
+            return True, EASY_DEFAULT_PROMPT_STYLE, "style"
+
+    if base_prompt:
+        return True, base_prompt, base_key
+
+    return False, "", "none"

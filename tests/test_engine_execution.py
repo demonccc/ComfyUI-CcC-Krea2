@@ -17,11 +17,7 @@ class MockCLIPTokenizer:
         self.tokenize_calls = []
 
     def tokenize(self, text: str, images: List[torch.Tensor] = None, llama_template: str = None) -> dict:
-        self.tokenize_calls.append({
-            "text": text,
-            "images": images,
-            "llama_template": llama_template
-        })
+        self.tokenize_calls.append({"text": text, "images": images, "llama_template": llama_template})
         return {"text": text, "num_images": len(images) if images else 0}
 
     def encode_from_tokens_scheduled(self, tokens: dict) -> List[Tuple[torch.Tensor, dict]]:
@@ -102,7 +98,7 @@ def test_engine_execute_subject_workflow():
         vae=vae,
         subject_image=subject_img,
         preset="balanced",
-        role_order=[ReferenceRole.SUBJECT]
+        role_order=[ReferenceRole.SUBJECT],
     )
 
     patched_model, positive, negative, latent_dict = Krea2EditEngine.execute(req)
@@ -151,7 +147,7 @@ def test_engine_execute_subject_scene_workflow():
         subject_image=subject_img,
         scene_image=scene_img,
         preset="balanced",
-        role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT]
+        role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT],
     )
 
     patched_model, positive, negative, latent_dict = Krea2EditEngine.execute(req)
@@ -187,7 +183,7 @@ def test_engine_execute_inpaint_subject_scene_workflow():
         inpaint_mask=inpaint_mask,
         inpaint_base_role=ReferenceRole.SCENE,
         edit_advanced_settings=EditAdvancedSettings(sampling_resize_mode="crop"),
-        role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT]
+        role_order=[ReferenceRole.SCENE, ReferenceRole.SUBJECT],
     )
 
     patched_model, positive, negative, latent_dict = Krea2EditEngine.execute(req)
@@ -205,6 +201,7 @@ def test_engine_execute_inpaint_subject_scene_workflow():
 
 def test_wrapper_compatibility_fallback_nested_structure():
     """Verify that when ModelPatcher lacks add_wrapper_with_key, patch_krea2_model creates exact nested structure expected by ComfyUI."""
+
     class MockLegacyModel:
         def __init__(self):
             self.model_options = {}

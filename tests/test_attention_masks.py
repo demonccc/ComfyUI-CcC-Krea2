@@ -23,7 +23,7 @@ def test_batch_1_mask_applies_expected_boost():
         ref_token_grids=[(5, 5)],
         mask_modes=["hard"],
         device=torch.device("cpu"),
-        dtype=torch.float32
+        dtype=torch.float32,
     )
 
     assert bias is not None
@@ -54,7 +54,7 @@ def test_batch_2_mask_is_not_silently_ignored_and_uses_first_item():
         ref_token_grids=[(10, 10)],
         mask_modes=["hard"],
         device=torch.device("cpu"),
-        dtype=torch.float32
+        dtype=torch.float32,
     )
 
     assert bias is not None
@@ -86,7 +86,7 @@ def test_hard_and_soft_mask_modes():
         ref_token_grids=[(2, 2)],
         mask_modes=["hard"],
         device=torch.device("cpu"),
-        dtype=torch.float32
+        dtype=torch.float32,
     )
     tgt_to_ref_hard = bias_hard[0, 0, 9:, 5:9]
     assert tgt_to_ref_hard[0, 0].item() == 0.0
@@ -104,7 +104,7 @@ def test_hard_and_soft_mask_modes():
         ref_token_grids=[(2, 2)],
         mask_modes=["soft"],
         device=torch.device("cpu"),
-        dtype=torch.float32
+        dtype=torch.float32,
     )
     tgt_to_ref_soft = bias_soft[0, 0, 9:, 5:9]
     assert abs(tgt_to_ref_soft[0, 0].item() - (0.2 * expected_b_val)) < 1e-4
@@ -127,7 +127,7 @@ def test_regions_outside_mask_retain_zero_additional_bias():
         ref_token_grids=[(5, 5)],
         mask_modes=["hard"],
         device=torch.device("cpu"),
-        dtype=torch.float32
+        dtype=torch.float32,
     )
 
     assert bias is not None

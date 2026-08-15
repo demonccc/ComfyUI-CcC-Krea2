@@ -14,29 +14,91 @@ class CcCKrea2ReferenceImage:
     RETURN_NAMES = ("reference_chain",)
     FUNCTION = "process"
 
-    DESCRIPTION = "Generic Reference Image node for edit (spatial VAE + Qwen vision) and style (Moodboard grid) references."
+    DESCRIPTION = (
+        "Generic Reference Image node for edit (spatial VAE + Qwen vision) and style (Moodboard grid) references."
+    )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "reference_path": (["edit", "style"], {"default": "edit", "tooltip": "Selects edit (spatial appearance/semantic reference) or style (Moodboard grid reference)."}),
-                "prepared_image": ("PREPARED_VISION_IMAGE", {"tooltip": "Prepared vision image from CcC Krea2 Qwen Vision Image Prep."}),
-                "vision_slot": (["auto", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"], {"default": "auto", "tooltip": "Controls Qwen semantic image ordering. This is not the VAE appearance frame."}),
+                "reference_path": (
+                    ["edit", "style"],
+                    {
+                        "default": "edit",
+                        "tooltip": "Selects edit (spatial appearance/semantic reference) or style (Moodboard grid reference).",
+                    },
+                ),
+                "prepared_image": (
+                    "PREPARED_VISION_IMAGE",
+                    {"tooltip": "Prepared vision image from CcC Krea2 Qwen Vision Image Prep."},
+                ),
+                "vision_slot": (
+                    ["auto", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+                    {
+                        "default": "auto",
+                        "tooltip": "Controls Qwen semantic image ordering. This is not the VAE appearance frame.",
+                    },
+                ),
                 "alias": ("STRING", {"default": "", "tooltip": "Alias name for reference tag in prompt."}),
-                "vision_instruction": ("STRING", {"multiline": True, "default": "", "tooltip": "Optional explicit instruction describing what Qwen should use from this reference."}),
-                "attention_boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 8.0, "step": 0.05, "tooltip": "CcC Krea2 Edit only. Multiplies target-to-reference attention. 1.0 is neutral."}),
-                "masked_attention_boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 8.0, "step": 0.05, "tooltip": "CcC Krea2 Edit only. Additional multiplier inside the attention mask."}),
-                "visual_reference_fit": (GENERIC_REFERENCE_FIT_MODES, {"default": "auto", "tooltip": "Specifies fit mode for Krea2 geometry scaling: auto, fit, or crop."}),
-                "style_fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Style path only. Controls style fidelity blending."}),
-                "style_processing": (["full", "2x2", "4x4"], {"default": "2x2", "tooltip": "Style path only. Moodboard tile grid resolution."}),
-                "indirect_style_transfer": ("BOOLEAN", {"default": True, "tooltip": "Style path only. Removes style vision rows post-encoding when True."}),
+                "vision_instruction": (
+                    "STRING",
+                    {
+                        "multiline": True,
+                        "default": "",
+                        "tooltip": "Optional explicit instruction describing what Qwen should use from this reference.",
+                    },
+                ),
+                "attention_boost": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "min": 0.0,
+                        "max": 8.0,
+                        "step": 0.05,
+                        "tooltip": "CcC Krea2 Edit only. Multiplies target-to-reference attention. 1.0 is neutral.",
+                    },
+                ),
+                "masked_attention_boost": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "min": 0.0,
+                        "max": 8.0,
+                        "step": 0.05,
+                        "tooltip": "CcC Krea2 Edit only. Additional multiplier inside the attention mask.",
+                    },
+                ),
+                "visual_reference_fit": (
+                    GENERIC_REFERENCE_FIT_MODES,
+                    {
+                        "default": "auto",
+                        "tooltip": "Specifies fit mode for Krea2 geometry scaling: auto, fit, or crop.",
+                    },
+                ),
+                "style_fidelity": (
+                    "FLOAT",
+                    {
+                        "default": 0.5,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Style path only. Controls style fidelity blending.",
+                    },
+                ),
+                "style_processing": (
+                    ["full", "2x2", "4x4"],
+                    {"default": "2x2", "tooltip": "Style path only. Moodboard tile grid resolution."},
+                ),
+                "indirect_style_transfer": (
+                    "BOOLEAN",
+                    {"default": True, "tooltip": "Style path only. Removes style vision rows post-encoding when True."},
+                ),
             },
-
             "optional": {
                 "previous_references": ("REFERENCE_CHAIN", {"tooltip": "Chained input from previous reference node."}),
                 "attention_mask": ("MASK", {"tooltip": "Optional spatial attention mask."}),
-            }
+            },
         }
 
     def process(
@@ -55,7 +117,7 @@ class CcCKrea2ReferenceImage:
         style_directive: bool = False,
         previous_references: Optional[ReferenceChain] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        **kwargs
+        **kwargs,
     ) -> Tuple[ReferenceChain]:
         if "style_directive" in kwargs:
             style_directive = kwargs["style_directive"]

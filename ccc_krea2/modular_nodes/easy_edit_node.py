@@ -3,7 +3,12 @@
 from typing import Tuple, Optional, Dict, Any
 import torch
 
-from ..easy_routing import resolve_easy_sources, route_easy_preset, get_easy_instruction_for_role
+from ..easy_routing import (
+    resolve_easy_sources,
+    route_easy_preset,
+    get_easy_instruction_for_role,
+    resolve_default_positive_prompt,
+)
 from ..grounding import prepare_easy_krea_vision_image
 from ..vision_prep import prepare_image_for_qwen
 from ..reference_specs import ReferenceSpec, StyleReferenceSpec, ReferenceChain
@@ -33,14 +38,45 @@ class CcCKrea2EasyEdit:
                 "model": ("MODEL", {"tooltip": "Input Diffusion MODEL to edit."}),
                 "clip": ("CLIP", {"tooltip": "Krea2 Qwen CLIP text/vision encoder."}),
                 "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
-                "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
-                "preset": (
-                    ["flexible", "balanced", "consistent", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
-                    {"default": "balanced", "tooltip": "Selects the routing preset recipe."}
+                "positive_prompt": (
+                    "STRING",
+                    {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."},
                 ),
-                "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."}),
-                "style_source": (["style image", "scene image", "subject image"], {"default": "style image", "tooltip": "Source image socket to use for style conditioning."}),
-                "apply_krea2_edit_patch": ("BOOLEAN", {"default": True, "tooltip": "Merged edit LoRA weights do not necessarily include the compatible runtime reference forward."}),
+                "use_default_prompt": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "Automatically resolves system default positive prompt for the active configuration.",
+                    },
+                ),
+                "preset": (
+                    [
+                        "flexible",
+                        "balanced",
+                        "consistent",
+                        "preserve_identity",
+                        "max_identity",
+                        "preserve_scene",
+                        "outfit_transfer",
+                        "style_transfer",
+                    ],
+                    {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
+                ),
+                "outfit_source": (
+                    ["outfit image", "scene image", "style image"],
+                    {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
+                ),
+                "style_source": (
+                    ["style image", "scene image", "subject image"],
+                    {"default": "style image", "tooltip": "Source image socket to use for style conditioning."},
+                ),
+                "apply_krea2_edit_patch": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "Merged edit LoRA weights do not necessarily include the compatible runtime reference forward.",
+                    },
+                ),
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt."}),
@@ -48,7 +84,7 @@ class CcCKrea2EasyEdit:
                 "scene": ("IMAGE", {"tooltip": "Scene reference image."}),
                 "outfit": ("IMAGE", {"tooltip": "Outfit reference image."}),
                 "style": ("IMAGE", {"tooltip": "Style reference image."}),
-            }
+            },
         }
 
     def process(
@@ -57,6 +93,7 @@ class CcCKrea2EasyEdit:
         clip: Any,
         vae: Any,
         positive_prompt: str,
+        use_default_prompt: bool = True,
         preset: str = "balanced",
         outfit_source: str = "outfit image",
         style_source: str = "style image",
@@ -72,6 +109,7 @@ class CcCKrea2EasyEdit:
             clip=clip,
             vae=vae,
             positive_prompt=positive_prompt,
+            use_default_prompt=use_default_prompt,
             negative_prompt=negative_prompt,
             preset=preset,
             outfit_source=outfit_source,
@@ -106,15 +144,52 @@ class CcCKrea2EasyEditOstris:
                 "model": ("MODEL", {"tooltip": "Input Diffusion MODEL to edit."}),
                 "clip": ("CLIP", {"tooltip": "Krea2 Qwen CLIP text/vision encoder."}),
                 "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
-                "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
-                "preset": (
-                    ["flexible", "balanced", "consistent", "preserve_identity", "max_identity", "preserve_scene", "outfit_transfer", "style_transfer"],
-                    {"default": "balanced", "tooltip": "Selects the routing preset recipe."}
+                "positive_prompt": (
+                    "STRING",
+                    {"multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."},
                 ),
-                "outfit_source": (["outfit image", "scene image", "style image"], {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."}),
-                "style_source": (["style image", "scene image", "subject image"], {"default": "style image", "tooltip": "Source image socket to use for style conditioning."}),
-                "apply_ostris_edit_patch": ("BOOLEAN", {"default": True, "tooltip": "When enabled, CcC explicitly selects index_timestep_zero reference behavior. Disable only if the connected MODEL/runtime already provides compatible Ostris edit behavior."}),
-                "ostris_kv_cache": ("BOOLEAN", {"default": False, "tooltip": "Currently unavailable in CcC. Intended only for LoRAs trained with ai-toolkit kv_cache."}),
+                "use_default_prompt": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "Automatically resolves system default positive prompt for the active configuration.",
+                    },
+                ),
+                "preset": (
+                    [
+                        "flexible",
+                        "balanced",
+                        "consistent",
+                        "preserve_identity",
+                        "max_identity",
+                        "preserve_scene",
+                        "outfit_transfer",
+                        "style_transfer",
+                    ],
+                    {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
+                ),
+                "outfit_source": (
+                    ["outfit image", "scene image", "style image"],
+                    {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
+                ),
+                "style_source": (
+                    ["style image", "scene image", "subject image"],
+                    {"default": "style image", "tooltip": "Source image socket to use for style conditioning."},
+                ),
+                "apply_ostris_edit_patch": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, CcC explicitly selects index_timestep_zero reference behavior. Disable only if the connected MODEL/runtime already provides compatible Ostris edit behavior.",
+                    },
+                ),
+                "ostris_kv_cache": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "Currently unavailable in CcC. Intended only for LoRAs trained with ai-toolkit kv_cache.",
+                    },
+                ),
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "default": "", "tooltip": "Negative prompt."}),
@@ -122,7 +197,7 @@ class CcCKrea2EasyEditOstris:
                 "scene": ("IMAGE", {"tooltip": "Scene reference image."}),
                 "outfit": ("IMAGE", {"tooltip": "Outfit reference image."}),
                 "style": ("IMAGE", {"tooltip": "Style reference image."}),
-            }
+            },
         }
 
     def process(
@@ -131,6 +206,7 @@ class CcCKrea2EasyEditOstris:
         clip: Any,
         vae: Any,
         positive_prompt: str,
+        use_default_prompt: bool = True,
         preset: str = "balanced",
         outfit_source: str = "outfit image",
         style_source: str = "style image",
@@ -147,6 +223,7 @@ class CcCKrea2EasyEditOstris:
             clip=clip,
             vae=vae,
             positive_prompt=positive_prompt,
+            use_default_prompt=use_default_prompt,
             negative_prompt=negative_prompt,
             preset=preset,
             outfit_source=outfit_source,
@@ -173,10 +250,11 @@ def _execute_easy_edit(
     backend_method: str,
     apply_patch: bool,
     ostris_kv_cache: bool,
-    subject: Optional[torch.Tensor],
-    scene: Optional[torch.Tensor],
-    outfit: Optional[torch.Tensor],
-    style: Optional[torch.Tensor],
+    use_default_prompt: bool = True,
+    subject: Optional[torch.Tensor] = None,
+    scene: Optional[torch.Tensor] = None,
+    outfit: Optional[torch.Tensor] = None,
+    style: Optional[torch.Tensor] = None,
 ) -> Tuple[Any, Any, Any, Dict[str, Any], str]:
     """Thin resolver for Easy Edit nodes delegating directly to shared orchestrator."""
 
@@ -190,10 +268,44 @@ def _execute_easy_edit(
         style_source=style_source,
     )
 
+    # Phase 1.5: Default Positive Prompt Resolution
+    has_default, default_prompt_text, default_prompt_key = resolve_default_positive_prompt(
+        preset=preset,
+        has_s=(resolved_sources.subject is not None),
+        has_sc=(resolved_sources.scene is not None),
+        has_o=(resolved_sources.effective_outfit is not None),
+        has_st=(resolved_sources.effective_style is not None),
+        outfit_source=outfit_source,
+        style_source=style_source,
+    )
+
+    is_subject_only = (
+        resolved_sources.subject is not None
+        and resolved_sources.scene is None
+        and resolved_sources.effective_outfit is None
+        and resolved_sources.effective_style is None
+    )
+
+    effective_use_default = use_default_prompt and has_default and not is_subject_only
+
+    if effective_use_default:
+        effective_positive_prompt = default_prompt_text
+        prompt_source_str = "default"
+        resolved_key_str = default_prompt_key
+    else:
+        effective_positive_prompt = positive_prompt.strip() if positive_prompt else ""
+        prompt_source_str = "custom"
+        resolved_key_str = "none"
+
+        if is_subject_only and not effective_positive_prompt:
+            raise ValueError(
+                "Subject-only Easy Edit requires a positive prompt because no default editing intent is available."
+            )
+
     # Phase 2: Preset Routing
     route = route_easy_preset(resolved_sources, preset=preset)
 
-    is_ostris = (backend_method == "ostris_edit")
+    is_ostris = backend_method == "ostris_edit"
 
     # Phase 3: Construct Generic ReferenceChain
     chain = ReferenceChain()
@@ -233,7 +345,6 @@ def _execute_easy_edit(
         )
         chain = chain.append(spec)
 
-
     if route.style_active and route.style_source is not None:
         style_vlm = prepare_easy_krea_vision_image(route.style_source, preset=preset, role="style")
         prep_style = prepare_image_for_qwen(image=style_vlm, clip=clip, original_image=route.style_source)
@@ -266,7 +377,9 @@ def _execute_easy_edit(
             if is_ostris:
                 g_vlm = preprocess_ostris_vision_image(route.target_geometry_source)
             else:
-                g_vlm = prepare_easy_krea_vision_image(route.target_geometry_source, preset=preset, role="target_geometry")
+                g_vlm = prepare_easy_krea_vision_image(
+                    route.target_geometry_source, preset=preset, role="target_geometry"
+                )
             geometry_prep = prepare_image_for_qwen(image=g_vlm, clip=clip, original_image=route.target_geometry_source)
 
     latent_dict, latent_info = build_target_latent(
@@ -277,7 +390,9 @@ def _execute_easy_edit(
         geometry_image=geometry_prep,
         batch_size=1,
         target_alias=route.target_content_role if route.target_content_role else "",
-        target_vision_instruction=get_easy_instruction_for_role(route.target_content_role) if route.target_content_role else "",
+        target_vision_instruction=get_easy_instruction_for_role(route.target_content_role)
+        if route.target_content_role
+        else "",
     )
 
     # Delegate to canonical shared orchestrator
@@ -287,7 +402,7 @@ def _execute_easy_edit(
         vae=vae,
         references=chain,
         target_latent=latent_dict,
-        positive_prompt=positive_prompt,
+        positive_prompt=effective_positive_prompt,
         negative_prompt=negative_prompt,
         reference_method=backend_method,
         apply_model_patch=apply_patch,
@@ -303,6 +418,9 @@ def _execute_easy_edit(
         f"Reference Contract: {backend_method}",
         f"Outfit Source Selector: {outfit_source}",
         f"Style Source Selector: {style_source}",
+        f"Use Default Prompt: {'yes' if effective_use_default else 'no'}",
+        f"Prompt Source: {prompt_source_str}",
+        f"Default Prompt Key: {resolved_key_str}",
         f"Resolved Subject: {'present' if resolved_sources.subject is not None else 'missing'}",
         f"Resolved Scene: {'present' if resolved_sources.scene is not None else 'missing'}",
         f"Resolved Outfit Source: {outfit_source} ({'present' if resolved_sources.effective_outfit is not None else 'missing'})",
@@ -320,14 +438,18 @@ def _execute_easy_edit(
     if backend_method == "krea2_edit":
         easy_header.append(f"CcC Krea2 Model Patch Applied: {'yes' if apply_patch else 'no'}")
     elif backend_method == "ostris_edit":
-        easy_header.append(f"Ostris Reference Method Explicitly Applied: {'yes (conditioning metadata)' if apply_patch else 'no (external runtime expected)'}")
+        easy_header.append(
+            f"Ostris Reference Method Explicitly Applied: {'yes (conditioning metadata)' if apply_patch else 'no (external runtime expected)'}"
+        )
     else:
         easy_header.append(f"Model Patch Applied: {'yes' if apply_patch else 'no'}")
 
-    easy_header.extend([
-        f"Warnings: {'; '.join(route.warnings) if route.warnings else 'none'}",
-        "",
-    ])
+    easy_header.extend(
+        [
+            f"Warnings: {'; '.join(route.warnings) if route.warnings else 'none'}",
+            "",
+        ]
+    )
 
     combined_info = "\n".join(easy_header) + "\n" + orchestrator_info
     return (patched_model, pos, neg, lat, combined_info)

@@ -15,12 +15,12 @@ from .geometry import resize_tensor
 class ResolvedGeometry:
     mode_requested: str
     mode_resolved: str
-    source_size: Tuple[int, int]          # (W, H)
-    crop_rectangle: Tuple[int, int, int, int] # (left, top, crop_w, crop_h)
-    vae_input_pixel_size: Tuple[int, int] # (W, H)
-    vae_latent_grid_size: Tuple[int, int] # (lat_w, lat_h)
-    target_grid_size: Tuple[int, int]     # (tgt_lat_w, tgt_lat_h)
-    centered_fractional_offset: Tuple[float, float] # (offset_y, offset_x)
+    source_size: Tuple[int, int]  # (W, H)
+    crop_rectangle: Tuple[int, int, int, int]  # (left, top, crop_w, crop_h)
+    vae_input_pixel_size: Tuple[int, int]  # (W, H)
+    vae_latent_grid_size: Tuple[int, int]  # (lat_w, lat_h)
+    target_grid_size: Tuple[int, int]  # (tgt_lat_w, tgt_lat_h)
+    centered_fractional_offset: Tuple[float, float]  # (offset_y, offset_x)
     interpolation_method: str
     whether_interpolation_occurred: bool
 
@@ -29,11 +29,7 @@ CROP_TOL = 0.08  # Krea2Edit upstream near-matched aspect ratio tolerance
 
 
 def resolve_krea2edit_geometry(
-    src_h: int,
-    src_w: int,
-    tgt_h: int,
-    tgt_w: int,
-    fit_mode: str = "auto"
+    src_h: int, src_w: int, tgt_h: int, tgt_w: int, fit_mode: str = "auto"
 ) -> ResolvedGeometry:
     """Resolve Krea2Edit pixel-space geometry and RoPE offsets matching upstream _fit_encode_image logic."""
     tgt_lat_h = tgt_h // 8
@@ -178,9 +174,7 @@ def resolve_krea2edit_geometry(
 
 
 def process_image_and_mask_geometry(
-    image: torch.Tensor,
-    mask: Optional[torch.Tensor],
-    geom: ResolvedGeometry
+    image: torch.Tensor, mask: Optional[torch.Tensor], geom: ResolvedGeometry
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     """Apply exact crop and resize geometry to both image tensor and attention mask tensor in lockstep."""
     if image.ndim == 3:
@@ -220,11 +214,7 @@ def process_image_and_mask_geometry(
 
 
 def resolve_visual_reference_fit(
-    image: torch.Tensor,
-    target_h: int,
-    target_w: int,
-    mode: str = "auto",
-    mask: Optional[torch.Tensor] = None
+    image: torch.Tensor, target_h: int, target_w: int, mode: str = "auto", mask: Optional[torch.Tensor] = None
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
     """Backward compatibility wrapper around resolve_krea2edit_geometry and process_image_and_mask_geometry."""
     if image.ndim == 3:
@@ -245,7 +235,7 @@ def resolve_visual_reference_fit(
         "centered_fractional_offset": geom.centered_fractional_offset,
         "interpolation_method": geom.interpolation_method,
         "whether_interpolation_occurred": geom.whether_interpolation_occurred,
-        "geom": geom
+        "geom": geom,
     }
 
     return fit_img, fit_mask, fit_meta

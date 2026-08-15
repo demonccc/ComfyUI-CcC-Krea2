@@ -91,7 +91,11 @@ def resolve_qwen_encoder_config(clip: Any) -> QwenVisionEncoderConfig:
             warnings.append(f"CLIP vision encoder introspection failed ({type(e).__name__}): {e}")
 
     factor = p_size * m_size
-    sources["factor"] = "derived" if (sources["patch_size"] == "introspected" or sources["merge_size"] == "introspected") else "fallback"
+    sources["factor"] = (
+        "derived"
+        if (sources["patch_size"] == "introspected" or sources["merge_size"] == "introspected")
+        else "fallback"
+    )
 
     if introspection_succeeded:
         status = "succeeded" if not warnings else "partial"
@@ -145,7 +149,7 @@ def calculate_qwen_vision_resolution(
     min_mp: float,
     max_mp: float,
     fixed_mp: float,
-    config: QwenVisionEncoderConfig
+    config: QwenVisionEncoderConfig,
 ) -> Tuple[int, int, int, int, str, str, str]:
     """Calculate prepared vision image dimensions based on mode and Qwen encoder constraints."""
     native_h, native_w = calculate_native_qwen_geometry(image_h, image_w, config)
@@ -223,13 +227,7 @@ def prepare_vision_image(
     config = resolve_qwen_encoder_config(clip)
 
     native_h, native_w, prep_h, prep_w, direction, auto_method, add_adj = calculate_qwen_vision_resolution(
-        image_h=ih,
-        image_w=iw,
-        mode=mode,
-        min_mp=min_mp,
-        max_mp=max_mp,
-        fixed_mp=fixed_mp,
-        config=config
+        image_h=ih, image_w=iw, mode=mode, min_mp=min_mp, max_mp=max_mp, fixed_mp=fixed_mp, config=config
     )
 
     resolved_method = auto_method
@@ -254,7 +252,7 @@ def prepare_vision_image(
         upscale_method_requested=upscale_method,
         encoder_signature=config.encoder_signature,
         resolved_alignment=config.factor,
-        resolved_native_limits={"min_pixels": config.min_pixels, "max_pixels": config.max_pixels}
+        resolved_native_limits={"min_pixels": config.min_pixels, "max_pixels": config.max_pixels},
     )
 
     debug_meta = {
@@ -273,10 +271,7 @@ def prepare_vision_image(
     effective_original = original_image if original_image is not None else image
 
     return PreparedVisionImage(
-        original_image=effective_original,
-        vision_image=vision_image,
-        prep_spec=prep_spec,
-        debug_metadata=debug_meta
+        original_image=effective_original, vision_image=vision_image, prep_spec=prep_spec, debug_metadata=debug_meta
     )
 
 
@@ -295,7 +290,8 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
     prep_area = (ph * pw) / 1_000_000.0
 
     req_method = (
-        spec.downscale_method_requested if meta["direction"] == "downscale"
+        spec.downscale_method_requested
+        if meta["direction"] == "downscale"
         else (spec.upscale_method_requested if meta["direction"] == "upscale" else "auto")
     )
 
@@ -327,7 +323,7 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
         f"Resize Direction: {meta['direction']}",
         f"Resize Method Requested: {req_method}",
         f"Resize Method Resolved: {meta['resolved_method']}",
-        f"Expected Additional Geometry Adjustment: {meta['additional_adjustment']}"
+        f"Expected Additional Geometry Adjustment: {meta['additional_adjustment']}",
     ]
 
     return "\n".join(lines)
@@ -335,5 +331,3 @@ def format_vision_info(prep_img: PreparedVisionImage) -> str:
 
 # Alias for prepared vision image creation
 prepare_image_for_qwen = prepare_vision_image
-
-

@@ -52,6 +52,7 @@ def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dic
     """Generate empty SD3-compatible LATENT dictionary matching EmptySD3LatentImage contract."""
     try:
         import nodes
+
         if hasattr(nodes, "EmptySD3LatentImage"):
             res = nodes.EmptySD3LatentImage().generate(width=width, height=height, batch_size=batch_size)
             if isinstance(res, tuple) and len(res) > 0:
@@ -64,6 +65,7 @@ def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dic
     device = "cpu"
     try:
         import comfy.model_management
+
         device = comfy.model_management.intermediate_device()
     except Exception:
         pass

@@ -33,7 +33,7 @@ def resolve_output_resolution(
     custom_aspect_source: str = "auto",
     role_resolution_limit_mode: str = "max_megapixels",
     role_resolution_max_megapixels: float = 2.0,
-    node_name: str = ""
+    node_name: str = "",
 ) -> Tuple[int, int]:
     """Calculate output width and height based on role-based resolution or custom megapixel aspect ratio.
 

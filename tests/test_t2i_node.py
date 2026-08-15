@@ -25,6 +25,7 @@ class FakeCLIP:
 
 class FakeModel:
     """Fake Model object for identity check."""
+
     pass
 
 
@@ -126,13 +127,13 @@ def test_t2i_empty_prompt_augmentation():
 def test_t2i_predefined_aspect_ratios_and_orientation():
     """11, 13, 14. Predefined aspect ratios produce correctly oriented aligned dimensions close to megapixels."""
     ratios = {
-        "1:1": (992, 992),       # ~0.984 MP
-        "4:3": (1152, 864),      # ~0.995 MP (W > H)
-        "3:4": (864, 1152),      # ~0.995 MP (H > W)
-        "16:9": (1328, 752),     # ~0.998 MP (W > H)
-        "9:16": (752, 1328),     # ~0.998 MP (H > W)
-        "3:2": (1232, 816),      # ~1.005 MP (W > H)
-        "2:3": (816, 1232),      # ~1.005 MP (H > W)
+        "1:1": (992, 992),  # ~0.984 MP
+        "4:3": (1152, 864),  # ~0.995 MP (W > H)
+        "3:4": (864, 1152),  # ~0.995 MP (H > W)
+        "16:9": (1328, 752),  # ~0.998 MP (W > H)
+        "9:16": (752, 1328),  # ~0.998 MP (H > W)
+        "3:2": (1232, 816),  # ~1.005 MP (W > H)
+        "2:3": (816, 1232),  # ~1.005 MP (H > W)
     }
 
     for ratio_str, expected_wh in ratios.items():

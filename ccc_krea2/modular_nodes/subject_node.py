@@ -35,9 +35,36 @@ class CcCKrea2SubjectImage:
                 "visual_fit_mode": (["auto", "fit", "crop"], {"default": "auto"}),
                 "attention_boost": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.05}),
                 "masked_attention_boost": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.05}),
-                "pose_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
-                "outfit_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
-                "masked_identity_anchor": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Implementation: Vision directive only"}),
+                "pose_anchor": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Implementation: Vision directive only",
+                    },
+                ),
+                "outfit_anchor": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Implementation: Vision directive only",
+                    },
+                ),
+                "masked_identity_anchor": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Implementation: Vision directive only",
+                    },
+                ),
                 "extra_vision_directive": ("STRING", {"default": "", "multiline": True}),
                 "vision_slot": ("INT", {"default": 0, "min": 0, "max": 16, "step": 1}),
                 "aliases": ("STRING", {"default": ""}),
@@ -45,7 +72,7 @@ class CcCKrea2SubjectImage:
             "optional": {
                 "attention_mask": ("MASK",),
                 "reference_chain": ("REFERENCE_CHAIN",),
-            }
+            },
         }
 
     def process(
@@ -62,7 +89,7 @@ class CcCKrea2SubjectImage:
         aliases="",
         attention_mask=None,
         reference_chain=None,
-        **kwargs
+        **kwargs,
     ):
         chain = reference_chain or kwargs.get("previous_references")
         if chain is None:
@@ -89,7 +116,7 @@ class CcCKrea2SubjectImage:
             attention_mask=attention_mask,
             masked_attention_boost=masked_attention_boost,
             masked_identity_anchor=masked_identity_anchor,
-            visual_fit_mode=visual_fit_mode
+            visual_fit_mode=visual_fit_mode,
         )
 
         return (chain.append(spec),)

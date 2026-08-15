@@ -8,6 +8,7 @@ import torch
 @dataclass(frozen=True)
 class VisionPrepSpec:
     """Specification describing how a vision image derivative was prepared for Qwen Vision."""
+
     mode: str  # "native", "adaptive", "fixed"
     semantic_min_mp: float
     semantic_max_mp: float
@@ -22,6 +23,7 @@ class VisionPrepSpec:
 @dataclass(frozen=True)
 class PreparedVisionImage:
     """Wrapper storing untouched original image and derived Qwen Vision image."""
+
     original_image: torch.Tensor
     vision_image: torch.Tensor
     prep_spec: VisionPrepSpec
@@ -31,6 +33,7 @@ class PreparedVisionImage:
 @dataclass(frozen=True)
 class ReferenceSpec:
     """Generic declarative specification for an edit or style reference image."""
+
     reference_path: str = "edit"  # "edit" or "style"
     prepared_image: Optional[PreparedVisionImage] = None
     requested_vision_slot: Optional[int] = None
@@ -80,7 +83,6 @@ class ReferenceSpec:
         if self.visual_fit_mode and self.visual_reference_fit == "auto":
             object.__setattr__(self, "visual_reference_fit", self.visual_fit_mode)
 
-
     @property
     def get_role(self) -> str:
         if self._legacy_role:
@@ -97,6 +99,7 @@ BaseReferenceSpec = ReferenceSpec
 @dataclass(frozen=True)
 class SubjectReferenceSpec(ReferenceSpec):
     """Deprecated compatibility wrapper for Subject reference."""
+
     def __post_init__(self):
         super().__post_init__()
         object.__setattr__(self, "reference_path", "edit")
@@ -107,6 +110,7 @@ class SubjectReferenceSpec(ReferenceSpec):
 @dataclass(frozen=True)
 class SceneReferenceSpec(ReferenceSpec):
     """Deprecated compatibility wrapper for Scene reference."""
+
     def __post_init__(self):
         super().__post_init__()
         object.__setattr__(self, "reference_path", "edit")
@@ -117,6 +121,7 @@ class SceneReferenceSpec(ReferenceSpec):
 @dataclass(frozen=True)
 class OutfitReferenceSpec(ReferenceSpec):
     """Deprecated compatibility wrapper for Outfit reference."""
+
     def __post_init__(self):
         super().__post_init__()
         object.__setattr__(self, "reference_path", "edit")
@@ -127,6 +132,7 @@ class OutfitReferenceSpec(ReferenceSpec):
 @dataclass(frozen=True)
 class StyleReferenceSpec(ReferenceSpec):
     """Deprecated compatibility wrapper for Style reference."""
+
     def __post_init__(self):
         super().__post_init__()
         object.__setattr__(self, "reference_path", "style")
@@ -137,6 +143,7 @@ class StyleReferenceSpec(ReferenceSpec):
 @dataclass(frozen=True)
 class ReferenceChain:
     """Immutable sequence of ReferenceSpec items."""
+
     specs: Tuple[ReferenceSpec, ...] = ()
 
     @property
@@ -155,4 +162,3 @@ class ReferenceChain:
 
     def __getitem__(self, idx):
         return self.specs[idx]
-

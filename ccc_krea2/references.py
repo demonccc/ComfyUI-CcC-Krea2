@@ -47,7 +47,7 @@ def prepare_reference(
     target_h: int,
     target_w: int,
     reference_fit_mode: Optional[str] = None,
-    attention_mask_mode: str = "hard"
+    attention_mask_mode: str = "hard",
 ) -> Optional[PreparedReference]:
     """Prepare reference for dual-path pipeline: Qwen3-VL grounding and VAE reference latent."""
     if config.image is None:
@@ -66,7 +66,7 @@ def prepare_reference(
         grounding_px=config.grounding_px,
         grounding_min_px=config.grounding_min_px,
         grounding_max_px=config.grounding_max_px,
-        resize_method=config.grounding_resize_method
+        resize_method=config.grounding_resize_method,
     )
 
     # 2. VAE Reference Latent Path
@@ -78,7 +78,7 @@ def prepare_reference(
         mode=fit_mode,
         mask=config.attention_mask,
         mask_interpolation=mask_interp,
-        resize_method=config.reference_resize_method
+        resize_method=config.reference_resize_method,
     )
 
     # Invert spatial mask if requested
@@ -102,7 +102,7 @@ def prepare_reference(
         spatial_hw=(spatial_h, spatial_w),
         lat_hw=(lat_h, lat_w),
         mask_mode=attention_mask_mode,
-        ref_fit_meta=ref_fit_meta
+        ref_fit_meta=ref_fit_meta,
     )
 
 

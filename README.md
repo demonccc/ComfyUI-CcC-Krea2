@@ -78,6 +78,14 @@ The identity presets fall into two distinct structural routing families for Subj
 
 With both **Subject** and **Scene** connected, `Flexible`, `Balanced`, and `Consistent` keep Scene-driven geometry while starting from free target content. `Preserve Identity` and `Max Identity` switch structural anchoring to the Subject. `Preserve Scene` does the opposite, making the Scene the target and geometry anchor.
 
+### System-Managed Default Prompts (`Use Default Prompt`)
+
+Easy Edit nodes include a **Use Default Prompt** toggle (`use_default_prompt`, default `true`):
+
+- **Default Mode (`Use Default Prompt = true`)**: The node automatically resolves an optimized positive prompt based on the active preset and connected reference images (e.g., `subject_scene`, `outfit_transfer`, `subject_scene_outfit`, `style`). When enabled, the prompt field displays the active system prompt and updates automatically as presets or inputs change.
+- **Custom Mode (`Use Default Prompt = false`)**: Gives full prompt control to the user. The text area is editable and preserves user-entered text without being overwritten when presets or connections change.
+- **Subject-only Exception**: When only a Subject image is connected, no default edit intent exists. `Use Default Prompt` is disabled, forcing custom mode, and a non-empty positive prompt is strictly required.
+
 | Goal | Suggested Preset |
 | --- | --- |
 | Maximum freedom while using a Scene reference | **Flexible** |

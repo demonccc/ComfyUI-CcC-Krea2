@@ -367,6 +367,7 @@
       },
       "widgets_values": [
         "A photo of a person",
+        true,
         "balanced",
         "outfit image",
         "style image",

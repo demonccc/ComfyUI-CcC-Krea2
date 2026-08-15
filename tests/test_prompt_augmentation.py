@@ -24,7 +24,9 @@ def test_positive_prepend_and_append_order_and_separator():
     neg = ""
 
     eff_pos, _ = apply_prompt_augmentation(pos, neg, aug)
-    expected = "masterpiece\n\nbest_quality\n\na woman sitting on a bench\n\ncyberpunk style\n\n8k resolution".replace("best_quality", "best quality")
+    expected = "masterpiece\n\nbest_quality\n\na woman sitting on a bench\n\ncyberpunk style\n\n8k resolution".replace(
+        "best_quality", "best quality"
+    )
     assert eff_pos == expected
 
 

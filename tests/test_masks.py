@@ -64,7 +64,7 @@ def test_generate_krea2_latent_inpaint_mask_binary_interpolation():
         base_image=base_img,
         inpaint_mask=inpaint_mask,
         inpaint_mask_blur=0,
-        sampling_resize_mode="crop"
+        sampling_resize_mode="crop",
     )
 
     assert "noise_mask" in latent_dict
@@ -111,17 +111,29 @@ def test_ref_attention_bias_numerical_safety():
 
     # Boost = 1.0 -> No bias added (returns None)
     bias_off = _compute_ref_attention_bias_patchified(
-        boosts=[1.0], txt_len=10, ref_token_lens=[64], tgt_len=64,
-        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
-        device=device, dtype=dtype
+        boosts=[1.0],
+        txt_len=10,
+        ref_token_lens=[64],
+        tgt_len=64,
+        ref_masks=[None],
+        ref_token_grids=[(8, 8)],
+        mask_modes=["hard"],
+        device=device,
+        dtype=dtype,
     )
     assert bias_off is None
 
     # Boost > 1.0 (e.g. 2.5) -> Positive log bias
     bias_high = _compute_ref_attention_bias_patchified(
-        boosts=[2.5], txt_len=10, ref_token_lens=[64], tgt_len=64,
-        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
-        device=device, dtype=dtype
+        boosts=[2.5],
+        txt_len=10,
+        ref_token_lens=[64],
+        tgt_len=64,
+        ref_masks=[None],
+        ref_token_grids=[(8, 8)],
+        mask_modes=["hard"],
+        device=device,
+        dtype=dtype,
     )
     assert bias_high is not None
     assert not torch.isnan(bias_high).any()
@@ -131,9 +143,15 @@ def test_ref_attention_bias_numerical_safety():
 
     # Boost < 1.0 (e.g. 0.5) -> Negative log bias
     bias_low = _compute_ref_attention_bias_patchified(
-        boosts=[0.5], txt_len=10, ref_token_lens=[64], tgt_len=64,
-        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
-        device=device, dtype=dtype
+        boosts=[0.5],
+        txt_len=10,
+        ref_token_lens=[64],
+        tgt_len=64,
+        ref_masks=[None],
+        ref_token_grids=[(8, 8)],
+        mask_modes=["hard"],
+        device=device,
+        dtype=dtype,
     )
     assert bias_low is not None
     assert not torch.isnan(bias_low).any()
@@ -142,9 +160,15 @@ def test_ref_attention_bias_numerical_safety():
 
     # Zero boost (0.0) -> Clamped to 1e-4, no log(0) -inf exception or NaN
     bias_zero = _compute_ref_attention_bias_patchified(
-        boosts=[0.0], txt_len=10, ref_token_lens=[64], tgt_len=64,
-        ref_masks=[None], ref_token_grids=[(8, 8)], mask_modes=["hard"],
-        device=device, dtype=dtype
+        boosts=[0.0],
+        txt_len=10,
+        ref_token_lens=[64],
+        tgt_len=64,
+        ref_masks=[None],
+        ref_token_grids=[(8, 8)],
+        mask_modes=["hard"],
+        device=device,
+        dtype=dtype,
     )
     assert bias_zero is not None
     assert not torch.isnan(bias_zero).any()

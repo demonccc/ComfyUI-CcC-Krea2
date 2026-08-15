@@ -1,12 +1,7 @@
 """Automatic vision directive generation for Subject, Scene, Outfit, and Style roles."""
 
 from typing import List, Dict, Any
-from .reference_specs import (
-    SubjectReferenceSpec,
-    SceneReferenceSpec,
-    OutfitReferenceSpec,
-    StyleReferenceSpec
-)
+from .reference_specs import SubjectReferenceSpec, SceneReferenceSpec, OutfitReferenceSpec, StyleReferenceSpec
 
 
 def build_automatic_role_directive(spec_dict: Dict[str, Any]) -> str:
@@ -59,8 +54,12 @@ def build_automatic_role_directive(spec_dict: Dict[str, Any]) -> str:
         assert isinstance(spec, StyleReferenceSpec)
         if spec.style_directive:
             directives.append(f"{img_id} (referred to as {alias_str}) is the style reference image.")
-            directives.append("Transfer only the color palette, lighting, texture, linework, rendering style, tone, mood, and artistic finish.")
-            directives.append("Do not copy subjects, identities, outfits, objects, poses, backgrounds, or composition layout from the style image.")
+            directives.append(
+                "Transfer only the color palette, lighting, texture, linework, rendering style, tone, mood, and artistic finish."
+            )
+            directives.append(
+                "Do not copy subjects, identities, outfits, objects, poses, backgrounds, or composition layout from the style image."
+            )
             directives.append(f"Apply style fidelity weight {float(spec.style_fidelity):.2f}.")
 
     if spec.extra_vision_directive:

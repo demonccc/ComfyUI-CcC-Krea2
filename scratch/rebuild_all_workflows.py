@@ -38,7 +38,9 @@ def ensure_link(workflow, from_node_id, from_slot, to_node_id, to_input_name, ty
                 link[1] = from_node_id
                 link[2] = from_slot
                 link[3] = to_node_id
-                link[4] = next((idx for idx, inp in enumerate(target_node["inputs"]) if inp["name"] == to_input_name), 0)
+                link[4] = next(
+                    (idx for idx, inp in enumerate(target_node["inputs"]) if inp["name"] == to_input_name), 0
+                )
                 link[5] = type_name
                 return existing_link_id
 
@@ -47,14 +49,9 @@ def ensure_link(workflow, from_node_id, from_slot, to_node_id, to_input_name, ty
     to_slot_index = next((idx for idx, inp in enumerate(target_node["inputs"]) if inp["name"] == to_input_name), 0)
 
     target_input["link"] = new_link_id
-    workflow.setdefault("links", []).append([
-        new_link_id,
-        from_node_id,
-        from_slot,
-        to_node_id,
-        to_slot_index,
-        type_name
-    ])
+    workflow.setdefault("links", []).append(
+        [new_link_id, from_node_id, from_slot, to_node_id, to_slot_index, type_name]
+    )
 
     # Also add link_id to outputs of source node if present
     source_node = nodes[from_node_id]
@@ -195,8 +192,11 @@ def process_workflow_file(filepath):
                 "order": 4,
                 "mode": 0,
                 "inputs": [],
-                "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": []}, {"name": "MASK", "type": "MASK", "links": []}],
-                "widgets_values": ["subject.jpg", "image"]
+                "outputs": [
+                    {"name": "IMAGE", "type": "IMAGE", "links": []},
+                    {"name": "MASK", "type": "MASK", "links": []},
+                ],
+                "widgets_values": ["subject.jpg", "image"],
             }
             subj_prep = {
                 "id": 13,
@@ -208,14 +208,14 @@ def process_workflow_file(filepath):
                 "mode": 0,
                 "inputs": [
                     {"name": "clip", "type": "CLIP", "link": None},
-                    {"name": "image", "type": "IMAGE", "link": None}
+                    {"name": "image", "type": "IMAGE", "link": None},
                 ],
                 "outputs": [
                     {"name": "prepared_image", "type": "PREPARED_VISION_IMAGE", "links": []},
                     {"name": "vision_image", "type": "IMAGE", "links": []},
-                    {"name": "vision_info", "type": "STRING", "links": []}
+                    {"name": "vision_info", "type": "STRING", "links": []},
                 ],
-                "widgets_values": ["native", 0.0, 1.0, 1.0, "auto", "auto"]
+                "widgets_values": ["native", 0.0, 1.0, 1.0, "auto", "auto"],
             }
             subj_ref = {
                 "id": 14,
@@ -228,10 +228,10 @@ def process_workflow_file(filepath):
                 "inputs": [
                     {"name": "prepared_image", "type": "PREPARED_VISION_IMAGE", "link": None},
                     {"name": "attention_mask", "type": "MASK", "link": None},
-                    {"name": "reference_chain", "type": "REFERENCE_CHAIN", "link": None}
+                    {"name": "reference_chain", "type": "REFERENCE_CHAIN", "link": None},
                 ],
                 "outputs": [{"name": "reference_chain", "type": "REFERENCE_CHAIN", "links": []}],
-                "widgets_values": ["auto", 1.0, 1.0, 0.0, 0.0, 0.0, "", 0, ""]
+                "widgets_values": ["auto", 1.0, 1.0, 0.0, 0.0, 0.0, "", 0, ""],
             }
             data["nodes"].extend([subj_load, subj_prep, subj_ref])
 
@@ -313,5 +313,6 @@ def process_workflow_file(filepath):
 
 if __name__ == "__main__":
     import glob
+
     for p in sorted(glob.glob("workflows/*.json")):
         process_workflow_file(p)

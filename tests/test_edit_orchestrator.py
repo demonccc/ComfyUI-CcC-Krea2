@@ -45,11 +45,7 @@ def test_edit_orchestrator_execution():
     (chain2,) = scene_node.process(prepared_image=prep, vision_slot="auto", previous_references=chain1)
 
     target_lat, _ = create_target_latent(
-        vae=mock_vae,
-        target_latent_content="empty",
-        target_geometry="fixed",
-        fixed_mp=0.5,
-        fixed_aspect_ratio="1:1"
+        vae=mock_vae, target_latent_content="empty", target_geometry="fixed", fixed_mp=0.5, fixed_aspect_ratio="1:1"
     )
 
     edit_node = CcCKrea2Edit()
@@ -61,7 +57,7 @@ def test_edit_orchestrator_execution():
         target_latent=target_lat,
         positive_prompt="a photo of a person",
         negative_prompt="blurry",
-        global_vision_directive="High quality"
+        global_vision_directive="High quality",
     )
 
     assert pos_out is not None
@@ -93,11 +89,7 @@ def test_edit_info_outfit_anchor_reporting():
     (chain,) = outfit_node.process(prepared_image=prep, vision_slot="auto")
 
     target_lat, _ = create_target_latent(
-        vae=mock_vae,
-        target_latent_content="empty",
-        target_geometry="fixed",
-        fixed_mp=0.5,
-        fixed_aspect_ratio="1:1"
+        vae=mock_vae, target_latent_content="empty", target_geometry="fixed", fixed_mp=0.5, fixed_aspect_ratio="1:1"
     )
 
     edit_node = CcCKrea2Edit()
@@ -112,7 +104,6 @@ def test_edit_info_outfit_anchor_reporting():
     )
 
     assert "Reference [Slot 1 - Outfit]:" in edit_info
-
 
 
 def test_edit_orchestrator_execution_native_5d_latent():
@@ -146,10 +137,7 @@ def test_edit_orchestrator_execution_native_5d_latent():
     scene_node = CcCKrea2SceneImage()
     (chain2,) = scene_node.process(prepared_image=prep, vision_slot="auto", previous_references=chain1)
 
-    target_lat = {
-        "samples": torch.zeros((1, 16, 1, 144, 216)),
-        "batch_index": [0]
-    }
+    target_lat = {"samples": torch.zeros((1, 16, 1, 144, 216)), "batch_index": [0]}
 
     edit_node = CcCKrea2Edit()
     model_out, pos_out, neg_out, lat_out, edit_info = edit_node.process(
@@ -160,7 +148,7 @@ def test_edit_orchestrator_execution_native_5d_latent():
         target_latent=target_lat,
         positive_prompt="a photo of a person in a room",
         negative_prompt="blurry",
-        global_vision_directive="High quality"
+        global_vision_directive="High quality",
     )
 
     assert pos_out is not None
@@ -192,7 +180,7 @@ def test_edit_orchestrator_invalid_latent_dimensions_raises():
             references=chain,
             target_latent={"samples": torch.zeros((16, 144, 216))},
             positive_prompt="test",
-            negative_prompt=""
+            negative_prompt="",
         )
 
     with pytest.raises(ValueError, match="Target latent samples must be a 4D or 5D tensor"):
@@ -203,14 +191,18 @@ def test_edit_orchestrator_invalid_latent_dimensions_raises():
             references=chain,
             target_latent={"samples": torch.zeros((1, 16, 1, 1, 144, 216))},
             positive_prompt="test",
-            negative_prompt=""
+            negative_prompt="",
         )
+
 
 def test_target_vision_generic():
     from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+
     # Setup mocks
     mock_clip = MagicMock()
-    mock_clip.tokenize.return_value = {"qwen3vl": [[ [{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None], [100, None] ]]}
+    mock_clip.tokenize.return_value = {
+        "qwen3vl": [[[{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None], [100, None]]]
+    }
     mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 260, 1536), {}]]
 
     mock_model = MagicMock()
@@ -230,17 +222,26 @@ def test_target_vision_generic():
             target_vision_slot=None,
             target_alias="",
             target_vision_instruction="",
-            target_image=mock_target_image
-        )
+            target_image=mock_target_image,
+        ),
     }
 
     from ccc_krea2.reference_slots import ReferenceChain
+
     mock_vae = MagicMock()
     _, pos_out, _, _, _ = run_krea2_edit_orchestrator(
-        model=mock_model, clip=mock_clip, vae=mock_vae, references=ReferenceChain(), target_latent=target_latent,
-        positive_prompt="raw positive prompt", negative_prompt="",
-        global_vision_directive="", reference_method="native",
-        prompt_augmentation=None, ostris_kv_cache=False, edit_node=None
+        model=mock_model,
+        clip=mock_clip,
+        vae=mock_vae,
+        references=ReferenceChain(),
+        target_latent=target_latent,
+        positive_prompt="raw positive prompt",
+        negative_prompt="",
+        global_vision_directive="",
+        reference_method="native",
+        prompt_augmentation=None,
+        ostris_kv_cache=False,
+        edit_node=None,
     )
 
     # Check the tokenize calls: positive prompt is the first call, negative is the second
@@ -252,11 +253,15 @@ def test_target_vision_generic():
     assert "target scene/context" not in prompt
     assert prompt.endswith("raw positive prompt")
 
+
 def test_target_vision_explicit():
     from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
+
     # Setup mocks
     mock_clip = MagicMock()
-    mock_clip.tokenize.return_value = {"qwen3vl": [[ [{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None], [100, None] ]]}
+    mock_clip.tokenize.return_value = {
+        "qwen3vl": [[[{"type": "image", "data": torch.rand(1, 512, 512, 3)}, None], [100, None]]]
+    }
     mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 260, 1536), {}]]
 
     mock_model = MagicMock()
@@ -276,17 +281,26 @@ def test_target_vision_explicit():
             target_vision_slot=None,
             target_alias="composition",
             target_vision_instruction="Use this reference for camera composition.",
-            target_image=mock_target_image
-        )
+            target_image=mock_target_image,
+        ),
     }
 
     from ccc_krea2.reference_slots import ReferenceChain
+
     mock_vae = MagicMock()
     _, pos_out, _, _, _ = run_krea2_edit_orchestrator(
-        model=mock_model, clip=mock_clip, vae=mock_vae, references=ReferenceChain(), target_latent=target_latent,
-        positive_prompt="raw positive prompt", negative_prompt="",
-        global_vision_directive="", reference_method="native",
-        prompt_augmentation=None, ostris_kv_cache=False, edit_node=None
+        model=mock_model,
+        clip=mock_clip,
+        vae=mock_vae,
+        references=ReferenceChain(),
+        target_latent=target_latent,
+        positive_prompt="raw positive prompt",
+        negative_prompt="",
+        global_vision_directive="",
+        reference_method="native",
+        prompt_augmentation=None,
+        ostris_kv_cache=False,
+        edit_node=None,
     )
 
     pos_prompt_call = mock_clip.tokenize.call_args_list[0]

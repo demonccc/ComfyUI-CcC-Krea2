@@ -59,10 +59,7 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
 
     # Build initial list with assigned logical slots
     for idx, spec in enumerate(chain.references):
-        resolved_unordered.append({
-            "spec": spec,
-            "resolved_slot": slot_assignments[idx]
-        })
+        resolved_unordered.append({"spec": spec, "resolved_slot": slot_assignments[idx]})
 
     # Phase 3: Sort references strictly by resolved logical slot
     resolved_sorted = sorted(resolved_unordered, key=lambda item: item["resolved_slot"])
@@ -139,15 +136,17 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
             physical_qwen_range = (physical_qwen_index, physical_qwen_index)
             physical_qwen_index += 1
 
-        resolved.append({
-            "spec": spec,
-            "resolved_slot": slot,
-            "logical_reference_id": slot,
-            "logical_role": getattr(spec, "reference_path", spec.role.lower()),
-            "logical_vision_slot": slot,
-            "expanded_aliases": tuple(expanded_aliases),
-            "vae_reference_frame": vae_frame,
-            "physical_qwen_range": physical_qwen_range,
-        })
+        resolved.append(
+            {
+                "spec": spec,
+                "resolved_slot": slot,
+                "logical_reference_id": slot,
+                "logical_role": getattr(spec, "reference_path", spec.role.lower()),
+                "logical_vision_slot": slot,
+                "expanded_aliases": tuple(expanded_aliases),
+                "vae_reference_frame": vae_frame,
+                "physical_qwen_range": physical_qwen_range,
+            }
+        )
 
     return resolved, warnings

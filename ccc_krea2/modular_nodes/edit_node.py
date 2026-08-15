@@ -19,19 +19,48 @@ class CcCKrea2Edit:
                 "model": ("MODEL", {"tooltip": "Input Diffusion MODEL to edit."}),
                 "clip": ("CLIP", {"tooltip": "Krea2 Qwen CLIP text/vision encoder."}),
                 "vae": ("VAE", {"tooltip": "VAE encoder/decoder."}),
-                "references": ("REFERENCE_CHAIN", {"tooltip": "Linked list of ReferenceSpecs defining appearance, semantic, and style conditioning."}),
+                "references": (
+                    "REFERENCE_CHAIN",
+                    {"tooltip": "Linked list of ReferenceSpecs defining appearance, semantic, and style conditioning."},
+                ),
                 "target_latent": ("LATENT", {"tooltip": "Target dimensions and noise initialization."}),
-                "positive_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True, "tooltip": "User prompt describing the desired edit."}),
-                "negative_prompt": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True, "tooltip": "Negative prompt."}),
+                "positive_prompt": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "dynamicPrompts": True,
+                        "tooltip": "User prompt describing the desired edit.",
+                    },
+                ),
+                "negative_prompt": (
+                    "STRING",
+                    {"default": "", "multiline": True, "dynamicPrompts": True, "tooltip": "Negative prompt."},
+                ),
             },
             "optional": {
-                "global_vision_directive": ("STRING", {"default": "", "multiline": True, "tooltip": "Optional global instruction pre-pended to all reference prompts."}),
-                "reference_method": (["native", "krea2_edit", "ostris_edit"], {"default": "krea2_edit", "tooltip": "Backend engine used to transport reference information."}),
-                "ostris_kv_cache": ("BOOLEAN", {"default": False, "tooltip": "Unsupported. Reserved for future ai-toolkit kv-cache models."}),
-                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION, {"tooltip": "Slot-based LoRA prompt fragment injection."}),
-            }
+                "global_vision_directive": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "Optional global instruction pre-pended to all reference prompts.",
+                    },
+                ),
+                "reference_method": (
+                    ["native", "krea2_edit", "ostris_edit"],
+                    {"default": "krea2_edit", "tooltip": "Backend engine used to transport reference information."},
+                ),
+                "ostris_kv_cache": (
+                    "BOOLEAN",
+                    {"default": False, "tooltip": "Unsupported. Reserved for future ai-toolkit kv-cache models."},
+                ),
+                "prompt_augmentation": (
+                    CCC_KREA2_PROMPT_AUGMENTATION,
+                    {"tooltip": "Slot-based LoRA prompt fragment injection."},
+                ),
+            },
         }
-
 
     def edit(
         self,
@@ -46,7 +75,7 @@ class CcCKrea2Edit:
         ostris_kv_cache=False,
         prompt_augmentation=None,
         global_vision_directive="",
-        **kwargs
+        **kwargs,
     ):
         patched_model, pos_cond, neg_cond, out_latent, edit_info = run_krea2_edit_orchestrator(
             model=model,
@@ -60,7 +89,7 @@ class CcCKrea2Edit:
             ostris_kv_cache=ostris_kv_cache,
             prompt_augmentation=prompt_augmentation,
             global_vision_directive=global_vision_directive,
-            **kwargs
+            **kwargs,
         )
         return (patched_model, pos_cond, neg_cond, out_latent, edit_info)
 

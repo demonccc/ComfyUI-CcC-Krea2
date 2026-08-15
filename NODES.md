@@ -13,12 +13,29 @@ This document provides the complete specification of all public nodes in the `Co
 - **Required Inputs**:
   - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`): Core models.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
+  - `use_default_prompt` (`BOOLEAN`, default: `True`): Controls system-managed default prompt resolution vs custom user prompt.
   - `preset` (`CHOICE`): `flexible`, `balanced`, `consistent`, `preserve_identity`, `max_identity`, `preserve_scene`, `outfit_transfer`, `style_transfer`.
   - `outfit_source` (`CHOICE`): `outfit image`, `scene image`, `style image` (default: `outfit image`).
   - `style_source` (`CHOICE`): `style image`, `scene image`, `subject image` (default: `style image`).
   - `apply_krea2_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEdit`.
   - `apply_ostris_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEditOstris`.
   - `ostris_kv_cache` (`BOOLEAN`, default: `False`): For `CcCKrea2EasyEditOstris`.
+
+#### System-Managed Default Prompts (`use_default_prompt`)
+
+Easy Edit nodes provide centralized default positive prompt resolution:
+
+- **Default Mode (`use_default_prompt = true`)**: The node automatically resolves an optimized positive prompt based on the active preset and connected reference images. The positive prompt widget displays the actual resolved system prompt and is set to read-only. Changing presets or inputs automatically refreshes the displayed default prompt.
+- **Custom Mode (`use_default_prompt = false`)**: Gives complete prompt control to the user. The positive prompt widget is enabled and editable, preserving user-entered text without modification when presets or input connections change.
+- **Subject-only Exception**: When only a Subject reference is connected, no default edit intent exists. `use_default_prompt` is disabled/greyed out and forced to custom mode. A positive prompt is required; an empty prompt raises a validation error.
+
+##### Default Prompt Keys and Canonical Templates
+
+- `outfit_transfer`: `Transfer only the outfit and accessories from the outfit reference to the subject. Preserve the subject identity, body, pose, framing, and composition. Do not preserve the subject clothing. Fit the transferred outfit and accessories naturally to the subject. Keep accessories physically attached to the subject in a natural way and never floating. Do not duplicate accessories.`
+- `subject_scene`: `Place the subject from the subject reference naturally into the scene reference. Preserve the subject identity, body shape, and body proportions. Preserve the scene composition, environment, framing, perspective, and spatial layout. Adapt the subject naturally to the scene lighting and environment.`
+- `subject_scene_outfit`: `Place the subject from the subject reference naturally into the scene reference wearing the outfit and accessories from the outfit reference. Preserve the subject identity, body shape, and body proportions. Preserve the scene composition, environment, framing, perspective, and spatial layout. Do not preserve the subject clothing. Fit the transferred outfit and accessories naturally to the subject and the scene. Keep accessories physically attached to the subject in a natural way and never floating. Do not duplicate accessories.`
+- `style`: `Apply the visual style from the style reference while preserving the subject identity, content, geometry, framing, and composition. Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. Do not copy subjects, objects, or scene content from the style reference.`
+
 - **Optional Inputs**:
   - `subject`, `scene`, `outfit`, `style` (`IMAGE`): Visual references for routing.
   - `negative_prompt` (`STRING`): Negative text prompt.

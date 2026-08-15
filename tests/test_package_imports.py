@@ -22,7 +22,11 @@ def test_no_absolute_internal_package_imports():
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
                 # Reject level == 0 (absolute) imports targeting ccc_krea2 or ccc_krea2.*
-                if node.level == 0 and node.module and (node.module == "ccc_krea2" or node.module.startswith("ccc_krea2.")):
+                if (
+                    node.level == 0
+                    and node.module
+                    and (node.module == "ccc_krea2" or node.module.startswith("ccc_krea2."))
+                ):
                     rel_path = py_file.relative_to(repo_root)
                     imported_names = ", ".join(alias.name for alias in node.names)
                     stmt = f"from {node.module} import {imported_names}"
@@ -52,9 +56,7 @@ def test_repository_entrypoint_package_loading():
 
     package_name = "test_custom_node_package"
     spec = importlib.util.spec_from_file_location(
-        package_name,
-        str(init_py),
-        submodule_search_locations=[str(repo_root)]
+        package_name, str(init_py), submodule_search_locations=[str(repo_root)]
     )
     assert spec is not None and spec.loader is not None
 

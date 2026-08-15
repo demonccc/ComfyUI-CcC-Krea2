@@ -534,24 +534,20 @@ NODE_CLASS_MAPPINGS = {
     # Modular Easy Nodes
     "CcCKrea2EasyEdit": CcCKrea2EasyEdit,
     "CcCKrea2EasyEditOstris": CcCKrea2EasyEditOstris,
-
     # Modular Reference Pipeline Nodes
     "CcCKrea2QwenVisionImagePrep": CcCKrea2QwenVisionImagePrep,
     "CcCKrea2TargetLatent": CcCKrea2TargetLatent,
     "CcCKrea2ReferenceImage": CcCKrea2ReferenceImage,
     "CcCKrea2Edit": CcCKrea2Edit,
-
     # Compatibility Nodes
     "CcCKrea2SubjectImage": CcCKrea2SubjectImage,
     "CcCKrea2SceneImage": CcCKrea2SceneImage,
     "CcCKrea2OutfitImage": CcCKrea2OutfitImage,
     "CcCKrea2StyleImage": CcCKrea2StyleImage,
-
     # Existing & Utility Nodes
     "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
     "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
     "CcCKrea2TextToImage": CcCKrea2TextToImage,
-
     # Legacy Combined Nodes
     "CcCKrea2Subject": CcCKrea2Subject,
     "CcCKrea2SubjectOutfit": CcCKrea2SubjectOutfit,
@@ -568,24 +564,20 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     # Modular Easy Nodes
     "CcCKrea2EasyEdit": "CcC Krea2 - Easy Edit",
     "CcCKrea2EasyEditOstris": "CcC Krea2 - Easy Edit Ostris",
-
     # Modular Reference Pipeline Nodes
     "CcCKrea2QwenVisionImagePrep": "CcC Krea2 - Qwen Vision Image Prep",
     "CcCKrea2TargetLatent": "CcC Krea2 - Target Latent",
     "CcCKrea2ReferenceImage": "CcC Krea2 - Reference Image",
     "CcCKrea2Edit": "CcC Krea2 - Edit",
-
     # Compatibility Nodes
     "CcCKrea2SubjectImage": "CcC Krea2 - Subject Image (Legacy)",
     "CcCKrea2SceneImage": "CcC Krea2 - Scene Image (Legacy)",
     "CcCKrea2OutfitImage": "CcC Krea2 - Outfit Image (Legacy)",
     "CcCKrea2StyleImage": "CcC Krea2 - Style Image (Legacy)",
-
     # Existing & Utility Nodes
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
     "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
-
     # Legacy Combined Nodes
     "CcCKrea2Subject": "CcC Krea2 - Subject (Legacy)",
     "CcCKrea2SubjectOutfit": "CcC Krea2 - Subject + Outfit (Legacy)",

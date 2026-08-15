@@ -11,6 +11,7 @@ from .geometry import resize_tensor
 @dataclass(frozen=True)
 class TargetVisionContext:
     """Target Vision Context metadata for contributing vision tokens from target source."""
+
     include_in_vision: str = "auto"  # "auto", "yes", "no"
     target_vision_slot: Optional[int] = None  # None ("auto") or int 1..10
     target_alias: str = ""
@@ -37,7 +38,7 @@ def calculate_target_latent_resolution(
     geometry_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Tuple[int, int, str, float, Optional[Tuple[int, int]], list]:
     """Calculate target latent pixel dimensions [H, W] and metadata."""
     if "target_geometry" in kwargs:
@@ -75,7 +76,9 @@ def calculate_target_latent_resolution(
         geometry_source = "fixed_megapixels"
         active_mp = fixed_megapixels
         if fixed_megapixels > 2.0:
-            warnings.append(f"Warning: Fixed MP is set to {fixed_megapixels:.2f} MP, exceeding recommended 2.0 MP limit.")
+            warnings.append(
+                f"Warning: Fixed MP is set to {fixed_megapixels:.2f} MP, exceeding recommended 2.0 MP limit."
+            )
 
         if ":" in aspect_ratio:
             parts = aspect_ratio.split(":")
@@ -105,7 +108,10 @@ def calculate_target_latent_resolution(
     target_h = max(128, int(round(raw_h / 16.0)) * 16)
     target_w = max(128, int(round(raw_w / 16.0)) * 16)
 
-    if geometry_mode in ("favor_image", "favor_subject", "favor_scene") and (target_h * target_w) / 1_000_000.0 > target_megapixels + 0.05:
+    if (
+        geometry_mode in ("favor_image", "favor_subject", "favor_scene")
+        and (target_h * target_w) / 1_000_000.0 > target_megapixels + 0.05
+    ):
         alt_h = max(128, int(math.floor(raw_h / 16.0)) * 16)
         alt_w = max(128, int(math.floor(raw_w / 16.0)) * 16)
         if alt_h >= 128 and alt_w >= 128:
@@ -116,17 +122,15 @@ def calculate_target_latent_resolution(
 
 @dataclass(frozen=True)
 class TargetContentTransform:
-    source_size: Tuple[int, int]              # (W, H)
-    crop_rectangle: Tuple[int, int, int, int] # (left, top, crop_w, crop_h)
-    target_size: Tuple[int, int]              # (target_w, target_h)
-    interpolation: str                         # "bicubic"
+    source_size: Tuple[int, int]  # (W, H)
+    crop_rectangle: Tuple[int, int, int, int]  # (left, top, crop_w, crop_h)
+    target_size: Tuple[int, int]  # (target_w, target_h)
+    interpolation: str  # "bicubic"
     interpolation_applied: bool
 
 
 def adapt_target_content_image(
-    image: torch.Tensor,
-    target_w: int,
-    target_h: int
+    image: torch.Tensor, target_w: int, target_h: int
 ) -> Tuple[torch.Tensor, TargetContentTransform]:
     """Deterministically adapt a source pixel image to fill target geometry for target latent initialization."""
     if image.ndim == 3:
@@ -161,7 +165,7 @@ def adapt_target_content_image(
         crop_rectangle=(left, top, crop_w, crop_h),
         target_size=(target_w, target_h),
         interpolation="bicubic",
-        interpolation_applied=interp_applied
+        interpolation_applied=interp_applied,
     )
     return adapted, transform
 
@@ -208,10 +212,7 @@ def parse_vision_slot_input(slot_input: Any) -> Optional[int]:
         return None
 
 
-def should_include_target_in_vision(
-    ctx: TargetVisionContext,
-    existing_chain: Optional[ReferenceChain] = None
-) -> bool:
+def should_include_target_in_vision(ctx: TargetVisionContext, existing_chain: Optional[ReferenceChain] = None) -> bool:
     """Evaluate whether target vision context should contribute a Qwen vision block.
 
     Auto deduplication logic:
@@ -267,7 +268,7 @@ def create_target_latent(
     target_vision_slot: Any = "auto",
     target_alias: str = "",
     target_vision_instruction: str = "",
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Tuple[Dict[str, Any], str]:
     """Backward compatibility alias for build_target_latent."""
     aspect = f"{custom_aspect_width}:{custom_aspect_height}" if fixed_aspect_ratio == "custom" else fixed_aspect_ratio
@@ -287,7 +288,7 @@ def create_target_latent(
         target_vision_slot=target_vision_slot,
         target_alias=target_alias,
         target_vision_instruction=target_vision_instruction,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -307,7 +308,7 @@ def build_target_latent(
     target_vision_slot: Any = "auto",
     target_alias: str = "",
     target_vision_instruction: str = "",
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Tuple[Dict[str, Any], str]:
     """Build formatted target LATENT dict and latent_info string."""
     if "target_latent_content" in kwargs:
@@ -346,8 +347,6 @@ def build_target_latent(
     else:
         active_target_image = target_image
 
-
-
     target_h, target_w, geom_src, active_mp, src_dims, warnings = calculate_target_latent_resolution(
         geometry_mode=geometry_mode,
         target_megapixels=target_megapixels,
@@ -356,7 +355,7 @@ def build_target_latent(
         target_image=active_target_image,
         geometry_image=geometry_image,
         subject_image=subject_image,
-        scene_image=scene_image
+        scene_image=scene_image,
     )
 
     latent_h = target_h // 8
@@ -395,7 +394,7 @@ def build_target_latent(
         target_vision_slot=slot_val,
         target_alias=target_alias,
         target_vision_instruction=target_vision_instruction,
-        target_image=active_target_image
+        target_image=active_target_image,
     )
 
     latent_dict = {
@@ -431,13 +430,15 @@ def build_target_latent(
         lines.append(f"Fixed MP: {fixed_megapixels:.2f} MP")
         lines.append(f"Fixed Aspect Ratio: {aspect_ratio}")
 
-    lines.extend([
-        f"Target Pixel Size: {target_w} x {target_h}",
-        f"Target MP: {actual_mp:.3f} MP",
-        f"Target Latent Size: {latent_w} x {latent_h}",
-        f"Batch Size: {batch_size}",
-        f"Warnings: {'; '.join(warnings) if warnings else 'none'}"
-    ])
+    lines.extend(
+        [
+            f"Target Pixel Size: {target_w} x {target_h}",
+            f"Target MP: {actual_mp:.3f} MP",
+            f"Target Latent Size: {latent_w} x {latent_h}",
+            f"Batch Size: {batch_size}",
+            f"Warnings: {'; '.join(warnings) if warnings else 'none'}",
+        ]
+    )
 
     latent_info = "\n".join(lines)
     return latent_dict, latent_info

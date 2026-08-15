@@ -5,11 +5,13 @@ import enum
 NODE_CATEGORY = "CcC/Krea2"
 LOGGER_PREFIX = "[CcC Krea2]"
 
+
 class ReferenceRole(str, enum.Enum):
     SUBJECT = "subject"
     OUTFIT = "outfit"
     SCENE = "scene"
     SOURCE = "source"
+
 
 # Centralized reference role order mappings.
 ROLE_ORDER_SUBJECT = [ReferenceRole.SUBJECT]

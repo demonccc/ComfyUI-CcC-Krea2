@@ -53,7 +53,6 @@ def check_patch_safety(model: Any, target_patch: str) -> None:
             )
 
 
-
 def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any:
     """Clone MODEL and register canonical DIFFUSION_MODEL wrapper with closure transport.
 
@@ -84,7 +83,9 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             ref_masks.append(ref.spatial_attention_mask)
             mask_modes.append(ref.mask_mode)
 
-    def krea2_edit_wrapper(executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any) -> torch.Tensor:
+    def krea2_edit_wrapper(
+        executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any
+    ) -> torch.Tensor:
         """Canonical ComfyUI DIFFUSION_MODEL wrapper signature."""
         dit_model = getattr(executor, "class_obj", None)
 
@@ -122,6 +123,7 @@ def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
     wrapper_type = "diffusion_model"
     try:
         import comfy.patcher_extension
+
         wrapper_type = comfy.patcher_extension.WrappersMP.DIFFUSION_MODEL
     except Exception:
         wrapper_type = "diffusion_model"
@@ -172,6 +174,7 @@ def _pad_to_patch_size(tensor: torch.Tensor, patch_size: int) -> torch.Tensor:
     """Pad 4D tensor spatial dimensions to multiples of patch_size using replicate padding."""
     try:
         from comfy.ldm.common_dit import pad_to_patch_size
+
         return pad_to_patch_size(tensor, (patch_size, patch_size), padding_mode="replicate")
     except (ImportError, AttributeError):
         h, w = tensor.shape[-2], tensor.shape[-1]
@@ -186,6 +189,7 @@ def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
     """Repeat or trim tensor along batch dimension to match target_bs."""
     try:
         from comfy.utils import repeat_to_batch_size
+
         return repeat_to_batch_size(tensor, target_bs)
     except (ImportError, AttributeError):
         curr_b = tensor.shape[0]
@@ -203,6 +207,7 @@ def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 100
     """Compute sinusoidal timestep embeddings with ComfyUI fallback."""
     try:
         from comfy.ldm.flux.layers import timestep_embedding
+
         return timestep_embedding(timesteps, dim, max_period=max_period)
     except (ImportError, AttributeError):
         half = dim // 2
@@ -226,7 +231,7 @@ def krea2_dit_incontext_forward(
     ref_masks: List[Optional[torch.Tensor]],
     mask_modes: List[str],
     transformer_options: Dict[str, Any],
-    ref_masked_boosts: Optional[List[float]] = None
+    ref_masked_boosts: Optional[List[float]] = None,
 ) -> torch.Tensor:
     """Execute Krea 2 SingleStreamDiT edit forward using exact model member API and signatures."""
     orig_ndim = x.ndim
@@ -299,7 +304,7 @@ def krea2_dit_incontext_forward(
         txt_len=txt_len,
         ref_token_grids=ref_token_grids,
         target_grid=(target_gh, target_gw),
-        device=x.device
+        device=x.device,
     )
 
     freqs = dit_model.pe_embedder(rope_pos_ids) if hasattr(dit_model, "pe_embedder") else None
@@ -314,7 +319,7 @@ def krea2_dit_incontext_forward(
         ref_token_grids=ref_token_grids,
         mask_modes=mask_modes,
         device=x.device,
-        dtype=x.dtype
+        dtype=x.dtype,
     )
 
     tdim = getattr(dit_model, "tdim", 256)
@@ -334,13 +339,7 @@ def krea2_dit_incontext_forward(
         t_opts["img_slice"] = [slice(txt_len + total_ref_len, None)]
         t_opts["block_index"] = i
 
-        h_seq = block(
-            h_seq,
-            tvec,
-            freqs,
-            attn_bias,
-            transformer_options=t_opts
-        )
+        h_seq = block(h_seq, tvec, freqs, attn_bias, transformer_options=t_opts)
 
     out_seq = dit_model.last(h_seq, t) if hasattr(dit_model, "last") else h_seq
 
@@ -353,7 +352,7 @@ def krea2_dit_incontext_forward(
         w=target_gw,
         p1=patch_size,
         p2=patch_size,
-        c=channels
+        c=channels,
     )
 
     out_cropped = out_4d[:, :, :orig_tgt_h, :orig_tgt_w]
@@ -369,7 +368,7 @@ def _build_incontext_3d_rope_pos_ids(
     txt_len: int,
     ref_token_grids: List[Tuple[int, int]],
     target_grid: Tuple[int, int],
-    device: torch.device
+    device: torch.device,
 ) -> torch.Tensor:
     """Build 3D RoPE position IDs with shape [batch_size, seq_len, 3]."""
     tgt_gh, tgt_gw = target_grid
@@ -415,7 +414,7 @@ def _compute_ref_attention_bias_patchified(
     mask_modes: List[str],
     device: torch.device,
     dtype: torch.dtype,
-    masked_boosts: Optional[List[float]] = None
+    masked_boosts: Optional[List[float]] = None,
 ) -> Optional[torch.Tensor]:
     """Compute additive attention logit bias covering full sequence."""
     resolved_base_boosts = []

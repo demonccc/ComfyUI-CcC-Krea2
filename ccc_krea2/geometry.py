@@ -5,12 +5,7 @@ import torch.nn.functional as F
 from typing import Tuple, Optional, Dict, Any
 
 
-def resize_tensor(
-    tensor: torch.Tensor,
-    target_h: int,
-    target_w: int,
-    method: str = "auto"
-) -> torch.Tensor:
+def resize_tensor(tensor: torch.Tensor, target_h: int, target_w: int, method: str = "auto") -> torch.Tensor:
     """Centralized tensor resizing helper for images and features.
 
     Supported methods: 'auto', 'nearest-exact', 'bilinear', 'bicubic', 'area', 'lanczos'.
@@ -59,6 +54,7 @@ def resize_tensor(
     elif method_key == "lanczos":
         try:
             import comfy.utils
+
             out_bchw = comfy.utils.common_upscale(
                 t_bchw.float(), target_w, target_h, upscale_method="lanczos", crop="disabled"
             )
@@ -88,7 +84,7 @@ def apply_sampling_transform(
     mode: str = "fit",
     mask: Optional[torch.Tensor] = None,
     mask_interpolation: str = "nearest-exact",
-    resize_method: str = "auto"
+    resize_method: str = "auto",
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     """Transform base image/mask for sampling LATENT output.
 
@@ -106,7 +102,7 @@ def apply_sampling_transform(
         mode=mode,
         mask=mask,
         mask_interpolation=mask_interpolation,
-        resize_method=resize_method
+        resize_method=resize_method,
     )
 
 
@@ -119,7 +115,7 @@ def apply_reference_fit_transform(
     crop_tolerance: float = 0.08,
     mask_interpolation: str = "bilinear",
     alignment: int = 16,
-    resize_method: str = "auto"
+    resize_method: str = "auto",
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
     """Transform reference image/mask for VAE reference tokens matching Krea 2 pixel-path geometry.
 
@@ -158,9 +154,8 @@ def apply_reference_fit_transform(
             mask_bchw = mask_bchw[:1].repeat(bs, 1, 1, 1)
 
     scale_fit = min(target_h / float(ih), target_w / float(iw))
-    is_near_match = (
-        (ih * scale_fit >= target_h * (1.0 - crop_tolerance)) and
-        (iw * scale_fit >= target_w * (1.0 - crop_tolerance))
+    is_near_match = (ih * scale_fit >= target_h * (1.0 - crop_tolerance)) and (
+        iw * scale_fit >= target_w * (1.0 - crop_tolerance)
     )
 
     mask_m = "nearest-exact" if mask_interpolation in ("nearest", "nearest-exact", "hard") else "bilinear"
@@ -175,13 +170,17 @@ def apply_reference_fit_transform(
         y0 = (ih - crop_h) // 2
         x0 = (iw - crop_w) // 2
 
-        cropped_src = img_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
+        cropped_src = img_bchw[..., y0 : y0 + crop_h, x0 : x0 + crop_w]
         fitted_img_bchw = _resize_bchw(cropped_src, target_h=target_h, target_w=target_w, method=resize_method)
 
         fitted_mask = None
         if mask_bchw is not None:
-            cropped_mask_src = mask_bchw[..., y0:y0 + crop_h, x0:x0 + crop_w]
-            fitted_mask = F.interpolate(cropped_mask_src, size=(target_h, target_w), mode=mask_m, **mask_kwargs).squeeze(1).clamp(0.0, 1.0)
+            cropped_mask_src = mask_bchw[..., y0 : y0 + crop_h, x0 : x0 + crop_w]
+            fitted_mask = (
+                F.interpolate(cropped_mask_src, size=(target_h, target_w), mode=mask_m, **mask_kwargs)
+                .squeeze(1)
+                .clamp(0.0, 1.0)
+            )
 
         ref_fit_meta = {"spatial_hw": (target_h, target_w)}
         out_img = fitted_img_bchw.movedim(1, -1) if is_channels_last else fitted_img_bchw
@@ -202,13 +201,15 @@ def apply_reference_fit_transform(
     sy0 = (ih - crop_h) // 2
     sx0 = (iw - crop_w) // 2
 
-    cropped_src = img_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
+    cropped_src = img_bchw[..., sy0 : sy0 + crop_h, sx0 : sx0 + crop_w]
     fitted_img_bchw = _resize_bchw(cropped_src, target_h=fh, target_w=fw, method=resize_method)
 
     fitted_mask = None
     if mask_bchw is not None:
-        cropped_mask_src = mask_bchw[..., sy0:sy0 + crop_h, sx0:sx0 + crop_w]
-        fitted_mask = F.interpolate(cropped_mask_src, size=(fh, fw), mode=mask_m, **mask_kwargs).squeeze(1).clamp(0.0, 1.0)
+        cropped_mask_src = mask_bchw[..., sy0 : sy0 + crop_h, sx0 : sx0 + crop_w]
+        fitted_mask = (
+            F.interpolate(cropped_mask_src, size=(fh, fw), mode=mask_m, **mask_kwargs).squeeze(1).clamp(0.0, 1.0)
+        )
 
     ref_fit_meta = {"spatial_hw": (fh, fw)}
     out_img = fitted_img_bchw.movedim(1, -1) if is_channels_last else fitted_img_bchw
@@ -231,7 +232,7 @@ def _apply_sampling_transform_internal(
     mode: str,
     mask: Optional[torch.Tensor],
     mask_interpolation: str,
-    resize_method: str = "auto"
+    resize_method: str = "auto",
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
     if image.ndim == 3:
         image = image.unsqueeze(0)
@@ -276,12 +277,12 @@ def _apply_sampling_transform_internal(
         scaled_img = _resize_bchw(img_bchw, target_h=new_h, target_w=new_w, method=resize_method)
         y0 = (new_h - target_h) // 2
         x0 = (new_w - target_w) // 2
-        cropped_img = scaled_img[..., y0:y0 + target_h, x0:x0 + target_w]
+        cropped_img = scaled_img[..., y0 : y0 + target_h, x0 : x0 + target_w]
 
         cropped_mask = None
         if mask_bchw is not None:
             scaled_mask = F.interpolate(mask_bchw, size=(new_h, new_w), mode=mask_m)
-            cropped_mask = scaled_mask[..., y0:y0 + target_h, x0:x0 + target_w].squeeze(1).clamp(0.0, 1.0)
+            cropped_mask = scaled_mask[..., y0 : y0 + target_h, x0 : x0 + target_w].squeeze(1).clamp(0.0, 1.0)
 
         out_img = cropped_img.movedim(1, -1) if is_channels_last else cropped_img
         return out_img.clamp(0.0, 1.0), cropped_mask
@@ -296,14 +297,16 @@ def _apply_sampling_transform_internal(
         padded_img = torch.zeros((bs, c, target_h, target_w), dtype=image.dtype, device=image.device)
         y0 = (target_h - new_h) // 2
         x0 = (target_w - new_w) // 2
-        padded_img[..., y0:y0 + new_h, x0:x0 + new_w] = scaled_img
+        padded_img[..., y0 : y0 + new_h, x0 : x0 + new_w] = scaled_img
 
         padded_mask = None
         if mask_bchw is not None:
             scaled_mask = F.interpolate(mask_bchw, size=(new_h, new_w), mode=mask_m)
 
-            padded_mask_tensor = torch.zeros((bs, 1, target_h, target_w), dtype=mask_bchw.dtype, device=mask_bchw.device)
-            padded_mask_tensor[..., y0:y0 + new_h, x0:x0 + new_w] = scaled_mask
+            padded_mask_tensor = torch.zeros(
+                (bs, 1, target_h, target_w), dtype=mask_bchw.dtype, device=mask_bchw.device
+            )
+            padded_mask_tensor[..., y0 : y0 + new_h, x0 : x0 + new_w] = scaled_mask
             padded_mask = padded_mask_tensor.squeeze(1).clamp(0.0, 1.0)
 
         out_img = padded_img.movedim(1, -1) if is_channels_last else padded_img
