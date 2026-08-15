@@ -38,6 +38,7 @@ def calculate_target_latent_resolution(
     geometry_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
+    force_target_megapixels: bool = False,
     **kwargs: Any,
 ) -> Tuple[int, int, str, float, Optional[Tuple[int, int]], list]:
     """Calculate target latent pixel dimensions [H, W] and metadata."""
@@ -49,6 +50,7 @@ def calculate_target_latent_resolution(
         fixed_megapixels = kwargs["fixed_mp"]
     if "fixed_aspect_ratio" in kwargs:
         aspect_ratio = kwargs["fixed_aspect_ratio"]
+    force_target_mp = force_target_megapixels or kwargs.get("force_target_megapixels", False)
 
     warnings = []
     source_dims = None
@@ -70,7 +72,8 @@ def calculate_target_latent_resolution(
         source_dims = (ih, iw)
         src_ar = iw / float(ih)
         geometry_source = "geometry_original_image" if geometry_image else "target_original_image"
-        active_mp = target_megapixels
+        src_mp = (ih * iw) / 1_000_000.0
+        active_mp = target_megapixels if force_target_mp else min(src_mp, target_megapixels)
     elif geometry_mode in ("fixed", "crop_subject"):
         geometry_source = "fixed_megapixels"
         active_mp = fixed_megapixels
@@ -307,6 +310,7 @@ def build_target_latent(
     target_vision_slot: Any = "auto",
     target_alias: str = "",
     target_vision_instruction: str = "",
+    force_target_megapixels: bool = False,
     **kwargs: Any,
 ) -> Tuple[Dict[str, Any], str]:
     """Build formatted target LATENT dict and latent_info string."""
@@ -318,6 +322,7 @@ def build_target_latent(
         target_megapixels = kwargs["maximum_mp"]
     if "fixed_mp" in kwargs:
         fixed_megapixels = kwargs["fixed_mp"]
+    force_target_mp = force_target_megapixels or kwargs.get("force_target_megapixels", False)
     orig_target_content = target_content
     orig_geometry_mode = geometry_mode
 
@@ -355,6 +360,7 @@ def build_target_latent(
         geometry_image=geometry_image,
         subject_image=subject_image,
         scene_image=scene_image,
+        force_target_megapixels=force_target_mp,
     )
 
     latent_h = target_h // 8

@@ -309,6 +309,23 @@ def _execute_easy_edit(
 
     is_ostris = backend_method == "ostris_edit"
 
+    # Common Multi-Reference Geometry Activation
+    has_scene = resolved_sources.scene is not None
+    has_subject = resolved_sources.subject is not None
+    has_outfit = resolved_sources.effective_outfit is not None
+
+    common_geometry_active = (has_scene and has_subject) or (has_subject and has_outfit)
+    if common_geometry_active:
+        if has_scene:
+            common_geometry_anchor_role = "scene"
+            common_geometry_anchor_img = resolved_sources.scene
+        else:
+            common_geometry_anchor_role = "subject"
+            common_geometry_anchor_img = resolved_sources.subject
+    else:
+        common_geometry_anchor_role = "none"
+        common_geometry_anchor_img = None
+
     # Phase 3: Construct Generic ReferenceChain
     chain = ReferenceChain()
 
@@ -318,9 +335,7 @@ def _execute_easy_edit(
         else:
             vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
-        fit_mode = "auto"
-        if preset == "subject_transfer" and alias_role == "subject" and resolved_sources.scene is not None:
-            fit_mode = "crop"
+        fit_mode = "crop" if common_geometry_active else "auto"
 
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(
@@ -376,26 +391,28 @@ def _execute_easy_edit(
             t_vlm = prepare_easy_krea_vision_image(route.target_content_source, preset=preset, role="target_content")
         target_content_prep = prepare_image_for_qwen(image=t_vlm, clip=clip, original_image=route.target_content_source)
 
+    effective_geometry_source = common_geometry_anchor_img if common_geometry_active else route.target_geometry_source
+    effective_geometry_mode = "favor_image" if common_geometry_active else route.target_geometry_mode
+
     geometry_prep = None
-    if route.target_geometry_source is not None:
-        if route.target_geometry_source is route.target_content_source:
+    if effective_geometry_source is not None:
+        if effective_geometry_source is route.target_content_source and target_content_prep is not None:
             geometry_prep = target_content_prep
         else:
             if is_ostris:
-                g_vlm = preprocess_ostris_vision_image(route.target_geometry_source)
+                g_vlm = preprocess_ostris_vision_image(effective_geometry_source)
             else:
-                g_vlm = prepare_easy_krea_vision_image(
-                    route.target_geometry_source, preset=preset, role="target_geometry"
-                )
-            geometry_prep = prepare_image_for_qwen(image=g_vlm, clip=clip, original_image=route.target_geometry_source)
+                g_vlm = prepare_easy_krea_vision_image(effective_geometry_source, preset=preset, role="target_geometry")
+            geometry_prep = prepare_image_for_qwen(image=g_vlm, clip=clip, original_image=effective_geometry_source)
 
     latent_dict, latent_info = build_target_latent(
         vae=vae,
         target_content=route.target_content_mode,
-        geometry_mode=route.target_geometry_mode,
+        geometry_mode=effective_geometry_mode,
         target_image=target_content_prep,
         geometry_image=geometry_prep,
         batch_size=1,
+        force_target_megapixels=common_geometry_active,
         target_alias=route.target_content_role if route.target_content_role else "",
         target_vision_instruction=get_easy_instruction_for_role(route.target_content_role)
         if route.target_content_role
@@ -432,10 +449,12 @@ def _execute_easy_edit(
         f"Resolved Scene: {'present' if resolved_sources.scene is not None else 'missing'}",
         f"Resolved Outfit Source: {outfit_source} ({'present' if resolved_sources.effective_outfit is not None else 'missing'})",
         f"Resolved Style Source: {style_source} ({'present' if resolved_sources.effective_style is not None else 'missing'})",
+        f"Common Geometry: {'yes' if common_geometry_active else 'no'}",
+        f"Common Geometry Anchor: {common_geometry_anchor_role}",
         f"Target Content Mode: {route.target_content_mode}",
         f"Target Content Source: {'present' if route.target_content_source is not None else 'none'}",
-        f"Target Geometry Mode: {route.target_geometry_mode}",
-        f"Target Geometry Source: {'present' if route.target_geometry_source is not None else 'none'}",
+        f"Target Geometry Mode: {effective_geometry_mode}",
+        f"Target Geometry Source: {'present' if effective_geometry_source is not None else 'none'}",
         f"Appearance Ref 1: {app_refs[0] if len(app_refs) > 0 else 'none'}",
         f"Appearance Ref 2: {app_refs[1] if len(app_refs) > 1 else 'none'}",
         f"Semantic-only Sources: {', '.join(sem_refs) if sem_refs else 'none'}",

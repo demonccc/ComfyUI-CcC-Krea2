@@ -1080,11 +1080,240 @@ class TestSubjectTransferMatrix:
             geometry_mode="favor_image",
             target_megapixels=2.0,
             geometry_image=sc_prep,
+            force_target_megapixels=True,
         )
         assert th % 16 == 0
         assert tw % 16 == 0
         assert abs((tw / float(th)) - (464.0 / 304.0)) < 0.05
         assert (th * tw) / 1_000_000.0 == pytest.approx(2.0, abs=0.05)
+
+
+class TestCommonMultiReferenceGeometry:
+    """Test suite for generalized Easy Edit common multi-reference geometry logic."""
+
+    def test_scene_subject_common_geometry(self):
+        import torch
+        from unittest.mock import MagicMock
+        from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
+
+        node = CcCKrea2EasyEdit()
+        subj_img = torch.rand(1, 1000, 800, 3)  # 4:5 portrait subject
+        scene_img = torch.rand(1, 300, 600, 3)  # 2:1 landscape scene
+
+        def mock_tokenize(prompt, images=None, **kwargs):
+            tok_pairs = []
+            if images:
+                for img in images:
+                    tok_pairs.append([{"type": "image", "data": img}, None])
+            else:
+                tok_pairs.append([100, None])
+            return {"qwen3vl": [tok_pairs]}
+
+        mock_model = MagicMock()
+        mock_clip = MagicMock()
+        mock_clip.is_test_dummy = True
+        mock_clip.tokenize.side_effect = mock_tokenize
+        mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 2000, 1536), {}]]
+        mock_vae = MagicMock()
+        mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 128))}
+
+        _, _, _, _, report = node.process(
+            model=mock_model,
+            clip=mock_clip,
+            positive_prompt="test prompt",
+            preset="balanced",
+            subject=subj_img,
+            scene=scene_img,
+            vae=mock_vae,
+            apply_krea2_edit_patch=False,
+        )
+        assert "Common Geometry: yes" in report
+        assert "Common Geometry Anchor: scene" in report
+
+    def test_subject_outfit_common_geometry(self):
+        import torch
+        from unittest.mock import MagicMock
+        from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
+
+        def mock_tokenize(prompt, images=None, **kwargs):
+            tok_pairs = []
+            if images:
+                for img in images:
+                    tok_pairs.append([{"type": "image", "data": img}, None])
+            else:
+                tok_pairs.append([100, None])
+            return {"qwen3vl": [tok_pairs]}
+
+        node = CcCKrea2EasyEdit()
+        subj_img = torch.rand(1, 600, 300, 3)  # 1:2 portrait subject
+        outfit_img = torch.rand(1, 400, 400, 3)  # 1:1 outfit
+        mock_model = MagicMock()
+        mock_clip = MagicMock()
+        mock_clip.is_test_dummy = True
+        mock_clip.tokenize.side_effect = mock_tokenize
+        mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 2000, 1536), {}]]
+        mock_vae = MagicMock()
+        mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 128, 64))}
+
+        _, _, _, _, report = node.process(
+            model=mock_model,
+            clip=mock_clip,
+            positive_prompt="test prompt",
+            preset="outfit_transfer",
+            subject=subj_img,
+            outfit=outfit_img,
+            vae=mock_vae,
+            apply_krea2_edit_patch=False,
+        )
+        assert "Common Geometry: yes" in report
+        assert "Common Geometry Anchor: subject" in report
+
+    def test_scene_subject_outfit_common_geometry(self):
+        import torch
+        from unittest.mock import MagicMock
+        from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
+
+        def mock_tokenize(prompt, images=None, **kwargs):
+            tok_pairs = []
+            if images:
+                for img in images:
+                    tok_pairs.append([{"type": "image", "data": img}, None])
+            else:
+                tok_pairs.append([100, None])
+            return {"qwen3vl": [tok_pairs]}
+
+        node = CcCKrea2EasyEdit()
+        subj_img = torch.rand(1, 500, 500, 3)
+        scene_img = torch.rand(1, 300, 600, 3)
+        outfit_img = torch.rand(1, 400, 300, 3)
+        mock_model = MagicMock()
+        mock_clip = MagicMock()
+        mock_clip.is_test_dummy = True
+        mock_clip.tokenize.side_effect = mock_tokenize
+        mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 2000, 1536), {}]]
+        mock_vae = MagicMock()
+        mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 128))}
+
+        _, _, _, _, report = node.process(
+            model=mock_model,
+            clip=mock_clip,
+            positive_prompt="test prompt",
+            preset="consistent",
+            subject=subj_img,
+            scene=scene_img,
+            outfit=outfit_img,
+            vae=mock_vae,
+            apply_krea2_edit_patch=False,
+        )
+        assert "Common Geometry: yes" in report
+        assert "Common Geometry Anchor: scene" in report
+
+    def test_scene_subject_outfit_dedup_common_geometry(self):
+        import torch
+        from unittest.mock import MagicMock
+        from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
+
+        def mock_tokenize(prompt, images=None, **kwargs):
+            tok_pairs = []
+            if images:
+                for img in images:
+                    tok_pairs.append([{"type": "image", "data": img}, None])
+            else:
+                tok_pairs.append([100, None])
+            return {"qwen3vl": [tok_pairs]}
+
+        node = CcCKrea2EasyEdit()
+        subj_img = torch.rand(1, 500, 500, 3)
+        scene_img = torch.rand(1, 300, 600, 3)
+        mock_model = MagicMock()
+        mock_clip = MagicMock()
+        mock_clip.is_test_dummy = True
+        mock_clip.tokenize.side_effect = mock_tokenize
+        mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 2000, 1536), {}]]
+        mock_vae = MagicMock()
+        mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 128))}
+
+        _, _, _, _, report = node.process(
+            model=mock_model,
+            clip=mock_clip,
+            positive_prompt="test prompt",
+            preset="subject_transfer",
+            subject=subj_img,
+            scene=scene_img,
+            outfit_source="scene image",
+            vae=mock_vae,
+            apply_krea2_edit_patch=False,
+        )
+        assert "Common Geometry: yes" in report
+        assert "Common Geometry Anchor: scene" in report
+
+    def test_single_source_no_common_geometry(self):
+        import torch
+        from unittest.mock import MagicMock
+        from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
+
+        def mock_tokenize(prompt, images=None, **kwargs):
+            tok_pairs = []
+            if images:
+                for img in images:
+                    tok_pairs.append([{"type": "image", "data": img}, None])
+            else:
+                tok_pairs.append([100, None])
+            return {"qwen3vl": [tok_pairs]}
+
+        node = CcCKrea2EasyEdit()
+        subj_img = torch.rand(1, 500, 500, 3)
+        scene_img = torch.rand(1, 300, 600, 3)
+        mock_model = MagicMock()
+        mock_clip = MagicMock()
+        mock_clip.is_test_dummy = True
+        mock_clip.tokenize.side_effect = mock_tokenize
+        mock_clip.encode_from_tokens_scheduled.return_value = [[torch.randn(1, 2000, 1536), {}]]
+        mock_vae = MagicMock()
+        mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+        # Subject only
+        _, _, _, _, report_s = node.process(
+            model=mock_model,
+            clip=mock_clip,
+            positive_prompt="test prompt",
+            preset="preserve_identity",
+            subject=subj_img,
+            vae=mock_vae,
+            apply_krea2_edit_patch=False,
+        )
+        assert "Common Geometry: no" in report_s
+        assert "Common Geometry Anchor: none" in report_s
+
+        # Scene only
+        _, _, _, _, report_sc = node.process(
+            model=mock_model,
+            clip=mock_clip,
+            positive_prompt="test prompt",
+            preset="preserve_scene",
+            scene=scene_img,
+            vae=mock_vae,
+            apply_krea2_edit_patch=False,
+        )
+        assert "Common Geometry: no" in report_sc
+        assert "Common Geometry Anchor: none" in report_sc
+
+    def test_crop_alignment_zero_rope_offset(self):
+        from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
+
+        # Target working geometry: 1152 x 1744 (H=1152, W=1744)
+        # Source image: 1000 x 1000 (H=1000, W=1000)
+        res = resolve_krea2edit_geometry(
+            src_h=1000,
+            src_w=1000,
+            tgt_h=1152,
+            tgt_w=1744,
+            fit_mode="crop",
+        )
+        assert res.mode_resolved == "crop"
+        assert res.vae_input_pixel_size == (1744, 1152)
+        assert res.vae_latent_grid_size == (218, 144)
+        assert res.centered_fractional_offset == (0.0, 0.0)
 
 
 # ---------------------------------------------------------------------------

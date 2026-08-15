@@ -214,7 +214,44 @@ def test_target_latent_legacy_geometry_favor_scene():
         batch_size=1,
     )
     assert "Content Source Size: 300 x 400" in info
+    assert "Content Target Size: 400 x 304" in info
+
+
+def test_target_latent_force_target_megapixels():
+    img_scene = torch.rand(1, 300, 400, 3)  # 4:3 (~0.12 MP)
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="scene",
+        scene_image=scene_prep,
+        target_geometry="favor_scene",
+        maximum_mp=1.0,
+        batch_size=1,
+        force_target_megapixels=True,
+    )
     assert "Content Target Size: 1152 x 864" in info
+
+
+def test_generic_favor_image_does_not_upscale_small_images():
+    img_scene = torch.rand(1, 300, 400, 3)  # 4:3 (~0.12 MP)
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+    mock_vae = MagicMock()
+    mock_vae.encode.return_value = {"samples": torch.zeros((1, 16, 64, 64))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="scene",
+        scene_image=scene_prep,
+        target_geometry="favor_scene",
+        maximum_mp=2.0,
+        batch_size=1,
+        force_target_megapixels=False,
+    )
+    # Small image (0.12 MP) should NOT upscale to max 2.0 MP by default
+    assert "Content Target Size: 400 x 304" in info
 
 
 def test_target_latent_strict_image_content():
