@@ -597,6 +597,7 @@ def route_easy_preset(
             target_content_source = Sc
             target_content_role = "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
         elif not has_s and not has_sc and has_o:
             target_content_mode = "empty"
             target_geometry_mode, target_geometry_source = "favor_image", Ou
@@ -606,6 +607,7 @@ def route_easy_preset(
             target_content_source = Sc
             target_content_role = "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
+            refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
             refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
         elif has_s and not has_sc and has_o:
             target_content_mode = "empty"
@@ -620,6 +622,7 @@ def route_easy_preset(
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
             else:
+                refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
                 refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
         else:
             # S + Sc + Ou
@@ -627,10 +630,12 @@ def route_easy_preset(
             target_content_source = Sc
             target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
-            refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
             if outfit_is_scene_physically:
                 refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
+                refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
             elif outfit_is_distinct:
+                refs.append(_ref(Sc, NORMAL_BOOST, "scene"))
+                refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
                 refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
 
     # Default geometry fallback if geometry source was not explicitly assigned
