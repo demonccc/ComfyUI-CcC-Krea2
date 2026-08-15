@@ -27,7 +27,7 @@ class CcCKrea2EasyEdit:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 8-preset Krea2 Edit node. "
+        "Opinionated 9-preset Krea2 Edit node. "
         "Automatically routes Subject, Scene, Outfit, and Style sources to canonical target and reference channels."
     )
 
@@ -134,7 +134,7 @@ class CcCKrea2EasyEditOstris:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 8-preset Ostris Edit node. "
+        "Opinionated 9-preset Ostris Edit node. "
         "Routes Subject, Scene, Outfit, and Style sources to Ostris edit pipeline."
     )
 

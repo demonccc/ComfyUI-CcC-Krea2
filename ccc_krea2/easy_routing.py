@@ -257,7 +257,7 @@ def route_easy_preset(
     sources: EasyResolvedSources,
     preset: str = "balanced",
 ) -> EasyPresetRoute:
-    """Phase 2: Evaluate preset routing matrix across all 8 presets.
+    """Phase 2: Evaluate preset routing matrix across all 9 presets.
 
     Exhaustive 8-combination coverage per preset:
         none, S, Sc, Ou, S+Sc, S+Ou, Sc+Ou, S+Sc+Ou
@@ -583,8 +583,7 @@ def route_easy_preset(
     elif preset == "subject_transfer":
         if not has_s:
             preset_warnings.append(
-                "preset 'subject_transfer' selected but Subject source is missing; "
-                "no subject can be transferred."
+                "preset 'subject_transfer' selected but Subject source is missing; no subject can be transferred."
             )
 
         if not has_s and not has_sc and not has_o:
