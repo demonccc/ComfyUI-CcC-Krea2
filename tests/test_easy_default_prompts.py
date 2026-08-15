@@ -206,3 +206,64 @@ class TestEasyEditNodeDefaultPromptBehavior:
         assert "Use Default Prompt: yes" in report
         assert "Prompt Source: default" in report
         assert "Default Prompt Key: outfit_transfer" in report
+
+    def test_10_subject_only_with_custom_prompt_succeeds(self, dummy_images, monkeypatch):
+        S, _, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+
+        captured = {}
+
+        def mock_orchestrator(*args, **kwargs):
+            captured["positive_prompt"] = kwargs.get("positive_prompt")
+            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
+
+        monkeypatch.setattr(
+            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
+            mock_orchestrator,
+        )
+
+        _, _, _, _, report = node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt="Custom subject edit prompt",
+            use_default_prompt=True,  # Is overridden to false for subject-only
+            preset="balanced",
+            subject=S,
+        )
+
+        assert captured["positive_prompt"] == "Custom subject edit prompt"
+        assert "Use Default Prompt: no" in report
+        assert "Prompt Source: custom" in report
+        assert "Default Prompt Key: none" in report
+
+    def test_11_reconnect_scene_with_use_default_false_keeps_custom_prompt(self, dummy_images, monkeypatch):
+        S, Sc, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+
+        captured = {}
+
+        def mock_orchestrator(*args, **kwargs):
+            captured["positive_prompt"] = kwargs.get("positive_prompt")
+            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
+
+        monkeypatch.setattr(
+            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
+            mock_orchestrator,
+        )
+
+        _, _, _, _, report = node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt="My preserved prompt",
+            use_default_prompt=False,
+            preset="balanced",
+            subject=S,
+            scene=Sc,
+        )
+
+        assert captured["positive_prompt"] == "My preserved prompt"
+        assert "Use Default Prompt: no" in report
+        assert "Prompt Source: custom" in report
+        assert "Default Prompt Key: none" in report

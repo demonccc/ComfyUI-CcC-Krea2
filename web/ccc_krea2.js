@@ -185,6 +185,16 @@ app.registerExtension({
                     "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. " +
                     "Do not copy subjects, objects, or scene content from the style reference.";
 
+                const ALL_SYSTEM_DEFAULT_PROMPTS = [
+                    EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER,
+                    EASY_DEFAULT_PROMPT_SUBJECT_SCENE,
+                    EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT,
+                    EASY_DEFAULT_PROMPT_STYLE,
+                    EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER + "\n\n" + EASY_DEFAULT_PROMPT_STYLE,
+                    EASY_DEFAULT_PROMPT_SUBJECT_SCENE + "\n\n" + EASY_DEFAULT_PROMPT_STYLE,
+                    EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT + "\n\n" + EASY_DEFAULT_PROMPT_STYLE,
+                ];
+
                 const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt) => {
                     if ((hasS && !hasSc && !hasO && !hasSt) || (!hasS && !hasSc && !hasO && !hasSt)) {
                         return { hasDefault: false, text: "" };
@@ -248,9 +258,21 @@ app.registerExtension({
                     const isSubjectOnly = hasS && !hasSc && !hasO && !hasSt;
 
                     if (isSubjectOnly) {
+                        useDefaultWidget.value = false;
                         useDefaultWidget.disabled = true;
                         posPromptWidget.disabled = false;
                         if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = false;
+
+                        const curVal = (posPromptWidget.value || "").trim();
+                        const isSystemManaged = node._isPromptSystemManaged ||
+                            (node._lastSystemDefault && curVal === node._lastSystemDefault.trim()) ||
+                            ALL_SYSTEM_DEFAULT_PROMPTS.some(p => p.trim() === curVal);
+
+                        if (isSystemManaged) {
+                            posPromptWidget.value = "";
+                        }
+                        node._isPromptSystemManaged = false;
+                        node._lastSystemDefault = "";
                     } else {
                         useDefaultWidget.disabled = false;
                         const preset = presetWidget?.value || "balanced";
@@ -260,6 +282,8 @@ app.registerExtension({
                             posPromptWidget.value = text;
                             posPromptWidget.disabled = true;
                             if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = true;
+                            node._isPromptSystemManaged = true;
+                            node._lastSystemDefault = text;
                         } else {
                             posPromptWidget.disabled = false;
                             if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = false;
@@ -276,6 +300,16 @@ app.registerExtension({
                         };
                     }
                 });
+
+                if (posPromptWidget) {
+                    const origPosCb = posPromptWidget.callback;
+                    posPromptWidget.callback = function () {
+                        if (origPosCb) origPosCb.apply(this, arguments);
+                        if (!useDefaultWidget?.value) {
+                            node._isPromptSystemManaged = false;
+                        }
+                    };
+                }
 
                 const origConnChange = node.onConnectionsChange;
                 node.onConnectionsChange = function () {
