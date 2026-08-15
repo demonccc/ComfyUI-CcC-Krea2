@@ -49,6 +49,24 @@ Max Identity
 | **Preserve Identity** | Strong identity preservation with Subject anchoring. |
 | **Max Identity** | Maximum identity anchoring; reduced editing freedom is acceptable when needed to preserve identity. |
 
+#### Technical Subject-Only Routing Contracts
+
+The table below details the technical routing contract resolved when running Easy Edit with a single **Subject** image connected:
+
+| Preset | Target Content | Subject Attention | Main Behavior |
+| --- | --- | ---: | --- |
+| **Flexible** | Empty | 1.0 | Maximum editing freedom |
+| **Balanced** | Empty | 2.5 | Moderate balance |
+| **Consistent** | Empty | 4.0 | Stronger Subject consistency |
+| **Preserve Identity** | Subject image | 6.0 | Strong identity preservation |
+| **Max Identity** | Subject image | 10.0 | Maximum identity anchoring |
+
+> [!NOTE]
+> **Subject Attention Boost Values**: An attention boost of `1.0` represents neutral reference attention (no extra amplification). The reference image still fully participates in Qwen Vision tokenization, VAE reference conditioning, and model patching. Boost values `>1.0` apply additional attention weight to the reference during Krea2 Edit RoPE/attention patching.
+
+> [!IMPORTANT]
+> **Multi-Reference Routing Warning**: These values describe the Subject-only Easy Edit contract. Multi-reference routing can use different target/reference combinations depending on Scene, Outfit, Style, and source selectors. The 3-phase routing engine in `ccc_krea2/easy_routing.py` remains authoritative.
+
 ---
 
 ## 2. Advanced Nodes

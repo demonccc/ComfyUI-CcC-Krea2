@@ -43,6 +43,49 @@ graph TD
 
 ---
 
+## Easy Edit Presets
+
+Easy Edit provides presets ranging from maximum editing freedom to maximum identity anchoring.
+
+| Preset | Editing Freedom | Identity / Reference Anchoring | Recommended Use |
+| --- | --- | --- | --- |
+| **Flexible** | Very High | Low / Neutral | Large creative changes, new poses, exploratory edits |
+| **Balanced** | High | Moderate | General-purpose edits when no strong preservation mode is required |
+| **Consistent** | Medium-High | Stronger | General editing with better Subject consistency |
+| **Preserve Identity** | Medium | Strong | Keep the same person while changing scene, outfit, or pose |
+| **Max Identity** | Lower | Maximum | Identity-critical edits where preserving the person is the priority |
+
+```
+Flexible
+   ↓
+Balanced
+   ↓
+Consistent
+   ↓
+Preserve Identity
+   ↓
+Max Identity
+```
+
+Increasing reference anchoring generally means less freedom for pose, composition, and reinterpretation.
+
+### Target Content Routing Groups
+
+The identity presets fall into two distinct structural routing families for Subject-only editing:
+
+- **Free Target Content Group** (`Flexible`, `Balanced`, `Consistent`): Sets `Target Content = empty`. Denoising starts from noise, allowing the Subject reference to guide generation via reference attention while keeping target latents free for major creative changes.
+- **Subject-Anchored Target Content Group** (`Preserve Identity`, `Max Identity`): Sets `Target Content = Subject image`. The Subject image acts as both appearance reference and initial target content, providing stronger identity and structural anchoring.
+
+### Task-Specific Presets
+
+The identity ladder covers subject preservation tasks. Additional task-specific presets provide targeted capabilities:
+
+- **Preserve Scene**: Prioritizes preserving the connected Scene composition, background, and visual context.
+- **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
+- **Style Transfer**: Uses the dedicated Style/Moodboard path to transfer artistic style, palette, texture, and visual mood.
+
+---
+
 ## Quick-Start Workflow Example
 
 1. Load CLIP using **CLIPLoader** configured with model type `krea2`.
