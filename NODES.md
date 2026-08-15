@@ -25,6 +25,30 @@ This document provides the complete specification of all public nodes in the `Co
 - **Outputs**:
   - `patched_model` (`MODEL`), `positive` (`CONDITIONING`), `negative` (`CONDITIONING`), `latent` (`LATENT`), `edit_info` (`STRING`).
 
+#### Preset Behavior & Identity Ladder
+
+The identity presets form a progression representing increasing reference/identity anchoring and, in general, decreasing editing freedom:
+
+```
+Flexible
+   ↓
+Balanced
+   ↓
+Consistent
+   ↓
+Preserve Identity
+   ↓
+Max Identity
+```
+
+| Preset | Behavior |
+| --- | --- |
+| **Flexible** | Maximum editing freedom with neutral reference influence. |
+| **Balanced** | Balance between reference consistency and editing freedom. |
+| **Consistent** | Stronger consistency with the Subject while keeping composition and editing relatively flexible. |
+| **Preserve Identity** | Strong identity preservation with Subject anchoring. |
+| **Max Identity** | Maximum identity anchoring; reduced editing freedom is acceptable when needed to preserve identity. |
+
 ---
 
 ## 2. Advanced Nodes
