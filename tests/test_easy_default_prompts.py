@@ -267,3 +267,99 @@ class TestEasyEditNodeDefaultPromptBehavior:
         assert "Use Default Prompt: no" in report
         assert "Prompt Source: custom" in report
         assert "Default Prompt Key: none" in report
+
+
+class TestEasyEditWorkflowMigration:
+    LEGACY_PRESETS = {
+        "flexible",
+        "balanced",
+        "consistent",
+        "preserve_identity",
+        "max_identity",
+        "preserve_scene",
+        "outfit_transfer",
+        "style_transfer",
+    }
+
+    def _migrate_widgets(self, widgets_values):
+        vals = list(widgets_values)
+        if len(vals) < 2:
+            return vals
+        val_at_1 = vals[1]
+        if isinstance(val_at_1, bool):
+            return vals
+        if isinstance(val_at_1, str) and val_at_1 in self.LEGACY_PRESETS:
+            vals.insert(1, False)
+            return vals
+        return vals
+
+    def test_case_1_legacy_krea_easy_edit(self):
+        input_vals = ["My old prompt", "balanced", "outfit image", "style image", True, "bad quality"]
+        migrated = self._migrate_widgets(input_vals)
+        assert migrated == ["My old prompt", False, "balanced", "outfit image", "style image", True, "bad quality"]
+
+    def test_case_2_already_new_krea_easy_edit(self):
+        input_vals = ["My prompt", True, "balanced", "outfit image", "style image", True, "bad quality"]
+        migrated = self._migrate_widgets(input_vals)
+        assert migrated == input_vals
+
+    def test_case_3_legacy_custom_prompt_ownership(self, dummy_images, monkeypatch):
+        S, Sc, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+        captured = {}
+
+        def mock_orchestrator(*args, **kwargs):
+            captured["positive_prompt"] = kwargs.get("positive_prompt")
+            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
+
+        monkeypatch.setattr(
+            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
+            mock_orchestrator,
+        )
+
+        input_vals = ["My old prompt", "balanced", "outfit image", "style image", True, "bad quality"]
+        migrated = self._migrate_widgets(input_vals)
+
+        # Process with migrated use_default_prompt = False and changed preset "outfit_transfer"
+        node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt=migrated[0],
+            use_default_prompt=migrated[1],
+            preset="outfit_transfer",
+            subject=S,
+            scene=Sc,
+        )
+        assert captured["positive_prompt"] == "My old prompt"
+
+    def test_case_4_legacy_empty_prompt(self):
+        input_vals = ["", "balanced", "outfit image", "style image", True, "bad quality"]
+        migrated = self._migrate_widgets(input_vals)
+        assert migrated == ["", False, "balanced", "outfit image", "style image", True, "bad quality"]
+
+    def test_case_5_legacy_ostris_easy_edit(self):
+        input_vals = ["Ostris prompt", "flexible", "outfit image", "style image", True, False, "bad quality"]
+        migrated = self._migrate_widgets(input_vals)
+        assert migrated == [
+            "Ostris prompt",
+            False,
+            "flexible",
+            "outfit image",
+            "style image",
+            True,
+            False,
+            "bad quality",
+        ]
+
+    def test_case_6_idempotency(self):
+        input_vals = ["My prompt", "balanced", "outfit image", "style image", True, "bad quality"]
+        pass1 = self._migrate_widgets(input_vals)
+        pass2 = self._migrate_widgets(pass1)
+        assert pass1 == pass2
+        assert pass2 == ["My prompt", False, "balanced", "outfit image", "style image", True, "bad quality"]
+
+    def test_case_7_unknown_value(self):
+        input_vals = ["My prompt", "unexpected value", "outfit image", "style image", True, "bad quality"]
+        migrated = self._migrate_widgets(input_vals)
+        assert migrated == input_vals

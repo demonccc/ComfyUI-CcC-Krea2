@@ -185,6 +185,51 @@ app.registerExtension({
                     "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. " +
                     "Do not copy subjects, objects, or scene content from the style reference.";
 
+                const LEGACY_PRESETS = [
+                    "flexible",
+                    "balanced",
+                    "consistent",
+                    "preserve_identity",
+                    "max_identity",
+                    "preserve_scene",
+                    "outfit_transfer",
+                    "style_transfer",
+                ];
+
+                const migrateLegacyEasyEditWidgets = (info) => {
+                    if (!info || !Array.isArray(info.widgets_values)) return;
+                    const vals = info.widgets_values;
+                    if (vals.length < 2) return;
+
+                    const valAtIndex1 = vals[1];
+
+                    // If index 1 is already a boolean, the workflow uses the new schema
+                    if (typeof valAtIndex1 === "boolean") return;
+
+                    // If index 1 is a valid preset string, this is a legacy workflow layout
+                    if (typeof valAtIndex1 === "string" && LEGACY_PRESETS.includes(valAtIndex1)) {
+                        vals.splice(1, 0, false);
+                        node._isPromptSystemManaged = false;
+
+                        if (node.widgets && Array.isArray(node.widgets)) {
+                            for (let i = 0; i < vals.length && i < node.widgets.length; i++) {
+                                if (node.widgets[i]) {
+                                    node.widgets[i].value = vals[i];
+                                }
+                            }
+                        }
+                    } else {
+                        console.warn(`[CcC.Krea2] Unknown value at use_default_prompt position for node ${node.comfyClass}:`, valAtIndex1);
+                    }
+                };
+
+                const origOnConfigure = node.onConfigure;
+                node.onConfigure = function (info) {
+                    migrateLegacyEasyEditWidgets(info);
+                    if (origOnConfigure) origOnConfigure.apply(this, arguments);
+                    updatePromptState();
+                };
+
                 const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt) => {
                     if ((hasS && !hasSc && !hasO && !hasSt) || (!hasS && !hasSc && !hasO && !hasSt)) {
                         return { hasDefault: false, text: "" };
