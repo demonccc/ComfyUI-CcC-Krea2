@@ -9,6 +9,8 @@ from ccc_krea2.easy_routing import (
     CONSISTENT_SUBJECT_BOOST,
     PRESERVE_IDENTITY_SUBJECT_BOOST,
     MAX_IDENTITY_SUBJECT_BOOST,
+    SUBJECT_TRANSFER_SUBJECT_BOOST,
+    SUBJECT_TRANSFER_OUTFIT_BOOST,
     PRESERVE_SCENE_BOOST,
     OUTFIT_EMPHASIS_BOOST,
     OUTFIT_TRANSFER_SUBJECT_BOOST,
@@ -910,6 +912,122 @@ class TestOutfitTransferMatrix:
 
 
 # ---------------------------------------------------------------------------
+# SUBJECT_TRANSFER: exhaustive routing matrix
+# ---------------------------------------------------------------------------
+
+
+class TestSubjectTransferMatrix:
+    def test_none(self, dummy_sources):
+        sources = resolve_easy_sources()
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert any("missing" in w for w in route.warnings)
+        assert len(route.edit_references) == 0
+
+    def test_subject_only(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is S
+        assert_refs(route.edit_references, [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject")])
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+
+    def test_scene_only(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(scene=Sc)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert any("missing" in w for w in route.warnings)
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert len(route.edit_references) == 0
+
+    def test_outfit_only(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(outfit=Ou)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert any("missing" in w for w in route.warnings)
+        assert route.target_content_mode == "empty"
+        assert route.target_geometry_source is Ou
+        assert_refs(route.edit_references, [(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")])
+        assert route.edit_references[0][1] == pytest.approx(4.0)
+
+    def test_subject_scene(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert route.target_geometry_source is Sc
+        assert_refs(route.edit_references, [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject")])
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+
+    def test_subject_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, outfit=Ou)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert route.target_content_mode == "empty"
+        assert route.target_geometry_source is S
+        assert_refs(
+            route.edit_references,
+            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"), (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")],
+        )
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
+
+    def test_scene_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(scene=Sc, outfit=Ou)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert any("missing" in w for w in route.warnings)
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert route.target_geometry_source is Sc
+        assert_refs(route.edit_references, [(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")])
+        assert route.edit_references[0][1] == pytest.approx(4.0)
+
+    def test_subject_scene_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"), (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")],
+        )
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
+
+    def test_subject_scene_as_outfit(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
+        route = route_easy_preset(sources, preset="subject_transfer")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene+outfit"
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"), (Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit")],
+        )
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
+
+    def test_no_fallback_to_other_presets(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        # Without Scene, target_content_mode must be empty (NOT image S like preserve_identity, NOT image Ou like outfit_transfer)
+        sources_s = resolve_easy_sources(subject=S)
+        route_s = route_easy_preset(sources_s, preset="subject_transfer")
+        assert route_s.target_content_mode == "empty"
+
+        sources_sou = resolve_easy_sources(subject=S, outfit=Ou)
+        route_sou = route_easy_preset(sources_sou, preset="subject_transfer")
+        assert route_sou.target_content_mode == "empty"
+
+
+# ---------------------------------------------------------------------------
 # Style configs
 # ---------------------------------------------------------------------------
 
@@ -924,6 +1042,7 @@ def test_style_active_for_all_presets(dummy_sources):
         "consistent",
         "preserve_identity",
         "max_identity",
+        "subject_transfer",
         "preserve_scene",
         "outfit_transfer",
     ):
@@ -1047,7 +1166,7 @@ class TestCrossRouting:
 
 
 # ---------------------------------------------------------------------------
-# Never more than 2 appearance refs — all 8 presets, several combinations
+# Never more than 2 appearance refs — all 9 presets, several combinations
 # ---------------------------------------------------------------------------
 
 
@@ -1059,6 +1178,7 @@ class TestCrossRouting:
         "consistent",
         "preserve_identity",
         "max_identity",
+        "subject_transfer",
         "preserve_scene",
         "outfit_transfer",
         "style_transfer",

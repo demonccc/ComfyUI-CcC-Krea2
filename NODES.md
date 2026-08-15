@@ -14,7 +14,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`): Core models.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
   - `use_default_prompt` (`BOOLEAN`, default: `True`): Controls system-managed default prompt resolution vs custom user prompt.
-  - `preset` (`CHOICE`): `flexible`, `balanced`, `consistent`, `preserve_identity`, `max_identity`, `preserve_scene`, `outfit_transfer`, `style_transfer`.
+  - `preset` (`CHOICE`): `flexible`, `balanced`, `consistent`, `preserve_identity`, `max_identity`, `subject_transfer`, `preserve_scene`, `outfit_transfer`, `style_transfer`.
   - `outfit_source` (`CHOICE`): `outfit image`, `scene image`, `style image` (default: `outfit image`).
   - `style_source` (`CHOICE`): `style image`, `scene image`, `subject image` (default: `style image`).
   - `apply_krea2_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEdit`.

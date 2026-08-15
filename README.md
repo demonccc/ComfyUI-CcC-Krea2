@@ -99,6 +99,7 @@ Easy Edit nodes include a **Use Default Prompt** toggle (`use_default_prompt`, d
 
 The identity ladder covers subject preservation tasks. Additional task-specific presets provide targeted capabilities:
 
+- **Subject Transfer**: Strongly transfers Subject identity into the target while allowing the Scene (when available) to define the target content/geometry anchor (Subject boost: 8.0, effective Outfit boost: 4.0).
 - **Preserve Scene**: Prioritizes preserving the connected Scene composition, background, and visual context.
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
 - **Style Transfer**: Uses the dedicated Style/Moodboard path to transfer artistic style, palette, texture, and visual mood.

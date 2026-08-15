@@ -93,6 +93,40 @@ class TestDefaultPromptResolver:
         assert text == EASY_DEFAULT_PROMPT_STYLE
         assert "Do not copy subjects, objects, or scene content from the style reference" in text
 
+    def test_subject_transfer_resolutions(self):
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="subject_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=False,
+            has_st=False,
+        )
+        assert has_def is True
+        assert key == "subject_scene"
+        assert text == EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="subject_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=True,
+            has_st=False,
+        )
+        assert has_def is True
+        assert key == "subject_scene_outfit"
+        assert text == EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="subject_transfer",
+            has_s=True,
+            has_sc=False,
+            has_o=True,
+            has_st=False,
+        )
+        assert has_def is True
+        assert key == "outfit_transfer"
+        assert text == EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+
 
 class TestEasyEditNodeDefaultPromptBehavior:
     def test_6_use_default_prompt_true_overrides_custom_text(self, dummy_images, monkeypatch):
