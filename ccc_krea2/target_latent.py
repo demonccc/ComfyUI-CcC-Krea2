@@ -70,8 +70,7 @@ def calculate_target_latent_resolution(
         source_dims = (ih, iw)
         src_ar = iw / float(ih)
         geometry_source = "geometry_original_image" if geometry_image else "target_original_image"
-        src_mp = (ih * iw) / 1_000_000.0
-        active_mp = min(src_mp, target_megapixels)
+        active_mp = target_megapixels
     elif geometry_mode in ("fixed", "crop_subject"):
         geometry_source = "fixed_megapixels"
         active_mp = fixed_megapixels

@@ -318,6 +318,10 @@ def _execute_easy_edit(
         else:
             vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
+        fit_mode = "auto"
+        if preset == "subject_transfer" and alias_role == "subject" and resolved_sources.scene is not None:
+            fit_mode = "crop"
+
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(
             reference_path="edit",
@@ -326,6 +330,7 @@ def _execute_easy_edit(
             vision_instruction=instruction,
             attention_boost=boost,
             appearance_reference=True,
+            visual_reference_fit=fit_mode,
             _legacy_role=alias_role,
         )
         chain = chain.append(spec)

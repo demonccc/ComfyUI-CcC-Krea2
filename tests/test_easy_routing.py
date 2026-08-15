@@ -1069,6 +1069,23 @@ class TestSubjectTransferMatrix:
         )
         assert should_include_target_in_vision(ctx, chain) is False
 
+    def test_subject_transfer_subject_geometry_adaptation(self):
+        import torch
+        from ccc_krea2.target_latent import calculate_target_latent_resolution
+        from ccc_krea2.vision_prep import prepare_vision_image
+
+        scene_img = torch.rand(1, 304, 464, 3)  # 464x304 scene (~0.14 MP)
+        sc_prep = prepare_vision_image(image=scene_img, clip=None, mode="native")
+        th, tw, geom_src, active_mp, src_dims, warnings = calculate_target_latent_resolution(
+            geometry_mode="favor_image",
+            target_megapixels=2.0,
+            geometry_image=sc_prep,
+        )
+        assert th % 16 == 0
+        assert tw % 16 == 0
+        assert abs((tw / float(th)) - (464.0 / 304.0)) < 0.05
+        assert (th * tw) / 1_000_000.0 == pytest.approx(2.0, abs=0.05)
+
 
 # ---------------------------------------------------------------------------
 # Style configs

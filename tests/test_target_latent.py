@@ -214,7 +214,7 @@ def test_target_latent_legacy_geometry_favor_scene():
         batch_size=1,
     )
     assert "Content Source Size: 300 x 400" in info
-    assert "Content Target Size: 400 x 304" in info
+    assert "Content Target Size: 1152 x 864" in info
 
 
 def test_target_latent_strict_image_content():
