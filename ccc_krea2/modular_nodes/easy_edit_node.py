@@ -468,13 +468,9 @@ def _execute_easy_edit(
         status_str = "present" if resolved_sources.effective_style is not None else "missing"
         resolved_style_str = f"{style_source} ({status_str})"
 
-    outfit_selector_report = (
-        "ignored by preset" if caps.outfit_policy == OUTFIT_POLICY_DISABLED else outfit_source
-    )
+    outfit_selector_report = "ignored by preset" if caps.outfit_policy == OUTFIT_POLICY_DISABLED else outfit_source
     style_selector_report = (
-        "ignored by preset"
-        if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_DISABLED)
-        else style_source
+        "ignored by preset" if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_DISABLED) else style_source
     )
 
     app_refs = [f"{alias}" for _, _, alias, _ in route.edit_references]

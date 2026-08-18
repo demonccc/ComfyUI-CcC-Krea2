@@ -357,7 +357,7 @@ def route_easy_preset(
     sources: EasyResolvedSources,
     preset: str = "balanced",
 ) -> EasyPresetRoute:
-    """Phase 2: Evaluate preset routing matrix across all 9 presets.
+    """Phase 2: Evaluate preset routing matrix across all 10 presets.
 
     Exhaustive 8-combination coverage per preset:
         none, S, Sc, Ou, S+Sc, S+Ou, Sc+Ou, S+Sc+Ou
@@ -810,11 +810,11 @@ def resolve_default_positive_prompt(
     base_key = ""
 
     if preset == "subject_transfer":
-        if not has_s and not has_sc:
+        if not (has_s and has_sc):
             return False, "", "none"
 
         base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE
-        if outfit_source == "none":
+        if not has_o:
             outfit_clause = "Preserve the clothing and accessories of the subject reference."
             base_key = "subject_transfer"
         elif outfit_source == "outfit image":
@@ -831,7 +831,7 @@ def resolve_default_positive_prompt(
             base_key = "subject_transfer_scene_outfit"
         elif outfit_source == "style image":
             outfit_clause = (
-                "Use the clothing and accessories from the style reference for the subject, "
+                "Use the clothing and accessories from the outfit reference for the subject, "
                 "while preserving the identity and body characteristics of the subject reference."
             )
             base_key = "subject_transfer_style_outfit"
@@ -843,7 +843,7 @@ def resolve_default_positive_prompt(
         return True, base_prompt, base_key
 
     elif preset == "scene_reinterpretation":
-        if not has_s and not has_sc:
+        if not (has_s and has_sc):
             return False, "", "none"
         base_prompt = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION
         base_key = "scene_reinterpretation"

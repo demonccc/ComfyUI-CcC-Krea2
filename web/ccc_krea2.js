@@ -246,20 +246,22 @@ app.registerExtension({
 
                 const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource) => {
                     if (preset === "subject_transfer") {
-                        if (!hasS && !hasSc) return { hasDefault: false, text: "" };
+                        if (!hasS || !hasSc) return { hasDefault: false, text: "" };
                         let outfitClause = "Preserve the clothing and accessories of the subject reference.";
-                        if (outfitSource === "outfit image") {
-                            outfitClause = "Replace the subject's clothing and accessories with the clothing and accessories from the outfit reference, fitting them naturally to the subject.";
-                        } else if (outfitSource === "scene image") {
-                            outfitClause = "Use the clothing and accessories worn by the main subject in the scene reference, while preserving the identity and body characteristics of the subject reference.";
-                        } else if (outfitSource === "style image") {
-                            outfitClause = "Use the clothing and accessories from the style reference for the subject, while preserving the identity and body characteristics of the subject reference.";
+                        if (hasO) {
+                            if (outfitSource === "outfit image") {
+                                outfitClause = "Replace the subject's clothing and accessories with the clothing and accessories from the outfit reference, fitting them naturally to the subject.";
+                            } else if (outfitSource === "scene image") {
+                                outfitClause = "Use the clothing and accessories worn by the main subject in the scene reference, while preserving the identity and body characteristics of the subject reference.";
+                            } else if (outfitSource === "style image") {
+                                outfitClause = "Use the clothing and accessories from the outfit reference for the subject, while preserving the identity and body characteristics of the subject reference.";
+                            }
                         }
                         return { hasDefault: true, text: `${EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE}\n\n${outfitClause}` };
                     }
 
                     if (preset === "scene_reinterpretation") {
-                        if (!hasS && !hasSc) return { hasDefault: false, text: "" };
+                        if (!hasS || !hasSc) return { hasDefault: false, text: "" };
                         return { hasDefault: true, text: EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION };
                     }
 
@@ -316,19 +318,15 @@ app.registerExtension({
 
                     if (outfitSourceWidget) {
                         outfitSourceWidget.disabled = !usesOutfit;
-                        if (!usesOutfit) outfitSourceWidget.value = "none";
                     }
                     if (outfitInput) outfitInput.disabled = !usesOutfit;
 
                     if (styleSourceWidget) {
+                        styleSourceWidget.disabled = isSceneAutoStyle;
                         if (isSceneAutoStyle) {
-                            styleSourceWidget.disabled = true;
-                            styleSourceWidget.value = "scene image";
                             styleSourceWidget.tooltip = preset === "subject_transfer"
                                 ? "Subject Transfer automatically uses the Scene reference for style integration."
                                 : "Scene Reinterpretation automatically uses the Scene reference for style integration.";
-                        } else {
-                            styleSourceWidget.disabled = false;
                         }
                     }
 
@@ -340,33 +338,36 @@ app.registerExtension({
                     const outfitSource = outfitSourceWidget?.value || "outfit image";
                     const styleSource = styleSourceWidget?.value || "style image";
 
+                    const effectiveOutfitSource = usesOutfit ? outfitSource : "none";
+                    const effectiveStyleSource = isSceneAutoStyle ? "scene image" : styleSource;
+
                     const hasO = usesOutfit && (
-                        (outfitSource === "outfit image" && hasRawO) ||
-                        (outfitSource === "scene image" && hasSc) ||
-                        (outfitSource === "style image" && hasRawSt)
+                        (effectiveOutfitSource === "outfit image" && hasRawO) ||
+                        (effectiveOutfitSource === "scene image" && hasSc) ||
+                        (effectiveOutfitSource === "style image" && hasRawSt)
                     );
 
                     const hasSt = isSceneAutoStyle ? hasSc : (
-                        (styleSource === "style image" && hasRawSt) ||
-                        (styleSource === "scene image" && hasSc) ||
-                        (styleSource === "subject image" && hasS)
+                        (effectiveStyleSource === "style image" && hasRawSt) ||
+                        (effectiveStyleSource === "scene image" && hasSc) ||
+                        (effectiveStyleSource === "subject image" && hasS)
                     );
 
                     const isSubjectOnly = hasS && !hasSc && !hasO && !hasSt;
+                    const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt, effectiveOutfitSource, effectiveStyleSource);
 
-                    if (isSubjectOnly) {
+                    if (isSubjectOnly || !hasDefault) {
                         useDefaultWidget.value = false;
                         useDefaultWidget.disabled = true;
                         posPromptWidget.disabled = false;
                         if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = false;
 
-                        if (node._isPromptSystemManaged) {
+                        if (node._isPromptSystemManaged && isSubjectOnly) {
                             posPromptWidget.value = "";
                         }
                         node._isPromptSystemManaged = false;
                     } else {
                         useDefaultWidget.disabled = false;
-                        const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource);
 
                         if (useDefaultWidget.value && hasDefault) {
                             posPromptWidget.value = text;
@@ -402,19 +403,22 @@ app.registerExtension({
                             const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation"].includes(preset);
                             const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation"].includes(preset);
 
+                            const effectiveOutfitSource = usesOutfit ? outfitSource : "none";
+                            const effectiveStyleSource = isSceneAutoStyle ? "scene image" : styleSource;
+
                             const hasO = usesOutfit && (
-                                (outfitSource === "outfit image" && hasRawO) ||
-                                (outfitSource === "scene image" && hasSc) ||
-                                (outfitSource === "style image" && hasRawSt)
+                                (effectiveOutfitSource === "outfit image" && hasRawO) ||
+                                (effectiveOutfitSource === "scene image" && hasSc) ||
+                                (effectiveOutfitSource === "style image" && hasRawSt)
                             );
 
                             const hasSt = isSceneAutoStyle ? hasSc : (
-                                (styleSource === "style image" && hasRawSt) ||
-                                (styleSource === "scene image" && hasSc) ||
-                                (styleSource === "subject image" && hasS)
+                                (effectiveStyleSource === "style image" && hasRawSt) ||
+                                (effectiveStyleSource === "scene image" && hasSc) ||
+                                (effectiveStyleSource === "subject image" && hasS)
                             );
 
-                            const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource);
+                            const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt, effectiveOutfitSource, effectiveStyleSource);
                             if (hasDefault && text) {
                                 posPromptWidget.value = text;
                             }

@@ -53,7 +53,9 @@ def assert_refs(refs, expected):
 
 def assert_bounded_appearance_refs(route):
     limit = 3 if route.preset == "subject_transfer" else 2
-    assert len(route.edit_references) <= limit, f"Too many appearance refs for preset {route.preset}: {route.edit_references}"
+    assert len(route.edit_references) <= limit, (
+        f"Too many appearance refs for preset {route.preset}: {route.edit_references}"
+    )
 
 
 def assert_no_more_than_2_refs(route):
@@ -1573,3 +1575,14 @@ def test_none_sources_resolution(dummy_sources):
     assert route.style_source is None
 
 
+def test_scene_auto_ignores_stale_style_source_selector(dummy_sources):
+    """Verify that presets with scene_auto style policy use scene as style even if style_source selector is set to 'none' or 'style image'."""
+    S, Sc, _, St = dummy_sources
+    sources = resolve_easy_sources(
+        preset="subject_transfer",
+        subject=S,
+        scene=Sc,
+        style=St,
+        style_source="none",  # Stale stored selector
+    )
+    assert sources.effective_style is Sc

@@ -377,7 +377,7 @@ def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
         widgets_values={"mode": "pytorch"},
     )
 
-    note = b.add_node(
+    b.add_node(
         "Note",
         [1500, 150],
         [300, 150],
@@ -483,7 +483,9 @@ def build_easy_workflow(
         b.add_group("Load Images", [0, 470, 350, img_count * 250 + 40])
 
     if has_subj:
-        sub = b.add_node("LoadImage", [20, y], [300, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image")
+        sub = b.add_node(
+            "LoadImage", [20, y], [300, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image"
+        )
         b.link(sub, "IMAGE", easy, "subject")
         y += 250
     if has_scene:
@@ -491,7 +493,9 @@ def build_easy_workflow(
         b.link(scn, "IMAGE", easy, "scene")
         y += 250
     if has_outfit:
-        outf = b.add_node("LoadImage", [20, y], [300, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image")
+        outf = b.add_node(
+            "LoadImage", [20, y], [300, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image"
+        )
         b.link(outf, "IMAGE", easy, "outfit")
         y += 250
     if has_style:
@@ -521,7 +525,9 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     unet, clip, vae, lora, auraflow, sampler = build_base_graph(b, is_ostris, is_native)
 
     # Subject ref
-    sub_img = b.add_node("LoadImage", [20, 550], [280, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image")
+    sub_img = b.add_node(
+        "LoadImage", [20, 550], [280, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image"
+    )
     sub_prep = b.add_node(
         "CcCKrea2QwenVisionImagePrep",
         [360, 550],
@@ -560,7 +566,9 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     b.link(sub_prep, "prepared_image", sub_ref, "prepared_image")
 
     # Outfit ref
-    outf_img = b.add_node("LoadImage", [20, 800], [280, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image")
+    outf_img = b.add_node(
+        "LoadImage", [20, 800], [280, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image"
+    )
     outf_prep = b.add_node(
         "CcCKrea2QwenVisionImagePrep",
         [360, 800],

@@ -138,7 +138,7 @@ Find pre-built workflow JSON files in the `workflows/` directory:
 - 🧪 [`10_advanced_ostris.json`](workflows/10_advanced_ostris.json): Advanced Reference Chain (Ostris backend)
 - 🎭 [`11_easy_scene_reinterpretation.json`](workflows/11_easy_scene_reinterpretation.json): Scene Reinterpretation Easy Edit
 
-Legacy workflow files targeting earlier role-node contracts are stored in [`workflows/additional/`](workflows/additional/) and [`workflows/legacy/`](workflows/legacy/).
+Legacy workflow files targeting earlier role-node contracts are stored in [`workflows/additional/`](workflows/additional/).
 
 ---
 

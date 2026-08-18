@@ -94,6 +94,7 @@ class TestDefaultPromptResolver:
         assert "Do not copy subjects, objects, or scene content from the style reference" in text
 
     def test_subject_transfer_resolutions(self):
+        # outfit_source="none"
         has_def, text, key = resolve_default_positive_prompt(
             preset="subject_transfer",
             has_s=True,
@@ -107,6 +108,21 @@ class TestDefaultPromptResolver:
         assert "Replace the main subject in the scene reference" in text
         assert "Preserve the clothing and accessories of the subject reference" in text
 
+        # outfit_source="outfit image" but Outfit is disconnected (has_o=False)
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="subject_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=False,
+            has_st=False,
+            outfit_source="outfit image",
+        )
+        assert has_def is True
+        assert key == "subject_transfer"
+        assert "Preserve the clothing and accessories of the subject reference" in text
+        assert "Replace the subject's clothing and accessories" not in text
+
+        # outfit_source="outfit image" with Outfit connected (has_o=True)
         has_def, text, key = resolve_default_positive_prompt(
             preset="subject_transfer",
             has_s=True,
@@ -117,7 +133,57 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "subject_transfer_outfit"
-        assert "Replace the subject's clothing and accessories with the clothing and accessories from the outfit reference" in text
+        assert (
+            "Replace the subject's clothing and accessories with the clothing and accessories from the outfit reference"
+            in text
+        )
+
+        # outfit_source="style image" with Style connected as Outfit (has_o=True)
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="subject_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=True,
+            has_st=False,
+            outfit_source="style image",
+        )
+        assert has_def is True
+        assert key == "subject_transfer_style_outfit"
+        assert "Use the clothing and accessories from the outfit reference for the subject" in text
+        assert "style reference" not in text
+
+    def test_preset_prompt_requires_subject_and_scene(self):
+        # subject_transfer requires both Subject and Scene
+        has_def, _, _ = resolve_default_positive_prompt(
+            "subject_transfer", has_s=True, has_sc=False, has_o=False, has_st=False
+        )
+        assert has_def is False
+
+        has_def, _, _ = resolve_default_positive_prompt(
+            "subject_transfer", has_s=False, has_sc=True, has_o=False, has_st=False
+        )
+        assert has_def is False
+
+        has_def, _, _ = resolve_default_positive_prompt(
+            "subject_transfer", has_s=True, has_sc=True, has_o=False, has_st=False
+        )
+        assert has_def is True
+
+        # scene_reinterpretation requires both Subject and Scene
+        has_def, _, _ = resolve_default_positive_prompt(
+            "scene_reinterpretation", has_s=True, has_sc=False, has_o=False, has_st=False
+        )
+        assert has_def is False
+
+        has_def, _, _ = resolve_default_positive_prompt(
+            "scene_reinterpretation", has_s=False, has_sc=True, has_o=False, has_st=False
+        )
+        assert has_def is False
+
+        has_def, _, _ = resolve_default_positive_prompt(
+            "scene_reinterpretation", has_s=True, has_sc=True, has_o=False, has_st=False
+        )
+        assert has_def is True
 
     def test_scene_reinterpretation_resolutions(self):
         has_def, text, key = resolve_default_positive_prompt(
