@@ -698,6 +698,15 @@ def main():
     build_advanced_workflow("09_advanced_native.json", is_native=True)
     # 10
     build_advanced_workflow("10_advanced_ostris.json", is_ostris=True)
+    # 11
+    build_easy_workflow(
+        "11_easy_scene_reinterpretation.json",
+        "scene_reinterpretation",
+        "none",
+        "scene image",
+        has_subj=True,
+        has_scene=True,
+    )
 
 
 if __name__ == "__main__":

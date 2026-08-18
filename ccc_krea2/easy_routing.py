@@ -81,6 +81,38 @@ EASY_DEFAULT_PROMPT_STYLE = (
 )
 
 
+OUTFIT_POLICY_USER = "user"
+OUTFIT_POLICY_DISABLED = "disabled"
+
+STYLE_POLICY_USER = "user"
+STYLE_POLICY_SCENE_AUTO = "scene_auto"
+STYLE_POLICY_DISABLED = "disabled"
+
+SCENE_REINTERPRETATION_SUBJECT_BOOST = 4.0
+
+EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
+    "Use this reference for the main subject's action, activity, pose, body dynamics, environment, spatial context, "
+    "camera framing, perspective, lighting, and broad outfit concept. Reinterpret these elements creatively for the "
+    "subject reference. Do not use the scene subject's identity as the generated subject identity."
+)
+
+EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE = (
+    "Replace the main subject in the scene reference with the subject from the subject reference.\n\n"
+    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n"
+    "Preserve the scene composition, environment, camera framing, perspective, lighting, and the action or pose of the main subject being replaced.\n\n"
+    "Integrate the subject naturally into the scene, adapting pose, orientation, lighting, and interaction with the environment as needed."
+)
+
+EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
+    "Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference.\n\n"
+    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n"
+    "Use the scene reference as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n"
+    "Adapt the subject naturally to the referenced action and environment.\n\n"
+    "Creatively reinterpret the clothing and accessories worn by the main subject in the scene so they are appropriate for the subject and the newly generated image. Do not copy the original scene outfit literally.\n\n"
+    "Generate a coherent new image rather than recreating the source scene exactly."
+)
+
+
 def get_easy_instruction_for_role(role: str) -> str:
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
 
@@ -89,26 +121,39 @@ def get_easy_instruction_for_role(role: str) -> str:
 class EasyPresetCapabilities:
     """Capability contract for Easy Edit presets."""
 
-    uses_outfit: bool
-    uses_style: bool
+    outfit_policy: str  # "user" | "disabled"
+    style_policy: str  # "user" | "scene_auto" | "disabled"
+
+    @property
+    def uses_outfit(self) -> bool:
+        return self.outfit_policy != OUTFIT_POLICY_DISABLED
+
+    @property
+    def uses_style(self) -> bool:
+        return self.style_policy != STYLE_POLICY_DISABLED
 
 
 EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
-    "flexible": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "balanced": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "consistent": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "preserve_identity": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "max_identity": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "subject_transfer": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "preserve_scene": EasyPresetCapabilities(uses_outfit=False, uses_style=True),
-    "outfit_transfer": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
-    "style_transfer": EasyPresetCapabilities(uses_outfit=False, uses_style=True),
+    "flexible": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "balanced": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "consistent": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "preserve_identity": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "max_identity": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "subject_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_SCENE_AUTO),
+    "preserve_scene": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
+    "outfit_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "style_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
+    "scene_reinterpretation": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
 }
 
 
 def get_easy_preset_capabilities(preset: str) -> EasyPresetCapabilities:
     """Return capability contract for given preset."""
-    return EASY_PRESET_CAPABILITIES.get(preset, EasyPresetCapabilities(uses_outfit=True, uses_style=True))
+    return EASY_PRESET_CAPABILITIES.get(
+        preset, EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER)
+    )
 
 
 @dataclass(frozen=True)
@@ -190,23 +235,25 @@ def resolve_easy_sources(
     """Phase 1: Resolve effective sources according to selectors with strict NO-FALLBACK policy and preset gating."""
     warnings: List[str] = []
 
-    caps = get_easy_preset_capabilities(preset) if preset else EasyPresetCapabilities(uses_outfit=True, uses_style=True)
+    caps = (
+        get_easy_preset_capabilities(preset)
+        if preset
+        else EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER)
+    )
 
     effective_subject = subject
     effective_scene = scene
 
     # Resolve outfit_source
     outfit_source_kind = "outfit"
-    if not caps.uses_outfit:
+    if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         effective_outfit = None
-        if outfit_source == "scene image":
-            outfit_source_kind = "scene"
-        elif outfit_source == "style image":
-            outfit_source_kind = "style"
-        else:
-            outfit_source_kind = "outfit"
+        outfit_source_kind = "disabled"
     else:
-        if outfit_source == "outfit image":
+        if outfit_source == "none":
+            effective_outfit = None
+            outfit_source_kind = "none"
+        elif outfit_source == "outfit image":
             effective_outfit = outfit
             outfit_source_kind = "outfit"
         elif outfit_source == "scene image":
@@ -228,16 +275,22 @@ def resolve_easy_sources(
 
     # Resolve style_source
     style_source_kind = "style"
-    if not caps.uses_style:
+    if caps.style_policy == STYLE_POLICY_DISABLED:
         effective_style = None
-        if style_source == "scene image":
-            style_source_kind = "scene"
-        elif style_source == "subject image":
-            style_source_kind = "subject"
+        style_source_kind = "disabled"
+    elif caps.style_policy == STYLE_POLICY_SCENE_AUTO:
+        # Automatic Scene style policy (Subject Transfer & Scene Reinterpretation)
+        style_source_kind = "scene"
+        if scene is not None:
+            effective_style = scene
         else:
-            style_source_kind = "style"
+            effective_style = None
     else:
-        if style_source == "style image":
+        # User style policy
+        if style_source == "none":
+            effective_style = None
+            style_source_kind = "none"
+        elif style_source == "style image":
             effective_style = style
             style_source_kind = "style"
         elif style_source == "scene image":
@@ -685,6 +738,28 @@ def route_easy_preset(
                 refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
                 refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
 
+    elif preset == "scene_reinterpretation":
+        target_content_mode = "empty"
+        target_content_source = None
+        target_content_role = "none"
+
+        if has_sc:
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+        elif has_s:
+            target_geometry_mode, target_geometry_source = "favor_image", S
+        else:
+            target_geometry_mode, target_geometry_source = "fixed", None
+
+        if has_sc:
+            refs.append((Sc, NORMAL_BOOST, "scene", EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION))
+        if has_s:
+            refs.append(_ref(S, SCENE_REINTERPRETATION_SUBJECT_BOOST, "subject"))
+
+        if not has_s:
+            preset_warnings.append("Scene Reinterpretation selected but Subject source is missing.")
+        if not has_sc:
+            preset_warnings.append("Scene Reinterpretation selected but Scene source is missing.")
+
     # Default geometry fallback if geometry source was not explicitly assigned
     if target_geometry_source is None:
         target_geometry_mode, target_geometry_source = _resolve_default_geometry_source(Sc, S, Ou)
@@ -734,7 +809,47 @@ def resolve_default_positive_prompt(
     base_prompt = ""
     base_key = ""
 
-    if preset == "outfit_transfer":
+    if preset == "subject_transfer":
+        if not has_s and not has_sc:
+            return False, "", "none"
+
+        base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE
+        if outfit_source == "none":
+            outfit_clause = "Preserve the clothing and accessories of the subject reference."
+            base_key = "subject_transfer"
+        elif outfit_source == "outfit image":
+            outfit_clause = (
+                "Replace the subject's clothing and accessories with the clothing and accessories "
+                "from the outfit reference, fitting them naturally to the subject."
+            )
+            base_key = "subject_transfer_outfit"
+        elif outfit_source == "scene image":
+            outfit_clause = (
+                "Use the clothing and accessories worn by the main subject in the scene reference, "
+                "while preserving the identity and body characteristics of the subject reference."
+            )
+            base_key = "subject_transfer_scene_outfit"
+        elif outfit_source == "style image":
+            outfit_clause = (
+                "Use the clothing and accessories from the style reference for the subject, "
+                "while preserving the identity and body characteristics of the subject reference."
+            )
+            base_key = "subject_transfer_style_outfit"
+        else:
+            outfit_clause = "Preserve the clothing and accessories of the subject reference."
+            base_key = "subject_transfer"
+
+        base_prompt = f"{base_prompt}\n\n{outfit_clause}"
+        return True, base_prompt, base_key
+
+    elif preset == "scene_reinterpretation":
+        if not has_s and not has_sc:
+            return False, "", "none"
+        base_prompt = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION
+        base_key = "scene_reinterpretation"
+        return True, base_prompt, base_key
+
+    elif preset == "outfit_transfer":
         if has_o:
             base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
             base_key = "outfit_transfer"

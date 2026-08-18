@@ -164,6 +164,7 @@ MODERN_CANONICAL = [
     "08_advanced_krea2_edit.json",
     "09_advanced_native.json",
     "10_advanced_ostris.json",
+    "11_easy_scene_reinterpretation.json",
 ]
 
 

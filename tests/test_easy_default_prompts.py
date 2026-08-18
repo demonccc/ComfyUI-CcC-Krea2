@@ -100,10 +100,12 @@ class TestDefaultPromptResolver:
             has_sc=True,
             has_o=False,
             has_st=False,
+            outfit_source="none",
         )
         assert has_def is True
-        assert key == "subject_scene"
-        assert text == EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+        assert key == "subject_transfer"
+        assert "Replace the main subject in the scene reference" in text
+        assert "Preserve the clothing and accessories of the subject reference" in text
 
         has_def, text, key = resolve_default_positive_prompt(
             preset="subject_transfer",
@@ -111,21 +113,24 @@ class TestDefaultPromptResolver:
             has_sc=True,
             has_o=True,
             has_st=False,
+            outfit_source="outfit image",
         )
         assert has_def is True
-        assert key == "subject_scene_outfit"
-        assert text == EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+        assert key == "subject_transfer_outfit"
+        assert "Replace the subject's clothing and accessories with the clothing and accessories from the outfit reference" in text
 
+    def test_scene_reinterpretation_resolutions(self):
         has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
+            preset="scene_reinterpretation",
             has_s=True,
-            has_sc=False,
-            has_o=True,
+            has_sc=True,
+            has_o=False,
             has_st=False,
         )
         assert has_def is True
-        assert key == "outfit_transfer"
-        assert text == EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+        assert key == "scene_reinterpretation"
+        assert "Create a new image of the subject from the subject reference performing the main action" in text
+        assert "Creatively reinterpret the clothing and accessories" in text
 
 
 class TestEasyEditNodeDefaultPromptBehavior:

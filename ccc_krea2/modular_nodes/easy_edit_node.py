@@ -27,7 +27,7 @@ class CcCKrea2EasyEdit:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 9-preset Krea2 Edit node. "
+        "Opinionated 10-preset Krea2 Edit node. "
         "Automatically routes Subject, Scene, Outfit, and Style sources to canonical target and reference channels."
     )
 
@@ -60,15 +60,16 @@ class CcCKrea2EasyEdit:
                         "preserve_scene",
                         "outfit_transfer",
                         "style_transfer",
+                        "scene_reinterpretation",
                     ],
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
                 ),
                 "outfit_source": (
-                    ["outfit image", "scene image", "style image"],
+                    ["none", "outfit image", "scene image", "style image"],
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
                 ),
                 "style_source": (
-                    ["style image", "scene image", "subject image"],
+                    ["none", "style image", "scene image", "subject image"],
                     {"default": "style image", "tooltip": "Source image socket to use for style conditioning."},
                 ),
                 "apply_krea2_edit_patch": (
@@ -134,7 +135,7 @@ class CcCKrea2EasyEditOstris:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 9-preset Ostris Edit node. "
+        "Opinionated 10-preset Ostris Edit node. "
         "Routes Subject, Scene, Outfit, and Style sources to Ostris edit pipeline."
     )
 
@@ -167,15 +168,16 @@ class CcCKrea2EasyEditOstris:
                         "preserve_scene",
                         "outfit_transfer",
                         "style_transfer",
+                        "scene_reinterpretation",
                     ],
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
                 ),
                 "outfit_source": (
-                    ["outfit image", "scene image", "style image"],
+                    ["none", "outfit image", "scene image", "style image"],
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
                 ),
                 "style_source": (
-                    ["style image", "scene image", "subject image"],
+                    ["none", "style image", "scene image", "subject image"],
                     {"default": "style image", "tooltip": "Source image socket to use for style conditioning."},
                 ),
                 "apply_ostris_edit_patch": (
@@ -434,21 +436,46 @@ def _execute_easy_edit(
         ostris_kv_cache=ostris_kv_cache,
     )
 
-    from ..easy_routing import get_easy_preset_capabilities
+    from ..easy_routing import (
+        get_easy_preset_capabilities,
+        OUTFIT_POLICY_DISABLED,
+        STYLE_POLICY_SCENE_AUTO,
+        STYLE_POLICY_DISABLED,
+    )
 
     caps = get_easy_preset_capabilities(preset)
-    outfit_cap_str = "enabled" if caps.uses_outfit else "disabled"
-    style_cap_str = "enabled" if caps.uses_style else "disabled"
+    outfit_policy_str = caps.outfit_policy
+    style_policy_str = "automatic scene" if caps.style_policy == STYLE_POLICY_SCENE_AUTO else caps.style_policy
 
-    if not caps.uses_outfit and (outfit is not None or outfit_source != "outfit image"):
+    if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         resolved_outfit_str = "ignored by preset"
+    elif outfit_source == "none":
+        resolved_outfit_str = "none"
     else:
-        resolved_outfit_str = f"{outfit_source} ({'present' if resolved_sources.effective_outfit is not None else 'missing'})"
+        status_str = "present" if resolved_sources.effective_outfit is not None else "missing"
+        resolved_outfit_str = f"{outfit_source} ({status_str})"
 
-    if not caps.uses_style and (style is not None or style_source != "style image"):
+    if caps.style_policy == STYLE_POLICY_SCENE_AUTO:
+        if resolved_sources.effective_style is not None:
+            resolved_style_str = "scene image (automatic)"
+        else:
+            resolved_style_str = "none (scene unavailable)"
+    elif caps.style_policy == STYLE_POLICY_DISABLED:
         resolved_style_str = "ignored by preset"
+    elif style_source == "none":
+        resolved_style_str = "none"
     else:
-        resolved_style_str = f"{style_source} ({'present' if resolved_sources.effective_style is not None else 'missing'})"
+        status_str = "present" if resolved_sources.effective_style is not None else "missing"
+        resolved_style_str = f"{style_source} ({status_str})"
+
+    outfit_selector_report = (
+        "ignored by preset" if caps.outfit_policy == OUTFIT_POLICY_DISABLED else outfit_source
+    )
+    style_selector_report = (
+        "ignored by preset"
+        if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_DISABLED)
+        else style_source
+    )
 
     app_refs = [f"{alias}" for _, _, alias, _ in route.edit_references]
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
@@ -457,10 +484,10 @@ def _execute_easy_edit(
         "=== Easy Edit Routing Report ===",
         f"Preset: {preset}",
         f"Reference Contract: {backend_method}",
-        f"Outfit Capability: {outfit_cap_str}",
-        f"Style Capability: {style_cap_str}",
-        f"Outfit Source Selector: {outfit_source}",
-        f"Style Source Selector: {style_source}",
+        f"Outfit Policy: {outfit_policy_str}",
+        f"Style Policy: {style_policy_str}",
+        f"Outfit Source Selector: {outfit_selector_report}",
+        f"Style Source Selector: {style_selector_report}",
         f"Use Default Prompt: {'yes' if effective_use_default else 'no'}",
         f"Prompt Source: {prompt_source_str}",
         f"Default Prompt Key: {resolved_key_str}",

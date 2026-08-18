@@ -1508,7 +1508,7 @@ def test_subject_transfer_multi_reference_3_refs(dummy_sources):
 
 
 def test_preset_capability_gating_outfit(dummy_sources):
-    """Verify preserve_scene and style_transfer ignore Outfit even when connected."""
+    """Verify preserve_scene, style_transfer, and scene_reinterpretation ignore Outfit even when connected."""
     S, Sc, Ou, _ = dummy_sources
 
     # preserve_scene with connected outfit
@@ -1524,4 +1524,52 @@ def test_preset_capability_gating_outfit(dummy_sources):
     route_st = route_easy_preset(sources_st, preset="style_transfer")
     st_aliases = [alias for _, _, alias, _ in route_st.edit_references]
     assert "outfit" not in st_aliases
+
+    # scene_reinterpretation with connected outfit
+    sources_sr = resolve_easy_sources(preset="scene_reinterpretation", subject=S, scene=Sc, outfit=Ou)
+    assert sources_sr.effective_outfit is None
+
+
+def test_scene_reinterpretation_routing(dummy_sources):
+    """Verify scene_reinterpretation preset behavior and routing contract."""
+    S, Sc, Ou, St = dummy_sources
+
+    # Scene + Subject -> target content empty, geometry Scene, style source scene
+    sources = resolve_easy_sources(preset="scene_reinterpretation", subject=S, scene=Sc, outfit=Ou, style=St)
+    assert sources.effective_outfit is None
+    assert sources.effective_style is Sc
+
+    route = route_easy_preset(sources, preset="scene_reinterpretation")
+    assert route.target_content_mode == "empty"
+    assert route.target_geometry_mode == "favor_image"
+    assert route.target_geometry_source is Sc
+    assert route.style_source is Sc
+
+    aliases = [alias for _, _, alias, _ in route.edit_references]
+    assert aliases == ["scene", "subject"]
+    assert route.edit_references[0][1] == pytest.approx(1.0)  # Scene boost
+    assert route.edit_references[1][1] == pytest.approx(4.0)  # Subject boost
+
+
+def test_none_sources_resolution(dummy_sources):
+    """Verify that setting outfit_source or style_source to 'none' disables the respective source."""
+    S, Sc, Ou, St = dummy_sources
+
+    sources = resolve_easy_sources(
+        preset="balanced",
+        subject=S,
+        scene=Sc,
+        outfit=Ou,
+        style=St,
+        outfit_source="none",
+        style_source="none",
+    )
+    assert sources.effective_outfit is None
+    assert sources.effective_style is None
+
+    route = route_easy_preset(sources, preset="balanced")
+    aliases = [alias for _, _, alias, _ in route.edit_references]
+    assert "outfit" not in aliases
+    assert route.style_source is None
+
 
