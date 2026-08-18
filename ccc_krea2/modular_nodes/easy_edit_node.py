@@ -302,6 +302,17 @@ def _execute_easy_edit(
         prompt_source_str = "custom"
         resolved_key_str = "none"
 
+        requires_explicit_custom_prompt = preset in {"subject_transfer", "scene_reinterpretation"} and not has_default
+        if requires_explicit_custom_prompt and not effective_positive_prompt:
+            if preset == "subject_transfer":
+                raise ValueError(
+                    "Subject Transfer requires a custom positive prompt when both Subject and Scene are not available."
+                )
+            elif preset == "scene_reinterpretation":
+                raise ValueError(
+                    "Scene Reinterpretation requires a custom positive prompt when both Subject and Scene are not available."
+                )
+
         if is_subject_only and not effective_positive_prompt:
             raise ValueError(
                 "Subject-only Easy Edit requires a positive prompt because no default editing intent is available."

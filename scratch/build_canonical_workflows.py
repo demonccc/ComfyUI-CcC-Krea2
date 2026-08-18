@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 
-# Explicit schema fixture ONLY for the standard nodes used by these ten workflows
+# Explicit schema fixture ONLY for the standard nodes used by these canonical workflows
 class MockUNETLoader:
     @classmethod
     def INPUT_TYPES(s):
@@ -157,6 +157,7 @@ CANONICAL_NAMES = [
     "08_advanced_krea2_edit.json",
     "09_advanced_native.json",
     "10_advanced_ostris.json",
+    "11_easy_scene_reinterpretation.json",
 ]
 
 

@@ -373,6 +373,129 @@ class TestEasyEditNodeDefaultPromptBehavior:
         assert "Prompt Source: custom" in report
         assert "Default Prompt Key: none" in report
 
+    def test_partial_subject_transfer_empty_custom_prompt_raises(self, dummy_images):
+        S, Sc, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+
+        # Subject-only Subject Transfer
+        with pytest.raises(
+            ValueError,
+            match="Subject Transfer requires a custom positive prompt when both Subject and Scene are not available.",
+        ):
+            node.process(
+                model="model",
+                clip="clip",
+                vae="vae",
+                positive_prompt="",
+                use_default_prompt=True,
+                preset="subject_transfer",
+                subject=S,
+            )
+
+        # Scene-only Subject Transfer
+        with pytest.raises(
+            ValueError,
+            match="Subject Transfer requires a custom positive prompt when both Subject and Scene are not available.",
+        ):
+            node.process(
+                model="model",
+                clip="clip",
+                vae="vae",
+                positive_prompt="",
+                use_default_prompt=True,
+                preset="subject_transfer",
+                scene=Sc,
+            )
+
+    def test_partial_subject_transfer_with_custom_prompt_succeeds(self, dummy_images, monkeypatch):
+        S, _, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+        captured = {}
+
+        def mock_orchestrator(*args, **kwargs):
+            captured["positive_prompt"] = kwargs.get("positive_prompt")
+            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
+
+        monkeypatch.setattr(
+            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
+            mock_orchestrator,
+        )
+
+        _, _, _, _, report = node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt="My custom subject transfer prompt",
+            use_default_prompt=True,
+            preset="subject_transfer",
+            subject=S,
+        )
+
+        assert captured["positive_prompt"] == "My custom subject transfer prompt"
+        assert "Prompt Source: custom" in report
+
+    def test_partial_scene_reinterpretation_empty_custom_prompt_raises(self, dummy_images):
+        S, Sc, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+
+        # Subject-only Scene Reinterpretation
+        with pytest.raises(
+            ValueError,
+            match="Scene Reinterpretation requires a custom positive prompt when both Subject and Scene are not available.",
+        ):
+            node.process(
+                model="model",
+                clip="clip",
+                vae="vae",
+                positive_prompt="",
+                use_default_prompt=True,
+                preset="scene_reinterpretation",
+                subject=S,
+            )
+
+        # Scene-only Scene Reinterpretation
+        with pytest.raises(
+            ValueError,
+            match="Scene Reinterpretation requires a custom positive prompt when both Subject and Scene are not available.",
+        ):
+            node.process(
+                model="model",
+                clip="clip",
+                vae="vae",
+                positive_prompt="",
+                use_default_prompt=True,
+                preset="scene_reinterpretation",
+                scene=Sc,
+            )
+
+    def test_partial_scene_reinterpretation_with_custom_prompt_succeeds(self, dummy_images, monkeypatch):
+        S, _, _, _ = dummy_images
+        node = CcCKrea2EasyEdit()
+        captured = {}
+
+        def mock_orchestrator(*args, **kwargs):
+            captured["positive_prompt"] = kwargs.get("positive_prompt")
+            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
+
+        monkeypatch.setattr(
+            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
+            mock_orchestrator,
+        )
+
+        _, _, _, _, report = node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt="My custom reinterpretation prompt",
+            use_default_prompt=True,
+            preset="scene_reinterpretation",
+            subject=S,
+        )
+
+        assert captured["positive_prompt"] == "My custom reinterpretation prompt"
+        assert "Prompt Source: custom" in report
+        assert "Scene Reinterpretation selected but Scene source is missing." in report
+
 
 class TestEasyEditWorkflowMigration:
     LEGACY_PRESETS = {

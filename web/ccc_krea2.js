@@ -324,9 +324,13 @@ app.registerExtension({
                     if (styleSourceWidget) {
                         styleSourceWidget.disabled = isSceneAutoStyle;
                         if (isSceneAutoStyle) {
+                            styleSourceWidget.label = "style_source [Auto: Scene]";
                             styleSourceWidget.tooltip = preset === "subject_transfer"
-                                ? "Subject Transfer automatically uses the Scene reference for style integration."
-                                : "Scene Reinterpretation automatically uses the Scene reference for style integration.";
+                                ? "Subject Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets."
+                                : "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
+                        } else {
+                            delete styleSourceWidget.label;
+                            styleSourceWidget.tooltip = "Source image socket to use for style conditioning.";
                         }
                     }
 
