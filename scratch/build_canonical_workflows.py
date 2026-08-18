@@ -84,6 +84,30 @@ class MockSaveImage:
     RETURN_TYPES = tuple()
 
 
+class MockModelSamplingAuraFlow:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"model": ("MODEL",), "shift": ("FLOAT", {"default": 1.15})}}
+
+    RETURN_TYPES = ("MODEL",)
+
+
+class MockBlackwellAttentionFix:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"model": ("MODEL",), "mode": (["pytorch", "sdpa", "flash_attn"],)}}
+
+    RETURN_TYPES = ("MODEL",)
+
+
+class MockNote:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"text": ("STRING", {"multiline": True, "default": ""})}}
+
+    RETURN_TYPES = tuple()
+
+
 CORE_MAPPINGS = {
     "UNETLoader": MockUNETLoader,
     "CLIPLoader": MockCLIPLoader,
@@ -92,6 +116,9 @@ CORE_MAPPINGS = {
     "KSampler": MockKSampler,
     "VAEDecode": MockVAEDecode,
     "SaveImage": MockSaveImage,
+    "ModelSamplingAuraFlow": MockModelSamplingAuraFlow,
+    "BlackwellAttentionFix": MockBlackwellAttentionFix,
+    "Note": MockNote,
 }
 
 
@@ -117,10 +144,6 @@ DYNAMIC_FILE_SELECTORS = {
 }
 
 # Frontend-only widgets mapping: node_type -> list of (widget_name, injection_index, default_value)
-# IMPORTANT DISTINCTION:
-# 'control_after_generate' sets widget.options.serialize = false but IS still persisted in workflow JSON.
-# 'image_upload' on LoadImage sets widget.serialize = false and is NOT persisted in workflow JSON.
-# Therefore only KSampler needs frontend injection here.
 FRONTEND_WIDGETS_MAP = {"KSampler": [("control_after_generate", 1, "randomize")]}
 
 CANONICAL_NAMES = [
@@ -151,7 +174,7 @@ class WorkflowBuilder:
         self.node_id = 1
         self.link_id = 1
 
-    def add_node(self, node_type, pos, size, inputs=None, widgets_values=None):
+    def add_node(self, node_type, pos, size, inputs=None, widgets_values=None, title=None):
         inputs = inputs or {}
         values_by_name = widgets_values or {}
 
@@ -169,7 +192,6 @@ class WorkflowBuilder:
         for name in inputs:
             if name not in all_in:
                 raise ValueError(f"Invalid input '{name}' for node '{node_type}'. Valid: {list(all_in.keys())}")
-            # Derive type
             expected_type = all_in[name][0]
             if isinstance(expected_type, list) or expected_type in ["STRING", "INT", "FLOAT", "BOOLEAN"]:
                 raise ValueError(f"'{name}' is a widget, not a socket on {node_type}")
@@ -210,7 +232,6 @@ class WorkflowBuilder:
 
             if name in values_by_name:
                 val = values_by_name[name]
-                # Validate primitive type/combo membership
                 if isinstance(val_type, list) or isinstance(val_type, tuple):
                     if val not in val_type:
                         if (node_type, name) not in DYNAMIC_FILE_SELECTORS:
@@ -255,6 +276,9 @@ class WorkflowBuilder:
             "properties": {"Node name for S&R": node_type},
             "widgets_values": serialized_widgets,
         }
+        if title:
+            node["title"] = title
+
         self.nodes.append(node)
         self.node_id += 1
         return node
@@ -275,11 +299,9 @@ class WorkflowBuilder:
         in_type = to_node["inputs"][to_idx]["type"]
 
         if out_type != in_type and in_type != "*" and out_type != "*":
-            # Just ignore if any is "*" (ComfyUI generic). For strict checking, exact match:
-            if out_type != in_type:
-                raise ValueError(
-                    f"Link type mismatch: {from_node['type']}.{from_out_name} ({out_type}) -> {to_node['type']}.{to_in_name} ({in_type})"
-                )
+            raise ValueError(
+                f"Link type mismatch: {from_node['type']}.{from_out_name} ({out_type}) -> {to_node['type']}.{to_in_name} ({in_type})"
+            )
 
         lnk = [self.link_id, from_node["id"], from_idx, to_node["id"], to_idx, out_type]
         self.links.append(lnk)
@@ -339,9 +361,39 @@ def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
 
         b.link(unet, "MODEL", lora, "model")
 
+    auraflow = b.add_node(
+        "ModelSamplingAuraFlow",
+        [1500, 0],
+        [300, 100],
+        inputs={"model": None},
+        widgets_values={"shift": 1.15},
+    )
+
+    blackwell = b.add_node(
+        "BlackwellAttentionFix",
+        [1850, 0],
+        [300, 100],
+        inputs={"model": None},
+        widgets_values={"mode": "pytorch"},
+    )
+
+    note = b.add_node(
+        "Note",
+        [1500, 150],
+        [300, 150],
+        widgets_values={
+            "text": (
+                "Note on Blackwell GPUs:\n"
+                "`BlackwellAttentionFix` is recommended for NVIDIA Blackwell GPUs (RTX 5090, 5080, 5070 family) "
+                "to prevent NaN/black image sampling issues. On non-Blackwell systems, this node acts as a pass-through "
+                "or can be muted/bypassed."
+            )
+        },
+    )
+
     sampler = b.add_node(
         "KSampler",
-        [1500, 0],
+        [2200, 0],
         [300, 200],
         inputs={"model": None, "positive": None, "negative": None, "latent_image": None},
         widgets_values={
@@ -354,16 +406,19 @@ def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
             "denoise": 1.0,
         },
     )
-    decode = b.add_node("VAEDecode", [1850, 0], [300, 100], inputs={"samples": None, "vae": None})
+
+    decode = b.add_node("VAEDecode", [2550, 0], [300, 100], inputs={"samples": None, "vae": None})
     save = b.add_node(
-        "SaveImage", [2200, 0], [300, 200], inputs={"images": None}, widgets_values={"filename_prefix": "CcCKrea2"}
+        "SaveImage", [2900, 0], [300, 200], inputs={"images": None}, widgets_values={"filename_prefix": "CcCKrea2"}
     )
 
+    b.link(auraflow, "MODEL", blackwell, "model")
+    b.link(blackwell, "MODEL", sampler, "model")
     b.link(sampler, "LATENT", decode, "samples")
     b.link(vae, "VAE", decode, "vae")
     b.link(decode, "IMAGE", save, "images")
 
-    return unet, clip, vae, lora, sampler
+    return unet, clip, vae, lora, auraflow, sampler
 
 
 def build_easy_workflow(
@@ -380,9 +435,10 @@ def build_easy_workflow(
     b = WorkflowBuilder()
     b.add_group("Loaders", [0, -50, 700, 500])
     b.add_group("Easy Edit", [750, -50, 700, 500])
-    b.add_group("Sampling", [1480, -50, 1100, 500])
+    b.add_group("Sampling", [1480, -50, 1050, 500])
+    b.add_group("Output", [2540, -50, 680, 500])
 
-    unet, clip, vae, lora, sampler = build_base_graph(b, is_ostris)
+    unet, clip, vae, lora, auraflow, sampler = build_base_graph(b, is_ostris)
 
     easy_type = "CcCKrea2EasyEditOstris" if is_ostris else "CcCKrea2EasyEdit"
 
@@ -413,28 +469,36 @@ def build_easy_workflow(
 
     easy = b.add_node(easy_type, [800, 0], [400, 400], inputs=easy_inputs, widgets_values=easy_widgets)
 
-    b.link(lora, "model", easy, "model")
+    if lora:
+        b.link(lora, "model", easy, "model")
+    else:
+        b.link(unet, "MODEL", easy, "model")
+
     b.link(clip, "CLIP", easy, "clip")
     b.link(vae, "VAE", easy, "vae")
 
     y = 500
+    img_count = sum([has_subj, has_scene, has_outfit, has_style])
+    if img_count > 0:
+        b.add_group("Load Images", [0, 470, 350, img_count * 250 + 40])
+
     if has_subj:
-        sub = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "subject.jpg"})
+        sub = b.add_node("LoadImage", [20, y], [300, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image")
         b.link(sub, "IMAGE", easy, "subject")
         y += 250
     if has_scene:
-        scn = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "scene.jpg"})
+        scn = b.add_node("LoadImage", [20, y], [300, 200], widgets_values={"image": "scene.jpg"}, title="Scene Image")
         b.link(scn, "IMAGE", easy, "scene")
         y += 250
     if has_outfit:
-        outf = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "outfit.jpg"})
+        outf = b.add_node("LoadImage", [20, y], [300, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image")
         b.link(outf, "IMAGE", easy, "outfit")
         y += 250
     if has_style:
-        sty = b.add_node("LoadImage", [0, y], [300, 200], widgets_values={"image": "style.jpg"})
+        sty = b.add_node("LoadImage", [20, y], [300, 200], widgets_values={"image": "style.jpg"}, title="Style Image")
         b.link(sty, "IMAGE", easy, "style")
 
-    b.link(easy, "patched_model", sampler, "model")
+    b.link(easy, "patched_model", auraflow, "model")
     b.link(easy, "positive", sampler, "positive")
     b.link(easy, "negative", sampler, "negative")
     b.link(easy, "latent", sampler, "latent_image")
@@ -445,20 +509,22 @@ def build_easy_workflow(
 def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     b = WorkflowBuilder()
     b.add_group("Loaders", [0, -50, 700, 500])
-    b.add_group("References", [0, 500, 1400, 600])
+    b.add_group("Load Images", [0, 500, 320, 540])
+    b.add_group("References", [340, 500, 1050, 600])
     b.add_group("Edit Orchestrator", [1450, -50, 500, 700])
-    b.add_group("Sampling", [2000, -50, 1100, 500])
+    b.add_group("Sampling", [2000, -50, 1050, 500])
+    b.add_group("Output", [3060, -50, 680, 500])
 
     if is_native:
         b.add_group("Native / compatible reference runtime required", [320, 0, 30, 30])
 
-    unet, clip, vae, lora, sampler = build_base_graph(b, is_ostris, is_native)
+    unet, clip, vae, lora, auraflow, sampler = build_base_graph(b, is_ostris, is_native)
 
     # Subject ref
-    sub_img = b.add_node("LoadImage", [0, 550], [300, 200], widgets_values={"image": "subject.jpg"})
+    sub_img = b.add_node("LoadImage", [20, 550], [280, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image")
     sub_prep = b.add_node(
         "CcCKrea2QwenVisionImagePrep",
-        [350, 550],
+        [360, 550],
         [300, 200],
         inputs={"clip": None, "image": None},
         widgets_values={
@@ -494,10 +560,10 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     b.link(sub_prep, "prepared_image", sub_ref, "prepared_image")
 
     # Outfit ref
-    outf_img = b.add_node("LoadImage", [0, 800], [300, 200], widgets_values={"image": "outfit.jpg"})
+    outf_img = b.add_node("LoadImage", [20, 800], [280, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image")
     outf_prep = b.add_node(
         "CcCKrea2QwenVisionImagePrep",
-        [350, 800],
+        [360, 800],
         [300, 200],
         inputs={"clip": None, "image": None},
         widgets_values={
@@ -583,7 +649,7 @@ def build_advanced_workflow(filename, is_ostris=False, is_native=False):
     b.link(outf_ref, "reference_chain", edit, "references")
     b.link(t_latent, "target_latent", edit, "target_latent")
 
-    b.link(edit, "patched_model", sampler, "model")
+    b.link(edit, "patched_model", auraflow, "model")
     b.link(edit, "positive", sampler, "positive")
     b.link(edit, "negative", sampler, "negative")
     b.link(edit, "latent", sampler, "latent_image")

@@ -273,10 +273,16 @@ app.registerExtension({
                         node._isPromptSystemManaged = !!useDefaultWidget.value;
                     }
 
+                    const preset = presetWidget?.value || "balanced";
+                    const usesOutfit = !["preserve_scene", "style_transfer"].includes(preset);
+
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
                     const sceneInput = node.inputs?.find(i => i.name === "scene");
                     const outfitInput = node.inputs?.find(i => i.name === "outfit");
                     const styleInput = node.inputs?.find(i => i.name === "style");
+
+                    if (outfitSourceWidget) outfitSourceWidget.disabled = !usesOutfit;
+                    if (outfitInput) outfitInput.disabled = !usesOutfit;
 
                     const hasS = !!(subjectInput && subjectInput.link != null);
                     const hasSc = !!(sceneInput && sceneInput.link != null);
@@ -286,9 +292,11 @@ app.registerExtension({
                     const outfitSource = outfitSourceWidget?.value || "outfit image";
                     const styleSource = styleSourceWidget?.value || "style image";
 
-                    const hasO = (outfitSource === "outfit image" && hasRawO) ||
-                                 (outfitSource === "scene image" && hasSc) ||
-                                 (outfitSource === "style image" && hasRawSt);
+                    const hasO = usesOutfit && (
+                        (outfitSource === "outfit image" && hasRawO) ||
+                        (outfitSource === "scene image" && hasSc) ||
+                        (outfitSource === "style image" && hasRawSt)
+                    );
 
                     const hasSt = (styleSource === "style image" && hasRawSt) ||
                                   (styleSource === "scene image" && hasSc) ||
@@ -308,7 +316,6 @@ app.registerExtension({
                         node._isPromptSystemManaged = false;
                     } else {
                         useDefaultWidget.disabled = false;
-                        const preset = presetWidget?.value || "balanced";
                         const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt);
 
                         if (useDefaultWidget.value && hasDefault) {

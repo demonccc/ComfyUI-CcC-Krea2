@@ -88,6 +88,8 @@ def resolve_krea2edit_geometry(
                 resolved_mode = "fit"
     elif fit_mode == "crop":
         resolved_mode = "crop"
+    elif fit_mode in ("contain_no_upscale", "fit_no_upscale"):
+        resolved_mode = "contain_no_upscale"
     else:
         resolved_mode = fit_mode
 
@@ -101,6 +103,23 @@ def resolve_krea2edit_geometry(
         vae_input_h = tgt_h
         interp_occurred = False
         interp_method = "none"
+
+    elif resolved_mode in ("contain_no_upscale", "fit_no_upscale"):
+        # Contain without upscale: preserve source AR and full image, scale down only if exceeding target bounds
+        sc = min(1.0, tgt_h / float(src_h), tgt_w / float(src_w))
+        target_cap_h = max(16, (tgt_h // 16) * 16)
+        target_cap_w = max(16, (tgt_w // 16) * 16)
+        fitted_h = min(max(16, (int(round(src_h * sc)) // 16) * 16), target_cap_h)
+        fitted_w = min(max(16, (int(round(src_w * sc)) // 16) * 16), target_cap_w)
+
+        crop_h = src_h
+        crop_w = src_w
+        left = 0
+        top = 0
+        vae_input_w = fitted_w
+        vae_input_h = fitted_h
+        interp_occurred = (crop_w, crop_h) != (fitted_w, fitted_h)
+        interp_method = "bicubic"
 
     elif resolved_mode == "crop":
         # Manual Visual Reference Fit = crop: center crop to exact target aspect ratio & resize to exact target pixel dimensions

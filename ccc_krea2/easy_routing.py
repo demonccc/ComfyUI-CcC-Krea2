@@ -1,7 +1,7 @@
 """Easy Edit 3-Phase Routing Engine for opinionated Krea2 Edit and Ostris Edit workflows."""
 
 from dataclasses import dataclass
-from typing import Optional, List, Tuple, Any
+from typing import Optional, List, Tuple, Any, Dict
 
 
 # Centralized boost constants for Easy presets
@@ -86,6 +86,32 @@ def get_easy_instruction_for_role(role: str) -> str:
 
 
 @dataclass(frozen=True)
+class EasyPresetCapabilities:
+    """Capability contract for Easy Edit presets."""
+
+    uses_outfit: bool
+    uses_style: bool
+
+
+EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
+    "flexible": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "balanced": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "consistent": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "preserve_identity": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "max_identity": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "subject_transfer": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "preserve_scene": EasyPresetCapabilities(uses_outfit=False, uses_style=True),
+    "outfit_transfer": EasyPresetCapabilities(uses_outfit=True, uses_style=True),
+    "style_transfer": EasyPresetCapabilities(uses_outfit=False, uses_style=True),
+}
+
+
+def get_easy_preset_capabilities(preset: str) -> EasyPresetCapabilities:
+    """Return capability contract for given preset."""
+    return EASY_PRESET_CAPABILITIES.get(preset, EasyPresetCapabilities(uses_outfit=True, uses_style=True))
+
+
+@dataclass(frozen=True)
 class EasyResolvedSources:
     """Phase 1: Resolved input sources with strict no-fallback rules."""
 
@@ -159,56 +185,77 @@ def resolve_easy_sources(
     style: Optional[Any] = None,
     outfit_source: str = "outfit image",
     style_source: str = "style image",
+    preset: Optional[str] = None,
 ) -> EasyResolvedSources:
-    """Phase 1: Resolve effective sources according to selectors with strict NO-FALLBACK policy."""
+    """Phase 1: Resolve effective sources according to selectors with strict NO-FALLBACK policy and preset gating."""
     warnings: List[str] = []
+
+    caps = get_easy_preset_capabilities(preset) if preset else EasyPresetCapabilities(uses_outfit=True, uses_style=True)
 
     effective_subject = subject
     effective_scene = scene
 
     # Resolve outfit_source
     outfit_source_kind = "outfit"
-    if outfit_source == "outfit image":
-        effective_outfit = outfit
-        outfit_source_kind = "outfit"
-    elif outfit_source == "scene image":
-        outfit_source_kind = "scene"
-        if scene is not None:
-            effective_outfit = scene
+    if not caps.uses_outfit:
+        effective_outfit = None
+        if outfit_source == "scene image":
+            outfit_source_kind = "scene"
+        elif outfit_source == "style image":
+            outfit_source_kind = "style"
         else:
-            effective_outfit = None
-            warnings.append("outfit_source set to 'scene image' but scene image is disconnected.")
-    elif outfit_source == "style image":
-        outfit_source_kind = "style"
-        if style is not None:
-            effective_outfit = style
-        else:
-            effective_outfit = None
-            warnings.append("outfit_source set to 'style image' but style image is disconnected.")
+            outfit_source_kind = "outfit"
     else:
-        effective_outfit = outfit
+        if outfit_source == "outfit image":
+            effective_outfit = outfit
+            outfit_source_kind = "outfit"
+        elif outfit_source == "scene image":
+            outfit_source_kind = "scene"
+            if scene is not None:
+                effective_outfit = scene
+            else:
+                effective_outfit = None
+                warnings.append("outfit_source set to 'scene image' but scene image is disconnected.")
+        elif outfit_source == "style image":
+            outfit_source_kind = "style"
+            if style is not None:
+                effective_outfit = style
+            else:
+                effective_outfit = None
+                warnings.append("outfit_source set to 'style image' but style image is disconnected.")
+        else:
+            effective_outfit = outfit
 
     # Resolve style_source
     style_source_kind = "style"
-    if style_source == "style image":
-        effective_style = style
-        style_source_kind = "style"
-    elif style_source == "scene image":
-        style_source_kind = "scene"
-        if scene is not None:
-            effective_style = scene
+    if not caps.uses_style:
+        effective_style = None
+        if style_source == "scene image":
+            style_source_kind = "scene"
+        elif style_source == "subject image":
+            style_source_kind = "subject"
         else:
-            effective_style = None
-            warnings.append("style_source set to 'scene image' but scene image is disconnected.")
-    elif style_source == "subject image":
-        style_source_kind = "subject"
-        if subject is not None:
-            effective_style = subject
-        else:
-            effective_style = None
-            warnings.append("style_source set to 'subject image' but subject image is disconnected.")
+            style_source_kind = "style"
     else:
-        effective_style = style
+        if style_source == "style image":
+            effective_style = style
+            style_source_kind = "style"
+        elif style_source == "scene image":
+            style_source_kind = "scene"
+            if scene is not None:
+                effective_style = scene
+            else:
+                effective_style = None
+                warnings.append("style_source set to 'scene image' but scene image is disconnected.")
+        elif style_source == "subject image":
+            style_source_kind = "subject"
+            if subject is not None:
+                effective_style = subject
+            else:
+                effective_style = None
+                warnings.append("style_source set to 'subject image' but subject image is disconnected.")
+        else:
+            effective_style = style
 
     return EasyResolvedSources(
         subject=subject,

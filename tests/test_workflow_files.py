@@ -78,6 +78,30 @@ class MockSaveImage:
     RETURN_TYPES = tuple()
 
 
+class MockModelSamplingAuraFlow:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"model": ("MODEL",), "shift": ("FLOAT", {"default": 1.15})}}
+
+    RETURN_TYPES = ("MODEL",)
+
+
+class MockBlackwellAttentionFix:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"model": ("MODEL",), "mode": (["pytorch", "sdpa", "flash_attn"],)}}
+
+    RETURN_TYPES = ("MODEL",)
+
+
+class MockNote:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"text": ("STRING", {"multiline": True})}}
+
+    RETURN_TYPES = tuple()
+
+
 try:
     import nodes as comfy_nodes
 
@@ -91,6 +115,9 @@ except ImportError:
         "KSampler": MockKSampler,
         "VAEDecode": MockVAEDecode,
         "SaveImage": MockSaveImage,
+        "ModelSamplingAuraFlow": MockModelSamplingAuraFlow,
+        "BlackwellAttentionFix": MockBlackwellAttentionFix,
+        "Note": MockNote,
     }
 
 

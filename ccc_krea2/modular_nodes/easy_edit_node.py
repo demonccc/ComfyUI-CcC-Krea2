@@ -268,6 +268,7 @@ def _execute_easy_edit(
         style=style,
         outfit_source=outfit_source,
         style_source=style_source,
+        preset=preset,
     )
 
     # Phase 1.5: Default Positive Prompt Resolution
@@ -335,7 +336,7 @@ def _execute_easy_edit(
         else:
             vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
-        fit_mode = "crop" if common_geometry_active else "auto"
+        fit_mode = "contain_no_upscale" if common_geometry_active else "auto"
 
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(
@@ -433,6 +434,22 @@ def _execute_easy_edit(
         ostris_kv_cache=ostris_kv_cache,
     )
 
+    from ..easy_routing import get_easy_preset_capabilities
+
+    caps = get_easy_preset_capabilities(preset)
+    outfit_cap_str = "enabled" if caps.uses_outfit else "disabled"
+    style_cap_str = "enabled" if caps.uses_style else "disabled"
+
+    if not caps.uses_outfit and (outfit is not None or outfit_source != "outfit image"):
+        resolved_outfit_str = "ignored by preset"
+    else:
+        resolved_outfit_str = f"{outfit_source} ({'present' if resolved_sources.effective_outfit is not None else 'missing'})"
+
+    if not caps.uses_style and (style is not None or style_source != "style image"):
+        resolved_style_str = "ignored by preset"
+    else:
+        resolved_style_str = f"{style_source} ({'present' if resolved_sources.effective_style is not None else 'missing'})"
+
     app_refs = [f"{alias}" for _, _, alias, _ in route.edit_references]
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 
@@ -440,6 +457,8 @@ def _execute_easy_edit(
         "=== Easy Edit Routing Report ===",
         f"Preset: {preset}",
         f"Reference Contract: {backend_method}",
+        f"Outfit Capability: {outfit_cap_str}",
+        f"Style Capability: {style_cap_str}",
         f"Outfit Source Selector: {outfit_source}",
         f"Style Source Selector: {style_source}",
         f"Use Default Prompt: {'yes' if effective_use_default else 'no'}",
@@ -447,19 +466,26 @@ def _execute_easy_edit(
         f"Default Prompt Key: {resolved_key_str}",
         f"Resolved Subject: {'present' if resolved_sources.subject is not None else 'missing'}",
         f"Resolved Scene: {'present' if resolved_sources.scene is not None else 'missing'}",
-        f"Resolved Outfit Source: {outfit_source} ({'present' if resolved_sources.effective_outfit is not None else 'missing'})",
-        f"Resolved Style Source: {style_source} ({'present' if resolved_sources.effective_style is not None else 'missing'})",
+        f"Resolved Outfit Source: {resolved_outfit_str}",
+        f"Resolved Style Source: {resolved_style_str}",
         f"Common Geometry: {'yes' if common_geometry_active else 'no'}",
         f"Common Geometry Anchor: {common_geometry_anchor_role}",
         f"Target Content Mode: {route.target_content_mode}",
         f"Target Content Source: {'present' if route.target_content_source is not None else 'none'}",
         f"Target Geometry Mode: {effective_geometry_mode}",
         f"Target Geometry Source: {'present' if effective_geometry_source is not None else 'none'}",
-        f"Appearance Ref 1: {app_refs[0] if len(app_refs) > 0 else 'none'}",
-        f"Appearance Ref 2: {app_refs[1] if len(app_refs) > 1 else 'none'}",
-        f"Semantic-only Sources: {', '.join(sem_refs) if sem_refs else 'none'}",
-        f"Style Active: {'yes' if route.style_active else 'no'}",
     ]
+    for i, app_ref in enumerate(app_refs):
+        easy_header.append(f"Appearance Ref {i + 1}: {app_ref}")
+    if not app_refs:
+        easy_header.append("Appearance Ref 1: none")
+
+    easy_header.extend(
+        [
+            f"Semantic-only Sources: {', '.join(sem_refs) if sem_refs else 'none'}",
+            f"Style Active: {'yes' if route.style_active else 'no'}",
+        ]
+    )
 
     if backend_method == "krea2_edit":
         easy_header.append(f"CcC Krea2 Model Patch Applied: {'yes' if apply_patch else 'no'}")

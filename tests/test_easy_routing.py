@@ -51,8 +51,13 @@ def assert_refs(refs, expected):
         assert alias == exp_alias, f"Wrong alias: {alias} != {exp_alias}"
 
 
+def assert_bounded_appearance_refs(route):
+    limit = 3 if route.preset == "subject_transfer" else 2
+    assert len(route.edit_references) <= limit, f"Too many appearance refs for preset {route.preset}: {route.edit_references}"
+
+
 def assert_no_more_than_2_refs(route):
-    assert len(route.edit_references) <= 2, f"Too many appearance refs: {route.edit_references}"
+    assert_bounded_appearance_refs(route)
 
 
 # ---------------------------------------------------------------------------
@@ -130,17 +135,17 @@ class TestFlexibleMatrix:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("preset", ["balanced", "style_transfer"])
+@pytest.mark.parametrize("preset", ["balanced"])
 class TestBalancedMatrix:
     def test_none(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources()
+        sources = resolve_easy_sources(preset=preset)
         route = route_easy_preset(sources, preset=preset)
         assert len(route.edit_references) == 0
 
     def test_subject_only(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(subject=S)
+        sources = resolve_easy_sources(preset=preset, subject=S)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "empty"
         assert route.target_content_source is None
@@ -150,7 +155,7 @@ class TestBalancedMatrix:
 
     def test_scene_only(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(scene=Sc)
+        sources = resolve_easy_sources(preset=preset, scene=Sc)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "empty"
         assert route.target_content_source is None
@@ -160,7 +165,7 @@ class TestBalancedMatrix:
 
     def test_outfit_only(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(outfit=Ou)
+        sources = resolve_easy_sources(preset=preset, outfit=Ou)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "empty"
         assert route.target_content_source is None
@@ -170,7 +175,7 @@ class TestBalancedMatrix:
 
     def test_subject_scene(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(subject=S, scene=Sc)
+        sources = resolve_easy_sources(preset=preset, subject=S, scene=Sc)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "empty"
         assert route.target_content_source is None
@@ -180,7 +185,7 @@ class TestBalancedMatrix:
 
     def test_subject_outfit(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(subject=S, outfit=Ou)
+        sources = resolve_easy_sources(preset=preset, subject=S, outfit=Ou)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "empty"
         assert route.target_content_source is None
@@ -190,7 +195,7 @@ class TestBalancedMatrix:
 
     def test_scene_outfit(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(scene=Sc, outfit=Ou)
+        sources = resolve_easy_sources(preset=preset, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
@@ -201,7 +206,7 @@ class TestBalancedMatrix:
 
     def test_scene_as_outfit(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(scene=Sc, outfit_source="scene image")
+        sources = resolve_easy_sources(preset=preset, scene=Sc, outfit_source="scene image")
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
@@ -215,7 +220,7 @@ class TestBalancedMatrix:
 
     def test_subject_scene_outfit(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
+        sources = resolve_easy_sources(preset=preset, subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
@@ -227,7 +232,7 @@ class TestBalancedMatrix:
 
     def test_subject_scene_as_outfit(self, dummy_sources, preset):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
+        sources = resolve_easy_sources(preset=preset, subject=S, scene=Sc, outfit_source="scene image")
         route = route_easy_preset(sources, preset=preset)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
@@ -238,7 +243,7 @@ class TestBalancedMatrix:
 
     def test_subject_outfit_from_style_distinct(self, dummy_sources, preset):
         S, Sc, Ou, St = dummy_sources
-        sources = resolve_easy_sources(subject=S, style=St, outfit_source="style image")
+        sources = resolve_easy_sources(preset=preset, subject=S, style=St, outfit_source="style image")
         route = route_easy_preset(sources, preset=preset)
         assert len(route.edit_references) == 2
         aliases = [alias for _, _, alias, _ in route.edit_references]
@@ -1455,7 +1460,7 @@ class TestCrossRouting:
 
 
 # ---------------------------------------------------------------------------
-# Never more than 2 appearance refs — all 9 presets, several combinations
+# Contract-aware appearance ref counts and capability gating tests
 # ---------------------------------------------------------------------------
 
 
@@ -1472,7 +1477,8 @@ class TestCrossRouting:
         "style_transfer",
     ],
 )
-def test_never_more_than_2_refs(dummy_sources, preset):
+def test_bounded_appearance_refs(dummy_sources, preset):
+    """Test that 2-ref bounded presets produce at most 2 appearance refs."""
     S, Sc, Ou, St = dummy_sources
     for args in [
         {},
@@ -1484,8 +1490,38 @@ def test_never_more_than_2_refs(dummy_sources, preset):
         {"scene": Sc, "outfit": Ou},
         {"subject": S, "scene": Sc, "outfit": Ou},
     ]:
-        sources = resolve_easy_sources(**args)
+        sources = resolve_easy_sources(preset=preset, **args)
         route = route_easy_preset(sources, preset=preset)
         assert len(route.edit_references) <= 2, (
             f"Preset '{preset}' with args {args} produced {len(route.edit_references)} refs"
         )
+
+
+def test_subject_transfer_multi_reference_3_refs(dummy_sources):
+    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 3 appearance refs."""
+    S, Sc, Ou, _ = dummy_sources
+    sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc, outfit=Ou)
+    route = route_easy_preset(sources, preset="subject_transfer")
+    assert len(route.edit_references) == 3
+    aliases = [alias for _, _, alias, _ in route.edit_references]
+    assert aliases == ["scene", "subject", "outfit"]
+
+
+def test_preset_capability_gating_outfit(dummy_sources):
+    """Verify preserve_scene and style_transfer ignore Outfit even when connected."""
+    S, Sc, Ou, _ = dummy_sources
+
+    # preserve_scene with connected outfit
+    sources_ps = resolve_easy_sources(preset="preserve_scene", subject=S, scene=Sc, outfit=Ou)
+    assert sources_ps.effective_outfit is None
+    route_ps = route_easy_preset(sources_ps, preset="preserve_scene")
+    ps_aliases = [alias for _, _, alias, _ in route_ps.edit_references]
+    assert "outfit" not in ps_aliases
+
+    # style_transfer with connected outfit
+    sources_st = resolve_easy_sources(preset="style_transfer", subject=S, outfit=Ou)
+    assert sources_st.effective_outfit is None
+    route_st = route_easy_preset(sources_st, preset="style_transfer")
+    st_aliases = [alias for _, _, alias, _ in route_st.edit_references]
+    assert "outfit" not in st_aliases
+

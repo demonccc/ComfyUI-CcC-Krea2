@@ -1,6 +1,6 @@
 {
-  "last_node_id": 9,
-  "last_link_id": 12,
+  "last_node_id": 12,
+  "last_link_id": 14,
   "nodes": [
     {
       "id": 1,
@@ -54,7 +54,7 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            6
+            8
           ]
         }
       ],
@@ -87,8 +87,8 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
-            3,
-            7
+            5,
+            9
           ]
         }
       ],
@@ -125,7 +125,7 @@
           "name": "model",
           "type": "MODEL",
           "links": [
-            5
+            7
           ]
         },
         {
@@ -156,14 +156,14 @@
     },
     {
       "id": 5,
-      "type": "KSampler",
+      "type": "ModelSamplingAuraFlow",
       "pos": [
         1500,
         0
       ],
       "size": [
         300,
-        200
+        100
       ],
       "flags": {},
       "order": 5,
@@ -172,22 +172,119 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 9
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingAuraFlow"
+      },
+      "widgets_values": [
+        1.15
+      ]
+    },
+    {
+      "id": 6,
+      "type": "BlackwellAttentionFix",
+      "pos": [
+        1850,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BlackwellAttentionFix"
+      },
+      "widgets_values": [
+        "pytorch"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "Note",
+      "pos": [
+        1500,
+        150
+      ],
+      "size": [
+        300,
+        150
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "Note"
+      },
+      "widgets_values": [
+        "Note on Blackwell GPUs:\n`BlackwellAttentionFix` is recommended for NVIDIA Blackwell GPUs (RTX 5090, 5080, 5070 family) to prevent NaN/black image sampling issues. On non-Blackwell systems, this node acts as a pass-through or can be muted/bypassed."
+      ]
+    },
+    {
+      "id": 8,
+      "type": "KSampler",
+      "pos": [
+        2200,
+        0
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
         },
         {
           "name": "positive",
           "type": "CONDITIONING",
-          "link": 10
+          "link": 12
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
-          "link": 11
+          "link": 13
         },
         {
           "name": "latent_image",
           "type": "LATENT",
-          "link": 12
+          "link": 14
         }
       ],
       "outputs": [
@@ -195,7 +292,7 @@
           "name": "LATENT",
           "type": "LATENT",
           "links": [
-            2
+            4
           ]
         }
       ],
@@ -213,10 +310,10 @@
       ]
     },
     {
-      "id": 6,
+      "id": 9,
       "type": "VAEDecode",
       "pos": [
-        1850,
+        2550,
         0
       ],
       "size": [
@@ -224,18 +321,18 @@
         100
       ],
       "flags": {},
-      "order": 6,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
           "name": "samples",
           "type": "LATENT",
-          "link": 2
+          "link": 4
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": 3
+          "link": 5
         }
       ],
       "outputs": [
@@ -243,7 +340,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4
+            6
           ]
         }
       ],
@@ -253,10 +350,10 @@
       "widgets_values": []
     },
     {
-      "id": 7,
+      "id": 10,
       "type": "SaveImage",
       "pos": [
-        2200,
+        2900,
         0
       ],
       "size": [
@@ -264,13 +361,13 @@
         200
       ],
       "flags": {},
-      "order": 7,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 4
+          "link": 6
         }
       ],
       "outputs": [],
@@ -282,7 +379,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 11,
       "type": "CcCKrea2EasyEdit",
       "pos": [
         800,
@@ -293,28 +390,28 @@
         400
       ],
       "flags": {},
-      "order": 8,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 5
+          "link": 7
         },
         {
           "name": "clip",
           "type": "CLIP",
-          "link": 6
+          "link": 8
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": 7
+          "link": 9
         },
         {
           "name": "subject",
           "type": "IMAGE",
-          "link": 8
+          "link": 10
         }
       ],
       "outputs": [
@@ -322,28 +419,28 @@
           "name": "patched_model",
           "type": "MODEL",
           "links": [
-            9
+            11
           ]
         },
         {
           "name": "positive",
           "type": "CONDITIONING",
           "links": [
-            10
+            12
           ]
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
           "links": [
-            11
+            13
           ]
         },
         {
           "name": "latent",
           "type": "LATENT",
           "links": [
-            12
+            14
           ]
         },
         {
@@ -366,10 +463,10 @@
       ]
     },
     {
-      "id": 9,
+      "id": 12,
       "type": "LoadImage",
       "pos": [
-        0,
+        20,
         500
       ],
       "size": [
@@ -377,7 +474,7 @@
         200
       ],
       "flags": {},
-      "order": 9,
+      "order": 12,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -385,7 +482,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            8
+            10
           ]
         },
         {
@@ -399,7 +496,8 @@
       },
       "widgets_values": [
         "subject.jpg"
-      ]
+      ],
+      "title": "Subject Image"
     }
   ],
   "links": [
@@ -417,85 +515,101 @@
       0,
       6,
       0,
-      "LATENT"
+      "MODEL"
     ],
     [
       3,
-      3,
-      0,
       6,
-      1,
-      "VAE"
-    ],
-    [
-      4,
-      6,
-      0,
-      7,
-      0,
-      "IMAGE"
-    ],
-    [
-      5,
-      4,
       0,
       8,
       0,
       "MODEL"
     ],
     [
+      4,
+      8,
+      0,
+      9,
+      0,
+      "LATENT"
+    ],
+    [
+      5,
+      3,
+      0,
+      9,
+      1,
+      "VAE"
+    ],
+    [
       6,
+      9,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      4,
+      0,
+      11,
+      0,
+      "MODEL"
+    ],
+    [
+      8,
       2,
       0,
-      8,
+      11,
       1,
       "CLIP"
     ],
     [
-      7,
+      9,
       3,
       0,
-      8,
+      11,
       2,
       "VAE"
     ],
     [
-      8,
-      9,
+      10,
+      12,
       0,
-      8,
+      11,
       3,
       "IMAGE"
     ],
     [
-      9,
-      8,
+      11,
+      11,
       0,
       5,
       0,
       "MODEL"
     ],
     [
-      10,
-      8,
-      1,
-      5,
-      1,
-      "CONDITIONING"
-    ],
-    [
-      11,
-      8,
-      2,
-      5,
-      2,
-      "CONDITIONING"
-    ],
-    [
       12,
+      11,
+      1,
       8,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      13,
+      11,
+      2,
+      8,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      14,
+      11,
       3,
-      5,
+      8,
       3,
       "LATENT"
     ]
@@ -526,8 +640,28 @@
       "bounding": [
         1480,
         -50,
-        1100,
+        1050,
         500
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        2540,
+        -50,
+        680,
+        500
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Load Images",
+      "bounding": [
+        0,
+        470,
+        350,
+        290
       ],
       "color": "#3f789e"
     }
