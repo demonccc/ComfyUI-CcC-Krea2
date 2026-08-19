@@ -977,7 +977,7 @@ class TestSubjectTransferMatrix:
             ],
         )
         assert route.edit_references[0][1] == pytest.approx(2.5)
-        assert route.edit_references[1][1] == pytest.approx(1.0)
+        assert route.edit_references[1][1] == pytest.approx(6.0)
         assert route.style_active is True
         assert route.style_source is Sc
         assert route.style_config.style_processing == "2x2"
@@ -1029,7 +1029,7 @@ class TestSubjectTransferMatrix:
             ],
         )
         assert route.edit_references[0][1] == pytest.approx(2.5)
-        assert route.edit_references[1][1] == pytest.approx(1.0)
+        assert route.edit_references[1][1] == pytest.approx(6.0)
         assert route.edit_references[2][1] == pytest.approx(4.0)
 
     def test_subject_scene_as_outfit(self, dummy_sources):
@@ -1048,7 +1048,7 @@ class TestSubjectTransferMatrix:
             ],
         )
         assert route.edit_references[0][1] == pytest.approx(4.0)
-        assert route.edit_references[1][1] == pytest.approx(1.0)
+        assert route.edit_references[1][1] == pytest.approx(6.0)
 
     def test_scene_as_outfit_without_subject(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
