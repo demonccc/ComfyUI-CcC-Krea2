@@ -128,16 +128,14 @@ def get_easy_instruction_for_role(role: str) -> str:
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
 
 
-def resolve_easy_visual_reference_fit(preset: str, role: str, common_geometry_active: bool) -> str:
+def resolve_easy_visual_reference_fit(preset: str = "", role: str = "", common_geometry_active: bool = True) -> str:
     """Resolve visual reference fit mode.
 
-    INVARIANT: Under common geometry, NO visual appearance reference in ANY preset
-    (including identity_transfer and subject_transfer) may ever be cropped. Always return
-    'contain_no_upscale'.
+    INVARIANT: EVERY visual appearance reference in Easy Edit MUST fit completely inside
+    the target latent geometry with 'contain_no_upscale'. No Easy appearance reference
+    may ever crop away source image content.
     """
-    if common_geometry_active:
-        return "contain_no_upscale"
-    return "auto"
+    return "contain_no_upscale"
 
 
 @dataclass(frozen=True)

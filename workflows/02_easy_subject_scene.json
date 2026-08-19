@@ -27,10 +27,19 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "UNETLoader"
+        "Node name for S&R": "UNETLoader",
+        "models": [
+          {
+            "name": "Neutrino_v2_base_nvfp4_svd.safetensors",
+            "url": "https://huggingface.co/Crowlley/Krea2Neutrino/resolve/main/Neutrino_v2_base_nvfp4_svd.safetensors",
+            "directory": "diffusion_models",
+            "hash": "6844374f31e7de278c3408b6333b8fbb7bf5cdd1321646d5480bf1aeda683e1a",
+            "hash_type": "SHA256"
+          }
+        ]
       },
       "widgets_values": [
-        "krea2_model.safetensors",
+        "Neutrino_v2_base_nvfp4_svd.safetensors",
         "default"
       ]
     },
@@ -59,10 +68,17 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPLoader"
+        "Node name for S&R": "CLIPLoader",
+        "models": [
+          {
+            "name": "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+            "url": "https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/resolve/main/Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+            "directory": "text_encoders"
+          }
+        ]
       },
       "widgets_values": [
-        "qwen3_vl.safetensors",
+        "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
         "krea2",
         "default"
       ]
@@ -93,10 +109,19 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "VAELoader"
+        "Node name for S&R": "VAELoader",
+        "models": [
+          {
+            "name": "qwen_image_vae.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors",
+            "directory": "vae",
+            "hash": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f",
+            "hash_type": "SHA256"
+          }
+        ]
       },
       "widgets_values": [
-        "ae.safetensors"
+        "qwen_image_vae.safetensors"
       ]
     },
     {
@@ -135,16 +160,32 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2LoRAStack"
+        "Node name for S&R": "CcCKrea2LoRAStack",
+        "models": [
+          {
+            "name": "krea2_identity_edit_v1_2.safetensors",
+            "url": "https://huggingface.co/conradlocke/krea2-identity-edit/resolve/main/krea2_identity_edit_v1_2.safetensors",
+            "directory": "loras",
+            "hash": "6adf9a69cc9502d286db7b69964d37da7e9cfe4b05b4d004bc275f087d3fd3cf",
+            "hash_type": "SHA256"
+          },
+          {
+            "name": "bfs_body_swap_v1_krea2.safetensors",
+            "url": "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap/resolve/main/bfs_body_swap_v1_krea2.safetensors",
+            "directory": "loras",
+            "hash": "0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79",
+            "hash_type": "SHA256"
+          }
+        ]
       },
       "widgets_values": [
         true,
         1.0,
         true,
-        "krea2_edit_lora.safetensors",
+        "krea2_identity_edit_v1_2.safetensors",
         1.0,
         true,
-        "krea2_bodyswap_lora.safetensors",
+        "bfs_body_swap_v1_krea2.safetensors",
         0.35,
         false,
         "None",
@@ -248,7 +289,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Note on Subject Transfer & Helper LoRAs:\n\u2022 Preset 'subject_transfer' uses scene image as latent target, automatic scene style, and anchors scene and subject as visual appearance references (crop fit).\n\u2022 Identity/Edit LoRA (krea2_edit_lora.safetensors at 1.0) recovers subject facial identity.\n\u2022 Optional Body-Swap LoRA (krea2_bodyswap_lora.safetensors at low strength ~0.3-0.4) improves body composition and pose/action integration.\n\u2022 CAUTION: Body-swap LoRA can improve body composition / action integration, but it may hurt facial identity if overused, so it should be kept at low strength.\n\u2022 ModelSamplingAuraFlow shift is set to 1.15.\n\u2022 BlackwellAttentionFix is included for NVIDIA Blackwell GPUs (RTX 5090/5080/5070)."
+        "Note on Easy Transfer Presets, Helper LoRAs & Model Downloads:\n\u2022 Identity Transfer: Preserves Subject identity in Scene. Uses Subject as target content/latent, Scene as geometry anchor. Outfit is disabled, Style is automatic Scene.\n\u2022 Subject Transfer: Preserves full Subject in Scene. Uses Scene as target content/latent and geometry anchor. Outfit is supported, Style is automatic Scene.\n\u2022 Easy Visual References: All Easy Edit appearance references enforce contain_no_upscale fit, preserving complete reference images without cropping.\n\u2022 Krea 2 Identity Edit LoRA (krea2_identity_edit_v1_2.safetensors at 1.0) recovers subject facial identity.\n\u2022 BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors at 0.35) is an experimental full-person replacement model where Scene acts as base image and Subject as reference person. Exact pose transfer is not guaranteed.\n\u2022 Upstream BFS Trigger: 'body_swap: replace the person with the reference person.'\n\u2022 ModelSamplingAuraFlow shift is set to 1.15.\n\u2022 BlackwellAttentionFix is included for NVIDIA Blackwell GPUs (RTX 5090/5080/5070).\n\nModel downloads:\n\u2022 Krea/Neutrino: https://huggingface.co/Crowlley/Krea2Neutrino\n\u2022 Qwen3-VL: https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/tree/main\n\u2022 Krea/ComfyUI alternatives: https://huggingface.co/Comfy-Org/Krea-2/\n\u2022 Identity Edit: https://huggingface.co/conradlocke/krea2-identity-edit\n\u2022 BFS Body Swap: https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap"
       ]
     },
     {

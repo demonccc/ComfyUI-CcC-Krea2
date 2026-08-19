@@ -101,11 +101,15 @@ Easy Edit nodes include a **Use Default Prompt** toggle (`use_default_prompt`, d
 
 The identity ladder covers subject preservation tasks. Additional task-specific presets provide targeted capabilities:
 
+- **Identity Transfer**: Transfers the identity of the Subject to the target person in the Scene. Uses the Subject image as target content (`contain_no_upscale`) and the Scene as geometry anchor (Subject boost: 7.0, Scene boost: 2.5, Outfit policy: disabled, Style policy: automatic scene).
+- **Subject Transfer**: Transfers the complete Subject into the Scene context. Uses the Scene image as target content and geometry anchor (Subject boost: 7.0, Scene boost: 2.5, effective Outfit boost: 4.0 when used, Style policy: automatic scene).
 - **Scene Reinterpretation**: Creatively reinterprets the main subject's action, activity, pose, environment, spatial context, framing, and clothing from the Scene reference for the Subject reference without pixel-for-pixel scene reproduction or target image initialization (Subject boost: 4.0, Scene boost: 1.0, Outfit policy: disabled, Style policy: automatic scene).
-- **Subject Transfer**: Strongly transfers Subject identity into the target while allowing the Scene (when available) to define the target content/geometry anchor (Subject boost: 8.0, effective Outfit boost: 4.0, Style policy: automatic scene).
 - **Preserve Scene**: Prioritizes preserving the connected Scene composition, background, and visual context (Outfit policy: disabled).
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
 - **Style Transfer**: Uses the dedicated Style/Moodboard path to transfer artistic style, palette, texture, and visual mood (Outfit policy: disabled).
+
+> [!NOTE]
+> All Easy Edit visual appearance references enforce `contain_no_upscale` fit. The complete source reference image is preserved for conditioning without cropping away facial features, head structure, garments, or surrounding context.
 
 ---
 
@@ -153,6 +157,53 @@ Restart ComfyUI after cloning.
 
 ---
 
+## Recommended Models and Downloads
+
+These are the primary model files currently used and recommended by the project canonical examples. Compatible alternative Krea 2 models (such as official repackaged weights) may also be used.
+
+### 1. Krea 2 Diffusion Model
+- **Repository**: [Crowlley/Krea2Neutrino](https://huggingface.co/Crowlley/Krea2Neutrino)
+- **Recommended File**: `Neutrino_v2_base_nvfp4_svd.safetensors`
+- **ComfyUI Folder**: `ComfyUI/models/diffusion_models/`
+- **Direct Download URL**: `https://huggingface.co/Crowlley/Krea2Neutrino/resolve/main/Neutrino_v2_base_nvfp4_svd.safetensors`
+- **SHA256**: `6844374f31e7de278c3408b6333b8fbb7bf5cdd1321646d5480bf1aeda683e1a`
+
+### 2. Qwen3-VL CLIP / Text Encoder
+- **Repository**: [brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants](https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/tree/main)
+- **Recommended File**: `Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors` (BF16 8.88 GiB variant)
+- **ComfyUI Folder**: `ComfyUI/models/text_encoders/`
+- **Direct Download URL**: `https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/resolve/main/Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors`
+
+### 3. VAE
+- **Repository**: [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/tree/main/vae)
+- **Recommended File**: `qwen_image_vae.safetensors`
+- **ComfyUI Folder**: `ComfyUI/models/vae/`
+- **Direct Download URL**: `https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors`
+- **SHA256**: `a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f`
+
+### 4. Krea 2 Identity Edit LoRA
+- **Repository**: [conradlocke/krea2-identity-edit](https://huggingface.co/conradlocke/krea2-identity-edit)
+- **Recommended File**: `krea2_identity_edit_v1_2.safetensors` (v1.2 recommended by upstream author)
+- **ComfyUI Folder**: `ComfyUI/models/loras/`
+- **Direct Download URL**: `https://huggingface.co/conradlocke/krea2-identity-edit/resolve/main/krea2_identity_edit_v1_2.safetensors`
+- **SHA256**: `6adf9a69cc9502d286db7b69964d37da7e9cfe4b05b4d004bc275f087d3fd3cf`
+
+### 5. BFS Body Swap LoRA
+- **Repository**: [Alissonerdx/BFS-Best-Face-Swap](https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap)
+- **Recommended File**: `bfs_body_swap_v1_krea2.safetensors`
+- **ComfyUI Folder**: `ComfyUI/models/loras/`
+- **Direct Download URL**: `https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap/resolve/main/bfs_body_swap_v1_krea2.safetensors`
+- **SHA256**: `0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79`
+- **Upstream Notes**: Labeled `experimental` by upstream author. Replaces the target person in the base image with the reference person (Scene = base image, Subject = reference person). Exact pose transfer is not guaranteed.
+  - Upstream trigger prompt: `body_swap: replace the person with the reference person.`
+  - Upstream starting recommendation for BFS Body Swap (0.5) + BFS Head Swap (0.5). Note: BFS Head Swap is a distinct model from Conrad's `krea2_identity_edit_v1_2.safetensors`.
+
+### Official Comfy-Org Alternatives
+Users may alternatively use official or repackaged ComfyUI-ready Krea 2 models from [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/), which hosts `diffusion_models/`, `text_encoders/`, `vae/`, and `loras/`. Note that Neutrino and third-party LoRAs (Conrad's Identity Edit / BFS Body Swap) are independent community resources.
+
+---
+
 ## License
 
 Licensed under the GNU General Public License v3.0 (GPL-3.0). See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full details.
+

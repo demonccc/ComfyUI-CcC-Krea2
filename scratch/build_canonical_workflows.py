@@ -7,11 +7,56 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 
+# Recommended model dependency definitions
+MODEL_UNET = {
+    "name": "Neutrino_v2_base_nvfp4_svd.safetensors",
+    "url": "https://huggingface.co/Crowlley/Krea2Neutrino/resolve/main/Neutrino_v2_base_nvfp4_svd.safetensors",
+    "directory": "diffusion_models",
+    "hash": "6844374f31e7de278c3408b6333b8fbb7bf5cdd1321646d5480bf1aeda683e1a",
+    "hash_type": "SHA256",
+}
+
+MODEL_CLIP = {
+    "name": "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+    "url": "https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/resolve/main/Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+    "directory": "text_encoders",
+}
+
+MODEL_VAE = {
+    "name": "qwen_image_vae.safetensors",
+    "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors",
+    "directory": "vae",
+    "hash": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f",
+    "hash_type": "SHA256",
+}
+
+MODEL_LORA_IDENTITY_EDIT = {
+    "name": "krea2_identity_edit_v1_2.safetensors",
+    "url": "https://huggingface.co/conradlocke/krea2-identity-edit/resolve/main/krea2_identity_edit_v1_2.safetensors",
+    "directory": "loras",
+    "hash": "6adf9a69cc9502d286db7b69964d37da7e9cfe4b05b4d004bc275f087d3fd3cf",
+    "hash_type": "SHA256",
+}
+
+MODEL_LORA_BODY_SWAP = {
+    "name": "bfs_body_swap_v1_krea2.safetensors",
+    "url": "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap/resolve/main/bfs_body_swap_v1_krea2.safetensors",
+    "directory": "loras",
+    "hash": "0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79",
+    "hash_type": "SHA256",
+}
+
+
 # Explicit schema fixture ONLY for the standard nodes used by these canonical workflows
 class MockUNETLoader:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
+        return {
+            "required": {
+                "unet_name": (["Neutrino_v2_base_nvfp4_svd.safetensors", "krea2_model.safetensors"],),
+                "weight_dtype": (["default"],),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
 
@@ -21,7 +66,12 @@ class MockCLIPLoader:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "clip_name": (["qwen3_vl.safetensors"],),
+                "clip_name": (
+                    [
+                        "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+                        "qwen3_vl.safetensors",
+                    ],
+                ),
                 "type": (["krea2", "sdxl", "sd3"],),
                 "device": (["default", "cpu"],),
             }
@@ -33,7 +83,7 @@ class MockCLIPLoader:
 class MockVAELoader:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {"vae_name": (["ae.safetensors"],)}}
+        return {"required": {"vae_name": (["qwen_image_vae.safetensors", "ae.safetensors"],)}}
 
     RETURN_TYPES = ("VAE",)
 
@@ -175,7 +225,7 @@ class WorkflowBuilder:
         self.node_id = 1
         self.link_id = 1
 
-    def add_node(self, node_type, pos, size, inputs=None, widgets_values=None, title=None):
+    def add_node(self, node_type, pos, size, inputs=None, widgets_values=None, title=None, model_dependencies=None):
         inputs = inputs or {}
         values_by_name = widgets_values or {}
 
@@ -277,6 +327,15 @@ class WorkflowBuilder:
             "properties": {"Node name for S&R": node_type},
             "widgets_values": serialized_widgets,
         }
+        if model_dependencies:
+            for dep in model_dependencies:
+                if not isinstance(dep, dict):
+                    raise ValueError(f"model_dependency entry must be dict, got {type(dep)}")
+                if not all(k in dep for k in ("name", "url", "directory")):
+                    raise ValueError(f"model_dependency missing required keys: {dep}")
+                if "/resolve/main/" not in dep["url"]:
+                    raise ValueError(f"model_dependency URL must contain /resolve/main/: {dep['url']}")
+            node["properties"]["models"] = [dict(d) for d in model_dependencies]
         if title:
             node["title"] = title
 
@@ -339,19 +398,34 @@ def build_base_graph(
         "UNETLoader",
         [0, 0],
         [300, 100],
-        widgets_values={"unet_name": "krea2_model.safetensors", "weight_dtype": "default"},
+        widgets_values={"unet_name": "Neutrino_v2_base_nvfp4_svd.safetensors", "weight_dtype": "default"},
+        model_dependencies=[MODEL_UNET],
     )
     clip = b.add_node(
         "CLIPLoader",
         [0, 150],
         [300, 100],
-        widgets_values={"clip_name": "qwen3_vl.safetensors", "type": "krea2", "device": "default"},
+        widgets_values={
+            "clip_name": "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+            "type": "krea2",
+            "device": "default",
+        },
+        model_dependencies=[MODEL_CLIP],
     )
-    vae = b.add_node("VAELoader", [0, 300], [300, 100], widgets_values={"vae_name": "ae.safetensors"})
+    vae = b.add_node(
+        "VAELoader",
+        [0, 300],
+        [300, 100],
+        widgets_values={"vae_name": "qwen_image_vae.safetensors"},
+        model_dependencies=[MODEL_VAE],
+    )
 
     lora = None
     if not is_native:
-        lora_name = "krea2_ostris_edit_lora.safetensors" if is_ostris else "krea2_edit_lora.safetensors"
+        lora_name = "krea2_ostris_edit_lora.safetensors" if is_ostris else "krea2_identity_edit_v1_2.safetensors"
+        lora_deps = []
+        if not is_ostris:
+            lora_deps.append(MODEL_LORA_IDENTITY_EDIT)
 
         widgets = {
             "enabled": True,
@@ -364,6 +438,8 @@ def build_base_graph(
             widgets["lora_2_enabled"] = True
             widgets["lora_2_name"] = lora_2_name
             widgets["lora_2_strength"] = lora_2_strength
+            if lora_2_name == "bfs_body_swap_v1_krea2.safetensors":
+                lora_deps.append(MODEL_LORA_BODY_SWAP)
 
         lora = b.add_node(
             "CcCKrea2LoRAStack",
@@ -371,6 +447,7 @@ def build_base_graph(
             [300, 250],
             inputs={"model": None},
             widgets_values=widgets,
+            model_dependencies=lora_deps if lora_deps else None,
         )
 
         b.link(unet, "MODEL", lora, "model")
@@ -693,14 +770,21 @@ def main():
     # 01
     build_easy_workflow("01_easy_subject.json", "balanced", "outfit image", "style image", has_subj=True)
     subject_transfer_note = (
-        "Note on Subject Transfer & Helper LoRAs:\n"
-        "• Preset 'subject_transfer' uses scene image as latent target, automatic scene style, "
-        "and anchors scene and subject as visual appearance references (crop fit).\n"
-        "• Identity/Edit LoRA (krea2_edit_lora.safetensors at 1.0) recovers subject facial identity.\n"
-        "• Optional Body-Swap LoRA (krea2_bodyswap_lora.safetensors at low strength ~0.3-0.4) improves body composition and pose/action integration.\n"
-        "• CAUTION: Body-swap LoRA can improve body composition / action integration, but it may hurt facial identity if overused, so it should be kept at low strength.\n"
+        "Note on Easy Transfer Presets, Helper LoRAs & Model Downloads:\n"
+        "• Identity Transfer: Preserves Subject identity in Scene. Uses Subject as target content/latent, Scene as geometry anchor. Outfit is disabled, Style is automatic Scene.\n"
+        "• Subject Transfer: Preserves full Subject in Scene. Uses Scene as target content/latent and geometry anchor. Outfit is supported, Style is automatic Scene.\n"
+        "• Easy Visual References: All Easy Edit appearance references enforce contain_no_upscale fit, preserving complete reference images without cropping.\n"
+        "• Krea 2 Identity Edit LoRA (krea2_identity_edit_v1_2.safetensors at 1.0) recovers subject facial identity.\n"
+        "• BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors at 0.35) is an experimental full-person replacement model where Scene acts as base image and Subject as reference person. Exact pose transfer is not guaranteed.\n"
+        "• Upstream BFS Trigger: 'body_swap: replace the person with the reference person.'\n"
         "• ModelSamplingAuraFlow shift is set to 1.15.\n"
-        "• BlackwellAttentionFix is included for NVIDIA Blackwell GPUs (RTX 5090/5080/5070)."
+        "• BlackwellAttentionFix is included for NVIDIA Blackwell GPUs (RTX 5090/5080/5070).\n\n"
+        "Model downloads:\n"
+        "• Krea/Neutrino: https://huggingface.co/Crowlley/Krea2Neutrino\n"
+        "• Qwen3-VL: https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/tree/main\n"
+        "• Krea/ComfyUI alternatives: https://huggingface.co/Comfy-Org/Krea-2/\n"
+        "• Identity Edit: https://huggingface.co/conradlocke/krea2-identity-edit\n"
+        "• BFS Body Swap: https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap"
     )
     # 02
     build_easy_workflow(
@@ -710,7 +794,7 @@ def main():
         "style image",
         has_subj=True,
         has_scene=True,
-        lora_2_name="krea2_bodyswap_lora.safetensors",
+        lora_2_name="bfs_body_swap_v1_krea2.safetensors",
         lora_2_strength=0.35,
         note_text=subject_transfer_note,
     )

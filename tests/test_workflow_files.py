@@ -6,7 +6,12 @@ from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 class MockUNETLoader:
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {"unet_name": (["krea2_model.safetensors"],), "weight_dtype": (["default"],)}}
+        return {
+            "required": {
+                "unet_name": (["Neutrino_v2_base_nvfp4_svd.safetensors", "krea2_model.safetensors"],),
+                "weight_dtype": (["default"],),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
 
@@ -16,7 +21,12 @@ class MockCLIPLoader:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "clip_name": (["qwen3_vl.safetensors"],),
+                "clip_name": (
+                    [
+                        "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+                        "qwen3_vl.safetensors",
+                    ],
+                ),
                 "type": (["krea2", "sdxl", "sd3"],),
                 "device": (["default", "cpu"],),
             }
@@ -28,7 +38,7 @@ class MockCLIPLoader:
 class MockVAELoader:
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {"vae_name": (["ae.safetensors"],)}}
+        return {"required": {"vae_name": (["qwen_image_vae.safetensors", "ae.safetensors"],)}}
 
     RETURN_TYPES = ("VAE",)
 
@@ -725,3 +735,76 @@ def test_generator_matches_checked_in_canonical_workflows(tmp_path):
         assert generated == checked_in, (
             f"Generated {filename} does not match checked-in version! Please commit the newly generated workflows."
         )
+
+
+def test_workflow_model_dependencies_metadata():
+    """Verify that canonical workflows contain valid model dependency metadata in properties.models."""
+    for filename in MODERN_CANONICAL:
+        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
+            wf = json.load(f)
+
+        # UNETLoader check
+        unets = _get_nodes_by_type(wf, "UNETLoader")
+        assert len(unets) == 1, f"Missing UNETLoader in {filename}"
+        unet_models = unets[0].get("properties", {}).get("models", [])
+        assert len(unet_models) == 1, f"Missing model metadata on UNETLoader in {filename}"
+        dep_u = unet_models[0]
+        assert dep_u["name"] == "Neutrino_v2_base_nvfp4_svd.safetensors"
+        assert dep_u["directory"] == "diffusion_models"
+        assert "/resolve/main/" in dep_u["url"]
+        assert unets[0]["widgets_values"][0] == dep_u["name"]
+
+        # CLIPLoader check
+        clips = _get_nodes_by_type(wf, "CLIPLoader")
+        assert len(clips) == 1, f"Missing CLIPLoader in {filename}"
+        clip_models = clips[0].get("properties", {}).get("models", [])
+        assert len(clip_models) == 1, f"Missing model metadata on CLIPLoader in {filename}"
+        dep_c = clip_models[0]
+        assert dep_c["name"] == "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors"
+        assert dep_c["directory"] == "text_encoders"
+        assert "/resolve/main/" in dep_c["url"]
+        assert clips[0]["widgets_values"][0] == dep_c["name"]
+
+        # VAELoader check
+        vaes = _get_nodes_by_type(wf, "VAELoader")
+        assert len(vaes) == 1, f"Missing VAELoader in {filename}"
+        vae_models = vaes[0].get("properties", {}).get("models", [])
+        assert len(vae_models) == 1, f"Missing model metadata on VAELoader in {filename}"
+        dep_v = vae_models[0]
+        assert dep_v["name"] == "qwen_image_vae.safetensors"
+        assert dep_v["directory"] == "vae"
+        assert "/resolve/main/" in dep_v["url"]
+        assert vaes[0]["widgets_values"][0] == dep_v["name"]
+
+        # LoRAStack check
+        loras = _get_nodes_by_type(wf, "CcCKrea2LoRAStack")
+        if loras:
+            lora_node = loras[0]
+            models = lora_node.get("properties", {}).get("models", [])
+            if "ostris" not in filename:
+                assert any(m["name"] == "krea2_identity_edit_v1_2.safetensors" for m in models), (
+                    f"Missing Identity Edit LoRA metadata in {filename}"
+                )
+            if filename == "02_easy_subject_scene.json":
+                assert any(m["name"] == "bfs_body_swap_v1_krea2.safetensors" for m in models), (
+                    f"Missing BFS Body Swap LoRA metadata in {filename}"
+                )
+
+
+def test_easy_subject_scene_note_text():
+    """Verify that 02_easy_subject_scene.json Note text is accurate and does not mention crop for Easy references."""
+    with open("workflows/02_easy_subject_scene.json", "r", encoding="utf-8") as f:
+        wf = json.load(f)
+
+    notes = _get_nodes_by_type(wf, "Note")
+    note_texts = [n["widgets_values"][0] for n in notes if n.get("widgets_values")]
+    combined_notes = "\n".join(note_texts)
+
+    assert "(crop fit)" not in combined_notes
+    assert "crop fit" not in combined_notes
+    assert "Identity Transfer" in combined_notes
+    assert "Subject Transfer" in combined_notes
+    assert "contain_no_upscale" in combined_notes
+    assert "https://huggingface.co/Crowlley/Krea2Neutrino" in combined_notes
+    assert "https://huggingface.co/conradlocke/krea2-identity-edit" in combined_notes
+    assert "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap" in combined_notes

@@ -1691,7 +1691,7 @@ def test_scene_auto_ignores_stale_style_source_selector(dummy_sources):
 
 
 def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
-    """Verify that Subject Transfer sets visual_reference_fit == 'crop' for Scene roles and 'contain_no_upscale' for Subject and Outfit roles under common geometry."""
+    """Verify that Subject Transfer sets visual_reference_fit == 'contain_no_upscale' for Scene, Subject, and Outfit roles."""
     import torch
     from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
 
@@ -1797,3 +1797,26 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     bal_edit_refs = [r for r in bal_chain.references if r.reference_path == "edit"]
     assert len(bal_edit_refs) == 2
     assert all(r.visual_reference_fit == "contain_no_upscale" for r in bal_edit_refs)
+
+
+def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
+    """Verify that resolve_easy_visual_reference_fit returns contain_no_upscale for all 11 Easy Edit presets and both single/multi-source conditions."""
+    from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
+
+    all_presets = list(EASY_PRESET_CAPABILITIES.keys())
+    assert len(all_presets) == 11
+
+    roles = ["subject", "scene", "outfit", "style"]
+
+    for preset in all_presets:
+        for role in roles:
+            # Multi-source / common geometry active
+            fit_multi = resolve_easy_visual_reference_fit(preset, role, common_geometry_active=True)
+            assert fit_multi == "contain_no_upscale", (
+                f"Preset '{preset}' for role '{role}' under multi-source returned '{fit_multi}', expected 'contain_no_upscale'"
+            )
+            # Single-source / common geometry inactive
+            fit_single = resolve_easy_visual_reference_fit(preset, role, common_geometry_active=False)
+            assert fit_single == "contain_no_upscale", (
+                f"Preset '{preset}' for role '{role}' under single-source returned '{fit_single}', expected 'contain_no_upscale'"
+            )
