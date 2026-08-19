@@ -13,6 +13,8 @@ CONSISTENT_SUBJECT_BOOST = 4.0
 PRESERVE_IDENTITY_SUBJECT_BOOST = 6.0
 MAX_IDENTITY_SUBJECT_BOOST = 10.0
 
+SUBJECT_TRANSFER_SCENE_BOOST = 2.5
+SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST = 1.0
 SUBJECT_TRANSFER_SUBJECT_BOOST = 8.0
 SUBJECT_TRANSFER_OUTFIT_BOOST = 4.0
 
@@ -690,6 +692,20 @@ def route_easy_preset(
             target_content_source = Sc
             target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+            # Subject Transfer intentionally anchors Scene both as target content
+            # and as an appearance reference. Historical replacement tests showed
+            # stronger scene preservation with Scene 2.5 / Subject 1.0 and crop alignment.
+            if outfit_is_scene_physically:
+                refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
+                if has_s:
+                    refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
+            else:
+                refs.append(_ref(Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"))
+                if has_s:
+                    refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
+                if has_o:
+                    refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
         else:
             target_content_mode = "empty"
             target_content_source = None
@@ -701,13 +717,10 @@ def route_easy_preset(
             else:
                 target_geometry_mode, target_geometry_source = "favor_image", None
 
-        if has_s:
-            refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
+            if has_s:
+                refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
 
-        if has_o:
-            if outfit_is_scene_physically:
-                refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
-            else:
+            if has_o:
                 refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
 
     elif preset == "scene_reinterpretation":

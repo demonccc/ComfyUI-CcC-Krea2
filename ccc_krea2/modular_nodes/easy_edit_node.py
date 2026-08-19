@@ -349,7 +349,13 @@ def _execute_easy_edit(
         else:
             vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
-        fit_mode = "contain_no_upscale" if common_geometry_active else "auto"
+        # Subject Transfer intentionally anchors Scene both as target content
+        # and as an appearance reference. Historical replacement tests showed
+        # stronger scene preservation with Scene 2.5 / Subject 1.0 and crop alignment.
+        if common_geometry_active:
+            fit_mode = "crop" if preset == "subject_transfer" else "contain_no_upscale"
+        else:
+            fit_mode = "auto"
 
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(

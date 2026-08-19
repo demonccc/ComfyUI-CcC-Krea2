@@ -9,6 +9,8 @@ from ccc_krea2.easy_routing import (
     CONSISTENT_SUBJECT_BOOST,
     PRESERVE_IDENTITY_SUBJECT_BOOST,
     MAX_IDENTITY_SUBJECT_BOOST,
+    SUBJECT_TRANSFER_SCENE_BOOST,
+    SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST,
     SUBJECT_TRANSFER_SUBJECT_BOOST,
     SUBJECT_TRANSFER_OUTFIT_BOOST,
     PRESERVE_SCENE_BOOST,
@@ -947,7 +949,8 @@ class TestSubjectTransferMatrix:
         assert any("missing" in w for w in route.warnings)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
-        assert_refs(route.edit_references, [])
+        assert_refs(route.edit_references, [(Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene")])
+        assert route.edit_references[0][1] == pytest.approx(2.5)
 
     def test_outfit_only(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -968,9 +971,13 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject")],
+            [
+                (Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"),
+                (S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"),
+            ],
         )
-        assert route.edit_references[0][1] == pytest.approx(8.0)
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(1.0)
         assert route.style_active is True
         assert route.style_source is Sc
         assert route.style_config.style_processing == "2x2"
@@ -998,9 +1005,13 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")],
+            [
+                (Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"),
+                (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"),
+            ],
         )
-        assert route.edit_references[0][1] == pytest.approx(4.0)
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
 
     def test_subject_scene_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1012,12 +1023,14 @@ class TestSubjectTransferMatrix:
         assert_refs(
             route.edit_references,
             [
-                (S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"),
+                (Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"),
+                (S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"),
                 (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"),
             ],
         )
-        assert route.edit_references[0][1] == pytest.approx(8.0)
-        assert route.edit_references[1][1] == pytest.approx(4.0)
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(1.0)
+        assert route.edit_references[2][1] == pytest.approx(4.0)
 
     def test_subject_scene_as_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1029,10 +1042,13 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"), (Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit")],
+            [
+                (Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit"),
+                (S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"),
+            ],
         )
-        assert route.edit_references[0][1] == pytest.approx(8.0)
-        assert route.edit_references[1][1] == pytest.approx(4.0)
+        assert route.edit_references[0][1] == pytest.approx(4.0)
+        assert route.edit_references[1][1] == pytest.approx(1.0)
 
     def test_scene_as_outfit_without_subject(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1497,14 +1513,14 @@ def test_bounded_appearance_refs(dummy_sources, preset):
         )
 
 
-def test_subject_transfer_multi_reference_2_refs(dummy_sources):
-    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 2 appearance refs (subject, outfit)."""
+def test_subject_transfer_multi_reference_3_refs(dummy_sources):
+    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 3 appearance refs."""
     S, Sc, Ou, _ = dummy_sources
     sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc, outfit=Ou)
     route = route_easy_preset(sources, preset="subject_transfer")
-    assert len(route.edit_references) == 2
+    assert len(route.edit_references) == 3
     aliases = [alias for _, _, alias, _ in route.edit_references]
-    assert aliases == ["subject", "outfit"]
+    assert aliases == ["scene", "subject", "outfit"]
 
 
 def test_preset_capability_gating_outfit(dummy_sources):
@@ -1584,3 +1600,60 @@ def test_scene_auto_ignores_stale_style_source_selector(dummy_sources):
         style_source="none",  # Stale stored selector
     )
     assert sources.effective_style is Sc
+
+
+def test_subject_transfer_node_visual_reference_fit_crop(monkeypatch):
+    """Verify that Subject Transfer with Subject + Scene sets visual_reference_fit == 'crop' on appearance refs, while other common geometry presets use 'contain_no_upscale'."""
+    import torch
+    from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
+
+    S = torch.ones((1, 64, 64, 3), dtype=torch.float32)
+    Sc = torch.ones((1, 64, 64, 3), dtype=torch.float32) * 0.5
+    node = CcCKrea2EasyEdit()
+
+    class DummyVAE:
+        def encode(self, x):
+            return torch.zeros((1, 16, 8, 8), dtype=torch.float32)
+
+    captured_chains = {}
+
+    def mock_orchestrator(model, clip, vae, references, **kwargs):
+        captured_chains["chain"] = references
+        return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
+
+    monkeypatch.setattr(
+        "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
+        mock_orchestrator,
+    )
+
+    # Subject Transfer + Subject + Scene
+    node.process(
+        model="model",
+        clip="clip",
+        vae=DummyVAE(),
+        positive_prompt="",
+        use_default_prompt=True,
+        preset="subject_transfer",
+        subject=S,
+        scene=Sc,
+    )
+    st_chain = captured_chains["chain"]
+    st_edit_refs = [r for r in st_chain.references if r.reference_path == "edit"]
+    assert len(st_edit_refs) == 2
+    assert all(r.visual_reference_fit == "crop" for r in st_edit_refs)
+
+    # Balanced preset + Subject + Scene
+    node.process(
+        model="model",
+        clip="clip",
+        vae=DummyVAE(),
+        positive_prompt="Custom balanced prompt",
+        use_default_prompt=False,
+        preset="balanced",
+        subject=S,
+        scene=Sc,
+    )
+    bal_chain = captured_chains["chain"]
+    bal_edit_refs = [r for r in bal_chain.references if r.reference_path == "edit"]
+    assert len(bal_edit_refs) == 2
+    assert all(r.visual_reference_fit == "contain_no_upscale" for r in bal_edit_refs)
