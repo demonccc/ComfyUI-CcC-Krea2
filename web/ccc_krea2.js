@@ -186,10 +186,9 @@ app.registerExtension({
                     "Do not copy subjects, objects, or scene content from the style reference.";
 
                 const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE =
-                    "Replace the main subject in the scene reference with the subject from the subject reference.\n\n" +
-                    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n" +
-                    "Preserve the scene composition, environment, camera framing, perspective, lighting, and the action or pose of the main subject being replaced.\n\n" +
-                    "Integrate the subject naturally into the scene, adapting pose, orientation, lighting, and interaction with the environment as needed.";
+                    "Replace only the target subject in the scene reference with the subject from the subject reference.\n\n" +
+                    "Preserve the identity of the subject from the subject reference.\n\n" +
+                    "Keep every other person and the rest of the scene unchanged.";
 
                 const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION =
                     "Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference.\n\n" +
@@ -247,14 +246,14 @@ app.registerExtension({
                 const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource) => {
                     if (preset === "subject_transfer") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        let outfitClause = "Preserve the clothing and accessories of the subject reference.";
+                        let outfitClause = "Keep the clothing and accessories of the subject reference.";
                         if (hasO) {
                             if (outfitSource === "outfit image") {
-                                outfitClause = "Replace the subject's clothing and accessories with the clothing and accessories from the outfit reference, fitting them naturally to the subject.";
+                                outfitClause = "Use the clothing and accessories from the outfit reference.";
                             } else if (outfitSource === "scene image") {
-                                outfitClause = "Use the clothing and accessories worn by the main subject in the scene reference, while preserving the identity and body characteristics of the subject reference.";
+                                outfitClause = "Use the clothing and accessories of the target subject from the scene reference.";
                             } else if (outfitSource === "style image") {
-                                outfitClause = "Use the clothing and accessories from the outfit reference for the subject, while preserving the identity and body characteristics of the subject reference.";
+                                outfitClause = "Use the clothing and accessories from the outfit reference.";
                             }
                         }
                         return { hasDefault: true, text: `${EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE}\n\n${outfitClause}` };

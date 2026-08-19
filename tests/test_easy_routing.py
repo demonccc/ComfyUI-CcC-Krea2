@@ -962,7 +962,7 @@ class TestSubjectTransferMatrix:
 
     def test_subject_scene(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
-        sources = resolve_easy_sources(subject=S, scene=Sc)
+        sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc)
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
@@ -973,6 +973,9 @@ class TestSubjectTransferMatrix:
         )
         assert route.edit_references[0][1] == pytest.approx(1.0)
         assert route.edit_references[1][1] == pytest.approx(8.0)
+        assert route.style_active is True
+        assert route.style_source is Sc
+        assert route.style_config.style_processing == "2x2"
 
     def test_subject_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources

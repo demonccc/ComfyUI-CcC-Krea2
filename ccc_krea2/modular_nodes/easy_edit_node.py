@@ -487,6 +487,35 @@ def _execute_easy_edit(
     app_refs = [f"{alias}" for _, _, alias, _ in route.edit_references]
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 
+    if route.target_content_mode == "empty" or route.target_content_source is None:
+        resolved_latent_source_str = "empty"
+        target_content_role_str = "none"
+    else:
+        src = route.target_content_source
+        is_sc = resolved_sources.scene is not None and src is resolved_sources.scene
+        is_s = resolved_sources.subject is not None and src is resolved_sources.subject
+        is_o = resolved_sources.effective_outfit is not None and src is resolved_sources.effective_outfit
+
+        if is_sc and is_o:
+            resolved_latent_source_str = "scene image (also Outfit source)"
+        elif is_sc:
+            resolved_latent_source_str = "scene image"
+        elif is_s:
+            resolved_latent_source_str = "subject image"
+        elif is_o:
+            resolved_latent_source_str = "outfit image"
+        else:
+            resolved_latent_source_str = "present"
+
+        if route.target_content_role and route.target_content_role != "":
+            target_content_role_str = route.target_content_role
+        else:
+            target_content_role_str = (
+                "scene+outfit"
+                if (is_sc and is_o)
+                else ("scene" if is_sc else ("subject" if is_s else ("outfit" if is_o else "none")))
+            )
+
     easy_header = [
         "=== Easy Edit Routing Report ===",
         f"Preset: {preset}",
@@ -505,7 +534,8 @@ def _execute_easy_edit(
         f"Common Geometry: {'yes' if common_geometry_active else 'no'}",
         f"Common Geometry Anchor: {common_geometry_anchor_role}",
         f"Target Content Mode: {route.target_content_mode}",
-        f"Target Content Source: {'present' if route.target_content_source is not None else 'none'}",
+        f"Target Content Role: {target_content_role_str}",
+        f"Resolved Latent Source: {resolved_latent_source_str}",
         f"Target Geometry Mode: {effective_geometry_mode}",
         f"Target Geometry Source: {'present' if effective_geometry_source is not None else 'none'}",
     ]

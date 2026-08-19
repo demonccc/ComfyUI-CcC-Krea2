@@ -388,7 +388,7 @@ def build_target_latent(
         raw_encoded = vae.encode(adapted_img)
         samples = normalize_vae_output(raw_encoded, batch_size=batch_size)
         vae_applied = True
-        content_src_name = "Target original_image"
+        content_src_name = f"Target original_image ({target_alias})" if target_alias else "Target original_image"
     else:
         raise ValueError(f"Unknown target_content mode: '{target_content}'. Expected 'empty' or 'image'.")
 

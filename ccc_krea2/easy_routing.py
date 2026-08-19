@@ -97,10 +97,9 @@ EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
 )
 
 EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE = (
-    "Replace the main subject in the scene reference with the subject from the subject reference.\n\n"
-    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n"
-    "Preserve the scene composition, environment, camera framing, perspective, lighting, and the action or pose of the main subject being replaced.\n\n"
-    "Integrate the subject naturally into the scene, adapting pose, orientation, lighting, and interaction with the environment as needed."
+    "Replace only the target subject in the scene reference with the subject from the subject reference.\n\n"
+    "Preserve the identity of the subject from the subject reference.\n\n"
+    "Keep every other person and the rest of the scene unchanged."
 )
 
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
@@ -815,28 +814,19 @@ def resolve_default_positive_prompt(
 
         base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE
         if not has_o:
-            outfit_clause = "Preserve the clothing and accessories of the subject reference."
+            outfit_clause = "Keep the clothing and accessories of the subject reference."
             base_key = "subject_transfer"
         elif outfit_source == "outfit image":
-            outfit_clause = (
-                "Replace the subject's clothing and accessories with the clothing and accessories "
-                "from the outfit reference, fitting them naturally to the subject."
-            )
+            outfit_clause = "Use the clothing and accessories from the outfit reference."
             base_key = "subject_transfer_outfit"
         elif outfit_source == "scene image":
-            outfit_clause = (
-                "Use the clothing and accessories worn by the main subject in the scene reference, "
-                "while preserving the identity and body characteristics of the subject reference."
-            )
+            outfit_clause = "Use the clothing and accessories of the target subject from the scene reference."
             base_key = "subject_transfer_scene_outfit"
         elif outfit_source == "style image":
-            outfit_clause = (
-                "Use the clothing and accessories from the outfit reference for the subject, "
-                "while preserving the identity and body characteristics of the subject reference."
-            )
+            outfit_clause = "Use the clothing and accessories from the outfit reference."
             base_key = "subject_transfer_style_outfit"
         else:
-            outfit_clause = "Preserve the clothing and accessories of the subject reference."
+            outfit_clause = "Keep the clothing and accessories of the subject reference."
             base_key = "subject_transfer"
 
         base_prompt = f"{base_prompt}\n\n{outfit_clause}"
