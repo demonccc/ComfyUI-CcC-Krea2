@@ -950,8 +950,9 @@ class TestSubjectTransferMatrix:
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
         assert route.target_content_role == "scene"
-        assert_refs(route.edit_references, [])
-        assert (Sc, "scene") in route.semantic_only_references
+        assert_refs(route.edit_references, [(Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene")])
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert len(route.semantic_only_references) == 0
 
     def test_outfit_only(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -973,15 +974,18 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject")],
+            [
+                (Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"),
+                (S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"),
+            ],
         )
-        assert route.edit_references[0][1] == pytest.approx(6.0)
-        assert (Sc, "scene") in route.semantic_only_references
-        assert SUBJECT_TRANSFER_SCENE_BOOST == pytest.approx(2.5)
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(6.0)
+        assert len(route.semantic_only_references) == 0
         assert route.style_active is True
         assert route.style_source is Sc
         assert route.style_config.style_processing == "2x2"
-        assert route.style_config.indirect_style_transfer is True
+        assert route.style_config.indirect_style_transfer is False
 
     def test_subject_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1006,10 +1010,14 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")],
+            [
+                (Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"),
+                (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"),
+            ],
         )
-        assert route.edit_references[0][1] == pytest.approx(4.0)
-        assert (Sc, "scene") in route.semantic_only_references
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
+        assert len(route.semantic_only_references) == 0
 
     def test_subject_scene_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1021,13 +1029,15 @@ class TestSubjectTransferMatrix:
         assert_refs(
             route.edit_references,
             [
+                (Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"),
                 (S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"),
                 (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"),
             ],
         )
-        assert route.edit_references[0][1] == pytest.approx(6.0)
-        assert route.edit_references[1][1] == pytest.approx(4.0)
-        assert (Sc, "scene") in route.semantic_only_references
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(6.0)
+        assert route.edit_references[2][1] == pytest.approx(4.0)
+        assert len(route.semantic_only_references) == 0
 
     def test_subject_scene_as_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1039,10 +1049,14 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject")],
+            [
+                (Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit"),
+                (S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"),
+            ],
         )
-        assert route.edit_references[0][1] == pytest.approx(6.0)
-        assert (Sc, "scene+outfit") in route.semantic_only_references
+        assert route.edit_references[0][1] == pytest.approx(4.0)
+        assert route.edit_references[1][1] == pytest.approx(6.0)
+        assert len(route.semantic_only_references) == 0
 
     def test_scene_as_outfit_without_subject(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1052,8 +1066,12 @@ class TestSubjectTransferMatrix:
         assert route.target_content_source is Sc
         assert route.target_content_role == "scene+outfit"
         assert route.target_geometry_source is Sc
-        assert_refs(route.edit_references, [])
-        assert (Sc, "scene+outfit") in route.semantic_only_references
+        assert_refs(
+            route.edit_references,
+            [(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit")],
+        )
+        assert route.edit_references[0][1] == pytest.approx(4.0)
+        assert len(route.semantic_only_references) == 0
         assert any("missing" in w for w in route.warnings)
 
     def test_no_fallback_to_other_presets(self, dummy_sources):
@@ -1352,7 +1370,7 @@ def test_style_active_for_all_presets(dummy_sources):
         assert r.style_source is St
         assert r.style_config.style_fidelity == 1.0
         assert r.style_config.style_processing == "2x2"
-        assert r.style_config.indirect_style_transfer is (p == "subject_transfer")
+        assert r.style_config.indirect_style_transfer is False
         assert r.style_config.vision_instruction == ""
 
     r_st = route_easy_preset(sources, preset="style_transfer")
@@ -1480,7 +1498,6 @@ class TestCrossRouting:
         "preserve_identity",
         "max_identity",
         "preserve_scene",
-        "subject_transfer",
         "outfit_transfer",
         "style_transfer",
     ],
@@ -1506,15 +1523,14 @@ def test_bounded_appearance_refs(dummy_sources, preset):
 
 
 def test_subject_transfer_multi_reference_routing(dummy_sources):
-    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 2 appearance refs (subject, outfit) and scene as semantic-only."""
+    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 3 appearance refs (scene, subject, outfit)."""
     S, Sc, Ou, _ = dummy_sources
     sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc, outfit=Ou)
     route = route_easy_preset(sources, preset="subject_transfer")
-    assert len(route.edit_references) == 2
+    assert len(route.edit_references) == 3
     aliases = [alias for _, _, alias, _ in route.edit_references]
-    assert aliases == ["subject", "outfit"]
-    assert len(route.semantic_only_references) == 1
-    assert route.semantic_only_references[0][1] == "scene"
+    assert aliases == ["scene", "subject", "outfit"]
+    assert len(route.semantic_only_references) == 0
 
 
 def test_preset_capability_gating_outfit(dummy_sources):
@@ -1638,11 +1654,10 @@ def test_subject_transfer_node_visual_reference_fit_crop(monkeypatch):
     st_sem_refs = [
         r for r in st_chain.references if r.reference_path == "edit" and not getattr(r, "appearance_reference", False)
     ]
-    assert len(st_app_refs) == 1
-    assert st_app_refs[0].alias == "subject"
-    assert st_app_refs[0].visual_reference_fit == "crop"
-    assert len(st_sem_refs) == 1
-    assert st_sem_refs[0].alias == "scene"
+    assert len(st_app_refs) == 2
+    assert [r.alias for r in st_app_refs] == ["scene", "subject"]
+    assert all(r.visual_reference_fit == "crop" for r in st_app_refs)
+    assert len(st_sem_refs) == 0
 
     # Balanced preset + Subject + Scene
     node.process(

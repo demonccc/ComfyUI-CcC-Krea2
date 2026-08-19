@@ -327,7 +327,14 @@ class WorkflowBuilder:
         }
 
 
-def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
+def build_base_graph(
+    b: WorkflowBuilder,
+    is_ostris=False,
+    is_native=False,
+    lora_2_name="None",
+    lora_2_strength=1.0,
+    note_text=None,
+):
     unet = b.add_node(
         "UNETLoader",
         [0, 0],
@@ -346,18 +353,24 @@ def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
     if not is_native:
         lora_name = "krea2_ostris_edit_lora.safetensors" if is_ostris else "krea2_edit_lora.safetensors"
 
+        widgets = {
+            "enabled": True,
+            "global_strength": 1.0,
+            "lora_1_enabled": True,
+            "lora_1_name": lora_name,
+            "lora_1_strength": 1.0,
+        }
+        if lora_2_name and lora_2_name != "None":
+            widgets["lora_2_enabled"] = True
+            widgets["lora_2_name"] = lora_2_name
+            widgets["lora_2_strength"] = lora_2_strength
+
         lora = b.add_node(
             "CcCKrea2LoRAStack",
             [350, 0],
             [300, 250],
             inputs={"model": None},
-            widgets_values={
-                "enabled": True,
-                "global_strength": 1.0,
-                "lora_1_enabled": True,
-                "lora_1_name": lora_name,
-                "lora_1_strength": 1.0,
-            },
+            widgets_values=widgets,
         )
 
         b.link(unet, "MODEL", lora, "model")
@@ -378,18 +391,17 @@ def build_base_graph(b: WorkflowBuilder, is_ostris=False, is_native=False):
         widgets_values={"mode": "pytorch"},
     )
 
+    default_note = (
+        "Note on Blackwell GPUs:\n"
+        "`BlackwellAttentionFix` is recommended for NVIDIA Blackwell GPUs (RTX 5090, 5080, 5070 family) "
+        "to prevent NaN/black image sampling issues. On non-Blackwell systems, this node acts as a pass-through "
+        "or can be muted/bypassed."
+    )
     b.add_node(
         "Note",
         [1500, 150],
         [300, 150],
-        widgets_values={
-            "text": (
-                "Note on Blackwell GPUs:\n"
-                "`BlackwellAttentionFix` is recommended for NVIDIA Blackwell GPUs (RTX 5090, 5080, 5070 family) "
-                "to prevent NaN/black image sampling issues. On non-Blackwell systems, this node acts as a pass-through "
-                "or can be muted/bypassed."
-            )
-        },
+        widgets_values={"text": note_text if note_text else default_note},
     )
 
     sampler = b.add_node(
@@ -432,6 +444,9 @@ def build_easy_workflow(
     has_scene=False,
     has_outfit=False,
     has_style=False,
+    lora_2_name="None",
+    lora_2_strength=1.0,
+    note_text=None,
 ):
     b = WorkflowBuilder()
     b.add_group("Loaders", [0, -50, 700, 500])
@@ -439,7 +454,13 @@ def build_easy_workflow(
     b.add_group("Sampling", [1480, -50, 1050, 500])
     b.add_group("Output", [2540, -50, 680, 500])
 
-    unet, clip, vae, lora, auraflow, sampler = build_base_graph(b, is_ostris)
+    unet, clip, vae, lora, auraflow, sampler = build_base_graph(
+        b,
+        is_ostris=is_ostris,
+        lora_2_name=lora_2_name,
+        lora_2_strength=lora_2_strength,
+        note_text=note_text,
+    )
 
     easy_type = "CcCKrea2EasyEditOstris" if is_ostris else "CcCKrea2EasyEdit"
 
@@ -671,9 +692,27 @@ def main():
 
     # 01
     build_easy_workflow("01_easy_subject.json", "balanced", "outfit image", "style image", has_subj=True)
+    subject_transfer_note = (
+        "Note on Subject Transfer & Helper LoRAs:\n"
+        "• Preset 'subject_transfer' uses scene image as latent target, automatic scene style, "
+        "and anchors scene and subject as visual appearance references (crop fit).\n"
+        "• Identity/Edit LoRA (krea2_edit_lora.safetensors at 1.0) recovers subject facial identity.\n"
+        "• Optional Body-Swap LoRA (krea2_bodyswap_lora.safetensors at low strength ~0.3-0.4) improves body composition and pose/action integration.\n"
+        "• CAUTION: Body-swap LoRA can improve body composition / action integration, but it may hurt facial identity if overused, so it should be kept at low strength.\n"
+        "• ModelSamplingAuraFlow shift is set to 1.15.\n"
+        "• BlackwellAttentionFix is included for NVIDIA Blackwell GPUs (RTX 5090/5080/5070)."
+    )
     # 02
     build_easy_workflow(
-        "02_easy_subject_scene.json", "balanced", "outfit image", "style image", has_subj=True, has_scene=True
+        "02_easy_subject_scene.json",
+        "subject_transfer",
+        "outfit image",
+        "style image",
+        has_subj=True,
+        has_scene=True,
+        lora_2_name="krea2_bodyswap_lora.safetensors",
+        lora_2_strength=0.35,
+        note_text=subject_transfer_note,
     )
     # 03
     build_easy_workflow(

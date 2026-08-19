@@ -143,9 +143,9 @@
         true,
         "krea2_edit_lora.safetensors",
         1.0,
-        false,
-        "None",
-        1.0,
+        true,
+        "krea2_bodyswap_lora.safetensors",
+        0.35,
         false,
         "None",
         1.0,
@@ -248,7 +248,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Note on Blackwell GPUs:\n`BlackwellAttentionFix` is recommended for NVIDIA Blackwell GPUs (RTX 5090, 5080, 5070 family) to prevent NaN/black image sampling issues. On non-Blackwell systems, this node acts as a pass-through or can be muted/bypassed."
+        "Note on Subject Transfer & Helper LoRAs:\n\u2022 Preset 'subject_transfer' uses scene image as latent target, automatic scene style, and anchors scene and subject as visual appearance references (crop fit).\n\u2022 Identity/Edit LoRA (krea2_edit_lora.safetensors at 1.0) recovers subject facial identity.\n\u2022 Optional Body-Swap LoRA (krea2_bodyswap_lora.safetensors at low strength ~0.3-0.4) improves body composition and pose/action integration.\n\u2022 CAUTION: Body-swap LoRA can improve body composition / action integration, but it may hurt facial identity if overused, so it should be kept at low strength.\n\u2022 ModelSamplingAuraFlow shift is set to 1.15.\n\u2022 BlackwellAttentionFix is included for NVIDIA Blackwell GPUs (RTX 5090/5080/5070)."
       ]
     },
     {
@@ -460,7 +460,7 @@
       "widgets_values": [
         "A photo of a person",
         true,
-        "balanced",
+        "subject_transfer",
         "outfit image",
         "style image",
         true,

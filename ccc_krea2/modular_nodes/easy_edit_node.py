@@ -488,7 +488,14 @@ def _execute_easy_edit(
         "ignored by preset" if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_DISABLED) else style_source
     )
 
-    app_refs = [f"{alias}" for _, _, alias, _ in route.edit_references]
+    app_refs = []
+    for _, boost, alias, _ in route.edit_references:
+        fit_str = (
+            "crop"
+            if (preset == "subject_transfer" and common_geometry_active)
+            else ("contain_no_upscale" if common_geometry_active else "auto")
+        )
+        app_refs.append(f"{alias} (boost={boost:.1f}, fit={fit_str})")
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 
     if route.target_content_mode == "empty" or route.target_content_source is None:

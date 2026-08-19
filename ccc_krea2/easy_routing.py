@@ -697,15 +697,12 @@ def route_easy_preset(
             target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-            # Subject Transfer routes Scene as target content/geometry and semantic-only guidance
-            # to prevent direct appearance/VAE reference conditioning from duplicating scene elements or breaking anatomy.
-            # Subject remains the direct appearance reference for identity.
             if outfit_is_scene_physically:
-                semantic_only_refs.append((Sc, "scene+outfit"))
+                refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
                 if has_s:
                     refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
             else:
-                semantic_only_refs.append((Sc, "scene"))
+                refs.append(_ref(Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"))
                 if has_s:
                     refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
                 if has_o:
@@ -757,8 +754,6 @@ def route_easy_preset(
     style_active = has_st
     if preset == "style_transfer":
         style_config = STRONG_EASY_STYLE_CONFIG
-    elif preset == "subject_transfer":
-        style_config = INDIRECT_EASY_STYLE_CONFIG
     else:
         style_config = DEFAULT_EASY_STYLE_CONFIG
 
