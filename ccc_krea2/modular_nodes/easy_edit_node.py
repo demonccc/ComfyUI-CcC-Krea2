@@ -8,6 +8,7 @@ from ..easy_routing import (
     route_easy_preset,
     get_easy_instruction_for_role,
     resolve_default_positive_prompt,
+    resolve_easy_visual_reference_fit,
 )
 from ..grounding import prepare_easy_krea_vision_image
 from ..vision_prep import prepare_image_for_qwen
@@ -27,7 +28,7 @@ class CcCKrea2EasyEdit:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 10-preset Krea2 Edit node. "
+        "Opinionated 11-preset Krea2 Edit node. "
         "Automatically routes Subject, Scene, Outfit, and Style sources to canonical target and reference channels."
     )
 
@@ -56,6 +57,7 @@ class CcCKrea2EasyEdit:
                         "consistent",
                         "preserve_identity",
                         "max_identity",
+                        "identity_transfer",
                         "subject_transfer",
                         "preserve_scene",
                         "outfit_transfer",
@@ -135,7 +137,7 @@ class CcCKrea2EasyEditOstris:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 10-preset Ostris Edit node. "
+        "Opinionated 11-preset Ostris Edit node. "
         "Routes Subject, Scene, Outfit, and Style sources to Ostris edit pipeline."
     )
 
@@ -164,6 +166,7 @@ class CcCKrea2EasyEditOstris:
                         "consistent",
                         "preserve_identity",
                         "max_identity",
+                        "identity_transfer",
                         "subject_transfer",
                         "preserve_scene",
                         "outfit_transfer",
@@ -349,14 +352,9 @@ def _execute_easy_edit(
         else:
             vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
-        # Subject Transfer uses crop fit mode under common geometry to align subject and scene aspect ratios.
-        if common_geometry_active:
-            if preset == "subject_transfer":
-                fit_mode = "crop" if alias_role in ("scene", "scene+outfit") else "contain_no_upscale"
-            else:
-                fit_mode = "contain_no_upscale"
-        else:
-            fit_mode = "auto"
+        fit_mode = resolve_easy_visual_reference_fit(
+            preset=preset, role=alias_role, common_geometry_active=common_geometry_active
+        )
 
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(
@@ -494,13 +492,9 @@ def _execute_easy_edit(
 
     app_refs = []
     for _, boost, alias, _ in route.edit_references:
-        if common_geometry_active:
-            if preset == "subject_transfer":
-                fit_str = "crop" if alias in ("scene", "scene+outfit") else "contain_no_upscale"
-            else:
-                fit_str = "contain_no_upscale"
-        else:
-            fit_str = "auto"
+        fit_str = resolve_easy_visual_reference_fit(
+            preset=preset, role=alias, common_geometry_active=common_geometry_active
+        )
         app_refs.append(f"{alias} (boost={boost:.1f}, fit={fit_str})")
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 

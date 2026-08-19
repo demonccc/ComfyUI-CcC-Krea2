@@ -190,6 +190,12 @@ app.registerExtension({
                     "Preserve the identity of the subject from the subject reference.\n\n" +
                     "Keep every other person and the rest of the scene unchanged.";
 
+                const EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER =
+                    "Replace only the identity of the target subject in the scene reference with the identity of the subject from the subject reference.\n\n" +
+                    "Preserve the facial identity, facial features, hair, body identity, anatomy, body shape, and body proportions of the subject reference.\n\n" +
+                    "Preserve the target subject's scene role, position, action, pose, clothing, interaction, and surrounding scene.\n\n" +
+                    "Keep every other person and the rest of the scene unchanged.";
+
                 const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION =
                     "Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference.\n\n" +
                     "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n" +
@@ -244,6 +250,11 @@ app.registerExtension({
                 };
 
                 const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource) => {
+                    if (preset === "identity_transfer") {
+                        if (!hasS || !hasSc) return { hasDefault: false, text: "" };
+                        return { hasDefault: true, text: EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER };
+                    }
+
                     if (preset === "subject_transfer") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
                         let outfitClause = "Keep the clothing and accessories of the subject reference.";
@@ -307,8 +318,8 @@ app.registerExtension({
                     }
 
                     const preset = presetWidget?.value || "balanced";
-                    const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation"].includes(preset);
-                    const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation"].includes(preset);
+                    const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "identity_transfer"].includes(preset);
+                    const isSceneAutoStyle = ["subject_transfer", "identity_transfer", "scene_reinterpretation"].includes(preset);
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
                     const sceneInput = node.inputs?.find(i => i.name === "scene");
@@ -329,9 +340,13 @@ app.registerExtension({
                         styleSourceWidget.disabled = isSceneAutoStyle;
                         if (isSceneAutoStyle) {
                             styleSourceWidget.label = "Style Source [Auto: Scene]";
-                            styleSourceWidget.tooltip = preset === "subject_transfer"
-                                ? "Subject Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets."
-                                : "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
+                            let tooltipText = "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
+                            if (preset === "identity_transfer") {
+                                tooltipText = "Identity Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
+                            } else if (preset === "subject_transfer") {
+                                tooltipText = "Subject Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
+                            }
+                            styleSourceWidget.tooltip = tooltipText;
                         } else {
                             delete styleSourceWidget.label;
                             styleSourceWidget.tooltip = "Source image socket to use for style conditioning.";
@@ -413,8 +428,8 @@ app.registerExtension({
                             const outfitSource = outfitSourceWidget?.value || "outfit image";
                             const styleSource = styleSourceWidget?.value || "style image";
 
-                            const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation"].includes(preset);
-                            const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation"].includes(preset);
+                            const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "identity_transfer"].includes(preset);
+                            const isSceneAutoStyle = ["subject_transfer", "identity_transfer", "scene_reinterpretation"].includes(preset);
 
                             const effectiveOutfitSource = usesOutfit ? outfitSource : "none";
                             const effectiveStyleSource = isSceneAutoStyle ? "scene image" : styleSource;

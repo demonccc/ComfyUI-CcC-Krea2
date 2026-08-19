@@ -13,6 +13,9 @@ CONSISTENT_SUBJECT_BOOST = 4.0
 PRESERVE_IDENTITY_SUBJECT_BOOST = 6.0
 MAX_IDENTITY_SUBJECT_BOOST = 10.0
 
+IDENTITY_TRANSFER_SCENE_BOOST = 2.5
+IDENTITY_TRANSFER_SUBJECT_BOOST = 7.0
+
 SUBJECT_TRANSFER_SCENE_BOOST = 2.5
 SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST = 7.0
 SUBJECT_TRANSFER_SUBJECT_BOOST = 8.0
@@ -104,6 +107,13 @@ EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE = (
     "Keep every other person and the rest of the scene unchanged."
 )
 
+EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER = (
+    "Replace only the identity of the target subject in the scene reference with the identity of the subject from the subject reference.\n\n"
+    "Preserve the facial identity, facial features, hair, body identity, anatomy, body shape, and body proportions of the subject reference.\n\n"
+    "Preserve the target subject's scene role, position, action, pose, clothing, interaction, and surrounding scene.\n\n"
+    "Keep every other person and the rest of the scene unchanged."
+)
+
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
     "Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference.\n\n"
     "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n"
@@ -116,6 +126,18 @@ EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
 
 def get_easy_instruction_for_role(role: str) -> str:
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
+
+
+def resolve_easy_visual_reference_fit(preset: str, role: str, common_geometry_active: bool) -> str:
+    """Resolve visual reference fit mode.
+
+    INVARIANT: Under common geometry, NO visual appearance reference in ANY preset
+    (including identity_transfer and subject_transfer) may ever be cropped. Always return
+    'contain_no_upscale'.
+    """
+    if common_geometry_active:
+        return "contain_no_upscale"
+    return "auto"
 
 
 @dataclass(frozen=True)
@@ -140,6 +162,9 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "consistent": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "preserve_identity": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "max_identity": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
+    "identity_transfer": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
     "subject_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_SCENE_AUTO),
     "preserve_scene": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
     "outfit_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
@@ -687,6 +712,35 @@ def route_easy_preset(
             elif outfit_is_distinct:
                 refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
 
+    elif preset == "identity_transfer":
+        if not has_s:
+            preset_warnings.append(
+                "preset 'identity_transfer' selected but Subject source is missing; no identity can be transferred."
+            )
+        if not has_sc:
+            preset_warnings.append(
+                "preset 'identity_transfer' selected but Scene source is missing; target Scene is missing."
+            )
+
+        if has_sc and has_s:
+            target_content_mode = "image"
+            target_content_source = S
+            target_content_role = "subject"
+            target_content_fit = "contain_no_upscale"
+            target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+            refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
+            refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
+        else:
+            target_content_mode = "empty"
+            target_content_source = None
+            target_content_role = "none"
+            target_geometry_mode, target_geometry_source = "favor_image", (Sc if has_sc else (S if has_s else None))
+            if has_s:
+                refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
+            elif has_sc:
+                refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
+
     elif preset == "subject_transfer":
         if not has_s:
             preset_warnings.append(
@@ -694,17 +748,9 @@ def route_easy_preset(
             )
 
         if has_sc:
-            if has_s:
-                # Subject Transfer uses Subject as target content to preserve identity/content,
-                # while Scene remains the geometry/composition anchor.
-                target_content_mode = "image"
-                target_content_source = S
-                target_content_role = "subject"
-                target_content_fit = "contain_no_upscale"
-            else:
-                target_content_mode = "image"
-                target_content_source = Sc
-                target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
+            target_content_mode = "image"
+            target_content_source = Sc
+            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
 
             if outfit_is_scene_physically:
@@ -809,7 +855,14 @@ def resolve_default_positive_prompt(
     base_prompt = ""
     base_key = ""
 
-    if preset == "subject_transfer":
+    if preset == "identity_transfer":
+        if not (has_s and has_sc):
+            return False, "", "none"
+        base_prompt = EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
+        base_key = "identity_transfer"
+        return True, base_prompt, base_key
+
+    elif preset == "subject_transfer":
         if not (has_s and has_sc):
             return False, "", "none"
 

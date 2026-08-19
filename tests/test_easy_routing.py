@@ -9,6 +9,8 @@ from ccc_krea2.easy_routing import (
     CONSISTENT_SUBJECT_BOOST,
     PRESERVE_IDENTITY_SUBJECT_BOOST,
     MAX_IDENTITY_SUBJECT_BOOST,
+    IDENTITY_TRANSFER_SCENE_BOOST,
+    IDENTITY_TRANSFER_SUBJECT_BOOST,
     SUBJECT_TRANSFER_SCENE_BOOST,
     SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST,
     SUBJECT_TRANSFER_SUBJECT_BOOST,
@@ -969,8 +971,8 @@ class TestSubjectTransferMatrix:
         sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc)
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is S
-        assert route.target_content_role == "subject"
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1024,8 +1026,8 @@ class TestSubjectTransferMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is S
-        assert route.target_content_role == "subject"
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1045,8 +1047,8 @@ class TestSubjectTransferMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is S
-        assert route.target_content_role == "subject"
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene+outfit"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1058,6 +1060,81 @@ class TestSubjectTransferMatrix:
         assert route.edit_references[0][1] == pytest.approx(4.0)
         assert route.edit_references[1][1] == pytest.approx(7.0)
         assert len(route.semantic_only_references) == 0
+
+
+# ---------------------------------------------------------------------------
+# IDENTITY_TRANSFER: exhaustive routing matrix
+# ---------------------------------------------------------------------------
+
+
+class TestIdentityTransferMatrix:
+    def test_none(self, dummy_sources):
+        sources = resolve_easy_sources(preset="identity_transfer")
+        route = route_easy_preset(sources, preset="identity_transfer")
+        assert any("missing" in w for w in route.warnings)
+        assert len(route.edit_references) == 0
+
+    def test_subject_only(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="identity_transfer", subject=S)
+        route = route_easy_preset(sources, preset="identity_transfer")
+        assert any("Scene source is missing" in w for w in route.warnings)
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is S
+        assert_refs(route.edit_references, [(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject")])
+
+    def test_scene_only(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="identity_transfer", scene=Sc)
+        route = route_easy_preset(sources, preset="identity_transfer")
+        assert any("Subject source is missing" in w for w in route.warnings)
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is Sc
+        assert_refs(route.edit_references, [(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene")])
+
+    def test_subject_scene(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="identity_transfer", subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="identity_transfer")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is S
+        assert route.target_content_role == "subject"
+        assert route.target_content_fit == "contain_no_upscale"
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [
+                (Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"),
+                (S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"),
+            ],
+        )
+        assert route.edit_references[0][1] == pytest.approx(2.5)
+        assert route.edit_references[1][1] == pytest.approx(7.0)
+        assert len(route.semantic_only_references) == 0
+        assert route.style_active is True
+        assert route.style_source is Sc
+        assert route.style_config.style_processing == "2x2"
+        assert route.style_config.indirect_style_transfer is False
+
+    def test_subject_scene_outfit_disabled(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="identity_transfer", subject=S, scene=Sc, outfit=Ou)
+        route = route_easy_preset(sources, preset="identity_transfer")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is S
+        assert route.target_content_role == "subject"
+        assert route.target_geometry_source is Sc
+        # Outfit policy is disabled, so Ou is ignored completely
+        assert_refs(
+            route.edit_references,
+            [
+                (Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"),
+                (S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"),
+            ],
+        )
+        assert len(route.edit_references) == 2
 
     def test_scene_as_outfit_without_subject(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1655,7 +1732,7 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     ]
     assert len(st_app_refs) == 2
     ref_map = {r.alias: r.visual_reference_fit for r in st_app_refs}
-    assert ref_map["scene"] == "crop"
+    assert ref_map["scene"] == "contain_no_upscale"
     assert ref_map["subject"] == "contain_no_upscale"
 
     # Subject Transfer + Subject + Scene + distinct Outfit
@@ -1678,7 +1755,7 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     ]
     assert len(st_outfit_refs) == 3
     ref_map3 = {r.alias: r.visual_reference_fit for r in st_outfit_refs}
-    assert ref_map3["scene"] == "crop"
+    assert ref_map3["scene"] == "contain_no_upscale"
     assert ref_map3["subject"] == "contain_no_upscale"
     assert ref_map3["outfit"] == "contain_no_upscale"
 
@@ -1702,7 +1779,7 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     ]
     assert len(st_sc_outfit_refs) == 2
     ref_map_sc = {r.alias: r.visual_reference_fit for r in st_sc_outfit_refs}
-    assert ref_map_sc["scene+outfit"] == "crop"
+    assert ref_map_sc["scene+outfit"] == "contain_no_upscale"
     assert ref_map_sc["subject"] == "contain_no_upscale"
 
     # Balanced preset + Subject + Scene

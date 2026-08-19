@@ -8,6 +8,7 @@ from ccc_krea2.easy_routing import (
     EASY_DEFAULT_PROMPT_SUBJECT_SCENE,
     EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT,
     EASY_DEFAULT_PROMPT_STYLE,
+    EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER,
     resolve_default_positive_prompt,
 )
 from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit, CcCKrea2EasyEditOstris
@@ -170,7 +171,37 @@ class TestDefaultPromptResolver:
         assert "Use the clothing and accessories from the outfit reference." in text
         assert "style reference" not in text
 
+    def test_identity_transfer_resolutions(self):
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="identity_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=False,
+            has_st=False,
+        )
+        assert has_def is True
+        assert key == "identity_transfer"
+        assert text == EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
+        assert "Replace only the identity of the target subject in the scene reference" in text
+        assert "facial identity, facial features, hair, body identity" in text
+
     def test_preset_prompt_requires_subject_and_scene(self):
+        # identity_transfer requires both Subject and Scene
+        has_def, _, _ = resolve_default_positive_prompt(
+            "identity_transfer", has_s=True, has_sc=False, has_o=False, has_st=False
+        )
+        assert has_def is False
+
+        has_def, _, _ = resolve_default_positive_prompt(
+            "identity_transfer", has_s=False, has_sc=True, has_o=False, has_st=False
+        )
+        assert has_def is False
+
+        has_def, _, _ = resolve_default_positive_prompt(
+            "identity_transfer", has_s=True, has_sc=True, has_o=False, has_st=False
+        )
+        assert has_def is True
+
         # subject_transfer requires both Subject and Scene
         has_def, _, _ = resolve_default_positive_prompt(
             "subject_transfer", has_s=True, has_sc=False, has_o=False, has_st=False
@@ -671,12 +702,29 @@ class TestEasyEditReportLatentSource:
             subject=S,
             scene=Sc,
         )
-        assert "Resolved Latent Source: subject image" in report1
-        assert "Target Content Role: subject" in report1
+        assert "Resolved Latent Source: scene image" in report1
+        assert "Target Content Role: scene" in report1
         assert "Resolved Style Source: scene image (automatic)" in report1
-        assert "Appearance Ref 1: scene" in report1
-        assert "Appearance Ref 2: subject" in report1
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain_no_upscale)" in report1
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report1
         assert "Semantic-only Sources: none" in report1
+
+        # Identity Transfer + Subject + Scene
+        _, _, _, _, report_id = node.process(
+            model="model",
+            clip="clip",
+            vae=DummyVAE(),
+            positive_prompt="",
+            use_default_prompt=True,
+            preset="identity_transfer",
+            subject=S,
+            scene=Sc,
+        )
+        assert "Resolved Latent Source: subject image" in report_id
+        assert "Target Content Role: subject" in report_id
+        assert "Resolved Style Source: scene image (automatic)" in report_id
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain_no_upscale)" in report_id
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report_id
 
         # Subject Transfer + Subject + Scene + Outfit Image
         _, _, _, _, report_outfit = node.process(
@@ -690,10 +738,10 @@ class TestEasyEditReportLatentSource:
             scene=Sc,
             outfit=Ou,
         )
-        assert "Resolved Latent Source: subject image" in report_outfit
-        assert "Appearance Ref 1: scene" in report_outfit
-        assert "Appearance Ref 2: subject" in report_outfit
-        assert "Appearance Ref 3: outfit" in report_outfit
+        assert "Resolved Latent Source: scene image" in report_outfit
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain_no_upscale)" in report_outfit
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report_outfit
+        assert "Appearance Ref 3: outfit (boost=4.0, fit=contain_no_upscale)" in report_outfit
         assert "Semantic-only Sources: none" in report_outfit
 
         # Subject Transfer + Subject + Scene + Outfit Source = Scene Image
@@ -708,9 +756,9 @@ class TestEasyEditReportLatentSource:
             scene=Sc,
             outfit_source="scene image",
         )
-        assert "Resolved Latent Source: subject image" in report_scene_outfit
-        assert "Appearance Ref 1: scene+outfit" in report_scene_outfit
-        assert "Appearance Ref 2: subject" in report_scene_outfit
+        assert "Resolved Latent Source: scene image" in report_scene_outfit
+        assert "Appearance Ref 1: scene+outfit (boost=4.0, fit=contain_no_upscale)" in report_scene_outfit
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report_scene_outfit
         assert "Semantic-only Sources: none" in report_scene_outfit
 
         # Subject Transfer + Subject Only (no Scene)
