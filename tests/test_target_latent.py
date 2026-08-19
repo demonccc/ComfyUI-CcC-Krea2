@@ -269,3 +269,74 @@ def test_target_latent_strict_image_content():
             maximum_mp=1.0,
             batch_size=1,
         )
+
+
+def test_target_latent_contain_no_upscale_portrait_into_landscape():
+    img_subj = torch.rand(1, 1448, 1086, 3)  # 1086 x 1448 (W x H)
+    img_scene = torch.rand(1, 1152, 1728, 3)  # 1728 x 1152 (W x H)
+    subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+
+    mock_vae = MagicMock()
+
+    def mock_encode(x):
+        if x.ndim == 4 and x.shape[-1] in (1, 3, 4):
+            h, w = x.shape[1], x.shape[2]
+        else:
+            h, w = x.shape[2], x.shape[3]
+        return {"samples": torch.ones((1, 16, h // 8, w // 8))}
+
+    mock_vae.encode.side_effect = mock_encode
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="subject",
+        subject_image=subj_prep,
+        scene_image=scene_prep,
+        target_geometry="favor_scene",
+        content_fit="contain_no_upscale",
+        maximum_mp=2.0,
+        batch_size=1,
+    )
+
+    samples = lat_dict["samples"]
+    assert samples.shape == (1, 16, 144, 216)
+    # Check centered offset: lw = 108, lw offset = (216 - 108) // 2 = 54
+    # Padding left (0..54) and right (162..216) must be zeros
+    assert torch.all(samples[:, :, :, :54] == 0)
+    assert torch.all(samples[:, :, :, 162:] == 0)
+    assert torch.all(samples[:, :, :, 54:162] == 1.0)
+
+    assert "Content Fit: contain_no_upscale" in info
+    assert "Content Source Size: 1086 x 1448" in info
+    assert "Content Resolved Size: 864 x 1152" in info
+    assert "Content Crop Rectangle: none" in info
+    assert "Content Latent Placement: centered" in info
+    assert "Content Latent Offset: X=54, Y=0" in info
+    assert "Content Target Size: 1728 x 1152" in info
+
+
+def test_target_latent_contain_no_upscale_small_image():
+    img_subj = torch.rand(1, 300, 400, 3)  # 400 x 300 (W x H) small subject
+    img_scene = torch.rand(1, 1000, 1000, 3)  # 1000 x 1000 scene target
+    subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
+    scene_prep = prepare_vision_image(image=img_scene, clip=None, mode="native")
+
+    mock_vae = MagicMock()
+    mock_vae.encode.side_effect = lambda x: {"samples": torch.ones((1, 16, x.shape[2] // 8, x.shape[3] // 8))}
+
+    lat_dict, info = create_target_latent(
+        vae=mock_vae,
+        target_latent_content="subject",
+        subject_image=subj_prep,
+        scene_image=scene_prep,
+        target_geometry="favor_scene",
+        content_fit="contain_no_upscale",
+        maximum_mp=1.0,
+        batch_size=1,
+    )
+
+    # 400x300 fits within 1000x1000 without upscaling, aligned to 16 = 400x288 or 400x300 aligned
+    assert "Content Fit: contain_no_upscale" in info
+    assert "Content Source Size: 400 x 300" in info
+    assert "Content Resolved Size: 400 x 288" in info

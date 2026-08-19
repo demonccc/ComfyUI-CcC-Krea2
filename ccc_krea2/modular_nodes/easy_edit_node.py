@@ -351,7 +351,10 @@ def _execute_easy_edit(
 
         # Subject Transfer uses crop fit mode under common geometry to align subject and scene aspect ratios.
         if common_geometry_active:
-            fit_mode = "crop" if preset == "subject_transfer" else "contain_no_upscale"
+            if preset == "subject_transfer":
+                fit_mode = "crop" if alias_role in ("scene", "scene+outfit") else "contain_no_upscale"
+            else:
+                fit_mode = "contain_no_upscale"
         else:
             fit_mode = "auto"
 
@@ -426,6 +429,7 @@ def _execute_easy_edit(
     latent_dict, latent_info = build_target_latent(
         vae=vae,
         target_content=route.target_content_mode,
+        content_fit=route.target_content_fit,
         geometry_mode=effective_geometry_mode,
         target_image=target_content_prep,
         geometry_image=geometry_prep,
@@ -490,11 +494,13 @@ def _execute_easy_edit(
 
     app_refs = []
     for _, boost, alias, _ in route.edit_references:
-        fit_str = (
-            "crop"
-            if (preset == "subject_transfer" and common_geometry_active)
-            else ("contain_no_upscale" if common_geometry_active else "auto")
-        )
+        if common_geometry_active:
+            if preset == "subject_transfer":
+                fit_str = "crop" if alias in ("scene", "scene+outfit") else "contain_no_upscale"
+            else:
+                fit_str = "contain_no_upscale"
+        else:
+            fit_str = "auto"
         app_refs.append(f"{alias} (boost={boost:.1f}, fit={fit_str})")
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 
@@ -527,6 +533,26 @@ def _execute_easy_edit(
                 else ("scene" if is_sc else ("subject" if is_s else ("outfit" if is_o else "none")))
             )
 
+    if effective_geometry_source is None:
+        target_geometry_source_str = "none"
+    else:
+        is_sc_geom = resolved_sources.scene is not None and effective_geometry_source is resolved_sources.scene
+        is_s_geom = resolved_sources.subject is not None and effective_geometry_source is resolved_sources.subject
+        is_o_geom = (
+            resolved_sources.effective_outfit is not None
+            and effective_geometry_source is resolved_sources.effective_outfit
+        )
+        if is_sc_geom and is_o_geom:
+            target_geometry_source_str = "scene image (also Outfit source)"
+        elif is_sc_geom:
+            target_geometry_source_str = "scene image"
+        elif is_s_geom:
+            target_geometry_source_str = "subject image"
+        elif is_o_geom:
+            target_geometry_source_str = "outfit image"
+        else:
+            target_geometry_source_str = "present"
+
     easy_header = [
         "=== Easy Edit Routing Report ===",
         f"Preset: {preset}",
@@ -547,8 +573,9 @@ def _execute_easy_edit(
         f"Target Content Mode: {route.target_content_mode}",
         f"Target Content Role: {target_content_role_str}",
         f"Resolved Latent Source: {resolved_latent_source_str}",
+        f"Target Content Fit: {route.target_content_fit}",
         f"Target Geometry Mode: {effective_geometry_mode}",
-        f"Target Geometry Source: {'present' if effective_geometry_source is not None else 'none'}",
+        f"Target Geometry Source: {target_geometry_source_str}",
     ]
     for i, app_ref in enumerate(app_refs):
         easy_header.append(f"Appearance Ref {i + 1}: {app_ref}")

@@ -218,6 +218,7 @@ class EasyPresetRoute:
     target_geometry_mode: str  # "fixed" or "favor_image"
     target_geometry_source: Optional[Any]
     target_content_role: str
+    target_content_fit: str
     # 4-tuple: (image, boost, alias_role, instruction)
     edit_references: Tuple[Tuple[Any, float, str, str], ...]
     # 2-tuple: (image, alias_role)
@@ -386,6 +387,7 @@ def route_easy_preset(
     target_content_mode = "empty"
     target_content_source: Optional[Any] = None
     target_content_role = ""
+    target_content_fit = "crop"
     target_geometry_mode = "fixed"
     target_geometry_source: Optional[Any] = None
     refs: List[Tuple[Any, float, str, str]] = []
@@ -698,6 +700,7 @@ def route_easy_preset(
                 target_content_mode = "image"
                 target_content_source = S
                 target_content_role = "subject"
+                target_content_fit = "contain_no_upscale"
             else:
                 target_content_mode = "image"
                 target_content_source = Sc
@@ -771,6 +774,7 @@ def route_easy_preset(
         target_geometry_mode=target_geometry_mode,
         target_geometry_source=target_geometry_source,
         target_content_role=target_content_role,
+        target_content_fit=target_content_fit,
         edit_references=tuple(refs),
         semantic_only_references=tuple(semantic_only_refs),
         style_active=style_active,

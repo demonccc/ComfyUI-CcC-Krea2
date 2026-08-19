@@ -268,6 +268,7 @@ def create_target_latent(
     custom_aspect_height: int = 1,
     batch_size: int = 1,
     vae: Any = None,
+    content_fit: str = "crop",
     include_in_vision: str = "auto",
     target_vision_slot: Any = "auto",
     target_alias: str = "",
@@ -288,6 +289,7 @@ def create_target_latent(
         geometry_image=geometry_image,
         subject_image=subject_image,
         scene_image=scene_image,
+        content_fit=content_fit,
         include_in_vision=include_in_vision,
         target_vision_slot=target_vision_slot,
         target_alias=target_alias,
@@ -308,6 +310,7 @@ def build_target_latent(
     geometry_image: Optional[PreparedVisionImage] = None,
     subject_image: Optional[PreparedVisionImage] = None,
     scene_image: Optional[PreparedVisionImage] = None,
+    content_fit: str = "crop",
     include_in_vision: str = "auto",
     target_vision_slot: Any = "auto",
     target_alias: str = "",
@@ -324,6 +327,7 @@ def build_target_latent(
         target_megapixels = kwargs["maximum_mp"]
     if "fixed_mp" in kwargs:
         fixed_megapixels = kwargs["fixed_mp"]
+    content_fit = kwargs.get("content_fit", kwargs.get("target_content_fit", content_fit))
     force_target_mp = force_target_megapixels or kwargs.get("force_target_megapixels", False)
     orig_target_content = target_content
     orig_geometry_mode = geometry_mode
@@ -369,6 +373,10 @@ def build_target_latent(
     latent_w = target_w // 8
     vae_applied = False
     transform_info: Optional[TargetContentTransform] = None
+    contained_w: Optional[int] = None
+    contained_h: Optional[int] = None
+    offset_x: int = 0
+    offset_y: int = 0
     content_src_name = "N/A"
 
     if target_content == "empty":
@@ -386,11 +394,78 @@ def build_target_latent(
             raise ValueError(f"VAE is required when target_content is '{target_content}'.")
 
         orig_img = active_target_image.original_image
-        adapted_img, transform_info = adapt_target_content_image(orig_img, target_w=target_w, target_h=target_h)
-        raw_encoded = vae.encode(adapted_img)
-        samples = normalize_vae_output(raw_encoded, batch_size=batch_size)
-        vae_applied = True
-        content_src_name = f"Target original_image ({target_alias})" if target_alias else "Target original_image"
+        src_h, src_w = get_image_dims(orig_img)
+
+        if content_fit == "contain_no_upscale":
+            if src_w <= target_w and src_h <= target_h:
+                scale = 1.0
+            else:
+                scale = min(target_w / float(src_w), target_h / float(src_h))
+
+            raw_contained_w = src_w * scale
+            raw_contained_h = src_h * scale
+
+            if scale < 1.0:
+                contained_w = max(16, int(round(raw_contained_w / 16.0)) * 16)
+                contained_h = max(16, int(round(raw_contained_h / 16.0)) * 16)
+                if contained_w > target_w:
+                    contained_w = int(math.floor(raw_contained_w / 16.0)) * 16
+                if contained_h > target_h:
+                    contained_h = int(math.floor(raw_contained_h / 16.0)) * 16
+            else:
+                contained_w = min(target_w, int(math.floor(src_w / 16.0)) * 16)
+                contained_h = min(target_h, int(math.floor(src_h / 16.0)) * 16)
+                contained_w = max(16, contained_w)
+                contained_h = max(16, contained_h)
+
+            if orig_img.ndim == 3:
+                img_4d = orig_img.unsqueeze(0)
+            else:
+                img_4d = orig_img
+
+            if (src_w, src_h) != (contained_w, contained_h):
+                adapted_img = resize_tensor(img_4d, target_h=contained_h, target_w=contained_w, method="bicubic")
+            else:
+                adapted_img = img_4d
+            adapted_img = torch.clamp(adapted_img, 0.0, 1.0)
+
+            raw_encoded = vae.encode(adapted_img)
+            contained_latent = normalize_vae_output(raw_encoded, batch_size=batch_size)
+
+            if contained_latent.ndim == 5:
+                t_dim = contained_latent.shape[2]
+                contained_lh = contained_latent.shape[3]
+                contained_lw = contained_latent.shape[4]
+                samples = torch.zeros(
+                    (batch_size, 16, t_dim, latent_h, latent_w),
+                    dtype=contained_latent.dtype,
+                    device=contained_latent.device,
+                )
+                offset_y = (latent_h - contained_lh) // 2
+                offset_x = (latent_w - contained_lw) // 2
+                samples[:, :, :, offset_y : offset_y + contained_lh, offset_x : offset_x + contained_lw] = (
+                    contained_latent
+                )
+            else:
+                contained_lh = contained_latent.shape[2]
+                contained_lw = contained_latent.shape[3]
+                samples = torch.zeros(
+                    (batch_size, 16, latent_h, latent_w),
+                    dtype=contained_latent.dtype,
+                    device=contained_latent.device,
+                )
+                offset_y = (latent_h - contained_lh) // 2
+                offset_x = (latent_w - contained_lw) // 2
+                samples[:, :, offset_y : offset_y + contained_lh, offset_x : offset_x + contained_lw] = contained_latent
+
+            vae_applied = True
+            content_src_name = f"Target original_image ({target_alias})" if target_alias else "Target original_image"
+        else:
+            adapted_img, transform_info = adapt_target_content_image(orig_img, target_w=target_w, target_h=target_h)
+            raw_encoded = vae.encode(adapted_img)
+            samples = normalize_vae_output(raw_encoded, batch_size=batch_size)
+            vae_applied = True
+            content_src_name = f"Target original_image ({target_alias})" if target_alias else "Target original_image"
     else:
         raise ValueError(f"Unknown target_content mode: '{target_content}'. Expected 'empty' or 'image'.")
 
@@ -414,19 +489,39 @@ def build_target_latent(
     src_size_str = f"{src_dims[1]} x {src_dims[0]}" if src_dims else "N/A"
     actual_mp = (target_h * target_w) / 1_000_000.0
 
-    lines = [
-        f"Latent Content: {orig_target_content}",
-        f"Geometry Strategy: {orig_geometry_mode}",
-        f"Geometry Source: {geom_src}",
-        f"Content Source: {content_src_name}",
-        f"Content Source Size: {f'{transform_info.source_size[0]} x {transform_info.source_size[1]}' if transform_info else src_size_str}",
-        f"Content Crop Rectangle: {transform_info.crop_rectangle if transform_info else 'N/A'}",
-        f"Content Target Size: {f'{transform_info.target_size[0]} x {transform_info.target_size[1]}' if transform_info else f'{target_w} x {target_h}'}",
-        f"Content Interpolation: {transform_info.interpolation if transform_info else 'none'}",
-        f"VAE Encode Applied: {'yes' if vae_applied else 'no'}",
-        f"Include Target in Vision: {include_in_vision}",
-        f"Target Vision Slot: {'auto' if slot_val is None else slot_val}",
-    ]
+    if content_fit == "contain_no_upscale" and target_content in ("image", "subject", "scene"):
+        orig_img = active_target_image.original_image
+        sh, sw = get_image_dims(orig_img)
+        lines = [
+            f"Latent Content: {orig_target_content}",
+            f"Geometry Strategy: {orig_geometry_mode}",
+            f"Geometry Source: {geom_src}",
+            f"Content Source: {content_src_name}",
+            "Content Fit: contain_no_upscale",
+            f"Content Source Size: {sw} x {sh}",
+            f"Content Resolved Size: {contained_w} x {contained_h}",
+            "Content Crop Rectangle: none",
+            "Content Latent Placement: centered",
+            f"Content Latent Offset: X={offset_x}, Y={offset_y}",
+            f"Content Target Size: {target_w} x {target_h}",
+            f"VAE Encode Applied: {'yes' if vae_applied else 'no'}",
+            f"Include Target in Vision: {include_in_vision}",
+            f"Target Vision Slot: {'auto' if slot_val is None else slot_val}",
+        ]
+    else:
+        lines = [
+            f"Latent Content: {orig_target_content}",
+            f"Geometry Strategy: {orig_geometry_mode}",
+            f"Geometry Source: {geom_src}",
+            f"Content Source: {content_src_name}",
+            f"Content Source Size: {f'{transform_info.source_size[0]} x {transform_info.source_size[1]}' if transform_info else src_size_str}",
+            f"Content Crop Rectangle: {transform_info.crop_rectangle if transform_info else 'N/A'}",
+            f"Content Target Size: {f'{transform_info.target_size[0]} x {transform_info.target_size[1]}' if transform_info else f'{target_w} x {target_h}'}",
+            f"Content Interpolation: {transform_info.interpolation if transform_info else 'none'}",
+            f"VAE Encode Applied: {'yes' if vae_applied else 'no'}",
+            f"Include Target in Vision: {include_in_vision}",
+            f"Target Vision Slot: {'auto' if slot_val is None else slot_val}",
+        ]
 
     if target_alias:
         lines.append(f"Target Alias: {target_alias}")

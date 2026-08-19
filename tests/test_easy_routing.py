@@ -1613,13 +1613,14 @@ def test_scene_auto_ignores_stale_style_source_selector(dummy_sources):
     assert sources.effective_style is Sc
 
 
-def test_subject_transfer_node_visual_reference_fit_crop(monkeypatch):
-    """Verify that Subject Transfer with Subject + Scene sets visual_reference_fit == 'crop' on appearance refs, while other common geometry presets use 'contain_no_upscale'."""
+def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
+    """Verify that Subject Transfer sets visual_reference_fit == 'crop' for Scene roles and 'contain_no_upscale' for Subject and Outfit roles under common geometry."""
     import torch
     from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
 
     S = torch.ones((1, 64, 64, 3), dtype=torch.float32)
     Sc = torch.ones((1, 64, 64, 3), dtype=torch.float32) * 0.5
+    Ou = torch.ones((1, 64, 64, 3), dtype=torch.float32) * 0.2
     node = CcCKrea2EasyEdit()
 
     class DummyVAE:
@@ -1652,13 +1653,57 @@ def test_subject_transfer_node_visual_reference_fit_crop(monkeypatch):
     st_app_refs = [
         r for r in st_chain.references if r.reference_path == "edit" and getattr(r, "appearance_reference", False)
     ]
-    st_sem_refs = [
-        r for r in st_chain.references if r.reference_path == "edit" and not getattr(r, "appearance_reference", False)
-    ]
     assert len(st_app_refs) == 2
-    assert [r.alias for r in st_app_refs] == ["scene", "subject"]
-    assert all(r.visual_reference_fit == "crop" for r in st_app_refs)
-    assert len(st_sem_refs) == 0
+    ref_map = {r.alias: r.visual_reference_fit for r in st_app_refs}
+    assert ref_map["scene"] == "crop"
+    assert ref_map["subject"] == "contain_no_upscale"
+
+    # Subject Transfer + Subject + Scene + distinct Outfit
+    node.process(
+        model="model",
+        clip="clip",
+        vae=DummyVAE(),
+        positive_prompt="",
+        use_default_prompt=True,
+        preset="subject_transfer",
+        subject=S,
+        scene=Sc,
+        outfit=Ou,
+    )
+    st_outfit_chain = captured_chains["chain"]
+    st_outfit_refs = [
+        r
+        for r in st_outfit_chain.references
+        if r.reference_path == "edit" and getattr(r, "appearance_reference", False)
+    ]
+    assert len(st_outfit_refs) == 3
+    ref_map3 = {r.alias: r.visual_reference_fit for r in st_outfit_refs}
+    assert ref_map3["scene"] == "crop"
+    assert ref_map3["subject"] == "contain_no_upscale"
+    assert ref_map3["outfit"] == "contain_no_upscale"
+
+    # Subject Transfer + Subject + Scene-as-Outfit
+    node.process(
+        model="model",
+        clip="clip",
+        vae=DummyVAE(),
+        positive_prompt="",
+        use_default_prompt=True,
+        preset="subject_transfer",
+        subject=S,
+        scene=Sc,
+        outfit_source="scene image",
+    )
+    st_sc_outfit_chain = captured_chains["chain"]
+    st_sc_outfit_refs = [
+        r
+        for r in st_sc_outfit_chain.references
+        if r.reference_path == "edit" and getattr(r, "appearance_reference", False)
+    ]
+    assert len(st_sc_outfit_refs) == 2
+    ref_map_sc = {r.alias: r.visual_reference_fit for r in st_sc_outfit_refs}
+    assert ref_map_sc["scene+outfit"] == "crop"
+    assert ref_map_sc["subject"] == "contain_no_upscale"
 
     # Balanced preset + Subject + Scene
     node.process(
