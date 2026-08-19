@@ -408,9 +408,13 @@ class TestEasyEditNodeDefaultPromptBehavior:
             )
 
     def test_partial_subject_transfer_with_custom_prompt_succeeds(self, dummy_images, monkeypatch):
-        S, _, _, _ = dummy_images
+        S, Sc, _, _ = dummy_images
         node = CcCKrea2EasyEdit()
         captured = {}
+
+        class DummyVAE:
+            def encode(self, x):
+                return torch.zeros((1, 16, 8, 8), dtype=torch.float32)
 
         def mock_orchestrator(*args, **kwargs):
             captured["positive_prompt"] = kwargs.get("positive_prompt")
@@ -421,18 +425,32 @@ class TestEasyEditNodeDefaultPromptBehavior:
             mock_orchestrator,
         )
 
-        _, _, _, _, report = node.process(
+        # Subject-only + Custom
+        _, _, _, _, report1 = node.process(
             model="model",
             clip="clip",
-            vae="vae",
+            vae=DummyVAE(),
             positive_prompt="My custom subject transfer prompt",
             use_default_prompt=True,
             preset="subject_transfer",
             subject=S,
         )
-
         assert captured["positive_prompt"] == "My custom subject transfer prompt"
-        assert "Prompt Source: custom" in report
+        assert "Prompt Source: custom" in report1
+
+        # Scene-only + Custom
+        _, _, _, _, report2 = node.process(
+            model="model",
+            clip="clip",
+            vae=DummyVAE(),
+            positive_prompt="My custom scene-only subject transfer prompt",
+            use_default_prompt=True,
+            preset="subject_transfer",
+            scene=Sc,
+        )
+        assert captured["positive_prompt"] == "My custom scene-only subject transfer prompt"
+        assert "Prompt Source: custom" in report2
+        assert "Subject source is missing" in report2
 
     def test_partial_scene_reinterpretation_empty_custom_prompt_raises(self, dummy_images):
         S, Sc, _, _ = dummy_images
@@ -469,7 +487,7 @@ class TestEasyEditNodeDefaultPromptBehavior:
             )
 
     def test_partial_scene_reinterpretation_with_custom_prompt_succeeds(self, dummy_images, monkeypatch):
-        S, _, _, _ = dummy_images
+        S, Sc, _, _ = dummy_images
         node = CcCKrea2EasyEdit()
         captured = {}
 
@@ -482,7 +500,8 @@ class TestEasyEditNodeDefaultPromptBehavior:
             mock_orchestrator,
         )
 
-        _, _, _, _, report = node.process(
+        # Subject-only + Custom
+        _, _, _, _, report1 = node.process(
             model="model",
             clip="clip",
             vae="vae",
@@ -491,10 +510,23 @@ class TestEasyEditNodeDefaultPromptBehavior:
             preset="scene_reinterpretation",
             subject=S,
         )
-
         assert captured["positive_prompt"] == "My custom reinterpretation prompt"
-        assert "Prompt Source: custom" in report
-        assert "Scene Reinterpretation selected but Scene source is missing." in report
+        assert "Prompt Source: custom" in report1
+        assert "Scene Reinterpretation selected but Scene source is missing." in report1
+
+        # Scene-only + Custom
+        _, _, _, _, report2 = node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt="My custom scene-only reinterpretation prompt",
+            use_default_prompt=True,
+            preset="scene_reinterpretation",
+            scene=Sc,
+        )
+        assert captured["positive_prompt"] == "My custom scene-only reinterpretation prompt"
+        assert "Prompt Source: custom" in report2
+        assert "Scene Reinterpretation selected but Subject source is missing." in report2
 
 
 class TestEasyEditWorkflowMigration:
