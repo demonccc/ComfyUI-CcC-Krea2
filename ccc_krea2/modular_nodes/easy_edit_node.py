@@ -543,6 +543,8 @@ def _execute_easy_edit(
         easy_header.append(f"Appearance Ref {i + 1}: {app_ref}")
     if not app_refs:
         easy_header.append("Appearance Ref 1: none")
+    elif len(app_refs) == 1:
+        easy_header.append("Appearance Ref 2: none")
 
     easy_header.extend(
         [

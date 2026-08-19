@@ -660,7 +660,7 @@ class TestEasyEditReportLatentSource:
             mock_orchestrator,
         )
 
-        # Subject Transfer + Subject + Scene
+        # Subject Transfer + Subject + Scene (no outfit)
         _, _, _, _, report1 = node.process(
             model="model",
             clip="clip",
@@ -674,6 +674,56 @@ class TestEasyEditReportLatentSource:
         assert "Resolved Latent Source: scene image" in report1
         assert "Target Content Role: scene" in report1
         assert "Resolved Style Source: scene image (automatic)" in report1
+        assert "Appearance Ref 1: subject" in report1
+        assert "Appearance Ref 2: none" in report1
+        assert "Appearance Ref 1: scene" not in report1
+        assert "Appearance Ref 2: scene" not in report1
+
+        # Subject Transfer + Subject + Scene + Outfit Image
+        _, _, _, _, report_outfit = node.process(
+            model="model",
+            clip="clip",
+            vae=DummyVAE(),
+            positive_prompt="",
+            use_default_prompt=True,
+            preset="subject_transfer",
+            subject=S,
+            scene=Sc,
+            outfit=Ou,
+        )
+        assert "Resolved Latent Source: scene image" in report_outfit
+        assert "Appearance Ref 1: subject" in report_outfit
+        assert "Appearance Ref 2: outfit" in report_outfit
+
+        # Subject Transfer + Subject + Scene + Outfit Source = Scene Image
+        _, _, _, _, report_scene_outfit = node.process(
+            model="model",
+            clip="clip",
+            vae=DummyVAE(),
+            positive_prompt="",
+            use_default_prompt=True,
+            preset="subject_transfer",
+            subject=S,
+            scene=Sc,
+            outfit_source="scene image",
+        )
+        assert "Resolved Latent Source: scene image (also Outfit source)" in report_scene_outfit
+        assert "Appearance Ref 1: subject" in report_scene_outfit
+        assert "Appearance Ref 2: scene+outfit" in report_scene_outfit
+
+        # Subject Transfer + Subject Only (no Scene)
+        _, _, _, _, report_subject_only = node.process(
+            model="model",
+            clip="clip",
+            vae="vae",
+            positive_prompt="Custom prompt for subject transfer",
+            use_default_prompt=False,
+            preset="subject_transfer",
+            subject=S,
+        )
+        assert "Resolved Latent Source: empty" in report_subject_only
+        assert "Appearance Ref 1: subject" in report_subject_only
+        assert "Appearance Ref 2: none" in report_subject_only
 
         # Scene Reinterpretation + Subject + Scene
         _, _, _, _, report2 = node.process(

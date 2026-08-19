@@ -947,8 +947,7 @@ class TestSubjectTransferMatrix:
         assert any("missing" in w for w in route.warnings)
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
-        assert_refs(route.edit_references, [(Sc, NORMAL_BOOST, "scene")])
-        assert route.edit_references[0][1] == pytest.approx(1.0)
+        assert_refs(route.edit_references, [])
 
     def test_outfit_only(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -969,10 +968,9 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(Sc, NORMAL_BOOST, "scene"), (S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject")],
+            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject")],
         )
-        assert route.edit_references[0][1] == pytest.approx(1.0)
-        assert route.edit_references[1][1] == pytest.approx(8.0)
+        assert route.edit_references[0][1] == pytest.approx(8.0)
         assert route.style_active is True
         assert route.style_source is Sc
         assert route.style_config.style_processing == "2x2"
@@ -1000,10 +998,9 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(Sc, NORMAL_BOOST, "scene"), (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")],
+            [(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit")],
         )
-        assert route.edit_references[0][1] == pytest.approx(1.0)
-        assert route.edit_references[1][1] == pytest.approx(4.0)
+        assert route.edit_references[0][1] == pytest.approx(4.0)
 
     def test_subject_scene_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1015,14 +1012,12 @@ class TestSubjectTransferMatrix:
         assert_refs(
             route.edit_references,
             [
-                (Sc, NORMAL_BOOST, "scene"),
                 (S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"),
                 (Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"),
             ],
         )
-        assert route.edit_references[0][1] == pytest.approx(1.0)
-        assert route.edit_references[1][1] == pytest.approx(8.0)
-        assert route.edit_references[2][1] == pytest.approx(4.0)
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
 
     def test_subject_scene_as_outfit(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1034,10 +1029,10 @@ class TestSubjectTransferMatrix:
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
-            [(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit"), (S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject")],
+            [(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"), (Sc, SUBJECT_TRANSFER_OUTFIT_BOOST, "scene+outfit")],
         )
-        assert route.edit_references[0][1] == pytest.approx(4.0)
-        assert route.edit_references[1][1] == pytest.approx(8.0)
+        assert route.edit_references[0][1] == pytest.approx(8.0)
+        assert route.edit_references[1][1] == pytest.approx(4.0)
 
     def test_scene_as_outfit_without_subject(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1502,14 +1497,14 @@ def test_bounded_appearance_refs(dummy_sources, preset):
         )
 
 
-def test_subject_transfer_multi_reference_3_refs(dummy_sources):
-    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 3 appearance refs."""
+def test_subject_transfer_multi_reference_2_refs(dummy_sources):
+    """Verify that subject_transfer with distinct Scene, Subject, and Outfit produces 2 appearance refs (subject, outfit)."""
     S, Sc, Ou, _ = dummy_sources
     sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc, outfit=Ou)
     route = route_easy_preset(sources, preset="subject_transfer")
-    assert len(route.edit_references) == 3
+    assert len(route.edit_references) == 2
     aliases = [alias for _, _, alias, _ in route.edit_references]
-    assert aliases == ["scene", "subject", "outfit"]
+    assert aliases == ["subject", "outfit"]
 
 
 def test_preset_capability_gating_outfit(dummy_sources):
