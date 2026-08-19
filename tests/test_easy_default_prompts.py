@@ -671,8 +671,8 @@ class TestEasyEditReportLatentSource:
             subject=S,
             scene=Sc,
         )
-        assert "Resolved Latent Source: scene image" in report1
-        assert "Target Content Role: scene" in report1
+        assert "Resolved Latent Source: subject image" in report1
+        assert "Target Content Role: subject" in report1
         assert "Resolved Style Source: scene image (automatic)" in report1
         assert "Appearance Ref 1: scene" in report1
         assert "Appearance Ref 2: subject" in report1
@@ -690,7 +690,7 @@ class TestEasyEditReportLatentSource:
             scene=Sc,
             outfit=Ou,
         )
-        assert "Resolved Latent Source: scene image" in report_outfit
+        assert "Resolved Latent Source: subject image" in report_outfit
         assert "Appearance Ref 1: scene" in report_outfit
         assert "Appearance Ref 2: subject" in report_outfit
         assert "Appearance Ref 3: outfit" in report_outfit
@@ -708,7 +708,7 @@ class TestEasyEditReportLatentSource:
             scene=Sc,
             outfit_source="scene image",
         )
-        assert "Resolved Latent Source: scene image (also Outfit source)" in report_scene_outfit
+        assert "Resolved Latent Source: subject image" in report_scene_outfit
         assert "Appearance Ref 1: scene+outfit" in report_scene_outfit
         assert "Appearance Ref 2: subject" in report_scene_outfit
         assert "Semantic-only Sources: none" in report_scene_outfit

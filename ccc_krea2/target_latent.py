@@ -246,7 +246,9 @@ def should_include_target_in_vision(ctx: TargetVisionContext, existing_chain: Op
         if ref_prep is target_prep:
             return False
         if ref_prep is not None and target_prep is not None:
-            if ref_prep.original_image is target_prep.original_image:
+            ref_orig = getattr(ref_prep, "original_image", ref_prep)
+            target_orig = getattr(target_prep, "original_image", target_prep)
+            if ref_orig is target_orig:
                 return False
 
     return True

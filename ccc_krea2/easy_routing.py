@@ -692,9 +692,16 @@ def route_easy_preset(
             )
 
         if has_sc:
-            target_content_mode = "image"
-            target_content_source = Sc
-            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
+            if has_s:
+                # Subject Transfer uses Subject as target content to preserve identity/content,
+                # while Scene remains the geometry/composition anchor.
+                target_content_mode = "image"
+                target_content_source = S
+                target_content_role = "subject"
+            else:
+                target_content_mode = "image"
+                target_content_source = Sc
+                target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
 
             if outfit_is_scene_physically:

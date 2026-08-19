@@ -969,8 +969,8 @@ class TestSubjectTransferMatrix:
         sources = resolve_easy_sources(preset="subject_transfer", subject=S, scene=Sc)
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is Sc
-        assert route.target_content_role == "scene"
+        assert route.target_content_source is S
+        assert route.target_content_role == "subject"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1024,7 +1024,8 @@ class TestSubjectTransferMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit=Ou)
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is Sc
+        assert route.target_content_source is S
+        assert route.target_content_role == "subject"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1044,8 +1045,8 @@ class TestSubjectTransferMatrix:
         sources = resolve_easy_sources(subject=S, scene=Sc, outfit_source="scene image")
         route = route_easy_preset(sources, preset="subject_transfer")
         assert route.target_content_mode == "image"
-        assert route.target_content_source is Sc
-        assert route.target_content_role == "scene+outfit"
+        assert route.target_content_source is S
+        assert route.target_content_role == "subject"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1090,11 +1091,11 @@ class TestSubjectTransferMatrix:
         from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
 
         S, Sc, Ou, _ = dummy_sources
-        ctx = TargetVisionContext(include_in_vision="auto", target_image=Sc)
+        ctx = TargetVisionContext(include_in_vision="auto", target_image=S)
         chain = ReferenceChain(
             specs=(
-                ReferenceSpec(prepared_image=Sc, role="scene", attention_boost=1.0),
-                ReferenceSpec(prepared_image=S, role="subject", attention_boost=8.0),
+                ReferenceSpec(prepared_image=Sc, role="scene", attention_boost=2.5),
+                ReferenceSpec(prepared_image=S, role="subject", attention_boost=7.0),
             )
         )
         assert should_include_target_in_vision(ctx, chain) is False
