@@ -808,3 +808,14 @@ def test_easy_subject_scene_note_text():
     assert "https://huggingface.co/Crowlley/Krea2Neutrino" in combined_notes
     assert "https://huggingface.co/conradlocke/krea2-identity-edit" in combined_notes
     assert "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap" in combined_notes
+
+
+def test_readme_bfs_head_swap_documentation():
+    """Verify that README clarifies BFS Head Swap V1.1 and distinguishes it from Conrad's Identity Edit."""
+    with open("README.md", "r", encoding="utf-8") as f:
+        readme = f.read()
+
+    assert "BFS Head Swap V1.1" in readme
+    assert "bfs_head_swap_v1.1_krea2.safetensors" in readme
+    assert "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap" in readme
+    assert "krea2_identity_edit_v1_2.safetensors" in readme

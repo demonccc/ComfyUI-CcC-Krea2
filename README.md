@@ -196,7 +196,7 @@ These are the primary model files currently used and recommended by the project 
 - **SHA256**: `0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79`
 - **Upstream Notes**: Labeled `experimental` by upstream author. Replaces the target person in the base image with the reference person (Scene = base image, Subject = reference person). Exact pose transfer is not guaranteed.
   - Upstream trigger prompt: `body_swap: replace the person with the reference person.`
-  - Upstream starting recommendation for BFS Body Swap (0.5) + BFS Head Swap (0.5). Note: BFS Head Swap is a distinct model from Conrad's `krea2_identity_edit_v1_2.safetensors`.
+  - Upstream starting recommendation for BFS Body Swap (`bfs_body_swap_v1_krea2.safetensors` at 0.5) + BFS Head Swap V1.1 – Krea 2 (`bfs_head_swap_v1.1_krea2.safetensors` at 0.5) from [Alissonerdx/BFS-Best-Face-Swap](https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap). Note: BFS Head Swap V1.1 (`bfs_head_swap_v1.1_krea2.safetensors`) is a distinct model from Conrad's `krea2_identity_edit_v1_2.safetensors` (different LoRAs from different authors). Our Conrad Identity Edit calibration remains independent.
 
 ### Official Comfy-Org Alternatives
 Users may alternatively use official or repackaged ComfyUI-ready Krea 2 models from [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/), which hosts `diffusion_models/`, `text_encoders/`, `vae/`, and `loras/`. Note that Neutrino and third-party LoRAs (Conrad's Identity Edit / BFS Body Swap) are independent community resources.

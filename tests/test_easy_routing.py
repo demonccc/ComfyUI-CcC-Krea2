@@ -1800,13 +1800,13 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
 
 
 def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
-    """Verify that resolve_easy_visual_reference_fit returns contain_no_upscale for all 11 Easy Edit presets and both single/multi-source conditions."""
+    """Verify that resolve_easy_visual_reference_fit returns contain_no_upscale for all 11 Easy Edit presets across Easy Edit appearance/edit reference roles (subject, scene, outfit, scene+outfit) under both single and multi-source conditions."""
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
     assert len(all_presets) == 11
 
-    roles = ["subject", "scene", "outfit", "style"]
+    roles = ["subject", "scene", "outfit", "scene+outfit"]
 
     for preset in all_presets:
         for role in roles:
