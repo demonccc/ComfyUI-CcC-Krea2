@@ -196,6 +196,10 @@ DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0, style_processing="2x2", indirect_style_transfer=False, vision_instruction=""
 )
 
+INDIRECT_EASY_STYLE_CONFIG = EasyStyleConfig(
+    style_fidelity=1.0, style_processing="2x2", indirect_style_transfer=True, vision_instruction=""
+)
+
 STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0,
     style_processing="4x4",
@@ -693,15 +697,15 @@ def route_easy_preset(
             target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
             target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-            # Subject Transfer intentionally anchors Scene both as target content
-            # and as an appearance reference. Historical replacement tests showed
-            # stronger scene preservation with Scene 2.5 / Subject 1.0 and crop alignment.
+            # Subject Transfer routes Scene as target content/geometry and semantic-only guidance
+            # to prevent direct appearance/VAE reference conditioning from duplicating scene elements or breaking anatomy.
+            # Subject remains the direct appearance reference for identity.
             if outfit_is_scene_physically:
-                refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
+                semantic_only_refs.append((Sc, "scene+outfit"))
                 if has_s:
                     refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
             else:
-                refs.append(_ref(Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"))
+                semantic_only_refs.append((Sc, "scene"))
                 if has_s:
                     refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
                 if has_o:
@@ -751,7 +755,12 @@ def route_easy_preset(
 
     # Style configuration: active for ALL presets whenever effective_style is present
     style_active = has_st
-    style_config = STRONG_EASY_STYLE_CONFIG if preset == "style_transfer" else DEFAULT_EASY_STYLE_CONFIG
+    if preset == "style_transfer":
+        style_config = STRONG_EASY_STYLE_CONFIG
+    elif preset == "subject_transfer":
+        style_config = INDIRECT_EASY_STYLE_CONFIG
+    else:
+        style_config = DEFAULT_EASY_STYLE_CONFIG
 
     return EasyPresetRoute(
         preset=preset,

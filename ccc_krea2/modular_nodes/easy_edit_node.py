@@ -349,9 +349,7 @@ def _execute_easy_edit(
         else:
             vlm_img = prepare_easy_krea_vision_image(item_img, preset=preset, role=alias_role)
 
-        # Subject Transfer intentionally anchors Scene both as target content
-        # and as an appearance reference. Historical replacement tests showed
-        # stronger scene preservation with Scene 2.5 / Subject 1.0 and crop alignment.
+        # Subject Transfer uses crop fit mode under common geometry to align subject and scene aspect ratios.
         if common_geometry_active:
             fit_mode = "crop" if preset == "subject_transfer" else "contain_no_upscale"
         else:
