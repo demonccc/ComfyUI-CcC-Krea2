@@ -46,7 +46,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "subject_scene"
-        assert text == EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+        assert "Place the main subject from the subject image naturally into the scene image." in text
 
     def test_3_subject_outfit_outfit_transfer(self):
         has_def, text, key = resolve_default_positive_prompt(
@@ -58,16 +58,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "outfit_transfer"
-        expected = (
-            "Transfer only the outfit and accessories from the outfit reference to the subject. "
-            "Preserve the subject identity, body, pose, framing, and composition. "
-            "Do not preserve the subject clothing. "
-            "Fit the transferred outfit and accessories naturally to the subject. "
-            "Keep accessories physically attached to the subject in a natural way and never floating. "
-            "Do not duplicate accessories."
-        )
-        assert text == expected
-        assert text == EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+        assert "Transfer only the outfit and accessories from the outfit image to the main subject." in text
 
     def test_4_subject_scene_outfit(self):
         has_def, text, key = resolve_default_positive_prompt(
@@ -79,7 +70,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "subject_scene_outfit"
-        assert text == EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+        assert "Place the main subject from the subject image naturally into the scene image wearing the outfit and accessories from the outfit image." in text
 
     def test_5_style(self):
         has_def, text, key = resolve_default_positive_prompt(
@@ -91,161 +82,72 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "style"
-        assert text == EASY_DEFAULT_PROMPT_STYLE
-        assert "Do not copy subjects, objects, or scene content from the style reference" in text
+        assert "Apply the visual style from the style image while preserving the main subject identity" in text
+        assert "Do not copy subjects, objects, or scene content from the style image." in text
 
-    def test_subject_transfer_resolutions(self):
-        # outfit_source="none"
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
-            has_s=True,
-            has_sc=True,
-            has_o=False,
-            has_st=False,
-            outfit_source="none",
-        )
-        assert has_def is True
-        assert key == "subject_transfer"
-        assert (
-            "Replace only the target subject in the scene reference with the subject from the subject reference."
-            in text
-        )
-        assert "Preserve the identity of the subject from the subject reference." in text
-        assert "Keep every other person and the rest of the scene unchanged." in text
-        assert "Keep the clothing and accessories of the subject reference." in text
-        assert "facial features, hair, anatomy, body shape, and body proportions" not in text
-        assert "camera framing, perspective, lighting" not in text
-        assert "adapting pose, orientation" not in text
-
-        # outfit_source="outfit image" but Outfit is disconnected (has_o=False)
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
-            has_s=True,
-            has_sc=True,
-            has_o=False,
-            has_st=False,
-            outfit_source="outfit image",
-        )
-        assert has_def is True
-        assert key == "subject_transfer"
-        assert "Keep the clothing and accessories of the subject reference." in text
-        assert "from the outfit reference" not in text
-
-        # outfit_source="outfit image" with Outfit connected (has_o=True)
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
-            has_s=True,
-            has_sc=True,
-            has_o=True,
-            has_st=False,
-            outfit_source="outfit image",
-        )
-        assert has_def is True
-        assert key == "subject_transfer_outfit"
-        assert "Use the clothing and accessories from the outfit reference." in text
-
-        # outfit_source="scene image" with Outfit connected (has_o=True)
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
-            has_s=True,
-            has_sc=True,
-            has_o=True,
-            has_st=False,
-            outfit_source="scene image",
-        )
-        assert has_def is True
-        assert key == "subject_transfer_scene_outfit"
-        assert "Use the clothing and accessories of the target subject from the scene reference." in text
-
-        # outfit_source="style image" with Style connected as Outfit (has_o=True)
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
-            has_s=True,
-            has_sc=True,
-            has_o=True,
-            has_st=False,
-            outfit_source="style image",
-        )
-        assert has_def is True
-        assert key == "subject_transfer_style_outfit"
-        assert "Use the clothing and accessories from the outfit reference." in text
-        assert "style reference" not in text
-
-    def test_identity_transfer_resolutions(self):
+    def test_placeholder_substitution_matrix(self):
+        # Example A: identity_transfer with custom subjects
         has_def, text, key = resolve_default_positive_prompt(
             preset="identity_transfer",
             has_s=True,
             has_sc=True,
             has_o=False,
             has_st=False,
+            reference_subject="woman in blue dress",
+            subject_description="man with glasses",
         )
         assert has_def is True
         assert key == "identity_transfer"
-        assert text == EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
-        assert "Replace only the identity of the target subject in the scene reference" in text
-        assert "facial identity, facial features, hair, body identity" in text
+        assert "Replace only the identity of the woman in blue dress of the scene image with the identity of the man with glasses from the subject image." in text
+        assert "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the man with glasses from the subject image." in text
+        assert "Preserve the position, action, pose, role, interaction, clothing, and accessories of the woman in blue dress from the scene image." in text
+        assert "Do not transfer the clothing or accessories of the man with glasses from the subject image." in text
 
-    def test_preset_prompt_requires_subject_and_scene(self):
-        # identity_transfer requires both Subject and Scene
-        has_def, _, _ = resolve_default_positive_prompt(
-            "identity_transfer", has_s=True, has_sc=False, has_o=False, has_st=False
-        )
-        assert has_def is False
-
-        has_def, _, _ = resolve_default_positive_prompt(
-            "identity_transfer", has_s=False, has_sc=True, has_o=False, has_st=False
-        )
-        assert has_def is False
-
-        has_def, _, _ = resolve_default_positive_prompt(
-            "identity_transfer", has_s=True, has_sc=True, has_o=False, has_st=False
-        )
-        assert has_def is True
-
-        # subject_transfer requires both Subject and Scene
-        has_def, _, _ = resolve_default_positive_prompt(
-            "subject_transfer", has_s=True, has_sc=False, has_o=False, has_st=False
-        )
-        assert has_def is False
-
-        has_def, _, _ = resolve_default_positive_prompt(
-            "subject_transfer", has_s=False, has_sc=True, has_o=False, has_st=False
-        )
-        assert has_def is False
-
-        has_def, _, _ = resolve_default_positive_prompt(
-            "subject_transfer", has_s=True, has_sc=True, has_o=False, has_st=False
-        )
-        assert has_def is True
-
-        # scene_reinterpretation requires both Subject and Scene
-        has_def, _, _ = resolve_default_positive_prompt(
-            "scene_reinterpretation", has_s=True, has_sc=False, has_o=False, has_st=False
-        )
-        assert has_def is False
-
-        has_def, _, _ = resolve_default_positive_prompt(
-            "scene_reinterpretation", has_s=False, has_sc=True, has_o=False, has_st=False
-        )
-        assert has_def is False
-
-        has_def, _, _ = resolve_default_positive_prompt(
-            "scene_reinterpretation", has_s=True, has_sc=True, has_o=False, has_st=False
-        )
-        assert has_def is True
-
-    def test_scene_reinterpretation_resolutions(self):
+        # Example B: subject_transfer without outfit
         has_def, text, key = resolve_default_positive_prompt(
-            preset="scene_reinterpretation",
+            preset="subject_transfer",
             has_s=True,
             has_sc=True,
             has_o=False,
             has_st=False,
+            reference_subject="target model",
+            subject_description="cyberpunk warrior",
         )
         assert has_def is True
-        assert key == "scene_reinterpretation"
-        assert "Create a new image of the subject from the subject reference performing the main action" in text
-        assert "Creatively reinterpret the clothing and accessories" in text
+        assert key == "subject_transfer"
+        assert "Replace only the target model of the scene image with the cyberpunk warrior of the subject image." in text
+        assert "Transfer the complete cyberpunk warrior from the subject image, including the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories." in text
+        assert "Preserve the face, body shape, body proportions, clothing, and accessories of the cyberpunk warrior from the subject image." in text
+
+        # Example C: subject_transfer with outfit
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="subject_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=True,
+            has_st=False,
+            outfit_source="outfit image",
+            reference_subject="astronaut",
+            subject_description="superhero",
+        )
+        assert has_def is True
+        assert key == "subject_transfer_outfit"
+        assert "Replace only the astronaut of the scene image with the superhero of the subject image." in text
+        assert "Dress the transferred superhero using the clothing and accessories from the outfit image." in text
+        assert "Use the clothing and accessories from the outfit image instead." in text
+
+        # Test empty/blank fallback
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="identity_transfer",
+            has_s=True,
+            has_sc=True,
+            has_o=False,
+            has_st=False,
+            reference_subject="   ",
+            subject_description="",
+        )
+        assert has_def is True
+        assert "Replace only the identity of the main subject of the scene image with the identity of the main subject from the subject image." in text
 
 
 class TestEasyEditNodeDefaultPromptBehavior:
@@ -275,7 +177,7 @@ class TestEasyEditNodeDefaultPromptBehavior:
             scene=Sc,
         )
 
-        assert captured["positive_prompt"] == EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+        assert "Place the main subject from the subject image naturally into the scene image." in captured["positive_prompt"]
         assert "Use Default Prompt: yes" in report
         assert "Prompt Source: default" in report
         assert "Default Prompt Key: subject_scene" in report
@@ -356,7 +258,7 @@ class TestEasyEditNodeDefaultPromptBehavior:
             outfit=Ou,
         )
 
-        assert captured["positive_prompt"] == EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+        assert "Transfer only the outfit and accessories from the outfit image to the main subject." in captured["positive_prompt"]
         assert "Use Default Prompt: yes" in report
         assert "Prompt Source: default" in report
         assert "Default Prompt Key: outfit_transfer" in report

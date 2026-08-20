@@ -52,37 +52,62 @@ EASY_ROLE_INSTRUCTIONS = {
 }
 
 
-# Centralized default positive prompts for Easy Edit
+# Centralized default positive prompts for Easy Edit (Placeholder-driven templates)
+
+EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER = (
+    "Replace only the identity of the {reference_subject} of the {scene_source} with the identity of the {subject} from the {subject_source}.\n\n"
+    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
+    "Preserve the position, action, pose, role, interaction, clothing, and accessories of the {reference_subject} from the {scene_source}.\n\n"
+    "Do not transfer the clothing or accessories of the {subject} from the {subject_source}.\n\n"
+    "Keep every other person and the rest of the scene unchanged."
+)
+
+EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT = (
+    "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n"
+    "Transfer the complete {subject} from the {subject_source}, including the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories.\n\n"
+    "Preserve the face, body shape, body proportions, clothing, and accessories of the {subject} from the {subject_source}.\n\n"
+    "Adapt the transferred {subject} naturally to the target scene while preserving the rest of the scene.\n\n"
+    "Keep every other person and the rest of the scene unchanged."
+)
+
+EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT = (
+    "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n"
+    "Preserve the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
+    "Dress the transferred {subject} using the clothing and accessories from the {outfit_source}.\n\n"
+    "Do not preserve the clothing or accessories of the {subject} from the {subject_source} when an explicit outfit source is selected. Use the clothing and accessories from the {outfit_source} instead.\n\n"
+    "Keep every other person and the rest of the scene unchanged."
+)
+
 EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER = (
-    "Transfer only the outfit and accessories from the outfit reference to the subject. "
-    "Preserve the subject identity, body, pose, framing, and composition. "
-    "Do not preserve the subject clothing. "
-    "Fit the transferred outfit and accessories naturally to the subject. "
-    "Keep accessories physically attached to the subject in a natural way and never floating. "
+    "Transfer only the outfit and accessories from the {outfit_source} to the {subject}.\n\n"
+    "Preserve the {subject} identity, body, pose, framing, and composition.\n\n"
+    "Do not preserve the {subject} clothing.\n\n"
+    "Fit the transferred outfit and accessories naturally to the {subject}.\n\n"
+    "Keep accessories physically attached to the {subject} in a natural way and never floating.\n\n"
     "Do not duplicate accessories."
 )
 
 EASY_DEFAULT_PROMPT_SUBJECT_SCENE = (
-    "Place the subject from the subject reference naturally into the scene reference. "
-    "Preserve the subject identity, body shape, and body proportions. "
-    "Preserve the scene composition, environment, framing, perspective, and spatial layout. "
-    "Adapt the subject naturally to the scene lighting and environment."
+    "Place the {subject} from the {subject_source} naturally into the {scene_source}.\n\n"
+    "Preserve the {subject} identity, body shape, and body proportions.\n\n"
+    "Preserve the scene composition, environment, framing, perspective, and spatial layout.\n\n"
+    "Adapt the {subject} naturally to the {scene_source} lighting and environment."
 )
 
 EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT = (
-    "Place the subject from the subject reference naturally into the scene reference wearing the outfit and accessories from the outfit reference. "
-    "Preserve the subject identity, body shape, and body proportions. "
-    "Preserve the scene composition, environment, framing, perspective, and spatial layout. "
-    "Do not preserve the subject clothing. "
-    "Fit the transferred outfit and accessories naturally to the subject and the scene. "
-    "Keep accessories physically attached to the subject in a natural way and never floating. "
+    "Place the {subject} from the {subject_source} naturally into the {scene_source} wearing the outfit and accessories from the {outfit_source}.\n\n"
+    "Preserve the {subject} identity, body shape, and body proportions.\n\n"
+    "Preserve the scene composition, environment, framing, perspective, and spatial layout.\n\n"
+    "Do not preserve the {subject} clothing.\n\n"
+    "Fit the transferred outfit and accessories naturally to the {subject} and the scene.\n\n"
+    "Keep accessories physically attached to the {subject} in a natural way and never floating.\n\n"
     "Do not duplicate accessories."
 )
 
 EASY_DEFAULT_PROMPT_STYLE = (
-    "Apply the visual style from the style reference while preserving the subject identity, content, geometry, framing, and composition. "
-    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. "
-    "Do not copy subjects, objects, or scene content from the style reference."
+    "Apply the visual style from the {style_source} while preserving the {subject} identity, content, geometry, framing, and composition.\n\n"
+    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood.\n\n"
+    "Do not copy subjects, objects, or scene content from the {style_source}."
 )
 
 
@@ -101,25 +126,12 @@ EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
     "subject reference. Do not use the scene subject's identity as the generated subject identity."
 )
 
-EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE = (
-    "Replace only the target subject in the scene reference with the subject from the subject reference.\n\n"
-    "Preserve the identity of the subject from the subject reference.\n\n"
-    "Keep every other person and the rest of the scene unchanged."
-)
-
-EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER = (
-    "Replace only the identity of the target subject in the scene reference with the identity of the subject from the subject reference.\n\n"
-    "Preserve the facial identity, facial features, hair, body identity, anatomy, body shape, and body proportions of the subject reference.\n\n"
-    "Preserve the target subject's scene role, position, action, pose, clothing, interaction, and surrounding scene.\n\n"
-    "Keep every other person and the rest of the scene unchanged."
-)
-
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
-    "Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference.\n\n"
-    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n"
-    "Use the scene reference as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n"
-    "Adapt the subject naturally to the referenced action and environment.\n\n"
-    "Creatively reinterpret the clothing and accessories worn by the main subject in the scene so they are appropriate for the subject and the newly generated image. Do not copy the original scene outfit literally.\n\n"
+    "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n"
+    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
+    "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n"
+    "Adapt the {subject} naturally to the referenced action and environment.\n\n"
+    "Creatively reinterpret the clothing and accessories worn by the {reference_subject} in the {scene_source} so they are appropriate for the {subject} and the newly generated image. Do not copy the original scene outfit literally.\n\n"
     "Generate a coherent new image rather than recreating the source scene exactly."
 )
 
@@ -133,9 +145,183 @@ def resolve_easy_visual_reference_fit(preset: str = "", role: str = "", common_g
 
     INVARIANT: EVERY visual appearance reference in Easy Edit MUST fit completely inside
     the target latent geometry with 'contain'. No Easy appearance reference
-    may ever crop away source image content, and upscaling is allowed when fitting target dimensions.
+    may crop away face, hair, clothing, or subject context.
     """
     return "contain"
+
+
+def render_easy_prompt(template: str, context: Dict[str, str]) -> str:
+    """Safely format prompt template with supported context placeholders."""
+    if not template:
+        return ""
+    ref_subj = context.get("reference_subject", "main subject")
+    subj = context.get("subject", "main subject")
+    scene_src = context.get("scene_source", "scene image")
+    subj_src = context.get("subject_source", "subject image")
+    outfit_src = context.get("outfit_source", "outfit image")
+    style_src = context.get("style_source", "style image")
+
+    fmt_context = {
+        "reference_subject": ref_subj,
+        "subject": subj,
+        "scene_source": scene_src,
+        "subject_source": subj_src,
+        "outfit_source": outfit_src,
+        "style_source": style_src,
+    }
+    return template.format(**fmt_context)
+
+
+def resolve_default_positive_prompt(
+    preset: str,
+    has_s: bool,
+    has_sc: bool,
+    has_o: bool,
+    has_st: bool,
+    outfit_source: str = "outfit image",
+    style_source: str = "style image",
+    reference_subject: str = "main subject",
+    subject_description: str = "main subject",
+) -> Tuple[bool, str, str]:
+    """Resolve default positive prompt text and internal key for Easy Edit based on preset and connected inputs.
+
+    Helper LoRA Workflow Alignment:
+    - Conrad Identity Edit LoRA (krea2_identity_edit_v1_2.safetensors) is naturally aligned with identity_transfer
+      (identity replacement while preserving Scene clothing).
+    - BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors) is naturally aligned with subject_transfer
+      (full-person replacement including Subject clothing).
+    - Both LoRAs can be used with either preset and are not exclusive.
+
+    Returns:
+        (has_default: bool, prompt_text: str, prompt_key: str)
+    """
+    # 1. Subject-only: if only Subject is connected (no Scene, Outfit, or Style), NO default prompt exists.
+    if has_s and not has_sc and not has_o and not has_st:
+        return False, "", "none"
+
+    # 2. No inputs at all: NO default prompt exists.
+    if not has_s and not has_sc and not has_o and not has_st:
+        return False, "", "none"
+
+    # Clean & fallback subject descriptions
+    ref_subj = reference_subject.strip() if reference_subject and reference_subject.strip() else "main subject"
+    subj_desc = subject_description.strip() if subject_description and subject_description.strip() else "main subject"
+
+    # Resolve effective outfit_source placeholder string
+    if outfit_source in {"outfit image", "scene image", "style image"}:
+        eff_outfit_source = outfit_source
+    else:
+        eff_outfit_source = "outfit image"
+
+    # Resolve effective style_source placeholder string
+    if style_source in {"style image", "scene image", "subject image"}:
+        eff_style_source = style_source
+    else:
+        eff_style_source = "style image"
+
+    context = {
+        "reference_subject": ref_subj,
+        "subject": subj_desc,
+        "scene_source": "scene image",
+        "subject_source": "subject image",
+        "outfit_source": eff_outfit_source,
+        "style_source": eff_style_source,
+    }
+
+    base_template = ""
+    base_key = ""
+
+    if preset == "identity_transfer":
+        if not (has_s and has_sc):
+            return False, "", "none"
+        base_template = EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
+        base_key = "identity_transfer"
+        return True, render_easy_prompt(base_template, context), base_key
+
+    elif preset == "subject_transfer":
+        if not (has_s and has_sc):
+            return False, "", "none"
+
+        if not has_o:
+            base_template = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT
+            base_key = "subject_transfer"
+        else:
+            base_template = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT
+            if eff_outfit_source == "outfit image":
+                base_key = "subject_transfer_outfit"
+            elif eff_outfit_source == "scene image":
+                base_key = "subject_transfer_scene_outfit"
+            elif eff_outfit_source == "style image":
+                base_key = "subject_transfer_style_outfit"
+            else:
+                base_key = "subject_transfer_outfit"
+
+        return True, render_easy_prompt(base_template, context), base_key
+
+    elif preset == "scene_reinterpretation":
+        if not (has_s and has_sc):
+            return False, "", "none"
+        base_template = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION
+        base_key = "scene_reinterpretation"
+        return True, render_easy_prompt(base_template, context), base_key
+
+    elif preset == "outfit_transfer":
+        if has_o:
+            base_template = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+            base_key = "outfit_transfer"
+        elif has_sc:
+            base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+            base_key = "subject_scene"
+    elif preset == "preserve_scene":
+        if has_sc:
+            if has_o:
+                base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+                base_key = "subject_scene_outfit"
+            else:
+                base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+                base_key = "subject_scene"
+        elif has_o:
+            base_template = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+            base_key = "outfit_transfer"
+    elif preset == "style_transfer":
+        if has_st:
+            base_template = EASY_DEFAULT_PROMPT_STYLE
+            base_key = "style"
+        else:
+            if has_sc and has_o:
+                base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+                base_key = "subject_scene_outfit"
+            elif has_sc:
+                base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+                base_key = "subject_scene"
+            elif has_o:
+                base_template = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+                base_key = "outfit_transfer"
+    else:
+        # Identity presets: flexible, balanced, consistent, preserve_identity, max_identity
+        if has_sc and has_o:
+            base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
+            base_key = "subject_scene_outfit"
+        elif has_sc:
+            base_template = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
+            base_key = "subject_scene"
+        elif has_o:
+            base_template = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
+            base_key = "outfit_transfer"
+
+    # Style clause handling
+    if has_st and preset != "style_transfer":
+        rendered_style = render_easy_prompt(EASY_DEFAULT_PROMPT_STYLE, context)
+        if base_template:
+            rendered_base = render_easy_prompt(base_template, context)
+            return True, f"{rendered_base}\n\n{rendered_style}", f"{base_key}_style"
+        else:
+            return True, rendered_style, "style"
+
+    if base_template:
+        return True, render_easy_prompt(base_template, context), base_key
+
+    return False, "", "none"
 
 
 @dataclass(frozen=True)
@@ -827,122 +1013,3 @@ def route_easy_preset(
         warnings=tuple(preset_warnings),
     )
 
-
-def resolve_default_positive_prompt(
-    preset: str,
-    has_s: bool,
-    has_sc: bool,
-    has_o: bool,
-    has_st: bool,
-    outfit_source: str = "outfit image",
-    style_source: str = "style image",
-) -> Tuple[bool, str, str]:
-    """Resolve default positive prompt text and internal key for Easy Edit based on preset and connected inputs.
-
-    Returns:
-        (has_default: bool, prompt_text: str, prompt_key: str)
-    """
-    # 1. Subject-only: if only Subject is connected (no Scene, Outfit, or Style), NO default prompt exists.
-    if has_s and not has_sc and not has_o and not has_st:
-        return False, "", "none"
-
-    # 2. No inputs at all: NO default prompt exists.
-    if not has_s and not has_sc and not has_o and not has_st:
-        return False, "", "none"
-
-    base_prompt = ""
-    base_key = ""
-
-    if preset == "identity_transfer":
-        if not (has_s and has_sc):
-            return False, "", "none"
-        base_prompt = EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
-        base_key = "identity_transfer"
-        return True, base_prompt, base_key
-
-    elif preset == "subject_transfer":
-        if not (has_s and has_sc):
-            return False, "", "none"
-
-        base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE
-        if not has_o:
-            outfit_clause = "Keep the clothing and accessories of the subject reference."
-            base_key = "subject_transfer"
-        elif outfit_source == "outfit image":
-            outfit_clause = "Use the clothing and accessories from the outfit reference."
-            base_key = "subject_transfer_outfit"
-        elif outfit_source == "scene image":
-            outfit_clause = "Use the clothing and accessories of the target subject from the scene reference."
-            base_key = "subject_transfer_scene_outfit"
-        elif outfit_source == "style image":
-            outfit_clause = "Use the clothing and accessories from the outfit reference."
-            base_key = "subject_transfer_style_outfit"
-        else:
-            outfit_clause = "Keep the clothing and accessories of the subject reference."
-            base_key = "subject_transfer"
-
-        base_prompt = f"{base_prompt}\n\n{outfit_clause}"
-        return True, base_prompt, base_key
-
-    elif preset == "scene_reinterpretation":
-        if not (has_s and has_sc):
-            return False, "", "none"
-        base_prompt = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION
-        base_key = "scene_reinterpretation"
-        return True, base_prompt, base_key
-
-    elif preset == "outfit_transfer":
-        if has_o:
-            base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
-            base_key = "outfit_transfer"
-        elif has_sc:
-            base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
-            base_key = "subject_scene"
-    elif preset == "preserve_scene":
-        if has_sc:
-            if has_o:
-                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
-                base_key = "subject_scene_outfit"
-            else:
-                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
-                base_key = "subject_scene"
-        elif has_o:
-            base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
-            base_key = "outfit_transfer"
-    elif preset == "style_transfer":
-        if has_st:
-            base_prompt = EASY_DEFAULT_PROMPT_STYLE
-            base_key = "style"
-        else:
-            if has_sc and has_o:
-                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
-                base_key = "subject_scene_outfit"
-            elif has_sc:
-                base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
-                base_key = "subject_scene"
-            elif has_o:
-                base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
-                base_key = "outfit_transfer"
-    else:
-        # Identity presets: flexible, balanced, consistent, preserve_identity, max_identity
-        if has_sc and has_o:
-            base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT
-            base_key = "subject_scene_outfit"
-        elif has_sc:
-            base_prompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE
-            base_key = "subject_scene"
-        elif has_o:
-            base_prompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER
-            base_key = "outfit_transfer"
-
-    # Style clause handling
-    if has_st and preset != "style_transfer":
-        if base_prompt:
-            return True, f"{base_prompt}\n\n{EASY_DEFAULT_PROMPT_STYLE}", f"{base_key}_style"
-        else:
-            return True, EASY_DEFAULT_PROMPT_STYLE, "style"
-
-    if base_prompt:
-        return True, base_prompt, base_key
-
-    return False, "", "none"

@@ -555,6 +555,8 @@ def build_easy_workflow(
         "positive_prompt": "A photo of a person",
         "use_default_prompt": True,
         "preset": preset,
+        "reference_subject": "main subject",
+        "subject_description": "main subject",
         "outfit_source": outfit_source,
         "style_source": style_source,
         "negative_prompt": "bad quality",

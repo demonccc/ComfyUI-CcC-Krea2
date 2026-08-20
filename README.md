@@ -101,12 +101,17 @@ Easy Edit nodes include a **Use Default Prompt** toggle (`use_default_prompt`, d
 
 The identity ladder covers subject preservation tasks. Additional task-specific presets provide targeted capabilities:
 
-- **Identity Transfer**: Transfers the identity of the Subject to the target person in the Scene. Uses the Subject image as target content (`contain_no_upscale`) and the Scene as geometry anchor (Subject boost: 7.0, Scene boost: 2.5, Outfit policy: disabled, Style policy: automatic scene).
-- **Subject Transfer**: Transfers the complete Subject into the Scene context. Uses the Scene image as target content and geometry anchor (Subject boost: 7.0, Scene boost: 2.5, effective Outfit boost: 4.0 when used, Style policy: automatic scene).
+- **Identity Transfer**: Transfers the identity of the Subject to the target person in the Scene while keeping the Scene clothing and surroundings intact. Uses the Subject image as target content and the Scene as geometry anchor. Naturally aligned with Conrad Identity Edit LoRA (`krea2_identity_edit_v1_2.safetensors`).
+- **Subject Transfer**: Transfers the complete Subject into the Scene context (including identity, body, and clothing/accessories unless overridden by Outfit source). Uses the Scene image as target content and geometry anchor. Naturally aligned with BFS Body Swap LoRA (`bfs_body_swap_v1_krea2.safetensors`).
 - **Scene Reinterpretation**: Creatively reinterprets the main subject's action, activity, pose, environment, spatial context, framing, and clothing from the Scene reference for the Subject reference without pixel-for-pixel scene reproduction or target image initialization (Subject boost: 4.0, Scene boost: 1.0, Outfit policy: disabled, Style policy: automatic scene).
 - **Preserve Scene**: Prioritizes preserving the connected Scene composition, background, and visual context (Outfit policy: disabled).
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
 - **Style Transfer**: Uses the dedicated Style/Moodboard path to transfer artistic style, palette, texture, and visual mood (Outfit policy: disabled).
+
+> [!NOTE]
+> **Placeholder-Driven Default Prompts & Subject Fields**:
+> Easy Edit preset prompts dynamically substitute `{reference_subject}`, `{subject}`, `{scene_source}`, `{subject_source}`, `{outfit_source}`, and `{style_source}`.
+> Two user-editable fields (`Reference Subject` and `Subject`) allow customization of target/subject roles when default prompts are enabled.
 
 > [!NOTE]
 > All Easy Edit visual appearance references enforce `contain` fit. The complete source reference image is preserved for conditioning without cropping away facial features, head structure, garments, or surrounding context.

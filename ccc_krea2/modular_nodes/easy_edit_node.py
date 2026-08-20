@@ -66,6 +66,22 @@ class CcCKrea2EasyEdit:
                     ],
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
                 ),
+                "reference_subject": (
+                    "STRING",
+                    {
+                        "default": "main subject",
+                        "multiline": False,
+                        "tooltip": "Description of the target subject in the scene reference image.",
+                    },
+                ),
+                "subject_description": (
+                    "STRING",
+                    {
+                        "default": "main subject",
+                        "multiline": False,
+                        "tooltip": "Description of the subject from the subject reference image.",
+                    },
+                ),
                 "outfit_source": (
                     ["none", "outfit image", "scene image", "style image"],
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
@@ -99,6 +115,8 @@ class CcCKrea2EasyEdit:
         positive_prompt: str,
         use_default_prompt: bool = True,
         preset: str = "balanced",
+        reference_subject: str = "main subject",
+        subject_description: str = "main subject",
         outfit_source: str = "outfit image",
         style_source: str = "style image",
         apply_krea2_edit_patch: bool = True,
@@ -116,6 +134,8 @@ class CcCKrea2EasyEdit:
             use_default_prompt=use_default_prompt,
             negative_prompt=negative_prompt,
             preset=preset,
+            reference_subject=reference_subject,
+            subject_description=subject_description,
             outfit_source=outfit_source,
             style_source=style_source,
             backend_method="krea2_edit",
@@ -175,6 +195,22 @@ class CcCKrea2EasyEditOstris:
                     ],
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
                 ),
+                "reference_subject": (
+                    "STRING",
+                    {
+                        "default": "main subject",
+                        "multiline": False,
+                        "tooltip": "Description of the target subject in the scene reference image.",
+                    },
+                ),
+                "subject_description": (
+                    "STRING",
+                    {
+                        "default": "main subject",
+                        "multiline": False,
+                        "tooltip": "Description of the subject from the subject reference image.",
+                    },
+                ),
                 "outfit_source": (
                     ["none", "outfit image", "scene image", "style image"],
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
@@ -215,6 +251,8 @@ class CcCKrea2EasyEditOstris:
         positive_prompt: str,
         use_default_prompt: bool = True,
         preset: str = "balanced",
+        reference_subject: str = "main subject",
+        subject_description: str = "main subject",
         outfit_source: str = "outfit image",
         style_source: str = "style image",
         apply_ostris_edit_patch: bool = True,
@@ -233,6 +271,8 @@ class CcCKrea2EasyEditOstris:
             use_default_prompt=use_default_prompt,
             negative_prompt=negative_prompt,
             preset=preset,
+            reference_subject=reference_subject,
+            subject_description=subject_description,
             outfit_source=outfit_source,
             style_source=style_source,
             backend_method="ostris_edit",
@@ -258,6 +298,8 @@ def _execute_easy_edit(
     apply_patch: bool,
     ostris_kv_cache: bool,
     use_default_prompt: bool = True,
+    reference_subject: str = "main subject",
+    subject_description: str = "main subject",
     subject: Optional[torch.Tensor] = None,
     scene: Optional[torch.Tensor] = None,
     outfit: Optional[torch.Tensor] = None,
@@ -285,6 +327,8 @@ def _execute_easy_edit(
         has_st=(resolved_sources.effective_style is not None),
         outfit_source=outfit_source,
         style_source=style_source,
+        reference_subject=reference_subject,
+        subject_description=subject_description,
     )
 
     is_subject_only = (
@@ -547,6 +591,9 @@ def _execute_easy_edit(
         else:
             target_geometry_source_str = "present"
 
+    ref_subj_str = reference_subject.strip() if reference_subject and reference_subject.strip() else "main subject"
+    subj_desc_str = subject_description.strip() if subject_description and subject_description.strip() else "main subject"
+
     easy_header = [
         "=== Easy Edit Routing Report ===",
         f"Preset: {preset}",
@@ -558,6 +605,9 @@ def _execute_easy_edit(
         f"Use Default Prompt: {'yes' if effective_use_default else 'no'}",
         f"Prompt Source: {prompt_source_str}",
         f"Default Prompt Key: {resolved_key_str}",
+        f"Reference Subject: {ref_subj_str}",
+        f"Subject Description: {subj_desc_str}",
+        f"Effective Positive Prompt: {effective_positive_prompt}",
         f"Resolved Subject: {'present' if resolved_sources.subject is not None else 'missing'}",
         f"Resolved Scene: {'present' if resolved_sources.scene is not None else 'missing'}",
         f"Resolved Outfit Source: {resolved_outfit_str}",

@@ -154,54 +154,66 @@ app.registerExtension({
                 const useDefaultWidget = node.widgets?.find(w => w.name === "use_default_prompt");
                 const posPromptWidget = node.widgets?.find(w => w.name === "positive_prompt");
                 const presetWidget = node.widgets?.find(w => w.name === "preset");
+                const refSubjWidget = node.widgets?.find(w => w.name === "reference_subject");
+                const subjDescWidget = node.widgets?.find(w => w.name === "subject_description");
                 const outfitSourceWidget = node.widgets?.find(w => w.name === "outfit_source");
                 const styleSourceWidget = node.widgets?.find(w => w.name === "style_source");
 
+                const EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER =
+                    "Replace only the identity of the {reference_subject} of the {scene_source} with the identity of the {subject} from the {subject_source}.\n\n" +
+                    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Preserve the position, action, pose, role, interaction, clothing, and accessories of the {reference_subject} from the {scene_source}.\n\n" +
+                    "Do not transfer the clothing or accessories of the {subject} from the {subject_source}.\n\n" +
+                    "Keep every other person and the rest of the scene unchanged.";
+
+                const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT =
+                    "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n" +
+                    "Transfer the complete {subject} from the {subject_source}, including the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories.\n\n" +
+                    "Preserve the face, body shape, body proportions, clothing, and accessories of the {subject} from the {subject_source}.\n\n" +
+                    "Adapt the transferred {subject} naturally to the target scene while preserving the rest of the scene.\n\n" +
+                    "Keep every other person and the rest of the scene unchanged.";
+
+                const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT =
+                    "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n" +
+                    "Preserve the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Dress the transferred {subject} using the clothing and accessories from the {outfit_source}.\n\n" +
+                    "Do not preserve the clothing or accessories of the {subject} from the {subject_source} when an explicit outfit source is selected. Use the clothing and accessories from the {outfit_source} instead.\n\n" +
+                    "Keep every other person and the rest of the scene unchanged.";
+
                 const EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER =
-                    "Transfer only the outfit and accessories from the outfit reference to the subject. " +
-                    "Preserve the subject identity, body, pose, framing, and composition. " +
-                    "Do not preserve the subject clothing. " +
-                    "Fit the transferred outfit and accessories naturally to the subject. " +
-                    "Keep accessories physically attached to the subject in a natural way and never floating. " +
+                    "Transfer only the outfit and accessories from the {outfit_source} to the {subject}.\n\n" +
+                    "Preserve the {subject} identity, body, pose, framing, and composition.\n\n" +
+                    "Do not preserve the {subject} clothing.\n\n" +
+                    "Fit the transferred outfit and accessories naturally to the {subject}.\n\n" +
+                    "Keep accessories physically attached to the {subject} in a natural way and never floating.\n\n" +
                     "Do not duplicate accessories.";
 
                 const EASY_DEFAULT_PROMPT_SUBJECT_SCENE =
-                    "Place the subject from the subject reference naturally into the scene reference. " +
-                    "Preserve the subject identity, body shape, and body proportions. " +
-                    "Preserve the scene composition, environment, framing, perspective, and spatial layout. " +
-                    "Adapt the subject naturally to the scene lighting and environment.";
+                    "Place the {subject} from the {subject_source} naturally into the {scene_source}.\n\n" +
+                    "Preserve the {subject} identity, body shape, and body proportions.\n\n" +
+                    "Preserve the scene composition, environment, framing, perspective, and spatial layout.\n\n" +
+                    "Adapt the {subject} naturally to the {scene_source} lighting and environment.";
 
                 const EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT =
-                    "Place the subject from the subject reference naturally into the scene reference wearing the outfit and accessories from the outfit reference. " +
-                    "Preserve the subject identity, body shape, and body proportions. " +
-                    "Preserve the scene composition, environment, framing, perspective, and spatial layout. " +
-                    "Do not preserve the subject clothing. " +
-                    "Fit the transferred outfit and accessories naturally to the subject and the scene. " +
-                    "Keep accessories physically attached to the subject in a natural way and never floating. " +
+                    "Place the {subject} from the {subject_source} naturally into the {scene_source} wearing the outfit and accessories from the {outfit_source}.\n\n" +
+                    "Preserve the {subject} identity, body shape, and body proportions.\n\n" +
+                    "Preserve the scene composition, environment, framing, perspective, and spatial layout.\n\n" +
+                    "Do not preserve the {subject} clothing.\n\n" +
+                    "Fit the transferred outfit and accessories naturally to the {subject} and the scene.\n\n" +
+                    "Keep accessories physically attached to the {subject} in a natural way and never floating.\n\n" +
                     "Do not duplicate accessories.";
 
                 const EASY_DEFAULT_PROMPT_STYLE =
-                    "Apply the visual style from the style reference while preserving the subject identity, content, geometry, framing, and composition. " +
-                    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. " +
-                    "Do not copy subjects, objects, or scene content from the style reference.";
-
-                const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE =
-                    "Replace only the target subject in the scene reference with the subject from the subject reference.\n\n" +
-                    "Preserve the identity of the subject from the subject reference.\n\n" +
-                    "Keep every other person and the rest of the scene unchanged.";
-
-                const EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER =
-                    "Replace only the identity of the target subject in the scene reference with the identity of the subject from the subject reference.\n\n" +
-                    "Preserve the facial identity, facial features, hair, body identity, anatomy, body shape, and body proportions of the subject reference.\n\n" +
-                    "Preserve the target subject's scene role, position, action, pose, clothing, interaction, and surrounding scene.\n\n" +
-                    "Keep every other person and the rest of the scene unchanged.";
+                    "Apply the visual style from the {style_source} while preserving the {subject} identity, content, geometry, framing, and composition.\n\n" +
+                    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood.\n\n" +
+                    "Do not copy subjects, objects, or scene content from the {style_source}.";
 
                 const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION =
-                    "Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference.\n\n" +
-                    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference.\n\n" +
-                    "Use the scene reference as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n" +
-                    "Adapt the subject naturally to the referenced action and environment.\n\n" +
-                    "Creatively reinterpret the clothing and accessories worn by the main subject in the scene so they are appropriate for the subject and the newly generated image. Do not copy the original scene outfit literally.\n\n" +
+                    "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n" +
+                    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n" +
+                    "Adapt the {subject} naturally to the referenced action and environment.\n\n" +
+                    "Creatively reinterpret the clothing and accessories worn by the {reference_subject} in the {scene_source} so they are appropriate for the {subject} and the newly generated image. Do not copy the original scene outfit literally.\n\n" +
                     "Generate a coherent new image rather than recreating the source scene exactly.";
 
                 const LEGACY_PRESETS = [
@@ -210,9 +222,12 @@ app.registerExtension({
                     "consistent",
                     "preserve_identity",
                     "max_identity",
+                    "identity_transfer",
+                    "subject_transfer",
                     "preserve_scene",
                     "outfit_transfer",
                     "style_transfer",
+                    "scene_reinterpretation",
                 ];
 
                 const migrateLegacyEasyEditWidgets = (info) => {
@@ -220,25 +235,27 @@ app.registerExtension({
                     const vals = info.widgets_values;
                     if (vals.length < 2) return;
 
-                    const valAtIndex1 = vals[1];
+                    let valAtIndex1 = vals[1];
 
-                    // If index 1 is already a boolean, the workflow uses the new schema
-                    if (typeof valAtIndex1 === "boolean") return;
-
-                    // If index 1 is a valid preset string, this is a legacy workflow layout
+                    // 1. If index 1 is a preset string (older schema 1 without use_default_prompt), splice use_default_prompt boolean
                     if (typeof valAtIndex1 === "string" && LEGACY_PRESETS.includes(valAtIndex1)) {
                         vals.splice(1, 0, false);
                         node._isPromptSystemManaged = false;
+                        valAtIndex1 = false;
+                    }
 
-                        if (node.widgets && Array.isArray(node.widgets)) {
-                            for (let i = 0; i < vals.length && i < node.widgets.length; i++) {
-                                if (node.widgets[i]) {
-                                    node.widgets[i].value = vals[i];
-                                }
+                    // 2. Schema check for reference_subject and subject_description fields (index 3 and 4)
+                    // If index 3 is outfit_source (e.g. "outfit image", "scene image", "style image", "none"), splice subject defaults
+                    if (typeof vals[3] === "string" && ["none", "outfit image", "scene image", "style image"].includes(vals[3])) {
+                        vals.splice(3, 0, "main subject", "main subject");
+                    }
+
+                    if (node.widgets && Array.isArray(node.widgets)) {
+                        for (let i = 0; i < vals.length && i < node.widgets.length; i++) {
+                            if (node.widgets[i]) {
+                                node.widgets[i].value = vals[i];
                             }
                         }
-                    } else {
-                        console.warn(`[CcC.Krea2] Unknown value at use_default_prompt position for node ${node.comfyClass}:`, valAtIndex1);
                     }
                 };
 
@@ -249,64 +266,89 @@ app.registerExtension({
                     updatePromptState();
                 };
 
-                const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource) => {
+                const renderJsEasyPrompt = (template, context) => {
+                    if (!template) return "";
+                    const refSubj = (context.reference_subject && context.reference_subject.trim()) ? context.reference_subject.trim() : "main subject";
+                    const subj = (context.subject && context.subject.trim()) ? context.subject.trim() : "main subject";
+                    const sceneSrc = context.scene_source || "scene image";
+                    const subjSrc = context.subject_source || "subject image";
+                    const outfitSrc = context.outfit_source || "outfit image";
+                    const styleSrc = context.style_source || "style image";
+
+                    return template
+                        .replace(/\{reference_subject\}/g, refSubj)
+                        .replace(/\{subject\}/g, subj)
+                        .replace(/\{scene_source\}/g, sceneSrc)
+                        .replace(/\{subject_source\}/g, subjSrc)
+                        .replace(/\{outfit_source\}/g, outfitSrc)
+                        .replace(/\{style_source\}/g, styleSrc);
+                };
+
+                const resolveJsDefaultPrompt = (preset, hasS, hasSc, hasO, hasSt, outfitSource, styleSource, refSubjVal, subjDescVal) => {
+                    const context = {
+                        reference_subject: refSubjVal,
+                        subject: subjDescVal,
+                        scene_source: "scene image",
+                        subject_source: "subject image",
+                        outfit_source: outfitSource,
+                        style_source: styleSource,
+                    };
+
                     if (preset === "identity_transfer") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        return { hasDefault: true, text: EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER };
+                        return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER, context) };
                     }
 
                     if (preset === "subject_transfer") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        let outfitClause = "Keep the clothing and accessories of the subject reference.";
-                        if (hasO) {
-                            if (outfitSource === "outfit image") {
-                                outfitClause = "Use the clothing and accessories from the outfit reference.";
-                            } else if (outfitSource === "scene image") {
-                                outfitClause = "Use the clothing and accessories of the target subject from the scene reference.";
-                            } else if (outfitSource === "style image") {
-                                outfitClause = "Use the clothing and accessories from the outfit reference.";
-                            }
-                        }
-                        return { hasDefault: true, text: `${EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BASE}\n\n${outfitClause}` };
+                        const template = hasO ? EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT : EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT;
+                        return { hasDefault: true, text: renderJsEasyPrompt(template, context) };
                     }
 
                     if (preset === "scene_reinterpretation") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        return { hasDefault: true, text: EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION };
+                        return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION, context) };
                     }
 
                     if ((hasS && !hasSc && !hasO && !hasSt) || (!hasS && !hasSc && !hasO && !hasSt)) {
                         return { hasDefault: false, text: "" };
                     }
-                    let basePrompt = "";
+
+                    let baseTemplate = "";
                     if (preset === "outfit_transfer") {
-                        if (hasO) basePrompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
-                        else if (hasSc) basePrompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
+                        if (hasO) baseTemplate = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
+                        else if (hasSc) baseTemplate = EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
                     } else if (preset === "preserve_scene") {
                         if (hasSc) {
-                            basePrompt = hasO ? EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT : EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
+                            baseTemplate = hasO ? EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT : EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
                         } else if (hasO) {
-                            basePrompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
+                            baseTemplate = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
                         }
                     } else if (preset === "style_transfer") {
-                        if (hasSt) basePrompt = EASY_DEFAULT_PROMPT_STYLE;
+                        if (hasSt) baseTemplate = EASY_DEFAULT_PROMPT_STYLE;
                         else {
-                            if (hasSc && hasO) basePrompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT;
-                            else if (hasSc) basePrompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
-                            else if (hasO) basePrompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
+                            if (hasSc && hasO) baseTemplate = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT;
+                            else if (hasSc) baseTemplate = EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
+                            else if (hasO) baseTemplate = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
                         }
                     } else {
-                        if (hasSc && hasO) basePrompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT;
-                        else if (hasSc) basePrompt = EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
-                        else if (hasO) basePrompt = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
+                        if (hasSc && hasO) baseTemplate = EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT;
+                        else if (hasSc) baseTemplate = EASY_DEFAULT_PROMPT_SUBJECT_SCENE;
+                        else if (hasO) baseTemplate = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
                     }
 
                     if (hasSt && preset !== "style_transfer") {
-                        if (basePrompt) return { hasDefault: true, text: basePrompt + "\n\n" + EASY_DEFAULT_PROMPT_STYLE };
-                        return { hasDefault: true, text: EASY_DEFAULT_PROMPT_STYLE };
+                        const renderedStyle = renderJsEasyPrompt(EASY_DEFAULT_PROMPT_STYLE, context);
+                        if (baseTemplate) {
+                            const renderedBase = renderJsEasyPrompt(baseTemplate, context);
+                            return { hasDefault: true, text: `${renderedBase}\n\n${renderedStyle}` };
+                        }
+                        return { hasDefault: true, text: renderedStyle };
                     }
 
-                    if (basePrompt) return { hasDefault: true, text: basePrompt };
+                    if (baseTemplate) {
+                        return { hasDefault: true, text: renderJsEasyPrompt(baseTemplate, context) };
+                    }
                     return { hasDefault: false, text: "" };
                 };
 
@@ -328,6 +370,8 @@ app.registerExtension({
 
                     const outfitSource = outfitSourceWidget?.value || "outfit image";
                     const styleSource = styleSourceWidget?.value || "style image";
+                    const refSubjVal = refSubjWidget?.value || "main subject";
+                    const subjDescVal = subjDescWidget?.value || "main subject";
 
                     const styleSocketIsUsedAsOutfit = usesOutfit && outfitSource === "style image";
 
@@ -382,13 +426,24 @@ app.registerExtension({
                     );
 
                     const isSubjectOnly = hasS && !hasSc && !hasO && !hasSt;
-                    const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt, effectiveOutfitSource, effectiveStyleSource);
+                    const { hasDefault, text } = resolveJsDefaultPrompt(
+                        preset, hasS, hasSc, hasO, hasSt, effectiveOutfitSource, effectiveStyleSource, refSubjVal, subjDescVal
+                    );
+
+                    // Subject description widgets are enabled ONLY when use_default_prompt is ON and preset is in identity_transfer, subject_transfer, outfit_transfer
+                    const supportsSubjectFields = ["identity_transfer", "subject_transfer", "outfit_transfer"].includes(preset);
+                    const enableSubjectFields = useDefaultWidget.value && supportsSubjectFields;
+                    if (refSubjWidget) refSubjWidget.disabled = !enableSubjectFields;
+                    if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;
 
                     if (isSubjectOnly || !hasDefault) {
                         useDefaultWidget.value = false;
                         useDefaultWidget.disabled = true;
                         posPromptWidget.disabled = false;
-                        if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = false;
+                        if (posPromptWidget.inputEl) {
+                            posPromptWidget.inputEl.readOnly = false;
+                            posPromptWidget.inputEl.title = "";
+                        }
 
                         if (node._isPromptSystemManaged && isSubjectOnly) {
                             posPromptWidget.value = "";
@@ -399,20 +454,27 @@ app.registerExtension({
 
                         if (useDefaultWidget.value && hasDefault) {
                             posPromptWidget.value = text;
-                            posPromptWidget.disabled = true;
-                            if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = true;
+                            posPromptWidget.disabled = false;
+                            if (posPromptWidget.inputEl) {
+                                posPromptWidget.inputEl.readOnly = true;
+                                posPromptWidget.inputEl.title = "Resolved preset prompt. Read-only while Use Default Prompt is enabled.";
+                            }
                             node._isPromptSystemManaged = true;
                         } else {
                             posPromptWidget.disabled = false;
-                            if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = false;
+                            if (posPromptWidget.inputEl) {
+                                posPromptWidget.inputEl.readOnly = false;
+                                posPromptWidget.inputEl.title = "";
+                            }
                             node._isPromptSystemManaged = false;
                         }
                     }
                 };
 
-                // Button widget: "Use Preset as Custom"
-                if (!node.widgets?.find(w => w.name === "use_preset_as_custom")) {
-                    const btn = node.addWidget("button", "Use Preset as Custom", "use_preset_as_custom", () => {
+                // Button widget: "Customize Preset Prompt"
+                let customizeBtn = node.widgets?.find(w => w.name === "use_preset_as_custom" || w.name === "customize_preset_prompt");
+                if (!customizeBtn) {
+                    customizeBtn = node.addWidget("button", "Customize Preset Prompt", "customize_preset_prompt", () => {
                         if (useDefaultWidget && posPromptWidget) {
                             const preset = presetWidget?.value || "balanced";
                             const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -427,6 +489,8 @@ app.registerExtension({
 
                             const outfitSource = outfitSourceWidget?.value || "outfit image";
                             const styleSource = styleSourceWidget?.value || "style image";
+                            const refSubjVal = refSubjWidget?.value || "main subject";
+                            const subjDescVal = subjDescWidget?.value || "main subject";
 
                             const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "identity_transfer"].includes(preset);
                             const isSceneAutoStyle = ["subject_transfer", "identity_transfer", "scene_reinterpretation"].includes(preset);
@@ -446,19 +510,27 @@ app.registerExtension({
                                 (effectiveStyleSource === "subject image" && hasS)
                             );
 
-                            const { hasDefault, text } = resolveJsDefaultPrompt(preset, hasS, hasSc, hasO, hasSt, effectiveOutfitSource, effectiveStyleSource);
+                            const { hasDefault, text } = resolveJsDefaultPrompt(
+                                preset, hasS, hasSc, hasO, hasSt, effectiveOutfitSource, effectiveStyleSource, refSubjVal, subjDescVal
+                            );
                             if (hasDefault && text) {
                                 posPromptWidget.value = text;
                             }
                             useDefaultWidget.value = false;
                             node._isPromptSystemManaged = false;
                             posPromptWidget.disabled = false;
-                            if (posPromptWidget.inputEl) posPromptWidget.inputEl.readOnly = false;
+                            if (posPromptWidget.inputEl) {
+                                posPromptWidget.inputEl.readOnly = false;
+                                posPromptWidget.inputEl.title = "";
+                            }
                             updatePromptState();
                             if (app.graph) app.graph.setDirtyCanvas(true, true);
                         }
                     });
-                    if (btn) btn.serialize = false;
+                    if (customizeBtn) customizeBtn.serialize = false;
+                } else if (customizeBtn.name === "use_preset_as_custom") {
+                    customizeBtn.name = "customize_preset_prompt";
+                    customizeBtn.label = "Customize Preset Prompt";
                 }
 
                 if (useDefaultWidget) {
@@ -474,7 +546,7 @@ app.registerExtension({
                     };
                 }
 
-                [presetWidget, outfitSourceWidget, styleSourceWidget].forEach(w => {
+                [presetWidget, refSubjWidget, subjDescWidget, outfitSourceWidget, styleSourceWidget].forEach(w => {
                     if (w) {
                         const orig = w.callback;
                         w.callback = function () {
