@@ -132,10 +132,10 @@ def resolve_easy_visual_reference_fit(preset: str = "", role: str = "", common_g
     """Resolve visual reference fit mode.
 
     INVARIANT: EVERY visual appearance reference in Easy Edit MUST fit completely inside
-    the target latent geometry with 'contain_no_upscale'. No Easy appearance reference
-    may ever crop away source image content.
+    the target latent geometry with 'contain'. No Easy appearance reference
+    may ever crop away source image content, and upscaling is allowed when fitting target dimensions.
     """
-    return "contain_no_upscale"
+    return "contain"
 
 
 @dataclass(frozen=True)

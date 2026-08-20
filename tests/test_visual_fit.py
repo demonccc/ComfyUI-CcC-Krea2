@@ -122,3 +122,44 @@ def test_geometry_parity_floor_vs_round():
     geom_crop = resolve_krea2edit_geometry(src_h=600, src_w=800, tgt_h=512, tgt_w=512, fit_mode="crop")
     assert geom_crop.mode_resolved == "crop"
     assert geom_crop.vae_input_pixel_size == (512, 512)
+
+
+def test_easy_contain_geometry_scene_upscale_3_to_2():
+    """Example A: Scene 612x408 -> target 1728x1152 (both 3:2). Full source retained, upscaled cleanly."""
+    from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
+
+    geom = resolve_krea2edit_geometry(src_h=408, src_w=612, tgt_h=1152, tgt_w=1728, fit_mode="contain")
+    assert geom.mode_resolved == "contain"
+    assert geom.crop_rectangle == (0, 0, 612, 408)  # Full source, 0 pixels discarded
+    assert geom.vae_input_pixel_size == (1728, 1152)
+    assert geom.vae_latent_grid_size == (216, 144)
+    assert geom.target_grid_size == (216, 144)
+    assert geom.centered_fractional_offset == (0.0, 0.0)
+
+
+def test_easy_contain_geometry_portrait_subject_downscale_height_fit():
+    """Example B: Portrait Subject 1086x1448 -> target 1728x1152. Full source retained, fit by height with X offset."""
+    from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
+
+    geom = resolve_krea2edit_geometry(src_h=1448, src_w=1086, tgt_h=1152, tgt_w=1728, fit_mode="contain")
+    assert geom.mode_resolved == "contain"
+    assert geom.crop_rectangle == (0, 0, 1086, 1448)  # Full source, 0 pixels discarded
+    assert geom.vae_input_pixel_size == (864, 1152)
+    assert geom.vae_latent_grid_size == (108, 144)
+    assert geom.target_grid_size == (216, 144)
+    assert geom.centered_fractional_offset == (0.0, 54.0)
+
+
+def test_easy_contain_no_source_content_discarded():
+    """Verify that contain fit mode never discards source pixels for any input dimensions."""
+    from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
+
+    test_cases = [
+        (400, 300, 1024, 1024),
+        (1080, 1920, 512, 512),
+        (500, 500, 1200, 800),
+        (1448, 1086, 1152, 1728),
+    ]
+    for src_h, src_w, tgt_h, tgt_w in test_cases:
+        geom = resolve_krea2edit_geometry(src_h=src_h, src_w=src_w, tgt_h=tgt_h, tgt_w=tgt_w, fit_mode="contain")
+        assert geom.crop_rectangle == (0, 0, src_w, src_h), f"Crop occurred for {src_w}x{src_h} into {tgt_w}x{tgt_h}"

@@ -1732,8 +1732,8 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     ]
     assert len(st_app_refs) == 2
     ref_map = {r.alias: r.visual_reference_fit for r in st_app_refs}
-    assert ref_map["scene"] == "contain_no_upscale"
-    assert ref_map["subject"] == "contain_no_upscale"
+    assert ref_map["scene"] == "contain"
+    assert ref_map["subject"] == "contain"
 
     # Subject Transfer + Subject + Scene + distinct Outfit
     node.process(
@@ -1755,9 +1755,9 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     ]
     assert len(st_outfit_refs) == 3
     ref_map3 = {r.alias: r.visual_reference_fit for r in st_outfit_refs}
-    assert ref_map3["scene"] == "contain_no_upscale"
-    assert ref_map3["subject"] == "contain_no_upscale"
-    assert ref_map3["outfit"] == "contain_no_upscale"
+    assert ref_map3["scene"] == "contain"
+    assert ref_map3["subject"] == "contain"
+    assert ref_map3["outfit"] == "contain"
 
     # Subject Transfer + Subject + Scene-as-Outfit
     node.process(
@@ -1779,8 +1779,8 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     ]
     assert len(st_sc_outfit_refs) == 2
     ref_map_sc = {r.alias: r.visual_reference_fit for r in st_sc_outfit_refs}
-    assert ref_map_sc["scene+outfit"] == "contain_no_upscale"
-    assert ref_map_sc["subject"] == "contain_no_upscale"
+    assert ref_map_sc["scene+outfit"] == "contain"
+    assert ref_map_sc["subject"] == "contain"
 
     # Balanced preset + Subject + Scene
     node.process(
@@ -1796,11 +1796,11 @@ def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
     bal_chain = captured_chains["chain"]
     bal_edit_refs = [r for r in bal_chain.references if r.reference_path == "edit"]
     assert len(bal_edit_refs) == 2
-    assert all(r.visual_reference_fit == "contain_no_upscale" for r in bal_edit_refs)
+    assert all(r.visual_reference_fit == "contain" for r in bal_edit_refs)
 
 
 def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
-    """Verify that resolve_easy_visual_reference_fit returns contain_no_upscale for all 11 Easy Edit presets across Easy Edit appearance/edit reference roles (subject, scene, outfit, scene+outfit) under both single and multi-source conditions."""
+    """Verify that resolve_easy_visual_reference_fit returns contain for all 11 Easy Edit presets across Easy Edit appearance/edit reference roles (subject, scene, outfit, scene+outfit) under both single and multi-source conditions."""
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
@@ -1812,11 +1812,11 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
         for role in roles:
             # Multi-source / common geometry active
             fit_multi = resolve_easy_visual_reference_fit(preset, role, common_geometry_active=True)
-            assert fit_multi == "contain_no_upscale", (
-                f"Preset '{preset}' for role '{role}' under multi-source returned '{fit_multi}', expected 'contain_no_upscale'"
+            assert fit_multi == "contain", (
+                f"Preset '{preset}' for role '{role}' under multi-source returned '{fit_multi}', expected 'contain'"
             )
             # Single-source / common geometry inactive
             fit_single = resolve_easy_visual_reference_fit(preset, role, common_geometry_active=False)
-            assert fit_single == "contain_no_upscale", (
-                f"Preset '{preset}' for role '{role}' under single-source returned '{fit_single}', expected 'contain_no_upscale'"
+            assert fit_single == "contain", (
+                f"Preset '{preset}' for role '{role}' under single-source returned '{fit_single}', expected 'contain'"
             )

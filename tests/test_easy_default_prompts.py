@@ -705,8 +705,8 @@ class TestEasyEditReportLatentSource:
         assert "Resolved Latent Source: scene image" in report1
         assert "Target Content Role: scene" in report1
         assert "Resolved Style Source: scene image (automatic)" in report1
-        assert "Appearance Ref 1: scene (boost=2.5, fit=contain_no_upscale)" in report1
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report1
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report1
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report1
         assert "Semantic-only Sources: none" in report1
 
         # Identity Transfer + Subject + Scene
@@ -723,8 +723,8 @@ class TestEasyEditReportLatentSource:
         assert "Resolved Latent Source: subject image" in report_id
         assert "Target Content Role: subject" in report_id
         assert "Resolved Style Source: scene image (automatic)" in report_id
-        assert "Appearance Ref 1: scene (boost=2.5, fit=contain_no_upscale)" in report_id
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report_id
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report_id
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report_id
 
         # Subject Transfer + Subject + Scene + Outfit Image
         _, _, _, _, report_outfit = node.process(
@@ -739,9 +739,9 @@ class TestEasyEditReportLatentSource:
             outfit=Ou,
         )
         assert "Resolved Latent Source: scene image" in report_outfit
-        assert "Appearance Ref 1: scene (boost=2.5, fit=contain_no_upscale)" in report_outfit
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report_outfit
-        assert "Appearance Ref 3: outfit (boost=4.0, fit=contain_no_upscale)" in report_outfit
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report_outfit
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report_outfit
+        assert "Appearance Ref 3: outfit (boost=4.0, fit=contain)" in report_outfit
         assert "Semantic-only Sources: none" in report_outfit
 
         # Subject Transfer + Subject + Scene + Outfit Source = Scene Image
@@ -757,8 +757,8 @@ class TestEasyEditReportLatentSource:
             outfit_source="scene image",
         )
         assert "Resolved Latent Source: scene image" in report_scene_outfit
-        assert "Appearance Ref 1: scene+outfit (boost=4.0, fit=contain_no_upscale)" in report_scene_outfit
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain_no_upscale)" in report_scene_outfit
+        assert "Appearance Ref 1: scene+outfit (boost=4.0, fit=contain)" in report_scene_outfit
+        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report_scene_outfit
         assert "Semantic-only Sources: none" in report_scene_outfit
 
         # Subject Transfer + Subject Only (no Scene)

@@ -804,7 +804,7 @@ def test_easy_subject_scene_note_text():
     assert "crop fit" not in combined_notes
     assert "Identity Transfer" in combined_notes
     assert "Subject Transfer" in combined_notes
-    assert "contain_no_upscale" in combined_notes
+    assert "without destructive cropping" in combined_notes
     assert "https://huggingface.co/Crowlley/Krea2Neutrino" in combined_notes
     assert "https://huggingface.co/conradlocke/krea2-identity-edit" in combined_notes
     assert "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap" in combined_notes
