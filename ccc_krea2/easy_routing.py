@@ -308,7 +308,7 @@ def resolve_easy_sources(
         effective_style = None
         style_source_kind = "disabled"
     elif caps.style_policy == STYLE_POLICY_SCENE_AUTO:
-        # Automatic Scene style policy (Subject Transfer & Scene Reinterpretation)
+        # Automatic Scene style policy for presets using STYLE_POLICY_SCENE_AUTO
         style_source_kind = "scene"
         if scene is not None:
             effective_style = scene
