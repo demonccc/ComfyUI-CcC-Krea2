@@ -109,7 +109,7 @@ The identity ladder covers subject preservation tasks. Additional task-specific 
 - **Style Transfer**: Uses the dedicated Style/Moodboard path to transfer artistic style, palette, texture, and visual mood (Outfit policy: disabled).
 
 > [!NOTE]
-> All Easy Edit visual appearance references enforce `contain_no_upscale` fit. The complete source reference image is preserved for conditioning without cropping away facial features, head structure, garments, or surrounding context.
+> All Easy Edit visual appearance references enforce `contain` fit. The complete source reference image is preserved for conditioning without cropping away facial features, head structure, garments, or surrounding context.
 
 ---
 

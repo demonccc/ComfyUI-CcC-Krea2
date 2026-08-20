@@ -1691,7 +1691,7 @@ def test_scene_auto_ignores_stale_style_source_selector(dummy_sources):
 
 
 def test_subject_transfer_node_visual_reference_fit_per_role(monkeypatch):
-    """Verify that Subject Transfer sets visual_reference_fit == 'contain_no_upscale' for Scene, Subject, and Outfit roles."""
+    """Verify that Subject Transfer uses visual_reference_fit == "contain" for Scene, Subject, Outfit, and Scene+Outfit appearance references."""
     import torch
     from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit
 

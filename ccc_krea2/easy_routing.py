@@ -386,7 +386,7 @@ def route_easy_preset(
     sources: EasyResolvedSources,
     preset: str = "balanced",
 ) -> EasyPresetRoute:
-    """Phase 2: Evaluate preset routing matrix across all 10 presets.
+    """Phase 2: Evaluate preset routing matrix across all Easy Edit presets.
 
     Exhaustive 8-combination coverage per preset:
         none, S, Sc, Ou, S+Sc, S+Ou, Sc+Ou, S+Sc+Ou
