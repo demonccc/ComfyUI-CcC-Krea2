@@ -55,11 +55,9 @@ EASY_ROLE_INSTRUCTIONS = {
 # Centralized default positive prompts for Easy Edit (Placeholder-driven templates)
 
 EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER = (
-    "Replace only the identity of the {reference_subject} of the {scene_source} with the identity of the {subject} from the {subject_source}.\n\n"
-    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
-    "Preserve the position, action, pose, role, interaction, clothing, and accessories of the {reference_subject} from the {scene_source}.\n\n"
-    "Do not transfer the clothing or accessories of the {subject} from the {subject_source}.\n\n"
-    "Keep every other person and the rest of the scene unchanged."
+    "Replace only the identity of the {reference_subject} of the scene image with the identity of the {subject_description} from the subject image.\n\n"
+    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject_description} from the subject image to the {reference_subject} of the scene image.\n\n"
+    "Preserve the position, action, pose, role, interaction, clothing, and accessories of the {reference_subject} from the scene image."
 )
 
 EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT = (
@@ -156,6 +154,7 @@ def render_easy_prompt(template: str, context: Dict[str, str]) -> str:
         return ""
     ref_subj = context.get("reference_subject", "main subject")
     subj = context.get("subject", "main subject")
+    subj_desc = context.get("subject_description", context.get("subject", "main subject"))
     scene_src = context.get("scene_source", "scene image")
     subj_src = context.get("subject_source", "subject image")
     outfit_src = context.get("outfit_source", "outfit image")
@@ -164,6 +163,7 @@ def render_easy_prompt(template: str, context: Dict[str, str]) -> str:
     fmt_context = {
         "reference_subject": ref_subj,
         "subject": subj,
+        "subject_description": subj_desc,
         "scene_source": scene_src,
         "subject_source": subj_src,
         "outfit_source": outfit_src,
@@ -222,6 +222,7 @@ def resolve_default_positive_prompt(
     context = {
         "reference_subject": ref_subj,
         "subject": subj_desc,
+        "subject_description": subj_desc,
         "scene_source": "scene image",
         "subject_source": "subject image",
         "outfit_source": eff_outfit_source,

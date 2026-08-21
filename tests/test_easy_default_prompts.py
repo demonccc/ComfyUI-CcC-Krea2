@@ -93,14 +93,22 @@ class TestDefaultPromptResolver:
             has_sc=True,
             has_o=False,
             has_st=False,
-            reference_subject="woman in blue dress",
-            subject_description="man with glasses",
+            reference_subject="woman playing volleyball",
+            subject_description="woman from the portrait",
         )
         assert has_def is True
-        assert "Do not transfer the clothing or accessories of the man with glasses from the subject image." in text
+        expected = (
+            "Replace only the identity of the woman playing volleyball of the scene image with the identity of the woman from the portrait from the subject image.\n\n"
+            "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the woman from the portrait from the subject image to the woman playing volleyball of the scene image.\n\n"
+            "Preserve the position, action, pose, role, interaction, clothing, and accessories of the woman playing volleyball from the scene image."
+        )
+        assert text == expected
+        assert "Do not transfer the clothing" not in text
+        assert "Keep every other person" not in text
 
-        # Test presets 2 through 6 use the exact same Identity Transfer prompt template
+        # Test presets identity_transfer and test_2 through test_6 use the exact same Identity Transfer prompt template
         for test_preset in [
+            "identity_transfer",
             "transfer_identity_test_2",
             "transfer_identity_test_3",
             "transfer_identity_test_4",
@@ -118,7 +126,11 @@ class TestDefaultPromptResolver:
             )
             assert has_def is True
             assert test_key == test_preset
-            assert "Replace only the identity of the hero of the scene image with the identity of the champion from the subject image." in test_text
+            assert test_text == (
+                "Replace only the identity of the hero of the scene image with the identity of the champion from the subject image.\n\n"
+                "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the champion from the subject image to the hero of the scene image.\n\n"
+                "Preserve the position, action, pose, role, interaction, clothing, and accessories of the hero from the scene image."
+            )
 
         # Example B: subject_transfer without outfit
         has_def, text, key = resolve_default_positive_prompt(

@@ -160,11 +160,9 @@ app.registerExtension({
                 const styleSourceWidget = node.widgets?.find(w => w.name === "style_source");
 
                 const EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER =
-                    "Replace only the identity of the {reference_subject} of the {scene_source} with the identity of the {subject} from the {subject_source}.\n\n" +
-                    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
-                    "Preserve the position, action, pose, role, interaction, clothing, and accessories of the {reference_subject} from the {scene_source}.\n\n" +
-                    "Do not transfer the clothing or accessories of the {subject} from the {subject_source}.\n\n" +
-                    "Keep every other person and the rest of the scene unchanged.";
+                    "Replace only the identity of the {reference_subject} of the scene image with the identity of the {subject_description} from the subject image.\n\n" +
+                    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject_description} from the subject image to the {reference_subject} of the scene image.\n\n" +
+                    "Preserve the position, action, pose, role, interaction, clothing, and accessories of the {reference_subject} from the scene image.";
 
                 const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT =
                     "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n" +
@@ -284,6 +282,9 @@ app.registerExtension({
                     if (!template) return "";
                     const refSubj = (context.reference_subject && context.reference_subject.trim()) ? context.reference_subject.trim() : "main subject";
                     const subj = (context.subject && context.subject.trim()) ? context.subject.trim() : "main subject";
+                    const subjDesc = (context.subject_description && context.subject_description.trim()) ? context.subject_description.trim() : (
+                        (context.subject && context.subject.trim()) ? context.subject.trim() : "main subject"
+                    );
                     const sceneSrc = context.scene_source || "scene image";
                     const subjSrc = context.subject_source || "subject image";
                     const outfitSrc = context.outfit_source || "outfit image";
@@ -291,6 +292,7 @@ app.registerExtension({
 
                     return template
                         .replace(/\{reference_subject\}/g, refSubj)
+                        .replace(/\{subject_description\}/g, subjDesc)
                         .replace(/\{subject\}/g, subj)
                         .replace(/\{scene_source\}/g, sceneSrc)
                         .replace(/\{subject_source\}/g, subjSrc)
@@ -302,6 +304,7 @@ app.registerExtension({
                     const context = {
                         reference_subject: refSubjVal,
                         subject: subjDescVal,
+                        subject_description: subjDescVal,
                         scene_source: "scene image",
                         subject_source: "subject image",
                         outfit_source: outfitSource,
@@ -375,6 +378,7 @@ app.registerExtension({
 
                     const preset = presetWidget?.value || "balanced";
                     const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", ...IDENTITY_TEST_PRESETS].includes(preset);
+                    const isStyleDisabled = preset === "transfer_identity_test_5";
                     const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation", "identity_transfer", "transfer_identity_test_2", "transfer_identity_test_3", "transfer_identity_test_4", "transfer_identity_test_6"].includes(preset);
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -395,8 +399,12 @@ app.registerExtension({
                     if (outfitInput) outfitInput.disabled = !usesOutfit;
 
                     if (styleSourceWidget) {
-                        styleSourceWidget.disabled = isSceneAutoStyle;
-                        if (isSceneAutoStyle) {
+                        if (isStyleDisabled) {
+                            styleSourceWidget.disabled = true;
+                            styleSourceWidget.label = "Style Source [Disabled]";
+                            styleSourceWidget.tooltip = "Transfer Identity Test 5 intentionally disables Scene style reinforcement.";
+                        } else if (isSceneAutoStyle) {
+                            styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene]";
                             let tooltipText = "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
                             if (IDENTITY_TEST_PRESETS.includes(preset)) {
@@ -406,13 +414,16 @@ app.registerExtension({
                             }
                             styleSourceWidget.tooltip = tooltipText;
                         } else {
+                            styleSourceWidget.disabled = false;
                             delete styleSourceWidget.label;
                             styleSourceWidget.tooltip = "Source image socket to use for style conditioning.";
                         }
                     }
 
                     if (styleInput) {
-                        if (isSceneAutoStyle) {
+                        if (isStyleDisabled) {
+                            styleInput.disabled = true;
+                        } else if (isSceneAutoStyle) {
                             styleInput.disabled = !styleSocketIsUsedAsOutfit;
                         } else {
                             styleInput.disabled = false;
@@ -425,7 +436,7 @@ app.registerExtension({
                     const hasRawSt = !!(styleInput && styleInput.link != null);
 
                     const effectiveOutfitSource = usesOutfit ? outfitSource : "none";
-                    const effectiveStyleSource = isSceneAutoStyle ? "scene image" : styleSource;
+                    const effectiveStyleSource = isStyleDisabled ? "none" : (isSceneAutoStyle ? "scene image" : styleSource);
 
                     const hasO = usesOutfit && (
                         (effectiveOutfitSource === "outfit image" && hasRawO) ||
@@ -433,11 +444,11 @@ app.registerExtension({
                         (effectiveOutfitSource === "style image" && hasRawSt)
                     );
 
-                    const hasSt = isSceneAutoStyle ? hasSc : (
+                    const hasSt = isStyleDisabled ? false : (isSceneAutoStyle ? hasSc : (
                         (effectiveStyleSource === "style image" && hasRawSt) ||
                         (effectiveStyleSource === "scene image" && hasSc) ||
                         (effectiveStyleSource === "subject image" && hasS)
-                    );
+                    ));
 
                     const isSubjectOnly = hasS && !hasSc && !hasO && !hasSt;
                     const { hasDefault, text } = resolveJsDefaultPrompt(
