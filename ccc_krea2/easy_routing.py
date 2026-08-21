@@ -114,6 +114,7 @@ OUTFIT_POLICY_DISABLED = "disabled"
 
 STYLE_POLICY_USER = "user"
 STYLE_POLICY_SCENE_AUTO = "scene_auto"
+STYLE_POLICY_SCENE_OUTFIT_AUTO = "scene_outfit_auto"
 STYLE_POLICY_DISABLED = "disabled"
 
 SCENE_REINTERPRETATION_SUBJECT_BOOST = 4.0
@@ -122,6 +123,45 @@ EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
     "Use this reference for the main subject's action, activity, pose, body dynamics, environment, spatial context, "
     "camera framing, perspective, lighting, and broad outfit concept. Reinterpret these elements creatively for the "
     "subject reference. Do not use the scene subject's identity as the generated subject identity."
+)
+
+EASY_SCENE_OUTFIT_STYLE_INSTRUCTION = (
+    "Use the Scene image only as a visual reference for the clothing and accessories worn by the target woman. "
+    "Reinforce their garment type, cut, coverage, colors, materials, and accessories. "
+    "Do not use this style conditioning to transfer the identity, body, pose, or other people from the Scene."
+)
+
+IDENTITY_TEST_PRESETS = (
+    "identity_transfer",
+    "transfer_identity_test_2",
+    "transfer_identity_test_3",
+    "transfer_identity_test_4",
+    "transfer_identity_test_5",
+    "transfer_identity_test_6",
+    # Group A
+    "transfer_identity_test_a_4_4",
+    "transfer_identity_test_a_4_5",
+    "transfer_identity_test_a_4_6",
+    # Group B
+    "transfer_identity_test_b_2_5_4",
+    "transfer_identity_test_b_2_5_5",
+    "transfer_identity_test_b_2_5_6",
+    # Group C
+    "transfer_identity_test_c_4_4",
+    "transfer_identity_test_c_4_5",
+    "transfer_identity_test_c_4_6",
+    "transfer_identity_test_c_4_7",
+    "transfer_identity_test_c_2_5_4",
+    "transfer_identity_test_c_2_5_5",
+    "transfer_identity_test_c_2_5_6",
+    "transfer_identity_test_c_2_5_9",
+    # Group D
+    "transfer_identity_test_d_s2_5_o2_5",
+    "transfer_identity_test_d_s2_5_o4",
+    "transfer_identity_test_d_s4_o4",
+    "transfer_identity_test_d_s5_o4",
+    "transfer_identity_test_d_s6_o4",
+    "transfer_identity_test_d_s7_o4",
 )
 
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
@@ -232,14 +272,7 @@ def resolve_default_positive_prompt(
     base_template = ""
     base_key = ""
 
-    if preset in {
-        "identity_transfer",
-        "transfer_identity_test_2",
-        "transfer_identity_test_3",
-        "transfer_identity_test_4",
-        "transfer_identity_test_5",
-        "transfer_identity_test_6",
-    }:
+    if preset in IDENTITY_TEST_PRESETS:
         if not (has_s and has_sc):
             return False, "", "none"
         base_template = EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
@@ -379,6 +412,30 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "scene_reinterpretation": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
+    # Group A — Test 3 family (Scene 4.0 / Subject variable)
+    "transfer_identity_test_a_4_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
+    "transfer_identity_test_a_4_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
+    "transfer_identity_test_a_4_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
+    # Group B — Test 4 family (Scene 2.5 / Subject variable)
+    "transfer_identity_test_b_2_5_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
+    "transfer_identity_test_b_2_5_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
+    "transfer_identity_test_b_2_5_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
+    # Group C — Test 3 & 4 families with Outfit Style
+    "transfer_identity_test_c_4_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_4_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_4_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_4_7": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_2_5_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_2_5_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_2_5_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    "transfer_identity_test_c_2_5_9": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
+    # Group D — Scene latent + Subject reference + Scene as Outfit reference
+    "transfer_identity_test_d_s2_5_o2_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
+    "transfer_identity_test_d_s2_5_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
+    "transfer_identity_test_d_s4_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
+    "transfer_identity_test_d_s5_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
+    "transfer_identity_test_d_s6_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
+    "transfer_identity_test_d_s7_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
 }
 
 
@@ -516,8 +573,8 @@ def resolve_easy_sources(
     if caps.style_policy == STYLE_POLICY_DISABLED:
         effective_style = None
         style_source_kind = "disabled"
-    elif caps.style_policy == STYLE_POLICY_SCENE_AUTO:
-        # Automatic Scene style policy for presets using STYLE_POLICY_SCENE_AUTO
+    elif caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_SCENE_OUTFIT_AUTO):
+        # Automatic Scene style policy for presets using STYLE_POLICY_SCENE_AUTO / STYLE_POLICY_SCENE_OUTFIT_AUTO
         style_source_kind = "scene"
         if scene is not None:
             effective_style = scene
@@ -600,6 +657,7 @@ def route_easy_preset(
     Exhaustive 8-combination coverage per preset:
         none, S, Sc, Ou, S+Sc, S+Ou, Sc+Ou, S+Sc+Ou
     """
+    caps = get_easy_preset_capabilities(preset)
     S = sources.effective_subject
     Sc = sources.effective_scene
     Ou = sources.effective_outfit
@@ -919,14 +977,7 @@ def route_easy_preset(
             elif outfit_is_distinct:
                 refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
 
-    elif preset in (
-        "identity_transfer",
-        "transfer_identity_test_2",
-        "transfer_identity_test_3",
-        "transfer_identity_test_4",
-        "transfer_identity_test_5",
-        "transfer_identity_test_6",
-    ):
+    elif preset in IDENTITY_TEST_PRESETS:
         if not has_s:
             preset_warnings.append(
                 f"preset '{preset}' selected but Subject source is missing; no identity can be transferred."
@@ -974,7 +1025,7 @@ def route_easy_preset(
                 refs.append(_ref(Sc, 2.5, "scene"))
                 refs.append(_ref(S, 9.0, "subject"))
 
-            elif preset == "transfer_identity_test_5":
+            elif preset in ("transfer_identity_test_5", "transfer_identity_test_6"):
                 target_content_mode = "image"
                 target_content_source = Sc
                 target_content_role = "scene"
@@ -983,14 +1034,67 @@ def route_easy_preset(
 
                 refs.append(_ref(S, 7.0, "subject"))
 
-            elif preset == "transfer_identity_test_6":
+            elif preset.startswith("transfer_identity_test_a_"):
+                target_content_mode = "empty"
+                target_content_source = None
+                target_content_role = "none"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                subj_boost = 4.0 if preset == "transfer_identity_test_a_4_4" else (5.0 if preset == "transfer_identity_test_a_4_5" else 6.0)
+                refs.append(_ref(Sc, 4.0, "scene"))
+                refs.append(_ref(S, subj_boost, "subject"))
+
+            elif preset.startswith("transfer_identity_test_b_"):
+                target_content_mode = "empty"
+                target_content_source = None
+                target_content_role = "none"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                subj_boost = 4.0 if preset == "transfer_identity_test_b_2_5_4" else (5.0 if preset == "transfer_identity_test_b_2_5_5" else 6.0)
+                refs.append(_ref(Sc, 2.5, "scene"))
+                refs.append(_ref(S, subj_boost, "subject"))
+
+            elif preset.startswith("transfer_identity_test_c_"):
+                target_content_mode = "empty"
+                target_content_source = None
+                target_content_role = "none"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                if preset.startswith("transfer_identity_test_c_4_"):
+                    sc_boost = 4.0
+                    s_val = preset.replace("transfer_identity_test_c_4_", "")
+                else:
+                    sc_boost = 2.5
+                    s_val = preset.replace("transfer_identity_test_c_2_5_", "")
+                subj_boost = float(s_val)
+
+                refs.append(_ref(Sc, sc_boost, "scene"))
+                refs.append(_ref(S, subj_boost, "subject"))
+
+            elif preset.startswith("transfer_identity_test_d_"):
                 target_content_mode = "image"
                 target_content_source = Sc
                 target_content_role = "scene"
                 target_content_fit = "contain_no_upscale"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-                refs.append(_ref(S, 7.0, "subject"))
+                if preset == "transfer_identity_test_d_s2_5_o2_5":
+                    subj_boost, outfit_boost = 2.5, 2.5
+                elif preset == "transfer_identity_test_d_s2_5_o4":
+                    subj_boost, outfit_boost = 2.5, 4.0
+                elif preset == "transfer_identity_test_d_s4_o4":
+                    subj_boost, outfit_boost = 4.0, 4.0
+                elif preset == "transfer_identity_test_d_s5_o4":
+                    subj_boost, outfit_boost = 5.0, 4.0
+                elif preset == "transfer_identity_test_d_s6_o4":
+                    subj_boost, outfit_boost = 6.0, 4.0
+                elif preset == "transfer_identity_test_d_s7_o4":
+                    subj_boost, outfit_boost = 7.0, 4.0
+                else:
+                    subj_boost, outfit_boost = 7.0, 4.0
+
+                refs.append(_ref(S, subj_boost, "subject"))
+                refs.append(_ref(Sc, outfit_boost, "outfit"))
         else:
             target_content_mode = "empty"
             target_content_source = None
@@ -999,7 +1103,7 @@ def route_easy_preset(
             if has_s:
                 refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
             elif has_sc:
-                scene_boost = 4.0 if preset == "transfer_identity_test_3" else 2.5
+                scene_boost = 4.0 if ("4_4" in preset or "4_5" in preset or "4_6" in preset or "4_7" in preset or "test_3" in preset) else 2.5
                 refs.append(_ref(Sc, scene_boost, "scene"))
 
     elif preset == "subject_transfer":
@@ -1069,7 +1173,14 @@ def route_easy_preset(
 
     # Style configuration: active for ALL presets whenever effective_style is present
     style_active = has_st
-    if preset == "style_transfer":
+    if caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
+        style_config = EasyStyleConfig(
+            style_fidelity=1.0,
+            style_processing="2x2",
+            indirect_style_transfer=False,
+            vision_instruction=EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
+        )
+    elif preset == "style_transfer":
         style_config = STRONG_EASY_STYLE_CONFIG
     else:
         style_config = DEFAULT_EASY_STYLE_CONFIG

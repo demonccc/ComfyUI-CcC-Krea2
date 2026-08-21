@@ -9,6 +9,12 @@ from ..easy_routing import (
     get_easy_instruction_for_role,
     resolve_default_positive_prompt,
     resolve_easy_visual_reference_fit,
+    EASY_PRESET_CAPABILITIES,
+    get_easy_preset_capabilities,
+    OUTFIT_POLICY_DISABLED,
+    STYLE_POLICY_SCENE_AUTO,
+    STYLE_POLICY_SCENE_OUTFIT_AUTO,
+    STYLE_POLICY_DISABLED,
 )
 from ..grounding import prepare_easy_krea_vision_image
 from ..vision_prep import prepare_image_for_qwen
@@ -17,6 +23,8 @@ from ..target_latent import build_target_latent
 from ..edit_engine import run_krea2_edit_orchestrator
 from ..ostris_backend import preprocess_ostris_vision_image
 from ..constants import NODE_CATEGORY
+
+EASY_EDIT_PRESETS = list(EASY_PRESET_CAPABILITIES.keys())
 
 
 class CcCKrea2EasyEdit:
@@ -28,7 +36,7 @@ class CcCKrea2EasyEdit:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 16-preset Krea2 Edit node. "
+        f"Opinionated {len(EASY_PRESET_CAPABILITIES)}-preset Krea2 Edit node. "
         "Automatically routes Subject, Scene, Outfit, and Style sources to canonical target and reference channels."
     )
 
@@ -51,24 +59,7 @@ class CcCKrea2EasyEdit:
                     },
                 ),
                 "preset": (
-                    [
-                        "flexible",
-                        "balanced",
-                        "consistent",
-                        "preserve_identity",
-                        "max_identity",
-                        "identity_transfer",
-                        "transfer_identity_test_2",
-                        "transfer_identity_test_3",
-                        "transfer_identity_test_4",
-                        "transfer_identity_test_5",
-                        "transfer_identity_test_6",
-                        "subject_transfer",
-                        "preserve_scene",
-                        "outfit_transfer",
-                        "style_transfer",
-                        "scene_reinterpretation",
-                    ],
+                    EASY_EDIT_PRESETS,
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
                 ),
                 "reference_subject": (
@@ -162,7 +153,7 @@ class CcCKrea2EasyEditOstris:
     FUNCTION = "process"
 
     DESCRIPTION = (
-        "Opinionated 16-preset Ostris Edit node. "
+        f"Opinionated {len(EASY_PRESET_CAPABILITIES)}-preset Ostris Edit node. "
         "Routes Subject, Scene, Outfit, and Style sources to Ostris edit pipeline."
     )
 
@@ -185,24 +176,7 @@ class CcCKrea2EasyEditOstris:
                     },
                 ),
                 "preset": (
-                    [
-                        "flexible",
-                        "balanced",
-                        "consistent",
-                        "preserve_identity",
-                        "max_identity",
-                        "identity_transfer",
-                        "transfer_identity_test_2",
-                        "transfer_identity_test_3",
-                        "transfer_identity_test_4",
-                        "transfer_identity_test_5",
-                        "transfer_identity_test_6",
-                        "subject_transfer",
-                        "preserve_scene",
-                        "outfit_transfer",
-                        "style_transfer",
-                        "scene_reinterpretation",
-                    ],
+                    EASY_EDIT_PRESETS,
                     {"default": "balanced", "tooltip": "Selects the routing preset recipe."},
                 ),
                 "reference_subject": (
@@ -507,42 +481,46 @@ def _execute_easy_edit(
         ostris_kv_cache=ostris_kv_cache,
     )
 
-    from ..easy_routing import (
-        get_easy_preset_capabilities,
-        OUTFIT_POLICY_DISABLED,
-        STYLE_POLICY_SCENE_AUTO,
-        STYLE_POLICY_DISABLED,
-    )
-
     caps = get_easy_preset_capabilities(preset)
     outfit_policy_str = caps.outfit_policy
-    style_policy_str = "automatic scene" if caps.style_policy == STYLE_POLICY_SCENE_AUTO else caps.style_policy
+    if caps.style_policy == STYLE_POLICY_SCENE_AUTO:
+        style_policy_str = "automatic scene"
+    elif caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
+        style_policy_str = "automatic scene outfit style"
+    else:
+        style_policy_str = caps.style_policy
 
-    if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
+    if preset.startswith("transfer_identity_test_d_"):
+        resolved_outfit_str = "scene image (automatic outfit reference)"
+        outfit_selector_report = "automatic (scene image)"
+    elif caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         resolved_outfit_str = "ignored by preset"
+        outfit_selector_report = "ignored by preset"
     elif outfit_source == "none":
         resolved_outfit_str = "none"
+        outfit_selector_report = outfit_source
     else:
         status_str = "present" if resolved_sources.effective_outfit is not None else "missing"
         resolved_outfit_str = f"{outfit_source} ({status_str})"
+        outfit_selector_report = outfit_source
 
-    if caps.style_policy == STYLE_POLICY_SCENE_AUTO:
+    if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_SCENE_OUTFIT_AUTO):
         if resolved_sources.effective_style is not None:
-            resolved_style_str = "scene image (automatic)"
+            kind_label = "automatic outfit style" if caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO else "automatic"
+            resolved_style_str = f"scene image ({kind_label})"
         else:
             resolved_style_str = "none (scene unavailable)"
+        style_selector_report = "automatic (scene image)"
     elif caps.style_policy == STYLE_POLICY_DISABLED:
         resolved_style_str = "ignored by preset"
+        style_selector_report = "ignored by preset"
     elif style_source == "none":
         resolved_style_str = "none"
+        style_selector_report = style_source
     else:
         status_str = "present" if resolved_sources.effective_style is not None else "missing"
         resolved_style_str = f"{style_source} ({status_str})"
-
-    outfit_selector_report = "ignored by preset" if caps.outfit_policy == OUTFIT_POLICY_DISABLED else outfit_source
-    style_selector_report = (
-        "ignored by preset" if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_DISABLED) else style_source
-    )
+        style_selector_report = style_source
 
     app_refs = []
     for _, boost, alias, _ in route.edit_references:

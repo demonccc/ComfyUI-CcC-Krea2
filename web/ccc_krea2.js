@@ -221,6 +221,59 @@ app.registerExtension({
                     "transfer_identity_test_4",
                     "transfer_identity_test_5",
                     "transfer_identity_test_6",
+                    // Group A
+                    "transfer_identity_test_a_4_4",
+                    "transfer_identity_test_a_4_5",
+                    "transfer_identity_test_a_4_6",
+                    // Group B
+                    "transfer_identity_test_b_2_5_4",
+                    "transfer_identity_test_b_2_5_5",
+                    "transfer_identity_test_b_2_5_6",
+                    // Group C
+                    "transfer_identity_test_c_4_4",
+                    "transfer_identity_test_c_4_5",
+                    "transfer_identity_test_c_4_6",
+                    "transfer_identity_test_c_4_7",
+                    "transfer_identity_test_c_2_5_4",
+                    "transfer_identity_test_c_2_5_5",
+                    "transfer_identity_test_c_2_5_6",
+                    "transfer_identity_test_c_2_5_9",
+                    // Group D
+                    "transfer_identity_test_d_s2_5_o2_5",
+                    "transfer_identity_test_d_s2_5_o4",
+                    "transfer_identity_test_d_s4_o4",
+                    "transfer_identity_test_d_s5_o4",
+                    "transfer_identity_test_d_s6_o4",
+                    "transfer_identity_test_d_s7_o4",
+                ];
+
+                const GROUP_A_PRESETS = [
+                    "transfer_identity_test_a_4_4",
+                    "transfer_identity_test_a_4_5",
+                    "transfer_identity_test_a_4_6",
+                ];
+                const GROUP_B_PRESETS = [
+                    "transfer_identity_test_b_2_5_4",
+                    "transfer_identity_test_b_2_5_5",
+                    "transfer_identity_test_b_2_5_6",
+                ];
+                const GROUP_C_PRESETS = [
+                    "transfer_identity_test_c_4_4",
+                    "transfer_identity_test_c_4_5",
+                    "transfer_identity_test_c_4_6",
+                    "transfer_identity_test_c_4_7",
+                    "transfer_identity_test_c_2_5_4",
+                    "transfer_identity_test_c_2_5_5",
+                    "transfer_identity_test_c_2_5_6",
+                    "transfer_identity_test_c_2_5_9",
+                ];
+                const GROUP_D_PRESETS = [
+                    "transfer_identity_test_d_s2_5_o2_5",
+                    "transfer_identity_test_d_s2_5_o4",
+                    "transfer_identity_test_d_s4_o4",
+                    "transfer_identity_test_d_s5_o4",
+                    "transfer_identity_test_d_s6_o4",
+                    "transfer_identity_test_d_s7_o4",
                 ];
 
                 const LEGACY_PRESETS = [
@@ -377,9 +430,13 @@ app.registerExtension({
                     }
 
                     const preset = presetWidget?.value || "balanced";
+                    const isGroupD = GROUP_D_PRESETS.includes(preset);
+                    const isGroupC = GROUP_C_PRESETS.includes(preset);
                     const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", ...IDENTITY_TEST_PRESETS].includes(preset);
-                    const isStyleDisabled = preset === "transfer_identity_test_5";
-                    const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation", "identity_transfer", "transfer_identity_test_2", "transfer_identity_test_3", "transfer_identity_test_4", "transfer_identity_test_6"].includes(preset);
+                    const isStyleDisabled = preset === "transfer_identity_test_5" || isGroupD;
+                    const isSceneOutfitStyle = isGroupC;
+                    const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation", "identity_transfer", "transfer_identity_test_2", "transfer_identity_test_3", "transfer_identity_test_4", "transfer_identity_test_6", ...GROUP_A_PRESETS, ...GROUP_B_PRESETS].includes(preset);
+                    const isSceneAutoOutfit = isGroupD;
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
                     const sceneInput = node.inputs?.find(i => i.name === "scene");
@@ -394,15 +451,35 @@ app.registerExtension({
                     const styleSocketIsUsedAsOutfit = usesOutfit && outfitSource === "style image";
 
                     if (outfitSourceWidget) {
-                        outfitSourceWidget.disabled = !usesOutfit;
+                        if (isSceneAutoOutfit) {
+                            outfitSourceWidget.disabled = true;
+                            outfitSourceWidget.label = "Outfit Source [Auto: Scene]";
+                            outfitSourceWidget.tooltip = "Automatically uses the Scene image as the outfit reference.";
+                        } else if (!usesOutfit) {
+                            outfitSourceWidget.disabled = true;
+                            delete outfitSourceWidget.label;
+                            outfitSourceWidget.tooltip = "Outfit source selector is disabled for this preset.";
+                        } else {
+                            outfitSourceWidget.disabled = false;
+                            delete outfitSourceWidget.label;
+                            outfitSourceWidget.tooltip = "Source image socket to use for outfit conditioning.";
+                        }
                     }
-                    if (outfitInput) outfitInput.disabled = !usesOutfit;
+                    if (outfitInput) {
+                        outfitInput.disabled = isSceneAutoOutfit || !usesOutfit;
+                    }
 
                     if (styleSourceWidget) {
                         if (isStyleDisabled) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Disabled]";
-                            styleSourceWidget.tooltip = "Transfer Identity Test 5 intentionally disables Scene style reinforcement.";
+                            styleSourceWidget.tooltip = isGroupD
+                                ? "Transfer Identity Test D intentionally disables style reinforcement in favor of Scene-as-Outfit appearance reference."
+                                : "Transfer Identity Test 5 intentionally disables Scene style reinforcement.";
+                        } else if (isSceneOutfitStyle) {
+                            styleSourceWidget.disabled = true;
+                            styleSourceWidget.label = "Style Source [Auto: Scene Outfit]";
+                            styleSourceWidget.tooltip = "Uses the Scene image as outfit-focused style conditioning to reinforce the target woman's clothing and accessories.";
                         } else if (isSceneAutoStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene]";
@@ -421,7 +498,7 @@ app.registerExtension({
                     }
 
                     if (styleInput) {
-                        if (isStyleDisabled) {
+                        if (isStyleDisabled || isSceneOutfitStyle) {
                             styleInput.disabled = true;
                         } else if (isSceneAutoStyle) {
                             styleInput.disabled = !styleSocketIsUsedAsOutfit;
@@ -435,16 +512,16 @@ app.registerExtension({
                     const hasRawO = !!(outfitInput && outfitInput.link != null);
                     const hasRawSt = !!(styleInput && styleInput.link != null);
 
-                    const effectiveOutfitSource = usesOutfit ? outfitSource : "none";
-                    const effectiveStyleSource = isStyleDisabled ? "none" : (isSceneAutoStyle ? "scene image" : styleSource);
+                    const effectiveOutfitSource = isSceneAutoOutfit ? "scene image" : (usesOutfit ? outfitSource : "none");
+                    const effectiveStyleSource = isStyleDisabled ? "none" : ((isSceneAutoStyle || isSceneOutfitStyle) ? "scene image" : styleSource);
 
-                    const hasO = usesOutfit && (
+                    const hasO = isSceneAutoOutfit ? hasSc : (usesOutfit && (
                         (effectiveOutfitSource === "outfit image" && hasRawO) ||
                         (effectiveOutfitSource === "scene image" && hasSc) ||
                         (effectiveOutfitSource === "style image" && hasRawSt)
-                    );
+                    ));
 
-                    const hasSt = isStyleDisabled ? false : (isSceneAutoStyle ? hasSc : (
+                    const hasSt = isStyleDisabled ? false : ((isSceneAutoStyle || isSceneOutfitStyle) ? hasSc : (
                         (effectiveStyleSource === "style image" && hasRawSt) ||
                         (effectiveStyleSource === "scene image" && hasSc) ||
                         (effectiveStyleSource === "subject image" && hasS)

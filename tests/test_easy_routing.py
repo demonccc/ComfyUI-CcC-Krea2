@@ -1896,7 +1896,7 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
-    assert len(all_presets) == 16
+    assert len(all_presets) == 36
 
     roles = ["subject", "scene", "outfit", "scene+outfit"]
 
@@ -1912,3 +1912,111 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
             assert fit_single == "contain", (
                 f"Preset '{preset}' for role '{role}' under single-source returned '{fit_single}', expected 'contain'"
             )
+
+
+def test_identity_transfer_experimental_presets_group_a_and_b():
+    """Verify Group A and Group B presets route scene boost and subject boost accurately."""
+    from ccc_krea2.easy_routing import resolve_easy_sources, route_easy_preset
+
+    S = object()
+    Sc = object()
+
+    # Group A
+    src_a44 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_a_4_4")
+    route_a44 = route_easy_preset(src_a44, "transfer_identity_test_a_4_4")
+    assert route_a44.target_content_mode == "empty"
+    assert len(route_a44.edit_references) == 2
+    assert route_a44.edit_references[0][:3] == (Sc, 4.0, "scene")
+    assert route_a44.edit_references[1][:3] == (S, 4.0, "subject")
+
+    src_a45 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_a_4_5")
+    route_a45 = route_easy_preset(src_a45, "transfer_identity_test_a_4_5")
+    assert route_a45.edit_references[0][:3] == (Sc, 4.0, "scene")
+    assert route_a45.edit_references[1][:3] == (S, 5.0, "subject")
+
+    src_a46 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_a_4_6")
+    route_a46 = route_easy_preset(src_a46, "transfer_identity_test_a_4_6")
+    assert route_a46.edit_references[0][:3] == (Sc, 4.0, "scene")
+    assert route_a46.edit_references[1][:3] == (S, 6.0, "subject")
+
+    # Group B
+    src_b254 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_b_2_5_4")
+    route_b254 = route_easy_preset(src_b254, "transfer_identity_test_b_2_5_4")
+    assert route_b254.target_content_mode == "empty"
+    assert len(route_b254.edit_references) == 2
+    assert route_b254.edit_references[0][:3] == (Sc, 2.5, "scene")
+    assert route_b254.edit_references[1][:3] == (S, 4.0, "subject")
+
+    src_b255 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_b_2_5_5")
+    route_b255 = route_easy_preset(src_b255, "transfer_identity_test_b_2_5_5")
+    assert route_b255.edit_references[0][:3] == (Sc, 2.5, "scene")
+    assert route_b255.edit_references[1][:3] == (S, 5.0, "subject")
+
+    src_b256 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_b_2_5_6")
+    route_b256 = route_easy_preset(src_b256, "transfer_identity_test_b_2_5_6")
+    assert route_b256.edit_references[0][:3] == (Sc, 2.5, "scene")
+    assert route_b256.edit_references[1][:3] == (S, 6.0, "subject")
+
+
+def test_identity_transfer_experimental_presets_group_c():
+    """Verify Group C presets use automatic scene outfit style instruction and policy."""
+    from ccc_krea2.easy_routing import (
+        resolve_easy_sources,
+        route_easy_preset,
+        get_easy_preset_capabilities,
+        STYLE_POLICY_SCENE_OUTFIT_AUTO,
+        EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
+    )
+
+    S = object()
+    Sc = object()
+
+    caps = get_easy_preset_capabilities("transfer_identity_test_c_4_4")
+    assert caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO
+
+    src = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_c_4_4")
+    route = route_easy_preset(src, "transfer_identity_test_c_4_4")
+    assert route.style_active is True
+    assert route.style_source is Sc
+    assert route.style_config.vision_instruction == EASY_SCENE_OUTFIT_STYLE_INSTRUCTION
+    assert route.edit_references[0][:3] == (Sc, 4.0, "scene")
+    assert route.edit_references[1][:3] == (S, 4.0, "subject")
+
+    src_259 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_c_2_5_9")
+    route_259 = route_easy_preset(src_259, "transfer_identity_test_c_2_5_9")
+    assert route_259.edit_references[0][:3] == (Sc, 2.5, "scene")
+    assert route_259.edit_references[1][:3] == (S, 9.0, "subject")
+
+
+def test_identity_transfer_experimental_presets_group_d():
+    """Verify Group D presets use Scene target latent, Subject reference, and Scene as Outfit reference."""
+    from ccc_krea2.easy_routing import (
+        resolve_easy_sources,
+        route_easy_preset,
+        get_easy_preset_capabilities,
+        STYLE_POLICY_DISABLED,
+    )
+
+    S = object()
+    Sc = object()
+
+    caps = get_easy_preset_capabilities("transfer_identity_test_d_s2_5_o2_5")
+    assert caps.style_policy == STYLE_POLICY_DISABLED
+
+    src = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_d_s2_5_o2_5")
+    route = route_easy_preset(src, "transfer_identity_test_d_s2_5_o2_5")
+    assert route.target_content_mode == "image"
+    assert route.target_content_source is Sc
+    assert route.target_content_role == "scene"
+    assert route.target_content_fit == "contain_no_upscale"
+    assert route.style_active is False
+
+    assert len(route.edit_references) == 2
+    assert route.edit_references[0][:3] == (S, 2.5, "subject")
+    assert route.edit_references[1][:3] == (Sc, 2.5, "outfit")
+
+    src_s7o4 = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_test_d_s7_o4")
+    route_s7o4 = route_easy_preset(src_s7o4, "transfer_identity_test_d_s7_o4")
+    assert route_s7o4.edit_references[0][:3] == (S, 7.0, "subject")
+    assert route_s7o4.edit_references[1][:3] == (Sc, 4.0, "outfit")
+
