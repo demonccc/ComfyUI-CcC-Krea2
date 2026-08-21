@@ -1136,6 +1136,98 @@ class TestIdentityTransferMatrix:
         )
         assert len(route.edit_references) == 2
 
+
+class TestIdentityTestPresetsMatrix:
+    def test_transfer_identity_test_2(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="transfer_identity_test_2", subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="transfer_identity_test_2")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [
+                (Sc, 2.5, "scene"),
+                (S, 7.0, "subject"),
+            ],
+        )
+        assert route.style_active is True
+        assert route.style_source is Sc
+
+    def test_transfer_identity_test_3(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="transfer_identity_test_3", subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="transfer_identity_test_3")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [
+                (Sc, 4.0, "scene"),
+                (S, 7.0, "subject"),
+            ],
+        )
+        assert route.style_active is True
+        assert route.style_source is Sc
+
+    def test_transfer_identity_test_4(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="transfer_identity_test_4", subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="transfer_identity_test_4")
+        assert route.target_content_mode == "empty"
+        assert route.target_content_source is None
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [
+                (Sc, 2.5, "scene"),
+                (S, 9.0, "subject"),
+            ],
+        )
+        assert route.style_active is True
+        assert route.style_source is Sc
+
+    def test_transfer_identity_test_5(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="transfer_identity_test_5", subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="transfer_identity_test_5")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene"
+        assert route.target_content_fit == "contain_no_upscale"
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [
+                (S, 7.0, "subject"),
+            ],
+        )
+        assert len(route.edit_references) == 1
+        assert route.style_active is False
+        assert route.style_source is None
+
+    def test_transfer_identity_test_6(self, dummy_sources):
+        S, Sc, Ou, _ = dummy_sources
+        sources = resolve_easy_sources(preset="transfer_identity_test_6", subject=S, scene=Sc)
+        route = route_easy_preset(sources, preset="transfer_identity_test_6")
+        assert route.target_content_mode == "image"
+        assert route.target_content_source is Sc
+        assert route.target_content_role == "scene"
+        assert route.target_content_fit == "contain_no_upscale"
+        assert route.target_geometry_source is Sc
+        assert_refs(
+            route.edit_references,
+            [
+                (S, 7.0, "subject"),
+            ],
+        )
+        assert len(route.edit_references) == 1
+        assert route.style_active is True
+        assert route.style_source is Sc
+
+
     def test_scene_as_outfit_without_subject(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
         sources = resolve_easy_sources(scene=Sc, outfit_source="scene image")
@@ -1804,7 +1896,7 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
-    assert len(all_presets) == 11
+    assert len(all_presets) == 16
 
     roles = ["subject", "scene", "outfit", "scene+outfit"]
 

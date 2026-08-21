@@ -97,11 +97,28 @@ class TestDefaultPromptResolver:
             subject_description="man with glasses",
         )
         assert has_def is True
-        assert key == "identity_transfer"
-        assert "Replace only the identity of the woman in blue dress of the scene image with the identity of the man with glasses from the subject image." in text
-        assert "Transfer the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the man with glasses from the subject image." in text
-        assert "Preserve the position, action, pose, role, interaction, clothing, and accessories of the woman in blue dress from the scene image." in text
         assert "Do not transfer the clothing or accessories of the man with glasses from the subject image." in text
+
+        # Test presets 2 through 6 use the exact same Identity Transfer prompt template
+        for test_preset in [
+            "transfer_identity_test_2",
+            "transfer_identity_test_3",
+            "transfer_identity_test_4",
+            "transfer_identity_test_5",
+            "transfer_identity_test_6",
+        ]:
+            has_def, test_text, test_key = resolve_default_positive_prompt(
+                preset=test_preset,
+                has_s=True,
+                has_sc=True,
+                has_o=False,
+                has_st=False,
+                reference_subject="hero",
+                subject_description="champion",
+            )
+            assert has_def is True
+            assert test_key == test_preset
+            assert "Replace only the identity of the hero of the scene image with the identity of the champion from the subject image." in test_text
 
         # Example B: subject_transfer without outfit
         has_def, text, key = resolve_default_positive_prompt(

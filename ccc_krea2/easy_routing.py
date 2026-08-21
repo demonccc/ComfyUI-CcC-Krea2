@@ -231,11 +231,18 @@ def resolve_default_positive_prompt(
     base_template = ""
     base_key = ""
 
-    if preset == "identity_transfer":
+    if preset in {
+        "identity_transfer",
+        "transfer_identity_test_2",
+        "transfer_identity_test_3",
+        "transfer_identity_test_4",
+        "transfer_identity_test_5",
+        "transfer_identity_test_6",
+    }:
         if not (has_s and has_sc):
             return False, "", "none"
         base_template = EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER
-        base_key = "identity_transfer"
+        base_key = preset
         return True, render_easy_prompt(base_template, context), base_key
 
     elif preset == "subject_transfer":
@@ -347,6 +354,21 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "preserve_identity": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "max_identity": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "identity_transfer": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
+    "transfer_identity_test_2": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
+    "transfer_identity_test_3": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
+    "transfer_identity_test_4": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
+    "transfer_identity_test_5": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+    ),
+    "transfer_identity_test_6": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
     "subject_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_SCENE_AUTO),
@@ -896,25 +918,78 @@ def route_easy_preset(
             elif outfit_is_distinct:
                 refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
 
-    elif preset == "identity_transfer":
+    elif preset in (
+        "identity_transfer",
+        "transfer_identity_test_2",
+        "transfer_identity_test_3",
+        "transfer_identity_test_4",
+        "transfer_identity_test_5",
+        "transfer_identity_test_6",
+    ):
         if not has_s:
             preset_warnings.append(
-                "preset 'identity_transfer' selected but Subject source is missing; no identity can be transferred."
+                f"preset '{preset}' selected but Subject source is missing; no identity can be transferred."
             )
         if not has_sc:
             preset_warnings.append(
-                "preset 'identity_transfer' selected but Scene source is missing; target Scene is missing."
+                f"preset '{preset}' selected but Scene source is missing; target Scene is missing."
             )
 
         if has_sc and has_s:
-            target_content_mode = "image"
-            target_content_source = S
-            target_content_role = "subject"
-            target_content_fit = "contain_no_upscale"
-            target_geometry_mode, target_geometry_source = "favor_image", Sc
+            if preset == "identity_transfer":
+                target_content_mode = "image"
+                target_content_source = S
+                target_content_role = "subject"
+                target_content_fit = "contain_no_upscale"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-            refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
-            refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
+                refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
+                refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
+
+            elif preset == "transfer_identity_test_2":
+                target_content_mode = "empty"
+                target_content_source = None
+                target_content_role = "none"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                refs.append(_ref(Sc, 2.5, "scene"))
+                refs.append(_ref(S, 7.0, "subject"))
+
+            elif preset == "transfer_identity_test_3":
+                target_content_mode = "empty"
+                target_content_source = None
+                target_content_role = "none"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                refs.append(_ref(Sc, 4.0, "scene"))
+                refs.append(_ref(S, 7.0, "subject"))
+
+            elif preset == "transfer_identity_test_4":
+                target_content_mode = "empty"
+                target_content_source = None
+                target_content_role = "none"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                refs.append(_ref(Sc, 2.5, "scene"))
+                refs.append(_ref(S, 9.0, "subject"))
+
+            elif preset == "transfer_identity_test_5":
+                target_content_mode = "image"
+                target_content_source = Sc
+                target_content_role = "scene"
+                target_content_fit = "contain_no_upscale"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                refs.append(_ref(S, 7.0, "subject"))
+
+            elif preset == "transfer_identity_test_6":
+                target_content_mode = "image"
+                target_content_source = Sc
+                target_content_role = "scene"
+                target_content_fit = "contain_no_upscale"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                refs.append(_ref(S, 7.0, "subject"))
         else:
             target_content_mode = "empty"
             target_content_source = None
@@ -923,7 +998,8 @@ def route_easy_preset(
             if has_s:
                 refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
             elif has_sc:
-                refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
+                scene_boost = 4.0 if preset == "transfer_identity_test_3" else 2.5
+                refs.append(_ref(Sc, scene_boost, "scene"))
 
     elif preset == "subject_transfer":
         if not has_s:
