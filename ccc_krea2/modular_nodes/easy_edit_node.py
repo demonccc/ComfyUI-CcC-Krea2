@@ -623,6 +623,31 @@ def _execute_easy_edit(
         ]
     )
 
+    if preset.startswith("transfer_identity_test_c_") or caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
+        easy_header.extend(
+            [
+                "Outfit Style Active: yes",
+                "Outfit Style Source: scene image",
+                "Outfit Style Processing: 2x2",
+                "Outfit Style Fidelity: 1.0",
+                "Outfit Style Indirect: no",
+                "Outfit Style Instruction Active: yes",
+            ]
+        )
+
+    if preset.startswith("transfer_identity_test_d_"):
+        outfit_ref = next((r for r in route.edit_references if r[2] == "outfit"), None)
+        actual_outfit_boost = outfit_ref[1] if outfit_ref else 4.0
+        easy_header.extend(
+            [
+                "Outfit Reference Active: yes",
+                "Outfit Reference Source: scene image",
+                "Outfit Reference Role: outfit",
+                f"Outfit Reference Boost: {actual_outfit_boost:.1f}",
+                "Scene Generic Appearance Reference Active: no",
+            ]
+        )
+
     if backend_method == "krea2_edit":
         easy_header.append(f"CcC Krea2 Model Patch Applied: {'yes' if apply_patch else 'no'}")
     elif backend_method == "ostris_edit":

@@ -276,7 +276,54 @@ app.registerExtension({
                     "transfer_identity_test_d_s7_o4",
                 ];
 
-                const LEGACY_PRESETS = [
+                const PRESET_DISPLAY_LABELS = {
+                    "flexible": "Flexible",
+                    "balanced": "Balanced",
+                    "consistent": "Consistent",
+                    "preserve_identity": "Preserve Identity",
+                    "max_identity": "Max Identity",
+                    "identity_transfer": "Identity Transfer",
+                    "transfer_identity_test_2": "Transfer Identity Test 2",
+                    "transfer_identity_test_3": "Transfer Identity Test 3 - Scene 4 / Subject 7",
+                    "transfer_identity_test_4": "Transfer Identity Test 4 - Scene 2.5 / Subject 9",
+                    "transfer_identity_test_5": "Transfer Identity Test 5",
+                    "transfer_identity_test_6": "Transfer Identity Test 6",
+                    "subject_transfer": "Subject Transfer",
+                    "preserve_scene": "Preserve Scene",
+                    "outfit_transfer": "Outfit Transfer",
+                    "style_transfer": "Style Transfer",
+                    "scene_reinterpretation": "Scene Reinterpretation",
+                    // Group A
+                    "transfer_identity_test_a_4_4": "Transfer Identity A - Scene 4 / Subject 4",
+                    "transfer_identity_test_a_4_5": "Transfer Identity A - Scene 4 / Subject 5",
+                    "transfer_identity_test_a_4_6": "Transfer Identity A - Scene 4 / Subject 6",
+                    // Group B
+                    "transfer_identity_test_b_2_5_4": "Transfer Identity B - Scene 2.5 / Subject 4",
+                    "transfer_identity_test_b_2_5_5": "Transfer Identity B - Scene 2.5 / Subject 5",
+                    "transfer_identity_test_b_2_5_6": "Transfer Identity B - Scene 2.5 / Subject 6",
+                    // Group C
+                    "transfer_identity_test_c_4_4": "Transfer Identity C - Scene 4 / Subject 4 + Outfit Style",
+                    "transfer_identity_test_c_4_5": "Transfer Identity C - Scene 4 / Subject 5 + Outfit Style",
+                    "transfer_identity_test_c_4_6": "Transfer Identity C - Scene 4 / Subject 6 + Outfit Style",
+                    "transfer_identity_test_c_4_7": "Transfer Identity C - Scene 4 / Subject 7 + Outfit Style",
+                    "transfer_identity_test_c_2_5_4": "Transfer Identity C - Scene 2.5 / Subject 4 + Outfit Style",
+                    "transfer_identity_test_c_2_5_5": "Transfer Identity C - Scene 2.5 / Subject 5 + Outfit Style",
+                    "transfer_identity_test_c_2_5_6": "Transfer Identity C - Scene 2.5 / Subject 6 + Outfit Style",
+                    "transfer_identity_test_c_2_5_9": "Transfer Identity C - Scene 2.5 / Subject 9 + Outfit Style",
+                    // Group D
+                    "transfer_identity_test_d_s2_5_o2_5": "Transfer Identity D - Subject 2.5 / Outfit 2.5",
+                    "transfer_identity_test_d_s2_5_o4": "Transfer Identity D - Subject 2.5 / Outfit 4",
+                    "transfer_identity_test_d_s4_o4": "Transfer Identity D - Subject 4 / Outfit 4",
+                    "transfer_identity_test_d_s5_o4": "Transfer Identity D - Subject 5 / Outfit 4",
+                    "transfer_identity_test_d_s6_o4": "Transfer Identity D - Subject 6 / Outfit 4",
+                    "transfer_identity_test_d_s7_o4": "Transfer Identity D - Subject 7 / Outfit 4",
+                };
+
+                const DISPLAY_TO_PRESET_ID = Object.fromEntries(
+                    Object.entries(PRESET_DISPLAY_LABELS).map(([k, v]) => [v, k])
+                );
+
+                const migrateLegacyEasyEditWidgets = (info) => {
                     "flexible",
                     "balanced",
                     "consistent",
@@ -588,10 +635,25 @@ app.registerExtension({
                     };
                 }
 
+                if (presetWidget) {
+                    presetWidget.formatValue = (val) => PRESET_DISPLAY_LABELS[val] || val;
+                    const origValues = presetWidget.options?.values;
+                    if (presetWidget.options) {
+                        presetWidget.options.values = () => {
+                            const raw = typeof origValues === "function" ? origValues() : (origValues || Object.keys(PRESET_DISPLAY_LABELS));
+                            return raw.map(v => PRESET_DISPLAY_LABELS[v] || v);
+                        };
+                    }
+                }
+
                 [presetWidget, refSubjWidget, subjDescWidget, outfitSourceWidget, styleSourceWidget].forEach(w => {
                     if (w) {
                         const orig = w.callback;
-                        w.callback = function () {
+                        w.callback = function (val) {
+                            if (w === presetWidget && DISPLAY_TO_PRESET_ID[val]) {
+                                this.value = DISPLAY_TO_PRESET_ID[val];
+                                val = this.value;
+                            }
                             if (orig) orig.apply(this, arguments);
                             updatePromptState();
                         };
