@@ -158,7 +158,7 @@ def test_js_prompt_ui_behavior():
     assert "[presetWidget, refSubjWidget, subjDescWidget, outfitSourceWidget, styleSourceWidget]" in js_code
     assert "onConnectionsChange" in js_code
     assert "onConfigure" in js_code
-    assert "setTimeout(updatePromptState, 20);" in js_code
+    assert "schedulePromptStateUpdate();" in js_code
 
 
 def test_js_no_use_default_value_mutation_in_update_prompt_state():
@@ -175,5 +175,36 @@ def test_js_no_use_default_value_mutation_in_update_prompt_state():
     assert "useDefaultWidget.value = false" not in fn_body, (
         "updatePromptState() must not overwrite user's useDefaultWidget.value preference"
     )
+
+
+def test_experimental_preset_display_labels():
+    """Verify all experimental calibration presets have [Experimental...] display label prefixes and map to internal IDs."""
+    from ccc_krea2.easy_routing import (
+        IDENTITY_TEST_PRESETS,
+        EASY_PRESET_DISPLAY_LABELS,
+    )
+    for preset_id in IDENTITY_TEST_PRESETS:
+        if preset_id == "identity_transfer":
+            continue
+        label = EASY_PRESET_DISPLAY_LABELS[preset_id]
+        assert label.startswith("[Experimental"), f"Preset '{preset_id}' label '{label}' must start with '[Experimental'"
+
+
+def test_legacy_preset_migration_defaults_true():
+    """Verify legacy workflow migration splices use_default_prompt = true (matching node default)."""
+    js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
+    js_code = js_path.read_text(encoding="utf-8")
+
+    assert "vals.splice(1, 0, true);" in js_code, "Legacy widget migration must default use_default_prompt to true"
+
+
+def test_js_dom_readonly_controls():
+    """Verify readOnly and disabled properties are applied to DOM input controls."""
+    js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
+    js_code = js_path.read_text(encoding="utf-8")
+
+    assert "posPromptWidget.inputEl.readOnly = true;" in js_code
+    assert "posPromptWidget.inputEl.disabled = true;" in js_code
+
 
 

@@ -283,40 +283,41 @@ app.registerExtension({
                     "preserve_identity": "Preserve Identity",
                     "max_identity": "Max Identity",
                     "identity_transfer": "Identity Transfer",
-                    "transfer_identity_test_2": "Transfer Identity Test 2",
-                    "transfer_identity_test_3": "Transfer Identity Test 3 - Scene 4 / Subject 7",
-                    "transfer_identity_test_4": "Transfer Identity Test 4 - Scene 2.5 / Subject 9",
-                    "transfer_identity_test_5": "Transfer Identity Test 5",
-                    "transfer_identity_test_6": "Transfer Identity Test 6",
                     "subject_transfer": "Subject Transfer",
                     "preserve_scene": "Preserve Scene",
                     "outfit_transfer": "Outfit Transfer",
                     "style_transfer": "Style Transfer",
                     "scene_reinterpretation": "Scene Reinterpretation",
+                    // Experimental calibration presets
+                    "transfer_identity_test_2": "[Experimental] Identity Test 2",
+                    "transfer_identity_test_3": "[Experimental] Identity Test 3 — Scene 4 / Subject 7",
+                    "transfer_identity_test_4": "[Experimental] Identity Test 4 — Scene 2.5 / Subject 9",
+                    "transfer_identity_test_5": "[Experimental] Identity Test 5",
+                    "transfer_identity_test_6": "[Experimental] Identity Test 6",
                     // Group A
-                    "transfer_identity_test_a_4_4": "Transfer Identity A - Scene 4 / Subject 4",
-                    "transfer_identity_test_a_4_5": "Transfer Identity A - Scene 4 / Subject 5",
-                    "transfer_identity_test_a_4_6": "Transfer Identity A - Scene 4 / Subject 6",
+                    "transfer_identity_test_a_4_4": "[Experimental A] Scene 4 / Subject 4",
+                    "transfer_identity_test_a_4_5": "[Experimental A] Scene 4 / Subject 5",
+                    "transfer_identity_test_a_4_6": "[Experimental A] Scene 4 / Subject 6",
                     // Group B
-                    "transfer_identity_test_b_2_5_4": "Transfer Identity B - Scene 2.5 / Subject 4",
-                    "transfer_identity_test_b_2_5_5": "Transfer Identity B - Scene 2.5 / Subject 5",
-                    "transfer_identity_test_b_2_5_6": "Transfer Identity B - Scene 2.5 / Subject 6",
+                    "transfer_identity_test_b_2_5_4": "[Experimental B] Scene 2.5 / Subject 4",
+                    "transfer_identity_test_b_2_5_5": "[Experimental B] Scene 2.5 / Subject 5",
+                    "transfer_identity_test_b_2_5_6": "[Experimental B] Scene 2.5 / Subject 6",
                     // Group C
-                    "transfer_identity_test_c_4_4": "Transfer Identity C - Scene 4 / Subject 4 + Outfit Style",
-                    "transfer_identity_test_c_4_5": "Transfer Identity C - Scene 4 / Subject 5 + Outfit Style",
-                    "transfer_identity_test_c_4_6": "Transfer Identity C - Scene 4 / Subject 6 + Outfit Style",
-                    "transfer_identity_test_c_4_7": "Transfer Identity C - Scene 4 / Subject 7 + Outfit Style",
-                    "transfer_identity_test_c_2_5_4": "Transfer Identity C - Scene 2.5 / Subject 4 + Outfit Style",
-                    "transfer_identity_test_c_2_5_5": "Transfer Identity C - Scene 2.5 / Subject 5 + Outfit Style",
-                    "transfer_identity_test_c_2_5_6": "Transfer Identity C - Scene 2.5 / Subject 6 + Outfit Style",
-                    "transfer_identity_test_c_2_5_9": "Transfer Identity C - Scene 2.5 / Subject 9 + Outfit Style",
+                    "transfer_identity_test_c_4_4": "[Experimental C] Scene 4 / Subject 4 + Outfit Style",
+                    "transfer_identity_test_c_4_5": "[Experimental C] Scene 4 / Subject 5 + Outfit Style",
+                    "transfer_identity_test_c_4_6": "[Experimental C] Scene 4 / Subject 6 + Outfit Style",
+                    "transfer_identity_test_c_4_7": "[Experimental C] Scene 4 / Subject 7 + Outfit Style",
+                    "transfer_identity_test_c_2_5_4": "[Experimental C] Scene 2.5 / Subject 4 + Outfit Style",
+                    "transfer_identity_test_c_2_5_5": "[Experimental C] Scene 2.5 / Subject 5 + Outfit Style",
+                    "transfer_identity_test_c_2_5_6": "[Experimental C] Scene 2.5 / Subject 6 + Outfit Style",
+                    "transfer_identity_test_c_2_5_9": "[Experimental C] Scene 2.5 / Subject 9 + Outfit Style",
                     // Group D
-                    "transfer_identity_test_d_s2_5_o2_5": "Transfer Identity D - Subject 2.5 / Outfit 2.5",
-                    "transfer_identity_test_d_s2_5_o4": "Transfer Identity D - Subject 2.5 / Outfit 4",
-                    "transfer_identity_test_d_s4_o4": "Transfer Identity D - Subject 4 / Outfit 4",
-                    "transfer_identity_test_d_s5_o4": "Transfer Identity D - Subject 5 / Outfit 4",
-                    "transfer_identity_test_d_s6_o4": "Transfer Identity D - Subject 6 / Outfit 4",
-                    "transfer_identity_test_d_s7_o4": "Transfer Identity D - Subject 7 / Outfit 4",
+                    "transfer_identity_test_d_s2_5_o2_5": "[Experimental D] Subject 2.5 / Outfit 2.5",
+                    "transfer_identity_test_d_s2_5_o4": "[Experimental D] Subject 2.5 / Outfit 4",
+                    "transfer_identity_test_d_s4_o4": "[Experimental D] Subject 4 / Outfit 4",
+                    "transfer_identity_test_d_s5_o4": "[Experimental D] Subject 5 / Outfit 4",
+                    "transfer_identity_test_d_s6_o4": "[Experimental D] Subject 6 / Outfit 4",
+                    "transfer_identity_test_d_s7_o4": "[Experimental D] Subject 7 / Outfit 4",
                 };
 
                 const DISPLAY_TO_PRESET_ID = Object.fromEntries(
@@ -330,11 +331,6 @@ app.registerExtension({
                     "preserve_identity",
                     "max_identity",
                     "identity_transfer",
-                    "transfer_identity_test_2",
-                    "transfer_identity_test_3",
-                    "transfer_identity_test_4",
-                    "transfer_identity_test_5",
-                    "transfer_identity_test_6",
                     "subject_transfer",
                     "preserve_scene",
                     "outfit_transfer",
@@ -350,10 +346,10 @@ app.registerExtension({
                     let valAtIndex1 = vals[1];
 
                     // 1. If index 1 is a preset string (older schema 1 without use_default_prompt), splice use_default_prompt boolean
-                    if (typeof valAtIndex1 === "string" && LEGACY_PRESETS.includes(valAtIndex1)) {
-                        vals.splice(1, 0, false);
-                        node._isPromptSystemManaged = false;
-                        valAtIndex1 = false;
+                    if (typeof valAtIndex1 === "string" && (LEGACY_PRESETS.includes(valAtIndex1) || valAtIndex1.startsWith("transfer_identity_test_"))) {
+                        vals.splice(1, 0, true);
+                        node._isPromptSystemManaged = true;
+                        valAtIndex1 = true;
                     }
 
                     // 2. Schema check for reference_subject and subject_description fields (index 3 and 4)
@@ -371,11 +367,41 @@ app.registerExtension({
                     }
                 };
 
+                let updateTimer = null;
+                let updateRaf = null;
+
+                const schedulePromptStateUpdate = () => {
+                    updatePromptState();
+
+                    if (updateTimer) clearTimeout(updateTimer);
+                    if (updateRaf && typeof requestAnimationFrame === "function") {
+                        cancelAnimationFrame(updateRaf);
+                        updateRaf = null;
+                    }
+
+                    const runDeferredPasses = () => {
+                        updatePromptState();
+                        updateTimer = setTimeout(() => {
+                            updatePromptState();
+                            updateTimer = null;
+                        }, 50);
+                    };
+
+                    if (typeof requestAnimationFrame === "function") {
+                        updateRaf = requestAnimationFrame(() => {
+                            updateRaf = null;
+                            runDeferredPasses();
+                        });
+                    } else {
+                        updateTimer = setTimeout(runDeferredPasses, 20);
+                    }
+                };
+
                 const origOnConfigure = node.onConfigure;
                 node.onConfigure = function (info) {
                     migrateLegacyEasyEditWidgets(info);
                     if (origOnConfigure) origOnConfigure.apply(this, arguments);
-                    updatePromptState();
+                    schedulePromptStateUpdate();
                 };
 
                 const renderJsEasyPrompt = (template, context) => {
@@ -454,75 +480,46 @@ app.registerExtension({
                         else if (hasO) baseTemplate = EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER;
                     }
 
-                    if (hasSt && preset !== "style_transfer") {
-                        const renderedStyle = renderJsEasyPrompt(EASY_DEFAULT_PROMPT_STYLE, context);
-                        if (baseTemplate) {
-                            const renderedBase = renderJsEasyPrompt(baseTemplate, context);
-                            return { hasDefault: true, text: `${renderedBase}\n\n${renderedStyle}` };
-                        }
-                        return { hasDefault: true, text: renderedStyle };
-                    }
-
-                    if (baseTemplate) {
-                        return { hasDefault: true, text: renderJsEasyPrompt(baseTemplate, context) };
-                    }
-                    return { hasDefault: false, text: "" };
+                    if (!baseTemplate) return { hasDefault: false, text: "" };
+                    return { hasDefault: true, text: renderJsEasyPrompt(baseTemplate, context) };
                 };
 
                 const updatePromptState = () => {
-                    if (!useDefaultWidget || !posPromptWidget) return;
+                    const preset = presetWidget ? (DISPLAY_TO_PRESET_ID[presetWidget.value] || presetWidget.value) : "flexible";
+                    const isIdentityTransfer = IDENTITY_TEST_PRESETS.includes(preset);
+                    const isSubjectTransfer = preset === "subject_transfer";
+                    const isPreserveScene = preset === "preserve_scene";
+                    const isOutfitTransfer = preset === "outfit_transfer";
+                    const isStyleTransfer = preset === "style_transfer";
+                    const isSceneReinterpretation = preset === "scene_reinterpretation";
 
-                    if (node._isPromptSystemManaged === undefined) {
-                        node._isPromptSystemManaged = !!useDefaultWidget.value;
-                    }
+                    const usesOutfit = isSubjectTransfer || isPreserveScene || isOutfitTransfer || isStyleTransfer || isSceneReinterpretation;
+                    const usesStyle = isStyleTransfer;
 
-                    const preset = presetWidget?.value || "balanced";
-                    const isGroupD = GROUP_D_PRESETS.includes(preset);
-                    const isGroupC = GROUP_C_PRESETS.includes(preset);
-                    const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", ...IDENTITY_TEST_PRESETS].includes(preset);
-                    const isStyleDisabled = preset === "transfer_identity_test_5" || isGroupD;
-                    const isSceneOutfitStyle = isGroupC;
-                    const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation", "identity_transfer", "transfer_identity_test_2", "transfer_identity_test_3", "transfer_identity_test_4", "transfer_identity_test_6", ...GROUP_A_PRESETS, ...GROUP_B_PRESETS].includes(preset);
-                    const isSceneAutoOutfit = isGroupD;
+                    if (outfitSourceWidget) outfitSourceWidget.disabled = !usesOutfit;
+                    if (styleSourceWidget) styleSourceWidget.disabled = !usesStyle;
+
+                    const outfitSource = outfitSourceWidget ? outfitSourceWidget.value : "outfit image";
+                    const styleSource = styleSourceWidget ? styleSourceWidget.value : "style image";
+
+                    const isSceneAutoOutfit = (isSubjectTransfer || isPreserveScene || isSceneReinterpretation) && outfitSource === "scene image";
+                    const isSceneOutfitStyle = GROUP_C_PRESETS.includes(preset);
+                    const isSceneAutoStyle = isPreserveScene || isSceneReinterpretation || (isStyleTransfer && styleSource === "scene image");
+                    const isStyleDisabled = isIdentityTransfer && !isSceneOutfitStyle;
+
+                    const refSubjVal = refSubjWidget ? refSubjWidget.value : "main subject";
+                    const subjDescVal = subjDescWidget ? subjDescWidget.value : "main subject";
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
                     const sceneInput = node.inputs?.find(i => i.name === "scene");
                     const outfitInput = node.inputs?.find(i => i.name === "outfit");
                     const styleInput = node.inputs?.find(i => i.name === "style");
 
-                    const outfitSource = outfitSourceWidget?.value || "outfit image";
-                    const styleSource = styleSourceWidget?.value || "style image";
-                    const refSubjVal = refSubjWidget?.value || "main subject";
-                    const subjDescVal = subjDescWidget?.value || "main subject";
-
-                    const styleSocketIsUsedAsOutfit = usesOutfit && outfitSource === "style image";
-
-                    if (outfitSourceWidget) {
-                        if (isSceneAutoOutfit) {
-                            outfitSourceWidget.disabled = true;
-                            outfitSourceWidget.label = "Outfit Source [Auto: Scene]";
-                            outfitSourceWidget.tooltip = "Automatically uses the Scene image as the outfit reference.";
-                        } else if (!usesOutfit) {
-                            outfitSourceWidget.disabled = true;
-                            delete outfitSourceWidget.label;
-                            outfitSourceWidget.tooltip = "Outfit source selector is disabled for this preset.";
-                        } else {
-                            outfitSourceWidget.disabled = false;
-                            delete outfitSourceWidget.label;
-                            outfitSourceWidget.tooltip = "Source image socket to use for outfit conditioning.";
-                        }
-                    }
-                    if (outfitInput) {
-                        outfitInput.disabled = isSceneAutoOutfit || !usesOutfit;
-                    }
-
                     if (styleSourceWidget) {
                         if (isStyleDisabled) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Disabled]";
-                            styleSourceWidget.tooltip = isGroupD
-                                ? "Transfer Identity Test D intentionally disables style reinforcement in favor of Scene-as-Outfit appearance reference."
-                                : "Transfer Identity Test 5 intentionally disables Scene style reinforcement.";
+                            styleSourceWidget.tooltip = "Style conditioning is disabled for this preset.";
                         } else if (isSceneOutfitStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene Outfit]";
@@ -530,23 +527,18 @@ app.registerExtension({
                         } else if (isSceneAutoStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene]";
-                            let tooltipText = "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
-                            if (IDENTITY_TEST_PRESETS.includes(preset)) {
-                                tooltipText = "Identity Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
-                            } else if (preset === "subject_transfer") {
-                                tooltipText = "Subject Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
-                            }
-                            styleSourceWidget.tooltip = tooltipText;
+                            styleSourceWidget.tooltip = "Uses the Scene image as style conditioning.";
                         } else {
                             styleSourceWidget.disabled = false;
-                            delete styleSourceWidget.label;
-                            styleSourceWidget.tooltip = "Source image socket to use for style conditioning.";
+                            styleSourceWidget.label = "Style Source";
+                            styleSourceWidget.tooltip = "Select the image to use as style conditioning source.";
                         }
                     }
 
                     if (styleInput) {
-                        if (isStyleDisabled || isSceneOutfitStyle) {
-                            styleInput.disabled = true;
+                        const styleSocketIsUsedAsOutfit = usesOutfit && outfitSource === "style image";
+                        if (isStyleDisabled) {
+                            styleInput.disabled = !styleSocketIsUsedAsOutfit;
                         } else if (isSceneAutoStyle) {
                             styleInput.disabled = !styleSocketIsUsedAsOutfit;
                         } else {
@@ -581,45 +573,57 @@ app.registerExtension({
 
                     // Subject description widgets are enabled ONLY when use_default_prompt is ON and preset supports subject fields
                     const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer", "outfit_transfer"].includes(preset);
-                    const enableSubjectFields = useDefaultWidget.value && supportsSubjectFields;
+                    const enableSubjectFields = (useDefaultWidget ? useDefaultWidget.value : false) && supportsSubjectFields;
                     if (refSubjWidget) refSubjWidget.disabled = !enableSubjectFields;
                     if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;
 
                     if (isSubjectOnly || !hasDefault) {
-                        useDefaultWidget.disabled = true;
+                        if (useDefaultWidget) {
+                            useDefaultWidget.disabled = true;
+                        }
                         posPromptWidget.disabled = false;
+                        posPromptWidget.readOnly = false;
                         if (posPromptWidget.inputEl) {
                             posPromptWidget.inputEl.readOnly = false;
+                            posPromptWidget.inputEl.disabled = false;
                             posPromptWidget.inputEl.title = "";
                         }
 
                         if (node._isPromptSystemManaged && isSubjectOnly) {
                             posPromptWidget.value = "";
+                            node._isPromptSystemManaged = false;
                         }
-                        node._isPromptSystemManaged = false;
                     } else {
-                        useDefaultWidget.disabled = false;
+                        if (useDefaultWidget) {
+                            useDefaultWidget.disabled = false;
+                        }
 
-                        if (useDefaultWidget.value && hasDefault) {
+                        if (useDefaultWidget && useDefaultWidget.value && hasDefault) {
                             posPromptWidget.value = text;
                             posPromptWidget.disabled = true;
+                            posPromptWidget.readOnly = true;
                             if (posPromptWidget.inputEl) {
                                 posPromptWidget.inputEl.readOnly = true;
+                                posPromptWidget.inputEl.disabled = true;
                                 posPromptWidget.inputEl.title = "Resolved preset prompt. Disable Use Default Prompt to edit manually.";
                             }
                             node._isPromptSystemManaged = true;
                         } else {
                             posPromptWidget.disabled = false;
+                            posPromptWidget.readOnly = false;
                             if (posPromptWidget.inputEl) {
                                 posPromptWidget.inputEl.readOnly = false;
+                                posPromptWidget.inputEl.disabled = false;
                                 posPromptWidget.inputEl.title = "";
                             }
                             node._isPromptSystemManaged = false;
                         }
                     }
+
+                    if (typeof node.setDirtyCanvas === "function") {
+                        node.setDirtyCanvas(true, true);
+                    }
                 };
-
-
 
                 if (useDefaultWidget) {
                     const origCb = useDefaultWidget.callback;
@@ -630,7 +634,7 @@ app.registerExtension({
                         } else {
                             node._isPromptSystemManaged = true;
                         }
-                        updatePromptState();
+                        schedulePromptStateUpdate();
                     };
                 }
 
@@ -654,7 +658,7 @@ app.registerExtension({
                                 val = this.value;
                             }
                             if (orig) orig.apply(this, arguments);
-                            updatePromptState();
+                            schedulePromptStateUpdate();
                         };
                     }
                 });
@@ -672,12 +676,11 @@ app.registerExtension({
                 const origConnChange = node.onConnectionsChange;
                 node.onConnectionsChange = function () {
                     if (origConnChange) origConnChange.apply(this, arguments);
-                    updatePromptState();
+                    schedulePromptStateUpdate();
                 };
 
-                setTimeout(updatePromptState, 20);
+                schedulePromptStateUpdate();
             }
         }
     }
 });
-
