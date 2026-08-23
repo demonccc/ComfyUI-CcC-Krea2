@@ -60,26 +60,10 @@ def test_js_python_preset_synchronization():
         assert item in EASY_PRESET_CAPABILITIES
 
     # 4. Assert Group A/B/C/D exact experiment IDs and counts
-    expected_group_a = ["transfer_identity_test_a_4_4", "transfer_identity_test_a_4_5", "transfer_identity_test_a_4_6"]
-    expected_group_b = ["transfer_identity_test_b_2_5_4", "transfer_identity_test_b_2_5_5", "transfer_identity_test_b_2_5_6"]
-    expected_group_c = [
-        "transfer_identity_test_c_4_4",
-        "transfer_identity_test_c_4_5",
-        "transfer_identity_test_c_4_6",
-        "transfer_identity_test_c_4_7",
-        "transfer_identity_test_c_2_5_4",
-        "transfer_identity_test_c_2_5_5",
-        "transfer_identity_test_c_2_5_6",
-        "transfer_identity_test_c_2_5_9",
-    ]
-    expected_group_d = [
-        "transfer_identity_test_d_s2_5_o2_5",
-        "transfer_identity_test_d_s2_5_o4",
-        "transfer_identity_test_d_s4_o4",
-        "transfer_identity_test_d_s5_o4",
-        "transfer_identity_test_d_s6_o4",
-        "transfer_identity_test_d_s7_o4",
-    ]
+    expected_group_a = []
+    expected_group_b = ["transfer_identity_test_b_2_5_5", "transfer_identity_test_b_2_5_6"]
+    expected_group_c = ["transfer_identity_test_c_2_5_5", "transfer_identity_test_c_2_5_6"]
+    expected_group_d = []
 
     assert js_group_a == expected_group_a
     assert js_group_b == expected_group_b

@@ -109,11 +109,14 @@ class TestDefaultPromptResolver:
         # Test presets identity_transfer and test_2 through test_6 use the exact same Identity Transfer prompt template
         for test_preset in [
             "identity_transfer",
-            "transfer_identity_test_2",
-            "transfer_identity_test_3",
-            "transfer_identity_test_4",
             "transfer_identity_test_5",
-            "transfer_identity_test_6",
+            "transfer_identity_test_5_subject_5",
+            "transfer_identity_test_5_subject_6",
+            "transfer_identity_test_5_subject_8",
+            "transfer_identity_test_b_2_5_5",
+            "transfer_identity_test_b_2_5_6",
+            "transfer_identity_test_c_2_5_5",
+            "transfer_identity_test_c_2_5_6",
         ]:
             has_def, test_text, test_key = resolve_default_positive_prompt(
                 preset=test_preset,
@@ -733,11 +736,11 @@ class TestEasyEditReportLatentSource:
         assert "Resolved Latent Source: subject image" in report3
         assert "Target Content Role: subject" in report3
 
-    def test_identity_transfer_all_26_presets_default_prompt_parity(self):
-        """Verify prompt parity across all 26 identity transfer presets (6 baseline + Groups A, B, C, D)."""
+    def test_identity_transfer_all_presets_default_prompt_parity(self):
+        """Verify prompt parity across all identity transfer test presets."""
         from ccc_krea2.easy_routing import IDENTITY_TEST_PRESETS
 
-        assert len(IDENTITY_TEST_PRESETS) == 26
+        assert len(IDENTITY_TEST_PRESETS) == 9
 
         expected_prompt_text = (
             "Replace only the identity of the volleyball player of the scene image with the identity of the portrait subject from the subject image.\n\n"
@@ -785,7 +788,7 @@ class TestEasyEditReportLatentSource:
             vae=DummyVAE(),
             positive_prompt="",
             use_default_prompt=True,
-            preset="transfer_identity_test_c_4_4",
+            preset="transfer_identity_test_c_2_5_5",
             subject=S,
             scene=Sc,
         )
@@ -796,38 +799,3 @@ class TestEasyEditReportLatentSource:
         assert "Outfit Style Fidelity: 1.0" in report
         assert "Outfit Style Indirect: no" in report
         assert "Outfit Style Instruction Active: yes" in report
-
-    def test_group_d_runtime_reporting_explicit_fields(self, dummy_images, monkeypatch):
-        """Verify Group D presets report all required explicit outfit reference metrics in the Easy Edit report."""
-        S, Sc, _, _ = dummy_images
-        node = CcCKrea2EasyEdit()
-
-        class DummyVAE:
-            def encode(self, x):
-                return torch.zeros((1, 16, 8, 8), dtype=torch.float32)
-
-        def mock_orchestrator(*args, **kwargs):
-            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
-
-        monkeypatch.setattr(
-            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
-            mock_orchestrator,
-        )
-
-        _, _, _, _, report = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="",
-            use_default_prompt=True,
-            preset="transfer_identity_test_d_s2_5_o4",
-            subject=S,
-            scene=Sc,
-        )
-
-        assert "Outfit Reference Active: yes" in report
-        assert "Outfit Reference Source: scene image" in report
-        assert "Outfit Reference Role: outfit" in report
-        assert "Outfit Reference Boost: 4.0" in report
-        assert "Style Active: no" in report
-        assert "Scene Generic Appearance Reference Active: no" in report

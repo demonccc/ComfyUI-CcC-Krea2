@@ -163,9 +163,9 @@ async function runTests() {
             assert(posPromptWidget.value.includes("Replace only the identity"), "User edit attempt restored to canonical prompt!");
 
             // Test 3 on Modern Widget
-            setPreset("[Experimental] Identity Test 3 — Scene 4 / Subject 7");
+            setPreset("[Experimental B] Scene 2.5 / Subject 5");
             await new Promise(r => setTimeout(r, 60));
-            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Test 3");
+            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Test B");
 
             // Switch to Manual Mode
             useDefaultWidget.value = false;
@@ -184,7 +184,7 @@ async function runTests() {
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
             // Preset change in Manual Mode must NOT overwrite user custom prompt
-            setPreset("transfer_identity_test_a_4_4");
+            setPreset("[Experimental C] Scene 2.5 / Subject 5 + Outfit Style");
             await new Promise(r => setTimeout(r, 60));
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
@@ -235,13 +235,13 @@ async function runTests() {
         assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
     }
 
-    // 5. Group A & B
+    // 5. Group B (preserved test)
     {
         const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
-        setPreset("transfer_identity_test_a_4_4");
+        setPreset("transfer_identity_test_b_2_5_5");
         await new Promise(r => setTimeout(r, 60));
 
         assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene]");
@@ -249,13 +249,13 @@ async function runTests() {
         assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
     }
 
-    // 6. Group C
+    // 6. Group C (preserved test)
     {
         const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
-        setPreset("transfer_identity_test_c_4_4");
+        setPreset("transfer_identity_test_c_2_5_5");
         await new Promise(r => setTimeout(r, 60));
 
         assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene Outfit]");
@@ -263,24 +263,7 @@ async function runTests() {
         assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
     }
 
-    // 7. Group D
-    {
-        const { node, outfitSourceWidget, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
-        node.inputs.find(i => i.name === "subject").link = 1;
-        node.inputs.find(i => i.name === "scene").link = 2;
-
-        setPreset("transfer_identity_test_d_s2_5_o2_5");
-        await new Promise(r => setTimeout(r, 60));
-
-        assert.strictEqual(outfitSourceWidget.label, "Outfit Source [Auto: Scene]");
-        assert.strictEqual(outfitSourceWidget.disabled, true);
-        assert.strictEqual(node.inputs.find(i => i.name === "outfit").disabled, true);
-        assert.strictEqual(styleSourceWidget.label, "Style Source [Disabled]");
-        assert.strictEqual(styleSourceWidget.disabled, true);
-        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
-    }
-
-    // 8. Workflow restoration sequence with modern widget ordering
+    // 7. Workflow restoration sequence with modern widget ordering
     {
         const { node, useDefaultWidget, posPromptWidget } = createMockNode("CcCKrea2EasyEdit", "modern");
         const infoOld = {
@@ -306,7 +289,7 @@ async function runTests() {
         assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt appears after links connected");
     }
 
-    // 9. Preset display ordering test
+    // 8. Preset display ordering test
     {
         const { presetWidget } = createMockNode("CcCKrea2EasyEdit", "legacy");
         assert(presetWidget.options && typeof presetWidget.options.values === "function");
@@ -319,6 +302,10 @@ async function runTests() {
             "Preserve Identity",
             "Max Identity",
             "Identity Transfer",
+            "Subject Transfer 1",
+            "Subject Transfer 2",
+            "Flexible Subject Transfer 1",
+            "Flexible Subject Transfer 2",
             "Subject Transfer",
             "Preserve Scene",
             "Outfit Transfer",
@@ -326,8 +313,8 @@ async function runTests() {
             "Scene Reinterpretation"
         ];
 
-        const actualStableFirst = displayedValues.slice(0, 11);
-        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 11 presets must be stable presets in exact order");
+        const actualStableFirst = displayedValues.slice(0, 15);
+        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 15 presets must be stable presets in exact order");
     }
 
     console.log("All modern & legacy JavaScript frontend tests PASSED successfully!");

@@ -216,65 +216,26 @@ app.registerExtension({
 
                 const IDENTITY_TEST_PRESETS = [
                     "identity_transfer",
-                    "transfer_identity_test_2",
-                    "transfer_identity_test_3",
-                    "transfer_identity_test_4",
+                    "transfer_identity_test_5_subject_5",
+                    "transfer_identity_test_5_subject_6",
                     "transfer_identity_test_5",
-                    "transfer_identity_test_6",
-                    // Group A
-                    "transfer_identity_test_a_4_4",
-                    "transfer_identity_test_a_4_5",
-                    "transfer_identity_test_a_4_6",
-                    // Group B
-                    "transfer_identity_test_b_2_5_4",
+                    "transfer_identity_test_5_subject_8",
                     "transfer_identity_test_b_2_5_5",
                     "transfer_identity_test_b_2_5_6",
-                    // Group C
-                    "transfer_identity_test_c_4_4",
-                    "transfer_identity_test_c_4_5",
-                    "transfer_identity_test_c_4_6",
-                    "transfer_identity_test_c_4_7",
-                    "transfer_identity_test_c_2_5_4",
                     "transfer_identity_test_c_2_5_5",
                     "transfer_identity_test_c_2_5_6",
-                    "transfer_identity_test_c_2_5_9",
-                    // Group D
-                    "transfer_identity_test_d_s2_5_o2_5",
-                    "transfer_identity_test_d_s2_5_o4",
-                    "transfer_identity_test_d_s4_o4",
-                    "transfer_identity_test_d_s5_o4",
-                    "transfer_identity_test_d_s6_o4",
-                    "transfer_identity_test_d_s7_o4",
                 ];
 
-                const GROUP_A_PRESETS = [
-                    "transfer_identity_test_a_4_4",
-                    "transfer_identity_test_a_4_5",
-                    "transfer_identity_test_a_4_6",
-                ];
+                const GROUP_A_PRESETS = [];
                 const GROUP_B_PRESETS = [
-                    "transfer_identity_test_b_2_5_4",
                     "transfer_identity_test_b_2_5_5",
                     "transfer_identity_test_b_2_5_6",
                 ];
                 const GROUP_C_PRESETS = [
-                    "transfer_identity_test_c_4_4",
-                    "transfer_identity_test_c_4_5",
-                    "transfer_identity_test_c_4_6",
-                    "transfer_identity_test_c_4_7",
-                    "transfer_identity_test_c_2_5_4",
                     "transfer_identity_test_c_2_5_5",
                     "transfer_identity_test_c_2_5_6",
-                    "transfer_identity_test_c_2_5_9",
                 ];
-                const GROUP_D_PRESETS = [
-                    "transfer_identity_test_d_s2_5_o2_5",
-                    "transfer_identity_test_d_s2_5_o4",
-                    "transfer_identity_test_d_s4_o4",
-                    "transfer_identity_test_d_s5_o4",
-                    "transfer_identity_test_d_s6_o4",
-                    "transfer_identity_test_d_s7_o4",
-                ];
+                const GROUP_D_PRESETS = [];
 
                 const PRESET_DISPLAY_LABELS = {
                     "flexible": "Flexible",
@@ -283,40 +244,24 @@ app.registerExtension({
                     "preserve_identity": "Preserve Identity",
                     "max_identity": "Max Identity",
                     "identity_transfer": "Identity Transfer",
-                    "transfer_identity_test_2": "[Experimental] Identity Test 2",
-                    "transfer_identity_test_3": "[Experimental] Identity Test 3 — Scene 4 / Subject 7",
-                    "transfer_identity_test_4": "[Experimental] Identity Test 4 — Scene 2.5 / Subject 9",
-                    "transfer_identity_test_5": "[Experimental] Identity Test 5",
-                    "transfer_identity_test_6": "[Experimental] Identity Test 6",
+                    "subject_transfer_1": "Subject Transfer 1",
+                    "subject_transfer_2": "Subject Transfer 2",
+                    "flexible_subject_transfer_1": "Flexible Subject Transfer 1",
+                    "flexible_subject_transfer_2": "Flexible Subject Transfer 2",
                     "subject_transfer": "Subject Transfer",
                     "preserve_scene": "Preserve Scene",
                     "outfit_transfer": "Outfit Transfer",
                     "style_transfer": "Style Transfer",
                     "scene_reinterpretation": "Scene Reinterpretation",
-                    // Group A
-                    "transfer_identity_test_a_4_4": "[Experimental A] Scene 4 / Subject 4",
-                    "transfer_identity_test_a_4_5": "[Experimental A] Scene 4 / Subject 5",
-                    "transfer_identity_test_a_4_6": "[Experimental A] Scene 4 / Subject 6",
-                    // Group B
-                    "transfer_identity_test_b_2_5_4": "[Experimental B] Scene 2.5 / Subject 4",
+                    // Experimental calibration presets
+                    "transfer_identity_test_5_subject_5": "[Experimental] Identity Test 5 - Subject 5",
+                    "transfer_identity_test_5_subject_6": "[Experimental] Identity Test 5 - Subject 6",
+                    "transfer_identity_test_5": "[Experimental] Identity Test 5",
+                    "transfer_identity_test_5_subject_8": "[Experimental] Identity Test 5 - Subject 8",
                     "transfer_identity_test_b_2_5_5": "[Experimental B] Scene 2.5 / Subject 5",
                     "transfer_identity_test_b_2_5_6": "[Experimental B] Scene 2.5 / Subject 6",
-                    // Group C
-                    "transfer_identity_test_c_4_4": "[Experimental C] Scene 4 / Subject 4 + Outfit Style",
-                    "transfer_identity_test_c_4_5": "[Experimental C] Scene 4 / Subject 5 + Outfit Style",
-                    "transfer_identity_test_c_4_6": "[Experimental C] Scene 4 / Subject 6 + Outfit Style",
-                    "transfer_identity_test_c_4_7": "[Experimental C] Scene 4 / Subject 7 + Outfit Style",
-                    "transfer_identity_test_c_2_5_4": "[Experimental C] Scene 2.5 / Subject 4 + Outfit Style",
                     "transfer_identity_test_c_2_5_5": "[Experimental C] Scene 2.5 / Subject 5 + Outfit Style",
                     "transfer_identity_test_c_2_5_6": "[Experimental C] Scene 2.5 / Subject 6 + Outfit Style",
-                    "transfer_identity_test_c_2_5_9": "[Experimental C] Scene 2.5 / Subject 9 + Outfit Style",
-                    // Group D
-                    "transfer_identity_test_d_s2_5_o2_5": "[Experimental D] Subject 2.5 / Outfit 2.5",
-                    "transfer_identity_test_d_s2_5_o4": "[Experimental D] Subject 2.5 / Outfit 4",
-                    "transfer_identity_test_d_s4_o4": "[Experimental D] Subject 4 / Outfit 4",
-                    "transfer_identity_test_d_s5_o4": "[Experimental D] Subject 5 / Outfit 4",
-                    "transfer_identity_test_d_s6_o4": "[Experimental D] Subject 6 / Outfit 4",
-                    "transfer_identity_test_d_s7_o4": "[Experimental D] Subject 7 / Outfit 4",
                 };
 
                 const DISPLAY_TO_PRESET_ID = Object.fromEntries(
@@ -330,6 +275,10 @@ app.registerExtension({
                     "preserve_identity",
                     "max_identity",
                     "identity_transfer",
+                    "subject_transfer_1",
+                    "subject_transfer_2",
+                    "flexible_subject_transfer_1",
+                    "flexible_subject_transfer_2",
                     "subject_transfer",
                     "preserve_scene",
                     "outfit_transfer",
@@ -344,10 +293,29 @@ app.registerExtension({
                     "transfer_identity_test_4",
                     "transfer_identity_test_5",
                     "transfer_identity_test_6",
-                    ...GROUP_A_PRESETS,
-                    ...GROUP_B_PRESETS,
-                    ...GROUP_C_PRESETS,
-                    ...GROUP_D_PRESETS,
+                    "transfer_identity_test_5_subject_5",
+                    "transfer_identity_test_5_subject_6",
+                    "transfer_identity_test_5_subject_8",
+                    "transfer_identity_test_a_4_4",
+                    "transfer_identity_test_a_4_5",
+                    "transfer_identity_test_a_4_6",
+                    "transfer_identity_test_b_2_5_4",
+                    "transfer_identity_test_b_2_5_5",
+                    "transfer_identity_test_b_2_5_6",
+                    "transfer_identity_test_c_4_4",
+                    "transfer_identity_test_c_4_5",
+                    "transfer_identity_test_c_4_6",
+                    "transfer_identity_test_c_4_7",
+                    "transfer_identity_test_c_2_5_4",
+                    "transfer_identity_test_c_2_5_5",
+                    "transfer_identity_test_c_2_5_6",
+                    "transfer_identity_test_c_2_5_9",
+                    "transfer_identity_test_d_s2_5_o2_5",
+                    "transfer_identity_test_d_s2_5_o4",
+                    "transfer_identity_test_d_s4_o4",
+                    "transfer_identity_test_d_s5_o4",
+                    "transfer_identity_test_d_s6_o4",
+                    "transfer_identity_test_d_s7_o4",
                 ];
 
                 const migrateLegacyEasyEditWidgets = (info) => {
@@ -459,7 +427,7 @@ app.registerExtension({
                         return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER, context) };
                     }
 
-                    if (preset === "subject_transfer") {
+                    if (["subject_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset)) {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
                         const template = hasO ? EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT : EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT;
                         return { hasDefault: true, text: renderJsEasyPrompt(template, context) };
@@ -623,10 +591,10 @@ app.registerExtension({
                     const preset = DISPLAY_TO_PRESET_ID[presetWidget?.value] || presetWidget?.value || "balanced";
                     const isGroupD = GROUP_D_PRESETS.includes(preset);
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
-                    const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", ...IDENTITY_TEST_PRESETS].includes(preset);
-                    const isStyleDisabled = preset === "transfer_identity_test_5" || isGroupD;
-                    const isSceneOutfitStyle = isGroupC;
-                    const isSceneAutoStyle = ["subject_transfer", "scene_reinterpretation", "identity_transfer", "transfer_identity_test_2", "transfer_identity_test_3", "transfer_identity_test_4", "transfer_identity_test_6", ...GROUP_A_PRESETS, ...GROUP_B_PRESETS].includes(preset);
+                    const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
+                    const isStyleDisabled = ["transfer_identity_test_5", "transfer_identity_test_5_subject_5", "transfer_identity_test_5_subject_6", "transfer_identity_test_5_subject_8"].includes(preset) || isGroupD;
+                    const isSceneOutfitStyle = ["flexible_subject_transfer_1", "flexible_subject_transfer_2", ...GROUP_C_PRESETS].includes(preset);
+                    const isSceneAutoStyle = ["subject_transfer", "subject_transfer_1", "subject_transfer_2", "scene_reinterpretation", "identity_transfer", ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -724,7 +692,7 @@ app.registerExtension({
                     );
 
                     // Subject description widgets are enabled ONLY when use_default_prompt is ON and preset supports subject fields
-                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer", "outfit_transfer"].includes(preset);
+                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer"].includes(preset);
                     const enableSubjectFields = useDefaultWidget.value && supportsSubjectFields;
                     if (refSubjWidget) refSubjWidget.disabled = !enableSubjectFields;
                     if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;

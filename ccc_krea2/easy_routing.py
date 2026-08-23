@@ -138,74 +138,38 @@ EASY_PRESET_DISPLAY_LABELS = {
     "preserve_identity": "Preserve Identity",
     "max_identity": "Max Identity",
     "identity_transfer": "Identity Transfer",
+    "subject_transfer_1": "Subject Transfer 1",
+    "subject_transfer_2": "Subject Transfer 2",
+    "flexible_subject_transfer_1": "Flexible Subject Transfer 1",
+    "flexible_subject_transfer_2": "Flexible Subject Transfer 2",
     "subject_transfer": "Subject Transfer",
     "preserve_scene": "Preserve Scene",
     "outfit_transfer": "Outfit Transfer",
     "style_transfer": "Style Transfer",
     "scene_reinterpretation": "Scene Reinterpretation",
     # Experimental calibration presets
-    "transfer_identity_test_2": "[Experimental] Identity Test 2",
-    "transfer_identity_test_3": "[Experimental] Identity Test 3 — Scene 4 / Subject 7",
-    "transfer_identity_test_4": "[Experimental] Identity Test 4 — Scene 2.5 / Subject 9",
+    "transfer_identity_test_5_subject_5": "[Experimental] Identity Test 5 - Subject 5",
+    "transfer_identity_test_5_subject_6": "[Experimental] Identity Test 5 - Subject 6",
     "transfer_identity_test_5": "[Experimental] Identity Test 5",
-    "transfer_identity_test_6": "[Experimental] Identity Test 6",
-    # Group A
-    "transfer_identity_test_a_4_4": "[Experimental A] Scene 4 / Subject 4",
-    "transfer_identity_test_a_4_5": "[Experimental A] Scene 4 / Subject 5",
-    "transfer_identity_test_a_4_6": "[Experimental A] Scene 4 / Subject 6",
-    # Group B
-    "transfer_identity_test_b_2_5_4": "[Experimental B] Scene 2.5 / Subject 4",
+    "transfer_identity_test_5_subject_8": "[Experimental] Identity Test 5 - Subject 8",
+    # Group B selected
     "transfer_identity_test_b_2_5_5": "[Experimental B] Scene 2.5 / Subject 5",
     "transfer_identity_test_b_2_5_6": "[Experimental B] Scene 2.5 / Subject 6",
-    # Group C
-    "transfer_identity_test_c_4_4": "[Experimental C] Scene 4 / Subject 4 + Outfit Style",
-    "transfer_identity_test_c_4_5": "[Experimental C] Scene 4 / Subject 5 + Outfit Style",
-    "transfer_identity_test_c_4_6": "[Experimental C] Scene 4 / Subject 6 + Outfit Style",
-    "transfer_identity_test_c_4_7": "[Experimental C] Scene 4 / Subject 7 + Outfit Style",
-    "transfer_identity_test_c_2_5_4": "[Experimental C] Scene 2.5 / Subject 4 + Outfit Style",
+    # Group C selected
     "transfer_identity_test_c_2_5_5": "[Experimental C] Scene 2.5 / Subject 5 + Outfit Style",
     "transfer_identity_test_c_2_5_6": "[Experimental C] Scene 2.5 / Subject 6 + Outfit Style",
-    "transfer_identity_test_c_2_5_9": "[Experimental C] Scene 2.5 / Subject 9 + Outfit Style",
-    # Group D
-    "transfer_identity_test_d_s2_5_o2_5": "[Experimental D] Subject 2.5 / Outfit 2.5",
-    "transfer_identity_test_d_s2_5_o4": "[Experimental D] Subject 2.5 / Outfit 4",
-    "transfer_identity_test_d_s4_o4": "[Experimental D] Subject 4 / Outfit 4",
-    "transfer_identity_test_d_s5_o4": "[Experimental D] Subject 5 / Outfit 4",
-    "transfer_identity_test_d_s6_o4": "[Experimental D] Subject 6 / Outfit 4",
-    "transfer_identity_test_d_s7_o4": "[Experimental D] Subject 7 / Outfit 4",
 }
 
 IDENTITY_TEST_PRESETS = (
     "identity_transfer",
-    "transfer_identity_test_2",
-    "transfer_identity_test_3",
-    "transfer_identity_test_4",
+    "transfer_identity_test_5_subject_5",
+    "transfer_identity_test_5_subject_6",
     "transfer_identity_test_5",
-    "transfer_identity_test_6",
-    # Group A
-    "transfer_identity_test_a_4_4",
-    "transfer_identity_test_a_4_5",
-    "transfer_identity_test_a_4_6",
-    # Group B
-    "transfer_identity_test_b_2_5_4",
+    "transfer_identity_test_5_subject_8",
     "transfer_identity_test_b_2_5_5",
     "transfer_identity_test_b_2_5_6",
-    # Group C
-    "transfer_identity_test_c_4_4",
-    "transfer_identity_test_c_4_5",
-    "transfer_identity_test_c_4_6",
-    "transfer_identity_test_c_4_7",
-    "transfer_identity_test_c_2_5_4",
     "transfer_identity_test_c_2_5_5",
     "transfer_identity_test_c_2_5_6",
-    "transfer_identity_test_c_2_5_9",
-    # Group D
-    "transfer_identity_test_d_s2_5_o2_5",
-    "transfer_identity_test_d_s2_5_o4",
-    "transfer_identity_test_d_s4_o4",
-    "transfer_identity_test_d_s5_o4",
-    "transfer_identity_test_d_s6_o4",
-    "transfer_identity_test_d_s7_o4",
 )
 
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
@@ -323,13 +287,13 @@ def resolve_default_positive_prompt(
         base_key = preset
         return True, render_easy_prompt(base_template, context), base_key
 
-    elif preset == "subject_transfer":
+    elif preset in ("subject_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2"):
         if not (has_s and has_sc):
             return False, "", "none"
 
         if not has_o:
             base_template = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT
-            base_key = "subject_transfer"
+            base_key = preset
         else:
             base_template = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT
             if eff_outfit_source == "outfit image":
@@ -434,20 +398,17 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "identity_transfer": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
-    "transfer_identity_test_2": EasyPresetCapabilities(
+    "subject_transfer_1": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
-    "transfer_identity_test_3": EasyPresetCapabilities(
+    "subject_transfer_2": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
-    "transfer_identity_test_4": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    "flexible_subject_transfer_1": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
     ),
-    "transfer_identity_test_5": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
-    ),
-    "transfer_identity_test_6": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    "flexible_subject_transfer_2": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
     ),
     "subject_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_SCENE_AUTO),
     "preserve_scene": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
@@ -456,30 +417,32 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "scene_reinterpretation": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
-    # Group A — Test 3 family (Scene 4.0 / Subject variable)
-    "transfer_identity_test_a_4_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
-    "transfer_identity_test_a_4_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
-    "transfer_identity_test_a_4_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
-    # Group B — Test 4 family (Scene 2.5 / Subject variable)
-    "transfer_identity_test_b_2_5_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
-    "transfer_identity_test_b_2_5_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
-    "transfer_identity_test_b_2_5_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO),
-    # Group C — Test 3 & 4 families with Outfit Style
-    "transfer_identity_test_c_4_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_4_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_4_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_4_7": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_2_5_4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_2_5_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_2_5_6": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    "transfer_identity_test_c_2_5_9": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO),
-    # Group D — Scene latent + Subject reference + Scene as Outfit reference
-    "transfer_identity_test_d_s2_5_o2_5": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
-    "transfer_identity_test_d_s2_5_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
-    "transfer_identity_test_d_s4_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
-    "transfer_identity_test_d_s5_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
-    "transfer_identity_test_d_s6_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
-    "transfer_identity_test_d_s7_o4": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED),
+    # Test 5 family
+    "transfer_identity_test_5_subject_5": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+    ),
+    "transfer_identity_test_5_subject_6": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+    ),
+    "transfer_identity_test_5": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+    ),
+    "transfer_identity_test_5_subject_8": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+    ),
+    # Preserved calibration tests
+    "transfer_identity_test_b_2_5_5": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
+    "transfer_identity_test_b_2_5_6": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+    ),
+    "transfer_identity_test_c_2_5_5": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
+    ),
+    "transfer_identity_test_c_2_5_6": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
+    ),
 }
 
 
@@ -1021,7 +984,12 @@ def route_easy_preset(
             elif outfit_is_distinct:
                 refs.append(_ref(Ou, OUTFIT_TRANSFER_BOOST, "outfit"))
 
-    elif preset in IDENTITY_TEST_PRESETS:
+    elif preset in IDENTITY_TEST_PRESETS or preset in (
+        "subject_transfer_1",
+        "subject_transfer_2",
+        "flexible_subject_transfer_1",
+        "flexible_subject_transfer_2",
+    ):
         if not has_s:
             preset_warnings.append(
                 f"preset '{preset}' selected but Subject source is missing; no identity can be transferred."
@@ -1042,103 +1010,46 @@ def route_easy_preset(
                 refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
                 refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
 
-            elif preset == "transfer_identity_test_2":
+            elif preset in (
+                "subject_transfer_1",
+                "subject_transfer_2",
+                "flexible_subject_transfer_1",
+                "flexible_subject_transfer_2",
+                "transfer_identity_test_b_2_5_5",
+                "transfer_identity_test_b_2_5_6",
+                "transfer_identity_test_c_2_5_5",
+                "transfer_identity_test_c_2_5_6",
+            ):
                 target_content_mode = "empty"
                 target_content_source = None
                 target_content_role = "none"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
+                s_boost = 6.0 if preset in ("subject_transfer_2", "flexible_subject_transfer_2", "transfer_identity_test_b_2_5_6", "transfer_identity_test_c_2_5_6") else 5.0
                 refs.append(_ref(Sc, 2.5, "scene"))
-                refs.append(_ref(S, 7.0, "subject"))
+                refs.append(_ref(S, s_boost, "subject"))
 
-            elif preset == "transfer_identity_test_3":
-                target_content_mode = "empty"
-                target_content_source = None
-                target_content_role = "none"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                refs.append(_ref(Sc, 4.0, "scene"))
-                refs.append(_ref(S, 7.0, "subject"))
-
-            elif preset == "transfer_identity_test_4":
-                target_content_mode = "empty"
-                target_content_source = None
-                target_content_role = "none"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                refs.append(_ref(Sc, 2.5, "scene"))
-                refs.append(_ref(S, 9.0, "subject"))
-
-            elif preset in ("transfer_identity_test_5", "transfer_identity_test_6"):
+            elif preset in (
+                "transfer_identity_test_5",
+                "transfer_identity_test_5_subject_5",
+                "transfer_identity_test_5_subject_6",
+                "transfer_identity_test_5_subject_8",
+            ):
                 target_content_mode = "image"
                 target_content_source = Sc
                 target_content_role = "scene"
                 target_content_fit = "contain_no_upscale"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-                refs.append(_ref(S, 7.0, "subject"))
-
-            elif preset.startswith("transfer_identity_test_a_"):
-                target_content_mode = "empty"
-                target_content_source = None
-                target_content_role = "none"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                subj_boost = 4.0 if preset == "transfer_identity_test_a_4_4" else (5.0 if preset == "transfer_identity_test_a_4_5" else 6.0)
-                refs.append(_ref(Sc, 4.0, "scene"))
-                refs.append(_ref(S, subj_boost, "subject"))
-
-            elif preset.startswith("transfer_identity_test_b_"):
-                target_content_mode = "empty"
-                target_content_source = None
-                target_content_role = "none"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                subj_boost = 4.0 if preset == "transfer_identity_test_b_2_5_4" else (5.0 if preset == "transfer_identity_test_b_2_5_5" else 6.0)
-                refs.append(_ref(Sc, 2.5, "scene"))
-                refs.append(_ref(S, subj_boost, "subject"))
-
-            elif preset.startswith("transfer_identity_test_c_"):
-                target_content_mode = "empty"
-                target_content_source = None
-                target_content_role = "none"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                if preset.startswith("transfer_identity_test_c_4_"):
-                    sc_boost = 4.0
-                    s_val = preset.replace("transfer_identity_test_c_4_", "")
+                if preset == "transfer_identity_test_5_subject_5":
+                    subj_boost = 5.0
+                elif preset == "transfer_identity_test_5_subject_6":
+                    subj_boost = 6.0
+                elif preset == "transfer_identity_test_5_subject_8":
+                    subj_boost = 8.0
                 else:
-                    sc_boost = 2.5
-                    s_val = preset.replace("transfer_identity_test_c_2_5_", "")
-                subj_boost = float(s_val)
-
-                refs.append(_ref(Sc, sc_boost, "scene"))
+                    subj_boost = 7.0
                 refs.append(_ref(S, subj_boost, "subject"))
-
-            elif preset.startswith("transfer_identity_test_d_"):
-                target_content_mode = "image"
-                target_content_source = Sc
-                target_content_role = "scene"
-                target_content_fit = "contain_no_upscale"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                if preset == "transfer_identity_test_d_s2_5_o2_5":
-                    subj_boost, outfit_boost = 2.5, 2.5
-                elif preset == "transfer_identity_test_d_s2_5_o4":
-                    subj_boost, outfit_boost = 2.5, 4.0
-                elif preset == "transfer_identity_test_d_s4_o4":
-                    subj_boost, outfit_boost = 4.0, 4.0
-                elif preset == "transfer_identity_test_d_s5_o4":
-                    subj_boost, outfit_boost = 5.0, 4.0
-                elif preset == "transfer_identity_test_d_s6_o4":
-                    subj_boost, outfit_boost = 6.0, 4.0
-                elif preset == "transfer_identity_test_d_s7_o4":
-                    subj_boost, outfit_boost = 7.0, 4.0
-                else:
-                    subj_boost, outfit_boost = 7.0, 4.0
-
-                refs.append(_ref(S, subj_boost, "subject"))
-                refs.append(_ref(Sc, outfit_boost, "outfit"))
         else:
             target_content_mode = "empty"
             target_content_source = None
@@ -1147,8 +1058,7 @@ def route_easy_preset(
             if has_s:
                 refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
             elif has_sc:
-                scene_boost = 4.0 if ("4_4" in preset or "4_5" in preset or "4_6" in preset or "4_7" in preset or "test_3" in preset) else 2.5
-                refs.append(_ref(Sc, scene_boost, "scene"))
+                refs.append(_ref(Sc, 2.5, "scene"))
 
     elif preset == "subject_transfer":
         if not has_s:
