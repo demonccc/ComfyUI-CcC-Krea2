@@ -160,3 +160,20 @@ def test_js_prompt_ui_behavior():
     assert "onConfigure" in js_code
     assert "setTimeout(updatePromptState, 20);" in js_code
 
+
+def test_js_no_use_default_value_mutation_in_update_prompt_state():
+    """Verify that updatePromptState() does not mutate useDefaultWidget.value = false when inputs are unavailable."""
+    js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
+    js_code = js_path.read_text(encoding="utf-8")
+
+    # Extract updatePromptState function block
+    match = re.search(r"const updatePromptState = \(\) => \{(.*?)\};\n\n", js_code, re.DOTALL)
+    assert match is not None, "Could not locate updatePromptState function definition in web/ccc_krea2.js"
+    fn_body = match.group(1)
+
+    # Invariant: updatePromptState must never overwrite useDefaultWidget.value
+    assert "useDefaultWidget.value = false" not in fn_body, (
+        "updatePromptState() must not overwrite user's useDefaultWidget.value preference"
+    )
+
+

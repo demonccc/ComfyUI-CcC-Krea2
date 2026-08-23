@@ -586,7 +586,6 @@ app.registerExtension({
                     if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;
 
                     if (isSubjectOnly || !hasDefault) {
-                        useDefaultWidget.value = false;
                         useDefaultWidget.disabled = true;
                         posPromptWidget.disabled = false;
                         if (posPromptWidget.inputEl) {
