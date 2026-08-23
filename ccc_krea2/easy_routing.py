@@ -147,29 +147,68 @@ EASY_PRESET_DISPLAY_LABELS = {
     "outfit_transfer": "Outfit Transfer",
     "style_transfer": "Style Transfer",
     "scene_reinterpretation": "Scene Reinterpretation",
-    # Experimental calibration presets
-    "transfer_identity_test_5_subject_5": "[Experimental] Identity Test 5 - Subject 5",
-    "transfer_identity_test_5_subject_6": "[Experimental] Identity Test 5 - Subject 6",
-    "transfer_identity_test_5": "[Experimental] Identity Test 5",
-    "transfer_identity_test_5_subject_8": "[Experimental] Identity Test 5 - Subject 8",
-    # Group B selected
-    "transfer_identity_test_b_2_5_5": "[Experimental B] Scene 2.5 / Subject 5",
-    "transfer_identity_test_b_2_5_6": "[Experimental B] Scene 2.5 / Subject 6",
-    # Group C selected
-    "transfer_identity_test_c_2_5_5": "[Experimental C] Scene 2.5 / Subject 5 + Outfit Style",
-    "transfer_identity_test_c_2_5_6": "[Experimental C] Scene 2.5 / Subject 6 + Outfit Style",
+    # Family E: Preserve Scene with Generic Scene Style
+    "transfer_identity_preserve_scene_subject_1": "[Experimental] Identity Preserve Scene - Subject 1",
+    "transfer_identity_preserve_scene_subject_2": "[Experimental] Identity Preserve Scene - Subject 2",
+    "transfer_identity_preserve_scene_subject_2_5": "[Experimental] Identity Preserve Scene - Subject 2.5",
+    "transfer_identity_preserve_scene_subject_4": "[Experimental] Identity Preserve Scene - Subject 4",
+    "transfer_identity_preserve_scene_subject_5": "[Experimental] Identity Preserve Scene - Subject 5",
+    "transfer_identity_preserve_scene_subject_6": "[Experimental] Identity Preserve Scene - Subject 6",
+    "transfer_identity_preserve_scene_subject_8": "[Experimental] Identity Preserve Scene - Subject 8",
+    # Family F: Preserve Scene with Scene Outfit Style
+    "transfer_identity_preserve_scene_subject_1_outfit_style": "[Experimental] Identity Preserve Scene - Subject 1 + Outfit Style",
+    "transfer_identity_preserve_scene_subject_2_outfit_style": "[Experimental] Identity Preserve Scene - Subject 2 + Outfit Style",
+    "transfer_identity_preserve_scene_subject_2_5_outfit_style": "[Experimental] Identity Preserve Scene - Subject 2.5 + Outfit Style",
+    "transfer_identity_preserve_scene_subject_4_outfit_style": "[Experimental] Identity Preserve Scene - Subject 4 + Outfit Style",
+    "transfer_identity_preserve_scene_subject_5_outfit_style": "[Experimental] Identity Preserve Scene - Subject 5 + Outfit Style",
+    "transfer_identity_preserve_scene_subject_6_outfit_style": "[Experimental] Identity Preserve Scene - Subject 6 + Outfit Style",
+    "transfer_identity_preserve_scene_subject_8_outfit_style": "[Experimental] Identity Preserve Scene - Subject 8 + Outfit Style",
+}
+
+FAMILY_E_PRESETS = (
+    "transfer_identity_preserve_scene_subject_1",
+    "transfer_identity_preserve_scene_subject_2",
+    "transfer_identity_preserve_scene_subject_2_5",
+    "transfer_identity_preserve_scene_subject_4",
+    "transfer_identity_preserve_scene_subject_5",
+    "transfer_identity_preserve_scene_subject_6",
+    "transfer_identity_preserve_scene_subject_8",
+)
+
+FAMILY_F_PRESETS = (
+    "transfer_identity_preserve_scene_subject_1_outfit_style",
+    "transfer_identity_preserve_scene_subject_2_outfit_style",
+    "transfer_identity_preserve_scene_subject_2_5_outfit_style",
+    "transfer_identity_preserve_scene_subject_4_outfit_style",
+    "transfer_identity_preserve_scene_subject_5_outfit_style",
+    "transfer_identity_preserve_scene_subject_6_outfit_style",
+    "transfer_identity_preserve_scene_subject_8_outfit_style",
+)
+
+FAMILY_E_BOOSTS = {
+    "transfer_identity_preserve_scene_subject_1": 1.0,
+    "transfer_identity_preserve_scene_subject_2": 2.0,
+    "transfer_identity_preserve_scene_subject_2_5": 2.5,
+    "transfer_identity_preserve_scene_subject_4": 4.0,
+    "transfer_identity_preserve_scene_subject_5": 5.0,
+    "transfer_identity_preserve_scene_subject_6": 6.0,
+    "transfer_identity_preserve_scene_subject_8": 8.0,
+}
+
+FAMILY_F_BOOSTS = {
+    "transfer_identity_preserve_scene_subject_1_outfit_style": 1.0,
+    "transfer_identity_preserve_scene_subject_2_outfit_style": 2.0,
+    "transfer_identity_preserve_scene_subject_2_5_outfit_style": 2.5,
+    "transfer_identity_preserve_scene_subject_4_outfit_style": 4.0,
+    "transfer_identity_preserve_scene_subject_5_outfit_style": 5.0,
+    "transfer_identity_preserve_scene_subject_6_outfit_style": 6.0,
+    "transfer_identity_preserve_scene_subject_8_outfit_style": 8.0,
 }
 
 IDENTITY_TEST_PRESETS = (
     "identity_transfer",
-    "transfer_identity_test_5_subject_5",
-    "transfer_identity_test_5_subject_6",
-    "transfer_identity_test_5",
-    "transfer_identity_test_5_subject_8",
-    "transfer_identity_test_b_2_5_5",
-    "transfer_identity_test_b_2_5_6",
-    "transfer_identity_test_c_2_5_5",
-    "transfer_identity_test_c_2_5_6",
+    *FAMILY_E_PRESETS,
+    *FAMILY_F_PRESETS,
 )
 
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
@@ -417,32 +456,14 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "scene_reinterpretation": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
-    # Test 5 family
-    "transfer_identity_test_5_subject_5": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
-    ),
-    "transfer_identity_test_5_subject_6": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
-    ),
-    "transfer_identity_test_5": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
-    ),
-    "transfer_identity_test_5_subject_8": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
-    ),
-    # Preserved calibration tests
-    "transfer_identity_test_b_2_5_5": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
-    ),
-    "transfer_identity_test_b_2_5_6": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
-    ),
-    "transfer_identity_test_c_2_5_5": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
-    ),
-    "transfer_identity_test_c_2_5_6": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
-    ),
+    **{
+        p: EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO)
+        for p in FAMILY_E_PRESETS
+    },
+    **{
+        p: EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO)
+        for p in FAMILY_F_PRESETS
+    },
 }
 
 
@@ -1015,40 +1036,25 @@ def route_easy_preset(
                 "subject_transfer_2",
                 "flexible_subject_transfer_1",
                 "flexible_subject_transfer_2",
-                "transfer_identity_test_b_2_5_5",
-                "transfer_identity_test_b_2_5_6",
-                "transfer_identity_test_c_2_5_5",
-                "transfer_identity_test_c_2_5_6",
             ):
                 target_content_mode = "empty"
                 target_content_source = None
                 target_content_role = "none"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-                s_boost = 6.0 if preset in ("subject_transfer_2", "flexible_subject_transfer_2", "transfer_identity_test_b_2_5_6", "transfer_identity_test_c_2_5_6") else 5.0
+                s_boost = 6.0 if preset in ("subject_transfer_2", "flexible_subject_transfer_2") else 5.0
                 refs.append(_ref(Sc, 2.5, "scene"))
                 refs.append(_ref(S, s_boost, "subject"))
 
-            elif preset in (
-                "transfer_identity_test_5",
-                "transfer_identity_test_5_subject_5",
-                "transfer_identity_test_5_subject_6",
-                "transfer_identity_test_5_subject_8",
-            ):
+            elif preset in FAMILY_E_PRESETS or preset in FAMILY_F_PRESETS:
                 target_content_mode = "image"
                 target_content_source = Sc
                 target_content_role = "scene"
                 target_content_fit = "contain_no_upscale"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-                if preset == "transfer_identity_test_5_subject_5":
-                    subj_boost = 5.0
-                elif preset == "transfer_identity_test_5_subject_6":
-                    subj_boost = 6.0
-                elif preset == "transfer_identity_test_5_subject_8":
-                    subj_boost = 8.0
-                else:
-                    subj_boost = 7.0
+                subj_boost = FAMILY_E_BOOSTS.get(preset) or FAMILY_F_BOOSTS.get(preset, 5.0)
+                refs.append(_ref(Sc, 2.5, "scene"))
                 refs.append(_ref(S, subj_boost, "subject"))
         else:
             target_content_mode = "empty"

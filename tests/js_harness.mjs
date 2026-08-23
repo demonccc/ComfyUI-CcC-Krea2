@@ -163,9 +163,9 @@ async function runTests() {
             assert(posPromptWidget.value.includes("Replace only the identity"), "User edit attempt restored to canonical prompt!");
 
             // Test 3 on Modern Widget
-            setPreset("[Experimental B] Scene 2.5 / Subject 5");
+            setPreset("[Experimental] Identity Preserve Scene - Subject 5");
             await new Promise(r => setTimeout(r, 60));
-            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Test B");
+            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Family E");
 
             // Switch to Manual Mode
             useDefaultWidget.value = false;
@@ -184,7 +184,7 @@ async function runTests() {
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
             // Preset change in Manual Mode must NOT overwrite user custom prompt
-            setPreset("[Experimental C] Scene 2.5 / Subject 5 + Outfit Style");
+            setPreset("[Experimental] Identity Preserve Scene - Subject 5 + Outfit Style");
             await new Promise(r => setTimeout(r, 60));
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
@@ -221,27 +221,13 @@ async function runTests() {
         }
     }
 
-    // 4. Test 5 (transfer_identity_test_5)
+    // 4. Family E preset (Auto Scene Style)
     {
         const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
-        setPreset("transfer_identity_test_5");
-        await new Promise(r => setTimeout(r, 60));
-
-        assert.strictEqual(styleSourceWidget.label, "Style Source [Disabled]");
-        assert.strictEqual(styleSourceWidget.disabled, true);
-        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
-    }
-
-    // 5. Group B (preserved test)
-    {
-        const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
-        node.inputs.find(i => i.name === "subject").link = 1;
-        node.inputs.find(i => i.name === "scene").link = 2;
-
-        setPreset("transfer_identity_test_b_2_5_5");
+        setPreset("transfer_identity_preserve_scene_subject_5");
         await new Promise(r => setTimeout(r, 60));
 
         assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene]");
@@ -249,13 +235,13 @@ async function runTests() {
         assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
     }
 
-    // 6. Group C (preserved test)
+    // 5. Family F preset (Auto Scene Outfit Style)
     {
         const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
-        setPreset("transfer_identity_test_c_2_5_5");
+        setPreset("transfer_identity_preserve_scene_subject_5_outfit_style");
         await new Promise(r => setTimeout(r, 60));
 
         assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene Outfit]");

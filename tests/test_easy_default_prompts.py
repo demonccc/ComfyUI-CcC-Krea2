@@ -106,18 +106,10 @@ class TestDefaultPromptResolver:
         assert "Do not transfer the clothing" not in text
         assert "Keep every other person" not in text
 
-        # Test presets identity_transfer and test_2 through test_6 use the exact same Identity Transfer prompt template
-        for test_preset in [
-            "identity_transfer",
-            "transfer_identity_test_5",
-            "transfer_identity_test_5_subject_5",
-            "transfer_identity_test_5_subject_6",
-            "transfer_identity_test_5_subject_8",
-            "transfer_identity_test_b_2_5_5",
-            "transfer_identity_test_b_2_5_6",
-            "transfer_identity_test_c_2_5_5",
-            "transfer_identity_test_c_2_5_6",
-        ]:
+        # Test presets in IDENTITY_TEST_PRESETS use the exact same Identity Transfer prompt template
+        from ccc_krea2.easy_routing import IDENTITY_TEST_PRESETS
+
+        for test_preset in IDENTITY_TEST_PRESETS:
             has_def, test_text, test_key = resolve_default_positive_prompt(
                 preset=test_preset,
                 has_s=True,
@@ -740,7 +732,7 @@ class TestEasyEditReportLatentSource:
         """Verify prompt parity across all identity transfer test presets."""
         from ccc_krea2.easy_routing import IDENTITY_TEST_PRESETS
 
-        assert len(IDENTITY_TEST_PRESETS) == 9
+        assert len(IDENTITY_TEST_PRESETS) == 15
 
         expected_prompt_text = (
             "Replace only the identity of the volleyball player of the scene image with the identity of the portrait subject from the subject image.\n\n"

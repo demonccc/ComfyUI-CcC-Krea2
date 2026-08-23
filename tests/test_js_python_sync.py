@@ -61,8 +61,8 @@ def test_js_python_preset_synchronization():
 
     # 4. Assert Group A/B/C/D exact experiment IDs and counts
     expected_group_a = []
-    expected_group_b = ["transfer_identity_test_b_2_5_5", "transfer_identity_test_b_2_5_6"]
-    expected_group_c = ["transfer_identity_test_c_2_5_5", "transfer_identity_test_c_2_5_6"]
+    expected_group_b = []
+    expected_group_c = []
     expected_group_d = []
 
     assert js_group_a == expected_group_a
