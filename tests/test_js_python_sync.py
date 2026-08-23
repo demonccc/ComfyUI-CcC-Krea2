@@ -207,4 +207,22 @@ def test_js_dom_readonly_controls():
     assert "posPromptWidget.inputEl.disabled = true;" in js_code
 
 
+def test_js_runtime_harness_suite(pytestconfig):
+    """Execute node-based JS runtime mock harness to verify full widget lifecycle and routing logic."""
+    import shutil
+    import subprocess
+    import pytest
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        pytest.skip("Node.js binary not found in PATH")
+
+    harness_path = Path(__file__).parent / "js_harness.mjs"
+    assert harness_path.exists(), f"JS harness missing at {harness_path}"
+
+    res = subprocess.run([node_bin, str(harness_path)], capture_output=True, text=True)
+    assert res.returncode == 0, f"JS runtime harness failed:\nStdout: {res.stdout}\nStderr: {res.stderr}"
+
+
+
 
