@@ -108,3 +108,55 @@ def test_js_python_preset_synchronization():
     assert easy_edit_presets == EASY_EDIT_PRESETS
     assert ostris_edit_presets == EASY_EDIT_PRESETS
     assert list(EASY_PRESET_CAPABILITIES.keys()) == list(EASY_EDIT_PRESETS)
+
+
+def test_js_structure_regression_protection():
+    """Verify structural integrity of web/ccc_krea2.js declarations to prevent syntax regressions."""
+    js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
+    js_code = js_path.read_text(encoding="utf-8")
+
+    assert "const LEGACY_PRESETS = [" in js_code, "Missing 'const LEGACY_PRESETS = [' declaration"
+    assert (
+        js_code.count("const migrateLegacyEasyEditWidgets = (info) => {") == 1
+    ), "Expected exactly one 'migrateLegacyEasyEditWidgets' declaration"
+
+
+def test_js_syntax_validation(pytestconfig):
+    """Validate JS file syntax with Node.js if available."""
+    import shutil
+    import subprocess
+    import tempfile
+    import pytest
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        pytest.skip("Node.js binary not found in PATH")
+
+    js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
+    with tempfile.NamedTemporaryFile(suffix=".mjs", delete=False) as tmp:
+        tmp.write(js_path.read_bytes())
+        tmp_path = tmp.name
+
+    res = subprocess.run([node_bin, "--check", tmp_path], capture_output=True, text=True)
+    Path(tmp_path).unlink(missing_ok=True)
+    assert res.returncode == 0, f"Node.js syntax check failed:\n{res.stderr}"
+
+
+def test_js_prompt_ui_behavior():
+    """Verify frontend logic contract for prompt widget disabling and event triggers."""
+    js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
+    js_code = js_path.read_text(encoding="utf-8")
+
+    # 1. Assert posPromptWidget disabled = true when default prompt active
+    assert "posPromptWidget.disabled = true;" in js_code
+
+    # 2. Assert posPromptWidget disabled = false when editable / custom
+    assert "posPromptWidget.disabled = false;" in js_code
+
+    # 3. Assert updatePromptState triggers on preset, subject widgets, use_default, connections, and lifecycle
+    assert "updatePromptState();" in js_code
+    assert "[presetWidget, refSubjWidget, subjDescWidget, outfitSourceWidget, styleSourceWidget]" in js_code
+    assert "onConnectionsChange" in js_code
+    assert "onConfigure" in js_code
+    assert "setTimeout(updatePromptState, 20);" in js_code
+

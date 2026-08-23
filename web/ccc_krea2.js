@@ -323,7 +323,7 @@ app.registerExtension({
                     Object.entries(PRESET_DISPLAY_LABELS).map(([k, v]) => [v, k])
                 );
 
-                const migrateLegacyEasyEditWidgets = (info) => {
+                const LEGACY_PRESETS = [
                     "flexible",
                     "balanced",
                     "consistent",
@@ -603,10 +603,10 @@ app.registerExtension({
 
                         if (useDefaultWidget.value && hasDefault) {
                             posPromptWidget.value = text;
-                            posPromptWidget.disabled = false;
+                            posPromptWidget.disabled = true;
                             if (posPromptWidget.inputEl) {
                                 posPromptWidget.inputEl.readOnly = true;
-                                posPromptWidget.inputEl.title = "Resolved preset prompt. Read-only while Use Default Prompt is enabled.";
+                                posPromptWidget.inputEl.title = "Resolved preset prompt. Disable Use Default Prompt to edit manually.";
                             }
                             node._isPromptSystemManaged = true;
                         } else {
