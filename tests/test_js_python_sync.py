@@ -224,5 +224,36 @@ def test_js_runtime_harness_suite(pytestconfig):
     assert res.returncode == 0, f"JS runtime harness failed:\nStdout: {res.stdout}\nStderr: {res.stderr}"
 
 
+def test_python_js_widget_order_sync():
+    """Verify that Python INPUT_TYPES primitive widget declaration order matches JS migration assumptions."""
+    from ccc_krea2.modular_nodes.easy_edit_node import CcCKrea2EasyEdit, CcCKrea2EasyEditOstris
+
+    expected_widget_order = [
+        "positive_prompt",
+        "use_default_prompt",
+        "preset",
+        "reference_subject",
+        "subject_description",
+        "outfit_source",
+        "style_source",
+    ]
+
+    for node_cls in [CcCKrea2EasyEdit, CcCKrea2EasyEditOstris]:
+        input_types = node_cls.INPUT_TYPES()
+        required = input_types.get("required", {})
+        
+        # Filter primitive widgets in required (excluding socket inputs like model, clip, vae)
+        primitive_widgets = [
+            k for k in required.keys() 
+            if k in expected_widget_order
+        ]
+        
+        assert primitive_widgets == expected_widget_order, (
+            f"{node_cls.__name__} primitive widget order {primitive_widgets} does not match "
+            f"expected migration order {expected_widget_order}"
+        )
+
+
+
 
 

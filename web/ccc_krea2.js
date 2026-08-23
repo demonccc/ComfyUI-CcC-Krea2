@@ -323,18 +323,13 @@ app.registerExtension({
                     Object.entries(PRESET_DISPLAY_LABELS).map(([k, v]) => [v, k])
                 );
 
-                const LEGACY_PRESETS = [
+                const STABLE_PRESET_IDS = [
                     "flexible",
                     "balanced",
                     "consistent",
                     "preserve_identity",
                     "max_identity",
                     "identity_transfer",
-                    "transfer_identity_test_2",
-                    "transfer_identity_test_3",
-                    "transfer_identity_test_4",
-                    "transfer_identity_test_5",
-                    "transfer_identity_test_6",
                     "subject_transfer",
                     "preserve_scene",
                     "outfit_transfer",
@@ -342,17 +337,32 @@ app.registerExtension({
                     "scene_reinterpretation",
                 ];
 
+                const LEGACY_PRESETS = [
+                    ...STABLE_PRESET_IDS,
+                    "transfer_identity_test_2",
+                    "transfer_identity_test_3",
+                    "transfer_identity_test_4",
+                    "transfer_identity_test_5",
+                    "transfer_identity_test_6",
+                    ...GROUP_A_PRESETS,
+                    ...GROUP_B_PRESETS,
+                    ...GROUP_C_PRESETS,
+                    ...GROUP_D_PRESETS,
+                ];
+
                 const migrateLegacyEasyEditWidgets = (info) => {
                     if (!info || !Array.isArray(info.widgets_values)) return;
                     const vals = info.widgets_values;
                     if (vals.length < 2) return;
 
-                    let valAtIndex1 = vals[1];
-                    if (typeof valAtIndex1 === "boolean") return;
-
-                    // If index 0 is a preset string (older schema 1 without use_default_prompt at index 1), splice use_default_prompt boolean
-                    const valAtIndex0 = vals[0];
-                    if (typeof valAtIndex0 === "string" && (LEGACY_PRESETS.includes(valAtIndex0) || valAtIndex0.startsWith("transfer_identity_test_"))) {
+                    // 1. If index 1 is a preset string (older schema 1 without use_default_prompt at index 1), splice use_default_prompt boolean
+                    const valAtIndex1 = vals[1];
+                    if (typeof valAtIndex1 === "string" && (
+                        LEGACY_PRESETS.includes(valAtIndex1) ||
+                        valAtIndex1.startsWith("transfer_identity_test_") ||
+                        DISPLAY_TO_PRESET_ID[valAtIndex1] ||
+                        Object.keys(PRESET_DISPLAY_LABELS).includes(valAtIndex1)
+                    )) {
                         vals.splice(1, 0, true);
                         node._isPromptSystemManaged = true;
                     }
@@ -680,8 +690,12 @@ app.registerExtension({
                     const origValues = presetWidget.options?.values;
                     if (presetWidget.options) {
                         presetWidget.options.values = () => {
-                            const raw = typeof origValues === "function" ? origValues() : (origValues || Object.keys(PRESET_DISPLAY_LABELS));
-                            return raw.map(v => PRESET_DISPLAY_LABELS[v] || v);
+                            const raw = typeof origValues === "function" ? origValues() : origValues;
+                            const rawList = (Array.isArray(raw) && raw.length > 0) ? raw : Object.keys(PRESET_DISPLAY_LABELS);
+                            const stableInRaw = STABLE_PRESET_IDS.filter(id => rawList.includes(id));
+                            const remainingInRaw = rawList.filter(id => !STABLE_PRESET_IDS.includes(id));
+                            const ordered = [...stableInRaw, ...remainingInRaw];
+                            return ordered.map(v => PRESET_DISPLAY_LABELS[v] || v);
                         };
                     }
                 }

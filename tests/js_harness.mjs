@@ -47,22 +47,25 @@ function createMockNode(comfyClass = "CcCKrea2EasyEdit") {
         }
     };
 
-    const presetWidget = { name: "preset", value: "balanced", options: { values: [] } };
+    // Actual ComfyUI INPUT_TYPES widget ordering
+    const posPromptWidget = { name: "positive_prompt", value: "", inputEl: { readOnly: false, disabled: false, title: "" } };
     const useDefaultWidget = { name: "use_default_prompt", value: true };
+    const presetWidget = { name: "preset", value: "balanced", options: { values: [] } };
     const refSubjWidget = { name: "reference_subject", value: "main subject" };
     const subjDescWidget = { name: "subject_description", value: "main subject" };
     const outfitSourceWidget = { name: "outfit_source", value: "outfit image" };
     const styleSourceWidget = { name: "style_source", value: "style image" };
-    const posPromptWidget = { name: "positive_prompt", value: "", inputEl: { readOnly: false, disabled: false, title: "" } };
+    const patchWidget = { name: "apply_krea2_edit_patch", value: true };
 
     node.widgets = [
-        presetWidget,
+        posPromptWidget,
         useDefaultWidget,
+        presetWidget,
         refSubjWidget,
         subjDescWidget,
         outfitSourceWidget,
         styleSourceWidget,
-        posPromptWidget
+        patchWidget
     ];
 
     registeredExtension.nodeCreated(node);
@@ -76,13 +79,14 @@ function createMockNode(comfyClass = "CcCKrea2EasyEdit") {
 
     return {
         node,
-        presetWidget,
+        posPromptWidget,
         useDefaultWidget,
+        presetWidget,
         refSubjWidget,
         subjDescWidget,
         outfitSourceWidget,
         styleSourceWidget,
-        posPromptWidget,
+        patchWidget,
         setPreset
     };
 }
@@ -192,17 +196,25 @@ async function runTests() {
         assert.strictEqual(outfitSourceWidget.disabled, false, "outfit_transfer enables outfitSourceWidget");
     }
 
-    // 8. Workflow restoration sequence
+    // 8. Workflow restoration sequence with real widget ordering
     {
         const { node, useDefaultWidget, posPromptWidget } = createMockNode();
-        const info = {
-            widgets_values: ["identity_transfer", "main subject", "main subject", "outfit image", "style image", ""]
+        // Old Schema 1 workflow: ["prompt text", "identity_transfer", "outfit image", "style image", true]
+        const infoOld = {
+            widgets_values: ["", "identity_transfer", "outfit image", "style image", true]
         };
-        node.onConfigure(info);
+        node.onConfigure(infoOld);
         await new Promise(r => setTimeout(r, 60));
 
         assert.strictEqual(useDefaultWidget.value, true);
         assert.strictEqual(node._isPromptSystemManaged, true);
+        assert.strictEqual(infoOld.widgets_values[0], "");
+        assert.strictEqual(infoOld.widgets_values[1], true);
+        assert.strictEqual(infoOld.widgets_values[2], "identity_transfer");
+        assert.strictEqual(infoOld.widgets_values[3], "main subject");
+        assert.strictEqual(infoOld.widgets_values[4], "main subject");
+        assert.strictEqual(infoOld.widgets_values[5], "outfit image");
+        assert.strictEqual(infoOld.widgets_values[6], "style image");
 
         // Links appear asynchronously
         node.inputs.find(i => i.name === "subject").link = 1;
@@ -238,27 +250,101 @@ async function runTests() {
         assert.strictEqual(posPromptWidget.readOnly, false);
     }
 
-    // 10. Migration idempotency
+    // 10. Comprehensive migration testing (Old, Intermediate, Current, Repeated)
     {
-        const { node } = createMockNode();
-        const infoLegacy = {
-            widgets_values: ["identity_transfer", "main subject", "main subject", "outfit image", "style image"]
+        // 10a. Old schema without use_default_prompt and without subject fields
+        const { node: node1 } = createMockNode();
+        const infoOld = {
+            widgets_values: ["custom prompt", "identity_transfer", "outfit image", "style image", true]
         };
-        node.onConfigure(infoLegacy);
-        assert.strictEqual(infoLegacy.widgets_values[1], true);
+        node1.onConfigure(infoOld);
+        assert.strictEqual(infoOld.widgets_values[0], "custom prompt");
+        assert.strictEqual(infoOld.widgets_values[1], true);
+        assert.strictEqual(infoOld.widgets_values[2], "identity_transfer");
+        assert.strictEqual(infoOld.widgets_values[3], "main subject");
+        assert.strictEqual(infoOld.widgets_values[4], "main subject");
+        assert.strictEqual(infoOld.widgets_values[5], "outfit image");
+        assert.strictEqual(infoOld.widgets_values[6], "style image");
+        assert.strictEqual(infoOld.widgets_values.length, 8);
 
-        node.onConfigure(infoLegacy);
-        assert.strictEqual(infoLegacy.widgets_values[1], true);
-        assert.strictEqual(infoLegacy.widgets_values.length, 6); // Not duplicated!
+        // Repeated call idempotency on Old Schema
+        const lengthAfterFirst = infoOld.widgets_values.length;
+        node1.onConfigure(infoOld);
+        assert.strictEqual(infoOld.widgets_values.length, lengthAfterFirst);
+        assert.strictEqual(infoOld.widgets_values[1], true);
 
+        // 10b. Intermediate schema with explicit use_default_prompt boolean false but without subject fields
+        const { node: node2 } = createMockNode();
+        const infoIntermediate = {
+            widgets_values: ["custom prompt", false, "identity_transfer", "outfit image", "style image", true]
+        };
+        node2.onConfigure(infoIntermediate);
+        assert.strictEqual(infoIntermediate.widgets_values[0], "custom prompt");
+        assert.strictEqual(infoIntermediate.widgets_values[1], false, "Explicit boolean false must be preserved!");
+        assert.strictEqual(infoIntermediate.widgets_values[2], "identity_transfer");
+        assert.strictEqual(infoIntermediate.widgets_values[3], "main subject");
+        assert.strictEqual(infoIntermediate.widgets_values[4], "main subject");
+        assert.strictEqual(infoIntermediate.widgets_values[5], "outfit image");
+        assert.strictEqual(infoIntermediate.widgets_values[6], "style image");
+        assert.strictEqual(infoIntermediate.widgets_values.length, 8);
+
+        // Repeated call idempotency on Intermediate Schema
+        node2.onConfigure(infoIntermediate);
+        assert.strictEqual(infoIntermediate.widgets_values[1], false);
+        assert.strictEqual(infoIntermediate.widgets_values.length, 8);
+
+        // 10c. Current schema with explicit boolean, subject fields, and all widgets
+        const { node: node3 } = createMockNode();
         const infoCurrent = {
-            widgets_values: ["identity_transfer", false, "main subject", "main subject", "outfit image", "style image"]
+            widgets_values: ["custom prompt", false, "identity_transfer", "target subject", "subject desc", "outfit image", "style image", true]
         };
-        node.onConfigure(infoCurrent);
-        assert.strictEqual(infoCurrent.widgets_values[1], false); // Preserved!
+        node3.onConfigure(infoCurrent);
+        assert.strictEqual(infoCurrent.widgets_values[0], "custom prompt");
+        assert.strictEqual(infoCurrent.widgets_values[1], false);
+        assert.strictEqual(infoCurrent.widgets_values[2], "identity_transfer");
+        assert.strictEqual(infoCurrent.widgets_values[3], "target subject");
+        assert.strictEqual(infoCurrent.widgets_values[4], "subject desc");
+        assert.strictEqual(infoCurrent.widgets_values[5], "outfit image");
+        assert.strictEqual(infoCurrent.widgets_values[6], "style image");
+        assert.strictEqual(infoCurrent.widgets_values.length, 8);
+
+        // Repeated call idempotency on Current Schema
+        node3.onConfigure(infoCurrent);
+        assert.strictEqual(infoCurrent.widgets_values.length, 8);
     }
 
-    console.log("All 10 JavaScript frontend behavior tests PASSED successfully!");
+    // 11. Preset display ordering test
+    {
+        const { presetWidget } = createMockNode();
+        assert(presetWidget.options && typeof presetWidget.options.values === "function");
+        const displayedValues = presetWidget.options.values();
+
+        const expectedStableFirst = [
+            "Flexible",
+            "Balanced",
+            "Consistent",
+            "Preserve Identity",
+            "Max Identity",
+            "Identity Transfer",
+            "Subject Transfer",
+            "Preserve Scene",
+            "Outfit Transfer",
+            "Style Transfer",
+            "Scene Reinterpretation"
+        ];
+
+        // Assert the first 11 items match the required stable presets in exact order
+        const actualStableFirst = displayedValues.slice(0, 11);
+        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 11 presets must be the stable presets in exact order");
+
+        // Assert experimental presets appear after index 10
+        const experimentalValues = displayedValues.slice(11);
+        assert(experimentalValues.length > 0, "Experimental presets must appear after stable presets");
+        assert(experimentalValues.some(v => v.startsWith("[Experimental]")), "Experimental calibration presets must follow stable presets");
+        assert(experimentalValues.some(v => v.startsWith("[Experimental A]")), "Group A presets must follow stable presets");
+    }
+
+    console.log("All JavaScript frontend behavior & migration tests PASSED successfully!");
 }
 
 runTests().catch(err => {
