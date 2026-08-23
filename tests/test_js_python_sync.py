@@ -143,17 +143,17 @@ def test_js_syntax_validation(pytestconfig):
 
 
 def test_js_prompt_ui_behavior():
-    """Verify frontend logic contract for prompt widget disabling and event triggers."""
+    """Verify frontend logic contract for prompt widget managed read-only state and event triggers."""
     js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
     js_code = js_path.read_text(encoding="utf-8")
 
-    # 1. Assert posPromptWidget disabled = true when default prompt active
-    assert "posPromptWidget.disabled = true;" in js_code
+    # 1. Assert helper functions and readOnly assignment when default prompt is active
+    assert "setPromptWidgetManaged" in js_code
+    assert "setPromptWidgetValue" in js_code
+    assert "widget.readOnly = true;" in js_code
+    assert "widget.disabled = false;" in js_code
 
-    # 2. Assert posPromptWidget disabled = false when editable / custom
-    assert "posPromptWidget.disabled = false;" in js_code
-
-    # 3. Assert updatePromptState triggers on preset, subject widgets, use_default, connections, and lifecycle
+    # 2. Assert updatePromptState triggers on preset, subject widgets, use_default, connections, and lifecycle
     assert "updatePromptState();" in js_code
     assert "[presetWidget, refSubjWidget, subjDescWidget, outfitSourceWidget, styleSourceWidget]" in js_code
     assert "onConnectionsChange" in js_code
@@ -199,12 +199,13 @@ def test_legacy_preset_migration_defaults_true():
 
 
 def test_js_dom_readonly_controls():
-    """Verify readOnly and disabled properties are applied to DOM input controls."""
+    """Verify readOnly and disabled properties are applied to DOM input controls without disabling widget object or element."""
     js_path = Path(__file__).parent.parent / "web" / "ccc_krea2.js"
     js_code = js_path.read_text(encoding="utf-8")
 
-    assert "posPromptWidget.inputEl.readOnly = true;" in js_code
-    assert "posPromptWidget.inputEl.disabled = true;" in js_code
+    assert "findPromptWidgetElement" in js_code
+    assert "el.readOnly = true;" in js_code
+    assert "el.disabled = false;" in js_code
 
 
 def test_js_runtime_harness_suite(pytestconfig):

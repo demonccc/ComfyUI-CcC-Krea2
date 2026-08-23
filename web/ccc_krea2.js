@@ -508,6 +508,111 @@ app.registerExtension({
                     return { hasDefault: false, text: "" };
                 };
 
+                const findPromptWidgetElement = (widget, targetNode) => {
+                    if (!widget) return null;
+                    if (widget.inputEl) {
+                        if (widget.inputEl.tagName === "TEXTAREA" || widget.inputEl.tagName === "INPUT") {
+                            return widget.inputEl;
+                        }
+                        const inner = widget.inputEl.querySelector?.("textarea, input");
+                        if (inner) return inner;
+                        return widget.inputEl;
+                    }
+                    if (widget.element) {
+                        if (widget.element.tagName === "TEXTAREA" || widget.element.tagName === "INPUT") {
+                            return widget.element;
+                        }
+                        const inner = widget.element.querySelector?.("textarea, input");
+                        if (inner) return inner;
+                        return widget.element;
+                    }
+                    if (targetNode && targetNode.element) {
+                        const nodeInner = targetNode.element.querySelector?.("textarea, input");
+                        if (nodeInner) return nodeInner;
+                    }
+                    return null;
+                };
+
+                const setPromptWidgetValue = (widget, value, targetNode) => {
+                    if (!widget) return;
+                    targetNode._updatingManagedPrompt = true;
+                    try {
+                        const prevValue = widget.value;
+                        widget.value = value;
+
+                        if (widget.valueStore && typeof widget.valueStore.set === "function") {
+                            widget.valueStore.set(value);
+                        } else if (widget.component && typeof widget.component.setValue === "function") {
+                            widget.component.setValue(value);
+                        }
+
+                        if (typeof targetNode.onWidgetChanged === "function" && prevValue !== value) {
+                            targetNode.onWidgetChanged(widget.name, value, prevValue, widget);
+                        }
+
+                        const el = findPromptWidgetElement(widget, targetNode);
+                        if (el && el.value !== value) {
+                            el.value = value;
+                        }
+                    } finally {
+                        targetNode._updatingManagedPrompt = false;
+                    }
+                    if (typeof targetNode.setDirtyCanvas === "function") {
+                        targetNode.setDirtyCanvas(true, true);
+                    }
+                };
+
+                const setPromptWidgetManaged = (widget, managed, text, targetNode) => {
+                    if (!widget) return;
+                    if (managed) {
+                        targetNode._isPromptSystemManaged = true;
+                        targetNode._resolvedManagedPrompt = text;
+                        widget.disabled = false;
+                        widget.readOnly = true;
+                        if (widget.options) {
+                            widget.options.readOnly = true;
+                        }
+                        setPromptWidgetValue(widget, text, targetNode);
+
+                        const applyElementProps = () => {
+                            const el = findPromptWidgetElement(widget, targetNode);
+                            if (el) {
+                                el.readOnly = true;
+                                el.disabled = false;
+                                el.title = "Resolved preset prompt. Disable Use Default Prompt to edit manually.";
+                                if (el.style) el.style.opacity = "0.85";
+                            }
+                        };
+                        applyElementProps();
+
+                        const el = findPromptWidgetElement(widget, targetNode);
+                        if (!el && !targetNode._renderRetryScheduled) {
+                            targetNode._renderRetryScheduled = true;
+                            if (typeof globalThis.requestAnimationFrame === "function") {
+                                globalThis.requestAnimationFrame(() => {
+                                    targetNode._renderRetryScheduled = false;
+                                    applyElementProps();
+                                });
+                            }
+                        }
+                    } else {
+                        targetNode._isPromptSystemManaged = false;
+                        targetNode._resolvedManagedPrompt = null;
+                        widget.disabled = false;
+                        widget.readOnly = false;
+                        if (widget.options) {
+                            widget.options.readOnly = false;
+                        }
+                        const el = findPromptWidgetElement(widget, targetNode);
+                        if (el) {
+                            el.readOnly = false;
+                            el.disabled = false;
+                            el.title = "";
+                            if (el.style) el.style.opacity = "";
+                        }
+                    }
+                };
+
                 const updatePromptState = () => {
                     if (!useDefaultWidget || !posPromptWidget) return;
 
@@ -626,43 +731,23 @@ app.registerExtension({
 
                     if (isSubjectOnly || !hasDefault) {
                         useDefaultWidget.disabled = true;
-                        posPromptWidget.disabled = false;
-                        posPromptWidget.readOnly = false;
-                        if (posPromptWidget.inputEl) {
-                            posPromptWidget.inputEl.readOnly = false;
-                            posPromptWidget.inputEl.disabled = false;
-                            posPromptWidget.inputEl.title = "";
-                        }
+                        setPromptWidgetManaged(posPromptWidget, false, "", node);
 
                         if (!node._isRestoring) {
                             if (node._isPromptSystemManaged && isSubjectOnly) {
-                                posPromptWidget.value = "";
+                                setPromptWidgetValue(posPromptWidget, "", node);
                                 node._isPromptSystemManaged = false;
+                                node._resolvedManagedPrompt = null;
                             }
                         }
                     } else {
                         useDefaultWidget.disabled = false;
 
                         if (useDefaultWidget.value && hasDefault) {
-                            posPromptWidget.value = text;
-                            posPromptWidget.disabled = true;
-                            posPromptWidget.readOnly = true;
-                            if (posPromptWidget.inputEl) {
-                                posPromptWidget.inputEl.readOnly = true;
-                                posPromptWidget.inputEl.disabled = true;
-                                posPromptWidget.inputEl.title = "Resolved preset prompt. Disable Use Default Prompt to edit manually.";
-                            }
-                            node._isPromptSystemManaged = true;
+                            setPromptWidgetManaged(posPromptWidget, true, text, node);
                             node._isRestoring = false;
                         } else {
-                            posPromptWidget.disabled = false;
-                            posPromptWidget.readOnly = false;
-                            if (posPromptWidget.inputEl) {
-                                posPromptWidget.inputEl.readOnly = false;
-                                posPromptWidget.inputEl.disabled = false;
-                                posPromptWidget.inputEl.title = "";
-                            }
-                            node._isPromptSystemManaged = false;
+                            setPromptWidgetManaged(posPromptWidget, false, "", node);
                             node._isRestoring = false;
                         }
                     }
@@ -678,6 +763,7 @@ app.registerExtension({
                         if (origCb) origCb.apply(this, arguments);
                         if (!useDefaultWidget.value) {
                             node._isPromptSystemManaged = false;
+                            node._resolvedManagedPrompt = null;
                         } else {
                             node._isPromptSystemManaged = true;
                         }
@@ -716,10 +802,20 @@ app.registerExtension({
 
                 if (posPromptWidget) {
                     const origPosCb = posPromptWidget.callback;
-                    posPromptWidget.callback = function () {
+                    posPromptWidget.callback = function (val) {
+                        if (node._updatingManagedPrompt) return;
+
+                        if (useDefaultWidget?.value && node._isPromptSystemManaged && node._resolvedManagedPrompt != null) {
+                            if (val !== node._resolvedManagedPrompt) {
+                                setPromptWidgetValue(posPromptWidget, node._resolvedManagedPrompt, node);
+                                return;
+                            }
+                        }
+
                         if (origPosCb) origPosCb.apply(this, arguments);
                         if (!useDefaultWidget?.value) {
                             node._isPromptSystemManaged = false;
+                            node._resolvedManagedPrompt = null;
                         }
                     };
                 }
