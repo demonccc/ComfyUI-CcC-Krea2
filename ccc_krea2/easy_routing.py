@@ -1050,7 +1050,6 @@ def route_easy_preset(
                 target_content_mode = "image"
                 target_content_source = Sc
                 target_content_role = "scene"
-                target_content_fit = "contain_no_upscale"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
                 subj_boost = FAMILY_E_BOOSTS.get(preset) or FAMILY_F_BOOSTS.get(preset, 5.0)

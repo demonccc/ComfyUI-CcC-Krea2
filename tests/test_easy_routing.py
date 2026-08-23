@@ -1145,7 +1145,7 @@ class TestIdentityTestPresetsMatrix:
         assert route.target_content_mode == "image"
         assert route.target_content_source is Sc
         assert route.target_content_role == "scene"
-        assert route.target_content_fit == "contain_no_upscale"
+        assert route.target_content_fit == "crop"
         assert route.target_geometry_source is Sc
         assert_refs(
             route.edit_references,
@@ -1880,7 +1880,7 @@ def test_identity_transfer_experimental_presets_family_e(preset, exp_sc_boost, e
     assert route.target_content_mode == "image"
     assert route.target_content_source is Sc
     assert route.target_content_role == "scene"
-    assert route.target_content_fit == "contain_no_upscale"
+    assert route.target_content_fit == "crop"
     assert route.target_geometry_source is Sc
     assert len(route.edit_references) == 2
     assert route.edit_references[0][:3] == (Sc, exp_sc_boost, "scene")
@@ -1926,7 +1926,7 @@ def test_identity_transfer_experimental_presets_family_f(preset, exp_sc_boost, e
     assert route.target_content_mode == "image"
     assert route.target_content_source is Sc
     assert route.target_content_role == "scene"
-    assert route.target_content_fit == "contain_no_upscale"
+    assert route.target_content_fit == "crop"
     assert route.target_geometry_source is Sc
     assert len(route.edit_references) == 2
     assert route.edit_references[0][:3] == (Sc, exp_sc_boost, "scene")
@@ -1983,4 +1983,27 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
     assert route.style_source is Sc
     if exp_style_policy == "scene_outfit_auto":
         assert route.style_config.vision_instruction == EASY_SCENE_OUTFIT_STYLE_INSTRUCTION
+
+
+def test_family_e_f_preserve_scene_fit_parity():
+    """Verify Family E and Family F experimental presets match preserve_scene target_content_fit ('crop')."""
+    from ccc_krea2.easy_routing import resolve_easy_sources, route_easy_preset
+
+    S = object()
+    Sc = object()
+
+    src_base = resolve_easy_sources(subject=S, scene=Sc, preset="preserve_scene")
+    route_base = route_easy_preset(src_base, preset="preserve_scene")
+
+    src_e = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_preserve_scene_subject_5")
+    route_e = route_easy_preset(src_e, preset="transfer_identity_preserve_scene_subject_5")
+
+    src_f = resolve_easy_sources(subject=S, scene=Sc, preset="transfer_identity_preserve_scene_subject_5_outfit_style")
+    route_f = route_easy_preset(src_f, preset="transfer_identity_preserve_scene_subject_5_outfit_style")
+
+    assert route_base.target_content_fit == "crop"
+    assert route_e.target_content_fit == "crop"
+    assert route_f.target_content_fit == "crop"
+    assert route_e.target_content_fit == route_base.target_content_fit
+    assert route_f.target_content_fit == route_base.target_content_fit
 
