@@ -217,11 +217,6 @@ app.registerExtension({
                 const FAMILY_E_PRESETS = [
                     "transfer_identity_preserve_scene_subject_1",
                     "transfer_identity_preserve_scene_subject_2",
-                    "transfer_identity_preserve_scene_subject_2_5",
-                    "transfer_identity_preserve_scene_subject_4",
-                    "transfer_identity_preserve_scene_subject_5",
-                    "transfer_identity_preserve_scene_subject_6",
-                    "transfer_identity_preserve_scene_subject_8",
                     "transfer_identity_scene_1_subject_1",
                     "transfer_identity_scene_2_subject_1",
                     "transfer_identity_scene_2_5_subject_1",
@@ -238,32 +233,10 @@ app.registerExtension({
                     "transfer_identity_scene_8_subject_2",
                 ];
 
-                const FAMILY_F_PRESETS = [
-                    "transfer_identity_preserve_scene_subject_1_outfit_style",
-                    "transfer_identity_preserve_scene_subject_2_outfit_style",
-                    "transfer_identity_preserve_scene_subject_2_5_outfit_style",
-                    "transfer_identity_preserve_scene_subject_4_outfit_style",
-                    "transfer_identity_preserve_scene_subject_5_outfit_style",
-                    "transfer_identity_preserve_scene_subject_6_outfit_style",
-                    "transfer_identity_preserve_scene_subject_8_outfit_style",
-                ];
-
                 const IDENTITY_TEST_PRESETS = [
                     "identity_transfer",
                     "transfer_identity_preserve_scene_subject_1",
                     "transfer_identity_preserve_scene_subject_2",
-                    "transfer_identity_preserve_scene_subject_2_5",
-                    "transfer_identity_preserve_scene_subject_4",
-                    "transfer_identity_preserve_scene_subject_5",
-                    "transfer_identity_preserve_scene_subject_6",
-                    "transfer_identity_preserve_scene_subject_8",
-                    "transfer_identity_preserve_scene_subject_1_outfit_style",
-                    "transfer_identity_preserve_scene_subject_2_outfit_style",
-                    "transfer_identity_preserve_scene_subject_2_5_outfit_style",
-                    "transfer_identity_preserve_scene_subject_4_outfit_style",
-                    "transfer_identity_preserve_scene_subject_5_outfit_style",
-                    "transfer_identity_preserve_scene_subject_6_outfit_style",
-                    "transfer_identity_preserve_scene_subject_8_outfit_style",
                     "transfer_identity_scene_1_subject_1",
                     "transfer_identity_scene_2_subject_1",
                     "transfer_identity_scene_2_5_subject_1",
@@ -304,11 +277,6 @@ app.registerExtension({
                     // Family E: Preserve Scene with Generic Scene Style
                     "transfer_identity_preserve_scene_subject_1": "[Experimental] Identity Preserve Scene - Subject 1",
                     "transfer_identity_preserve_scene_subject_2": "[Experimental] Identity Preserve Scene - Subject 2",
-                    "transfer_identity_preserve_scene_subject_2_5": "[Experimental] Identity Preserve Scene - Subject 2.5",
-                    "transfer_identity_preserve_scene_subject_4": "[Experimental] Identity Preserve Scene - Subject 4",
-                    "transfer_identity_preserve_scene_subject_5": "[Experimental] Identity Preserve Scene - Subject 5",
-                    "transfer_identity_preserve_scene_subject_6": "[Experimental] Identity Preserve Scene - Subject 6",
-                    "transfer_identity_preserve_scene_subject_8": "[Experimental] Identity Preserve Scene - Subject 8",
                     // Scene Boost variants (Subject 1)
                     "transfer_identity_scene_1_subject_1": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 1",
                     "transfer_identity_scene_2_subject_1": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 1",
@@ -325,14 +293,6 @@ app.registerExtension({
                     "transfer_identity_scene_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 2",
                     "transfer_identity_scene_6_subject_2": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 2",
                     "transfer_identity_scene_8_subject_2": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 2",
-                    // Family F: Preserve Scene with Scene Outfit Style
-                    "transfer_identity_preserve_scene_subject_1_outfit_style": "[Experimental] Identity Preserve Scene - Subject 1 + Outfit Style",
-                    "transfer_identity_preserve_scene_subject_2_outfit_style": "[Experimental] Identity Preserve Scene - Subject 2 + Outfit Style",
-                    "transfer_identity_preserve_scene_subject_2_5_outfit_style": "[Experimental] Identity Preserve Scene - Subject 2.5 + Outfit Style",
-                    "transfer_identity_preserve_scene_subject_4_outfit_style": "[Experimental] Identity Preserve Scene - Subject 4 + Outfit Style",
-                    "transfer_identity_preserve_scene_subject_5_outfit_style": "[Experimental] Identity Preserve Scene - Subject 5 + Outfit Style",
-                    "transfer_identity_preserve_scene_subject_6_outfit_style": "[Experimental] Identity Preserve Scene - Subject 6 + Outfit Style",
-                    "transfer_identity_preserve_scene_subject_8_outfit_style": "[Experimental] Identity Preserve Scene - Subject 8 + Outfit Style",
                 };
 
                 const DISPLAY_TO_PRESET_ID = Object.fromEntries(
@@ -664,7 +624,7 @@ app.registerExtension({
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
                     const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
                     const isStyleDisabled = isGroupD;
-                    const isSceneOutfitStyle = ["flexible_subject_transfer_1", "flexible_subject_transfer_2", ...FAMILY_F_PRESETS, ...GROUP_C_PRESETS].includes(preset);
+                    const isSceneOutfitStyle = ["flexible_subject_transfer_1", "flexible_subject_transfer_2", ...GROUP_C_PRESETS].includes(preset);
                     const isSceneAutoStyle = ["subject_transfer", "subject_transfer_1", "subject_transfer_2", "scene_reinterpretation", "identity_transfer", ...FAMILY_E_PRESETS, ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
