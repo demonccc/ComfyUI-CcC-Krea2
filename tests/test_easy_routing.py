@@ -1827,7 +1827,7 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
-    assert len(all_presets) == 29
+    assert len(all_presets) == 43
 
     roles = ["subject", "scene", "outfit", "scene+outfit"]
 
@@ -2007,3 +2007,56 @@ def test_family_e_f_preserve_scene_fit_parity():
     assert route_e.target_content_fit == route_base.target_content_fit
     assert route_f.target_content_fit == route_base.target_content_fit
 
+
+@pytest.mark.parametrize(
+    "preset,exp_sc_boost,exp_s_boost",
+    [
+        ("transfer_identity_scene_1_subject_1", 1.0, 1.0),
+        ("transfer_identity_scene_2_subject_1", 2.0, 1.0),
+        ("transfer_identity_scene_2_5_subject_1", 2.5, 1.0),
+        ("transfer_identity_scene_4_subject_1", 4.0, 1.0),
+        ("transfer_identity_scene_5_subject_1", 5.0, 1.0),
+        ("transfer_identity_scene_6_subject_1", 6.0, 1.0),
+        ("transfer_identity_scene_8_subject_1", 8.0, 1.0),
+        ("transfer_identity_scene_1_subject_2", 1.0, 2.0),
+        ("transfer_identity_scene_2_subject_2", 2.0, 2.0),
+        ("transfer_identity_scene_2_5_subject_2", 2.5, 2.0),
+        ("transfer_identity_scene_4_subject_2", 4.0, 2.0),
+        ("transfer_identity_scene_5_subject_2", 5.0, 2.0),
+        ("transfer_identity_scene_6_subject_2", 6.0, 2.0),
+        ("transfer_identity_scene_8_subject_2", 8.0, 2.0),
+    ],
+)
+def test_identity_transfer_scene_boost_experimental_presets(preset, exp_sc_boost, exp_s_boost):
+    """Verify Scene Boost variants retain Family E routing, exact boost values, and generic Scene Style."""
+    from ccc_krea2.easy_routing import (
+        resolve_easy_sources,
+        route_easy_preset,
+        get_easy_preset_capabilities,
+        STYLE_POLICY_SCENE_AUTO,
+        OUTFIT_POLICY_DISABLED,
+        EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
+    )
+
+    S = object()
+    Sc = object()
+
+    caps = get_easy_preset_capabilities(preset)
+    assert caps.style_policy == STYLE_POLICY_SCENE_AUTO
+    assert caps.outfit_policy == OUTFIT_POLICY_DISABLED
+
+    src = resolve_easy_sources(subject=S, scene=Sc, preset=preset)
+    route = route_easy_preset(src, preset)
+
+    assert route.target_content_mode == "image"
+    assert route.target_content_source is Sc
+    assert route.target_content_role == "scene"
+    assert route.target_content_fit == "crop"
+    assert route.target_geometry_source is Sc
+    assert len(route.edit_references) == 2
+    assert route.edit_references[0][:3] == (Sc, exp_sc_boost, "scene")
+    assert route.edit_references[1][:3] == (S, exp_s_boost, "subject")
+    assert route.style_active is True
+    assert route.style_source is Sc
+    assert route.style_config.vision_instruction != EASY_SCENE_OUTFIT_STYLE_INSTRUCTION
+    assert not any(alias == "outfit" for _, _, alias, _ in route.edit_references)

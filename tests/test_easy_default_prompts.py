@@ -732,7 +732,7 @@ class TestEasyEditReportLatentSource:
         """Verify prompt parity across all identity transfer test presets."""
         from ccc_krea2.easy_routing import IDENTITY_TEST_PRESETS
 
-        assert len(IDENTITY_TEST_PRESETS) == 15
+        assert len(IDENTITY_TEST_PRESETS) == 29
 
         expected_prompt_text = (
             "Replace only the identity of the volleyball player of the scene image with the identity of the portrait subject from the subject image.\n\n"

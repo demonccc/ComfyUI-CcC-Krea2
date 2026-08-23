@@ -155,6 +155,22 @@ EASY_PRESET_DISPLAY_LABELS = {
     "transfer_identity_preserve_scene_subject_5": "[Experimental] Identity Preserve Scene - Subject 5",
     "transfer_identity_preserve_scene_subject_6": "[Experimental] Identity Preserve Scene - Subject 6",
     "transfer_identity_preserve_scene_subject_8": "[Experimental] Identity Preserve Scene - Subject 8",
+    # Scene Boost variants (Subject 1)
+    "transfer_identity_scene_1_subject_1": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 1",
+    "transfer_identity_scene_2_subject_1": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 1",
+    "transfer_identity_scene_2_5_subject_1": "[Experimental] Identity Preserve Scene - Scene 2.5 / Subject 1",
+    "transfer_identity_scene_4_subject_1": "[Experimental] Identity Preserve Scene - Scene 4 / Subject 1",
+    "transfer_identity_scene_5_subject_1": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 1",
+    "transfer_identity_scene_6_subject_1": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 1",
+    "transfer_identity_scene_8_subject_1": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 1",
+    # Scene Boost variants (Subject 2)
+    "transfer_identity_scene_1_subject_2": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 2",
+    "transfer_identity_scene_2_subject_2": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 2",
+    "transfer_identity_scene_2_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 2.5 / Subject 2",
+    "transfer_identity_scene_4_subject_2": "[Experimental] Identity Preserve Scene - Scene 4 / Subject 2",
+    "transfer_identity_scene_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 2",
+    "transfer_identity_scene_6_subject_2": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 2",
+    "transfer_identity_scene_8_subject_2": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 2",
     # Family F: Preserve Scene with Scene Outfit Style
     "transfer_identity_preserve_scene_subject_1_outfit_style": "[Experimental] Identity Preserve Scene - Subject 1 + Outfit Style",
     "transfer_identity_preserve_scene_subject_2_outfit_style": "[Experimental] Identity Preserve Scene - Subject 2 + Outfit Style",
@@ -173,6 +189,20 @@ FAMILY_E_PRESETS = (
     "transfer_identity_preserve_scene_subject_5",
     "transfer_identity_preserve_scene_subject_6",
     "transfer_identity_preserve_scene_subject_8",
+    "transfer_identity_scene_1_subject_1",
+    "transfer_identity_scene_2_subject_1",
+    "transfer_identity_scene_2_5_subject_1",
+    "transfer_identity_scene_4_subject_1",
+    "transfer_identity_scene_5_subject_1",
+    "transfer_identity_scene_6_subject_1",
+    "transfer_identity_scene_8_subject_1",
+    "transfer_identity_scene_1_subject_2",
+    "transfer_identity_scene_2_subject_2",
+    "transfer_identity_scene_2_5_subject_2",
+    "transfer_identity_scene_4_subject_2",
+    "transfer_identity_scene_5_subject_2",
+    "transfer_identity_scene_6_subject_2",
+    "transfer_identity_scene_8_subject_2",
 )
 
 FAMILY_F_PRESETS = (
@@ -193,6 +223,37 @@ FAMILY_E_BOOSTS = {
     "transfer_identity_preserve_scene_subject_5": 5.0,
     "transfer_identity_preserve_scene_subject_6": 6.0,
     "transfer_identity_preserve_scene_subject_8": 8.0,
+    "transfer_identity_scene_1_subject_1": 1.0,
+    "transfer_identity_scene_2_subject_1": 1.0,
+    "transfer_identity_scene_2_5_subject_1": 1.0,
+    "transfer_identity_scene_4_subject_1": 1.0,
+    "transfer_identity_scene_5_subject_1": 1.0,
+    "transfer_identity_scene_6_subject_1": 1.0,
+    "transfer_identity_scene_8_subject_1": 1.0,
+    "transfer_identity_scene_1_subject_2": 2.0,
+    "transfer_identity_scene_2_subject_2": 2.0,
+    "transfer_identity_scene_2_5_subject_2": 2.0,
+    "transfer_identity_scene_4_subject_2": 2.0,
+    "transfer_identity_scene_5_subject_2": 2.0,
+    "transfer_identity_scene_6_subject_2": 2.0,
+    "transfer_identity_scene_8_subject_2": 2.0,
+}
+
+FAMILY_E_SCENE_BOOSTS = {
+    "transfer_identity_scene_1_subject_1": 1.0,
+    "transfer_identity_scene_2_subject_1": 2.0,
+    "transfer_identity_scene_2_5_subject_1": 2.5,
+    "transfer_identity_scene_4_subject_1": 4.0,
+    "transfer_identity_scene_5_subject_1": 5.0,
+    "transfer_identity_scene_6_subject_1": 6.0,
+    "transfer_identity_scene_8_subject_1": 8.0,
+    "transfer_identity_scene_1_subject_2": 1.0,
+    "transfer_identity_scene_2_subject_2": 2.0,
+    "transfer_identity_scene_2_5_subject_2": 2.5,
+    "transfer_identity_scene_4_subject_2": 4.0,
+    "transfer_identity_scene_5_subject_2": 5.0,
+    "transfer_identity_scene_6_subject_2": 6.0,
+    "transfer_identity_scene_8_subject_2": 8.0,
 }
 
 FAMILY_F_BOOSTS = {
@@ -1052,8 +1113,9 @@ def route_easy_preset(
                 target_content_role = "scene"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
+                sc_boost = FAMILY_E_SCENE_BOOSTS.get(preset, 2.5)
                 subj_boost = FAMILY_E_BOOSTS.get(preset) or FAMILY_F_BOOSTS.get(preset, 5.0)
-                refs.append(_ref(Sc, 2.5, "scene"))
+                refs.append(_ref(Sc, sc_boost, "scene"))
                 refs.append(_ref(S, subj_boost, "subject"))
         else:
             target_content_mode = "empty"
