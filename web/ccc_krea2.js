@@ -526,7 +526,7 @@ app.registerExtension({
                         } else if (isSceneOutfitStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene Outfit]";
-                            styleSourceWidget.tooltip = "Uses the Scene image as outfit-focused style conditioning to reinforce the target woman's clothing and accessories.";
+                            styleSourceWidget.tooltip = "Uses the Scene image as outfit-focused style conditioning to reinforce the target subject's clothing and accessories.";
                         } else if (isSceneAutoStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene]";
