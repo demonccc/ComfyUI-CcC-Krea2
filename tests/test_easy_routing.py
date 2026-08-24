@@ -1523,8 +1523,8 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
 @pytest.mark.parametrize(
     "preset,exp_sc_boost,exp_s_boost,exp_style_policy",
     [
-        ("subject_transfer_1", 2.5, 5.0, "scene_auto"),
-        ("subject_transfer_2", 2.5, 6.0, "scene_auto"),
+        ("subject_transfer_1", 1.0, 5.0, "scene_auto"),
+        ("subject_transfer_2", 1.0, 6.0, "scene_auto"),
         ("flexible_subject_transfer_1", 2.5, 5.0, "scene_outfit_auto"),
         ("flexible_subject_transfer_2", 2.5, 6.0, "scene_outfit_auto"),
     ],
@@ -1539,6 +1539,7 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
         STYLE_POLICY_SCENE_OUTFIT_AUTO,
         OUTFIT_POLICY_DISABLED,
         EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
+        EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION,
     )
 
     S = object()
@@ -1563,3 +1564,9 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
     assert route.style_source is Sc
     if exp_style_policy == "scene_outfit_auto":
         assert route.style_config.vision_instruction == EASY_SCENE_OUTFIT_STYLE_INSTRUCTION
+        assert route.style_config.indirect_style_transfer is False
+    else:
+        assert route.style_config.vision_instruction == EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION
+        assert route.style_config.indirect_style_transfer is True
+        assert route.style_config.style_processing == "2x2"
+        assert route.style_config.style_fidelity == 1.0

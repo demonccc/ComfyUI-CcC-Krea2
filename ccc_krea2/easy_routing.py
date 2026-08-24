@@ -15,6 +15,8 @@ MAX_IDENTITY_SUBJECT_BOOST = 10.0
 
 IDENTITY_TRANSFER_SCENE_BOOST = 2.0
 IDENTITY_TRANSFER_SUBJECT_BOOST = 2.0
+SUBJECT_TRANSFER_SCENE_BOOST = 1.0
+FLEXIBLE_SUBJECT_TRANSFER_SCENE_BOOST = 2.5
 PRESERVE_SCENE_BOOST = 2.5
 OUTFIT_EMPHASIS_BOOST = 2.5
 OUTFIT_TRANSFER_SUBJECT_BOOST = 8.0
@@ -34,6 +36,13 @@ EASY_SCENE_AND_OUTFIT_INSTRUCTION = (
     "Use this reference for the scene composition, environment, spatial relationships, "
     "camera framing and lighting, and also for the clothing, garments and accessories. "
     "Do not use the clothing wearer's identity as the subject identity."
+)
+EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION = (
+    "Use the scene image to reinforce the scene composition, framing, environment, objects, lighting, "
+    "color palette, and overall visual treatment.\n\n"
+    "Preserve the position, pose, action, role, and interactions of the person being replaced.\n\n"
+    "Do not transfer the identity, facial features, hair, anatomy, body shape, body proportions, clothing, "
+    "or accessories of that person."
 )
 
 EASY_ROLE_INSTRUCTIONS = {
@@ -475,6 +484,13 @@ DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
 
 INDIRECT_EASY_STYLE_CONFIG = EasyStyleConfig(
     style_fidelity=1.0, style_processing="2x2", indirect_style_transfer=True, vision_instruction=""
+)
+
+SUBJECT_TRANSFER_SCENE_STYLE_CONFIG = EasyStyleConfig(
+    style_fidelity=1.0,
+    style_processing="2x2",
+    indirect_style_transfer=True,
+    vision_instruction=EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION,
 )
 
 STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
@@ -1009,7 +1025,12 @@ def route_easy_preset(
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
                 s_boost = 6.0 if preset in ("subject_transfer_2", "flexible_subject_transfer_2") else 5.0
-                refs.append(_ref(Sc, 2.5, "scene"))
+                scene_boost = (
+                    SUBJECT_TRANSFER_SCENE_BOOST
+                    if preset in ("subject_transfer_1", "subject_transfer_2")
+                    else FLEXIBLE_SUBJECT_TRANSFER_SCENE_BOOST
+                )
+                refs.append(_ref(Sc, scene_boost, "scene"))
                 refs.append(_ref(S, s_boost, "subject"))
 
         else:
@@ -1059,6 +1080,8 @@ def route_easy_preset(
             indirect_style_transfer=False,
             vision_instruction=EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
         )
+    elif preset in ("subject_transfer_1", "subject_transfer_2"):
+        style_config = SUBJECT_TRANSFER_SCENE_STYLE_CONFIG
     elif preset == "style_transfer":
         style_config = STRONG_EASY_STYLE_CONFIG
     else:
