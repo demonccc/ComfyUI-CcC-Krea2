@@ -127,21 +127,26 @@ class TestDefaultPromptResolver:
                 "Preserve the position, action, pose, role, interaction, clothing, and accessories of the hero from the scene image."
             )
 
-        # Example B: the current Subject Transfer candidate
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer_1",
-            has_s=True,
-            has_sc=True,
-            has_o=False,
-            has_st=False,
-            reference_subject="target model",
-            subject_description="cyberpunk warrior",
-        )
-        assert has_def is True
-        assert key == "subject_transfer_1"
-        assert "Replace only the target model of the scene image with the cyberpunk warrior of the subject image." in text
-        assert "Transfer the complete cyberpunk warrior from the subject image, including the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories." in text
-        assert "Preserve the face, body shape, body proportions, clothing, and accessories of the cyberpunk warrior from the subject image." in text
+        # Subject Transfer candidates use the BFS body-swap trigger and preserve Subject clothing.
+        for preset in ("subject_transfer_1", "subject_transfer_2"):
+            has_def, text, key = resolve_default_positive_prompt(
+                preset=preset,
+                has_s=True,
+                has_sc=True,
+                has_o=False,
+                has_st=True,
+                reference_subject="target model",
+                subject_description="cyberpunk warrior",
+            )
+            assert has_def is True
+            assert key == preset
+            assert text.startswith("body_swap: replace the person with the reference person.")
+            assert "Replace only the target model in the scene image with the complete cyberpunk warrior from the subject image." in text
+            assert "strictly preserving the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories of the cyberpunk warrior" in text
+            assert "Place the transferred cyberpunk warrior in the exact position occupied by the target model." in text
+            assert "The transferred cyberpunk warrior must perform the same action and interact in the same way as the target model." in text
+            assert "Keep the clothing and accessories of the cyberpunk warrior from the subject image." in text
+            assert "Do not use the clothing or accessories of the target model from the scene image." in text
 
         # Scene Reinterpretation with an explicit Outfit source
         has_def, text, key = resolve_default_positive_prompt(

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Reworked the automatic prompts for `subject_transfer_1` and `subject_transfer_2` around the BFS Body Swap trigger, explicitly preserving Subject clothing and matching the Scene character's position, pose, action, role, and interactions. Routing and automatic Scene Style remain unchanged.
 - Promoted the former Identity Preserve Scene `Scene 2 / Subject 2` routing to `identity_transfer` (Scene target/geometry, Scene and Subject boosts `2.0`) and removed obsolete experimental presets and the old stable `subject_transfer`.
 - Promoted the useful Test 5 behavior into `scene_reinterpretation`: Empty latent, Scene geometry and semantic-only guidance, Subject appearance `7.0`, optional selectable Outfit appearance `4.0`, and selectable Style. Removed the standalone Test 5 preset.
 
