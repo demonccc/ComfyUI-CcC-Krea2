@@ -408,11 +408,7 @@ app.registerExtension({
                         const template = (hasO && !usesSubjectOutfit)
                             ? EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT
                             : EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT;
-                        let text = renderJsEasyPrompt(template, context);
-                        if (hasSt) {
-                            text += "\n\n" + renderJsEasyPrompt(EASY_DEFAULT_PROMPT_STYLE, context);
-                        }
-                        return { hasDefault: true, text };
+                        return { hasDefault: true, text: renderJsEasyPrompt(template, context) };
                     }
 
                     if (preset === "scene_reinterpretation") {

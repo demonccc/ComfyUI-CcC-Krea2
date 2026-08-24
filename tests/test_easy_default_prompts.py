@@ -110,9 +110,10 @@ class TestDefaultPromptResolver:
             style_source="style image",
         )
         assert has_def is True
-        assert key == "subject_transfer_scene_outfit_style"
+        assert key == "subject_transfer_scene_outfit"
         assert "Dress the transferred main subject using the clothing, footwear, and accessories worn by the main subject in the scene image." in text
-        assert "Use the style image only as a visual style reference." in text
+        assert "visual style reference" not in text
+        assert "color palette, lighting character, contrast, texture" not in text
 
     def test_placeholder_substitution_matrix(self):
         # Example A: identity_transfer with custom subjects

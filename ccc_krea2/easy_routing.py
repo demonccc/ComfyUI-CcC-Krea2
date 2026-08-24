@@ -382,11 +382,7 @@ def resolve_default_positive_prompt(
             else:
                 base_key = "subject_transfer_outfit"
 
-        rendered_base = render_easy_prompt(base_template, context)
-        if has_st:
-            rendered_style = render_easy_prompt(EASY_DEFAULT_PROMPT_STYLE, context)
-            return True, f"{rendered_base}\n\n{rendered_style}", f"{base_key}_style"
-        return True, rendered_base, base_key
+        return True, render_easy_prompt(base_template, context), base_key
 
     elif preset == "scene_reinterpretation":
         if not (has_s and has_sc):
