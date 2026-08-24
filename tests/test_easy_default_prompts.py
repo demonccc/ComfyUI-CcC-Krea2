@@ -169,13 +169,12 @@ class TestDefaultPromptResolver:
             )
             assert has_def is True
             assert key == preset
-            assert text.startswith("body_swap: replace the person with the reference person.")
-            assert "Replace only the target model in the scene image with the complete cyberpunk warrior from the subject image." in text
-            assert "strictly preserving the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories of the cyberpunk warrior" in text
-            assert "Place the transferred cyberpunk warrior in the exact position occupied by the target model." in text
-            assert "The transferred cyberpunk warrior must perform the same action and interact in the same way as the target model." in text
-            assert "Keep the clothing and accessories of the cyberpunk warrior from the subject image." in text
-            assert "Do not use the clothing or accessories of the target model from the scene image." in text
+            assert "body_swap" not in text
+            assert "Replace only the target model of the scene image with the cyberpunk warrior from the subject image." in text
+            assert "Transfer the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories of the cyberpunk warrior from the subject image." in text
+            assert "Place the transferred cyberpunk warrior in the same position and pose as the target model." in text
+            assert "perform the same action, fulfill the same role, and interact with every person and object in the same way as the target model" in text
+            assert text.endswith("Keep every other person and the rest of the scene unchanged.")
 
         # Scene Reinterpretation with an explicit Outfit source
         has_def, text, key = resolve_default_positive_prompt(

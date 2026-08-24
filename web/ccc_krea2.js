@@ -171,14 +171,11 @@ app.registerExtension({
                     "Adapt the transferred {subject} naturally to the target scene while preserving the rest of the scene.\n\n" +
                     "Keep every other person and the rest of the scene unchanged.";
 
-                const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BODY_SWAP =
-                    "body_swap: replace the person with the reference person.\n\n" +
-                    "Replace only the {reference_subject} in the {scene_source} with the complete {subject} from the {subject_source}.\n\n" +
-                    "Use the {scene_source} as the base image. Preserve its environment, background, composition, camera framing, perspective, lighting, every other person and object, and all spatial relationships.\n\n" +
-                    "Transfer the complete {subject} from the {subject_source}, strictly preserving the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories of the {subject}.\n\n" +
-                    "Place the transferred {subject} in the exact position occupied by the {reference_subject}. Match the same body position, pose, body orientation, action, movement, role, and interaction with every person and object in the scene. The transferred {subject} must perform the same action and interact in the same way as the {reference_subject}.\n\n" +
-                    "Keep the clothing and accessories of the {subject} from the {subject_source}. Do not use the clothing or accessories of the {reference_subject} from the {scene_source}.\n\n" +
-                    "Blend the transferred {subject} naturally into the lighting, shadows, perspective, and environment of the {scene_source}. Keep every other person and the rest of the scene unchanged.";
+                const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER =
+                    "Replace only the {reference_subject} of the {scene_source} with the {subject} from the {subject_source}.\n\n" +
+                    "Transfer the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories of the {subject} from the {subject_source}.\n\n" +
+                    "Place the transferred {subject} in the same position and pose as the {reference_subject}. Make the transferred {subject} perform the same action, fulfill the same role, and interact with every person and object in the same way as the {reference_subject}.\n\n" +
+                    "Keep every other person and the rest of the scene unchanged.";
 
                 const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT =
                     "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n" +
@@ -402,7 +399,7 @@ app.registerExtension({
 
                     if (["subject_transfer_1", "subject_transfer_2"].includes(preset)) {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BODY_SWAP, context) };
+                        return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER, context) };
                     }
 
                     if (["flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset)) {
