@@ -173,7 +173,7 @@ async function runTests() {
             // Scene Reinterpretation promoted from the useful Test 5 routing
             setPreset("Scene Reinterpretation");
             await new Promise(r => setTimeout(r, 60));
-            assert(posPromptWidget.value.includes("Create a new image"), "Scene Reinterpretation prompt assigned");
+            assert(posPromptWidget.value.includes("Replace only the main subject in the scene image"), "Scene Reinterpretation replacement prompt assigned");
 
             // Switch to Manual Mode
             useDefaultWidget.value = false;
@@ -202,7 +202,7 @@ async function runTests() {
             await new Promise(r => setTimeout(r, 60));
 
             assert.strictEqual(node._isPromptSystemManaged, true);
-            assert(posPromptWidget.value.includes("Create a new image"), "Scene Reinterpretation prompt returned on toggling default prompt ON");
+            assert(posPromptWidget.value.includes("Replace only the main subject in the scene image"), "Scene Reinterpretation replacement prompt returned on toggling default prompt ON");
         }
 
         // 3. Delayed Render Fixture Test

@@ -191,6 +191,10 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "scene_reinterpretation_outfit"
+        assert text.startswith("Replace only the dancer in the scene image with the portrait woman from the subject image.")
+        assert "Do not add the portrait woman as an additional person." in text
+        assert "Place the transferred portrait woman in the same position and role as the dancer" in text
+        assert "Create a new image of" not in text
         assert "Dress the portrait woman using the clothing, footwear, and accessories worn by the portrait woman in the subject image." in text
 
         # Test empty/blank fallback

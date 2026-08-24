@@ -213,19 +213,19 @@ app.registerExtension({
                     "Do not transfer subjects, identities, facial features, hair, anatomy, body shapes, clothing, accessories, poses, objects, environment, layout, framing, or scene composition from the {style_source}.";
 
                 const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION =
-                    "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n" +
-                    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Replace only the {reference_subject} in the {scene_source} with the {subject} from the {subject_source}. Do not add the {subject} as an additional person.\n\n" +
+                    "Preserve the exact identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Place the transferred {subject} in the same position and role as the {reference_subject}, performing the same main action or activity.\n\n" +
                     "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n" +
-                    "Adapt the {subject} naturally to the referenced action and environment.\n\n" +
                     "Creatively reinterpret the clothing and accessories worn by the {reference_subject} in the {scene_source} so they are appropriate for the {subject} and the newly generated image. Do not copy the original scene outfit literally.\n\n" +
                     "Generate a coherent new image rather than recreating the source scene exactly.";
 
                 const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION_WITH_OUTFIT =
-                    "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n" +
-                    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Replace only the {reference_subject} in the {scene_source} with the {subject} from the {subject_source}. Do not add the {subject} as an additional person.\n\n" +
+                    "Preserve the exact identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Place the transferred {subject} in the same position and role as the {reference_subject}, performing the same main action or activity.\n\n" +
                     "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n" +
                     "Dress the {subject} using {outfit_reference}.\n\n" +
-                    "Adapt the {subject} and the selected outfit naturally to the referenced action and environment.\n\n" +
                     "Generate a coherent new image rather than recreating the source scene exactly.";
 
                 const IDENTITY_TEST_PRESETS = [
