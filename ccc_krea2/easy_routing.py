@@ -44,6 +44,19 @@ EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION = (
     "Do not transfer the identity, facial features, hair, anatomy, body shape, body proportions, clothing, "
     "or accessories of that person."
 )
+EASY_DEFAULT_STYLE_INSTRUCTION = (
+    "Use this image only as a visual style reference.\n\n"
+    "Apply its color palette, lighting character, contrast, texture, rendering treatment, photographic treatment, "
+    "and overall visual mood.\n\n"
+    "Do not transfer subjects, identities, facial features, hair, anatomy, body shapes, clothing, accessories, "
+    "poses, objects, environment, layout, framing, or scene composition from this image."
+)
+EASY_SEMANTIC_OUTFIT_INSTRUCTION = (
+    "Use this image only as the outfit reference.\n\n"
+    "Transfer the clothing, garments, footwear, and accessories shown in this image to the transferred subject.\n\n"
+    "Do not transfer the wearer's identity, facial features, hair, anatomy, body shape, body proportions, pose, "
+    "background, environment, objects, composition, lighting, or photographic style."
+)
 
 EASY_ROLE_INSTRUCTIONS = {
     "subject": EASY_SUBJECT_INSTRUCTION,
@@ -116,9 +129,9 @@ EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT = (
 )
 
 EASY_DEFAULT_PROMPT_STYLE = (
-    "Apply the visual style from the {style_source} while preserving the {subject} identity, content, geometry, framing, and composition.\n\n"
-    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood.\n\n"
-    "Do not copy subjects, objects, or scene content from the {style_source}."
+    "Use the {style_source} only as a visual style reference.\n\n"
+    "Apply its color palette, lighting character, contrast, texture, rendering treatment, photographic treatment, and overall visual mood.\n\n"
+    "Do not transfer subjects, identities, facial features, hair, anatomy, body shapes, clothing, accessories, poses, objects, environment, layout, framing, or scene composition from the {style_source}."
 )
 
 
@@ -127,7 +140,6 @@ OUTFIT_POLICY_DISABLED = "disabled"
 
 STYLE_POLICY_USER = "user"
 STYLE_POLICY_SCENE_AUTO = "scene_auto"
-STYLE_POLICY_SCENE_OUTFIT_AUTO = "scene_outfit_auto"
 STYLE_POLICY_DISABLED = "disabled"
 
 SCENE_REINTERPRETATION_SUBJECT_BOOST = 7.0
@@ -137,12 +149,6 @@ EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
     "Use this reference for the main subject's action, activity, pose, body dynamics, environment, spatial context, "
     "camera framing, perspective, lighting, and broad outfit concept. Reinterpret these elements creatively for the "
     "subject reference. Do not use the scene subject's identity as the generated subject identity."
-)
-
-EASY_SCENE_OUTFIT_STYLE_INSTRUCTION = (
-    "Use the Scene image only as a visual reference for the clothing and accessories worn by the target subject. "
-    "Reinforce their garment type, cut, coverage, colors, materials, and accessories. "
-    "Do not use this style conditioning to transfer the identity, body, pose, or other people from the Scene."
 )
 
 EASY_PRESET_DISPLAY_LABELS = {
@@ -304,7 +310,7 @@ def resolve_default_positive_prompt(
         if not (has_s and has_sc):
             return False, "", "none"
 
-        if not has_o:
+        if not has_o or eff_outfit_source == "subject image":
             base_template = EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT
             base_key = preset
         else:
@@ -318,7 +324,11 @@ def resolve_default_positive_prompt(
             else:
                 base_key = "subject_transfer_outfit"
 
-        return True, render_easy_prompt(base_template, context), base_key
+        rendered_base = render_easy_prompt(base_template, context)
+        if has_st:
+            rendered_style = render_easy_prompt(EASY_DEFAULT_PROMPT_STYLE, context)
+            return True, f"{rendered_base}\n\n{rendered_style}", f"{base_key}_style"
+        return True, rendered_base, base_key
 
     elif preset == "scene_reinterpretation":
         if not (has_s and has_sc):
@@ -422,10 +432,10 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
     "flexible_subject_transfer_1": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
+        outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER
     ),
     "flexible_subject_transfer_2": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
+        outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER
     ),
     "preserve_scene": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
     "outfit_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
@@ -479,11 +489,17 @@ class EasyStyleConfig:
 
 
 DEFAULT_EASY_STYLE_CONFIG = EasyStyleConfig(
-    style_fidelity=1.0, style_processing="2x2", indirect_style_transfer=False, vision_instruction=""
+    style_fidelity=1.0,
+    style_processing="2x2",
+    indirect_style_transfer=True,
+    vision_instruction=EASY_DEFAULT_STYLE_INSTRUCTION,
 )
 
-INDIRECT_EASY_STYLE_CONFIG = EasyStyleConfig(
-    style_fidelity=1.0, style_processing="2x2", indirect_style_transfer=True, vision_instruction=""
+SEMANTIC_OUTFIT_STYLE_CONFIG = EasyStyleConfig(
+    style_fidelity=1.0,
+    style_processing="2x2",
+    indirect_style_transfer=False,
+    vision_instruction=EASY_SEMANTIC_OUTFIT_INSTRUCTION,
 )
 
 SUBJECT_TRANSFER_SCENE_STYLE_CONFIG = EasyStyleConfig(
@@ -492,14 +508,6 @@ SUBJECT_TRANSFER_SCENE_STYLE_CONFIG = EasyStyleConfig(
     indirect_style_transfer=True,
     vision_instruction=EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION,
 )
-
-STRONG_EASY_STYLE_CONFIG = EasyStyleConfig(
-    style_fidelity=1.0,
-    style_processing="4x4",
-    indirect_style_transfer=False,
-    vision_instruction="Adopt the artistic style, color palette, texture, and visual mood of this style reference.",
-)
-
 
 @dataclass(frozen=True)
 class EasyPresetRoute:
@@ -516,6 +524,9 @@ class EasyPresetRoute:
     edit_references: Tuple[Tuple[Any, float, str, str], ...]
     # 2-tuple: (image, alias_role)
     semantic_only_references: Tuple[Tuple[Any, str], ...]
+    semantic_outfit_active: bool
+    semantic_outfit_source: Optional[Any]
+    semantic_outfit_config: EasyStyleConfig
     style_active: bool
     style_source: Optional[Any]
     style_config: EasyStyleConfig
@@ -542,6 +553,12 @@ def resolve_easy_sources(
 
     effective_subject = subject
     effective_scene = scene
+
+    if preset in ("flexible_subject_transfer_1", "flexible_subject_transfer_2"):
+        if outfit_source not in ("none", "subject image", "scene image"):
+            # Flexible Subject Transfer defaults to preserving/reinforcing the
+            # Subject outfit and deliberately does not consume the Outfit socket.
+            outfit_source = "subject image"
 
     # Resolve outfit_source
     outfit_source_kind = "outfit"
@@ -584,8 +601,8 @@ def resolve_easy_sources(
     if caps.style_policy == STYLE_POLICY_DISABLED:
         effective_style = None
         style_source_kind = "disabled"
-    elif caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_SCENE_OUTFIT_AUTO):
-        # Automatic Scene style policy for presets using STYLE_POLICY_SCENE_AUTO / STYLE_POLICY_SCENE_OUTFIT_AUTO
+    elif caps.style_policy == STYLE_POLICY_SCENE_AUTO:
+        # Automatic Scene style policy for presets with locked Scene guidance.
         style_source_kind = "scene"
         if scene is not None:
             effective_style = scene
@@ -1071,19 +1088,16 @@ def route_easy_preset(
     if target_geometry_source is None:
         target_geometry_mode, target_geometry_source = _resolve_default_geometry_source(Sc, S, Ou)
 
-    # Style configuration: active for ALL presets whenever effective_style is present
+    # Flexible Subject Transfer carries the selected Outfit through a separate direct
+    # semantic StyleReferenceSpec because Scene and Subject occupy both appearance slots.
+    semantic_outfit_active = preset in ("flexible_subject_transfer_1", "flexible_subject_transfer_2") and has_o
+    semantic_outfit_source = Ou if semantic_outfit_active else None
+
+    # Artistic Style configuration: indirect by default so only Qwen's semantic
+    # interpretation remains after the source image rows are removed.
     style_active = has_st
-    if caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
-        style_config = EasyStyleConfig(
-            style_fidelity=1.0,
-            style_processing="2x2",
-            indirect_style_transfer=False,
-            vision_instruction=EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
-        )
-    elif preset in ("subject_transfer_1", "subject_transfer_2"):
+    if preset in ("subject_transfer_1", "subject_transfer_2"):
         style_config = SUBJECT_TRANSFER_SCENE_STYLE_CONFIG
-    elif preset == "style_transfer":
-        style_config = STRONG_EASY_STYLE_CONFIG
     else:
         style_config = DEFAULT_EASY_STYLE_CONFIG
 
@@ -1097,6 +1111,9 @@ def route_easy_preset(
         target_content_fit=target_content_fit,
         edit_references=tuple(refs),
         semantic_only_references=tuple(semantic_only_refs),
+        semantic_outfit_active=semantic_outfit_active,
+        semantic_outfit_source=semantic_outfit_source,
+        semantic_outfit_config=SEMANTIC_OUTFIT_STYLE_CONFIG,
         style_active=style_active,
         style_source=St,
         style_config=style_config,

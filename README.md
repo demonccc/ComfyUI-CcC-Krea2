@@ -103,10 +103,11 @@ The identity ladder covers subject preservation tasks. Additional task-specific 
 
 - **Identity Transfer**: Transfers the identity of the Subject to the target person in the Scene while keeping the Scene clothing, pose, and surroundings intact. Uses the Scene image as both target content and geometry anchor, with Scene and Subject appearance boosts of `2.0`. Naturally aligned with Conrad Identity Edit LoRA (`krea2_identity_edit_v1_2.safetensors`).
 - **Subject Transfer 1 / 2**: Current experimental candidates for transferring the complete Subject into the Scene context. Both start from an empty target latent with Scene geometry and differ in Subject appearance strength (`5.0` / `6.0`). Naturally aligned with BFS Body Swap LoRA (`bfs_body_swap_v1_krea2.safetensors`).
+- **Flexible Subject Transfer 1 / 2**: Uses Scene and Subject as the two appearance references. Outfit is independently selectable from none, Subject (default), or Scene and travels through a direct semantic Style path with outfit-only guardrails. Artistic Style is independently selectable and uses the global indirect style-only profile.
 - **Scene Reinterpretation**: Creatively reinterprets the Scene without target image initialization. Scene defines geometry and enters as a semantic-only reference; Subject is the primary appearance reference (`7.0`). An optional Outfit appearance reference (`4.0`) can come from Subject, Scene, Outfit, or Style, and Style is manually selectable.
 - **Preserve Scene**: Prioritizes preserving the connected Scene composition, background, and visual context (Outfit policy: disabled).
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
-- **Style Transfer**: Uses the dedicated Style/Moodboard path to transfer artistic style, palette, texture, and visual mood (Outfit policy: disabled).
+- **Style Transfer**: Uses the dedicated indirect Style/Moodboard path to transfer artistic style, palette, texture, and visual mood without retaining the source Style image rows (Outfit policy: disabled).
 
 > [!NOTE]
 > **Placeholder-Driven Default Prompts & Subject Fields**:

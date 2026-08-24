@@ -211,9 +211,9 @@ app.registerExtension({
                     "Do not duplicate accessories.";
 
                 const EASY_DEFAULT_PROMPT_STYLE =
-                    "Apply the visual style from the {style_source} while preserving the {subject} identity, content, geometry, framing, and composition.\n\n" +
-                    "Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood.\n\n" +
-                    "Do not copy subjects, objects, or scene content from the {style_source}.";
+                    "Use the {style_source} only as a visual style reference.\n\n" +
+                    "Apply its color palette, lighting character, contrast, texture, rendering treatment, photographic treatment, and overall visual mood.\n\n" +
+                    "Do not transfer subjects, identities, facial features, hair, anatomy, body shapes, clothing, accessories, poses, objects, environment, layout, framing, or scene composition from the {style_source}.";
 
                 const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION =
                     "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n" +
@@ -398,8 +398,15 @@ app.registerExtension({
 
                     if (["flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset)) {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        const template = hasO ? EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT : EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT;
-                        return { hasDefault: true, text: renderJsEasyPrompt(template, context) };
+                        const usesSubjectOutfit = hasO && outfitSource === "subject image";
+                        const template = (hasO && !usesSubjectOutfit)
+                            ? EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT
+                            : EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT;
+                        let text = renderJsEasyPrompt(template, context);
+                        if (hasSt) {
+                            text += "\n\n" + renderJsEasyPrompt(EASY_DEFAULT_PROMPT_STYLE, context);
+                        }
+                        return { hasDefault: true, text };
                     }
 
                     if (preset === "scene_reinterpretation") {
@@ -563,9 +570,10 @@ app.registerExtension({
                     const preset = DISPLAY_TO_PRESET_ID[presetWidget?.value] || presetWidget?.value || "balanced";
                     const isGroupD = GROUP_D_PRESETS.includes(preset);
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
-                    const usesOutfit = !["preserve_scene", "style_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
+                    const isFlexibleSubjectTransfer = ["flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset);
+                    const usesOutfit = !["preserve_scene", "style_transfer", "subject_transfer_1", "subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
                     const isStyleDisabled = isGroupD;
-                    const isSceneOutfitStyle = ["flexible_subject_transfer_1", "flexible_subject_transfer_2", ...GROUP_C_PRESETS].includes(preset);
+                    const isSceneOutfitStyle = GROUP_C_PRESETS.includes(preset);
                     const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "identity_transfer", ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
@@ -574,12 +582,31 @@ app.registerExtension({
                     const outfitInput = node.inputs?.find(i => i.name === "outfit");
                     const styleInput = node.inputs?.find(i => i.name === "style");
 
-                    const outfitSource = outfitSourceWidget?.value || "outfit image";
-                    const styleSource = styleSourceWidget?.value || "style image";
+                    const enteringFlexibleSubjectTransfer = isFlexibleSubjectTransfer
+                        && node._lastEasyPreset !== undefined
+                        && node._lastEasyPreset !== preset
+                        && !node._isRestoring;
+
+                    if (outfitSourceWidget?.options) {
+                        outfitSourceWidget.options.values = isFlexibleSubjectTransfer
+                            ? ["none", "subject image", "scene image"]
+                            : ["none", "subject image", "scene image", "outfit image", "style image"];
+                    }
+                    if (isFlexibleSubjectTransfer && !["none", "subject image", "scene image"].includes(outfitSourceWidget?.value)) {
+                        outfitSourceWidget.value = "subject image";
+                    }
+                    if (enteringFlexibleSubjectTransfer) {
+                        if (outfitSourceWidget) outfitSourceWidget.value = "subject image";
+                        if (styleSourceWidget) styleSourceWidget.value = "none";
+                    }
+                    node._lastEasyPreset = preset;
+
+                    const outfitSource = outfitSourceWidget?.value || (isFlexibleSubjectTransfer ? "subject image" : "outfit image");
+                    const styleSource = styleSourceWidget?.value || "none";
                     const refSubjVal = refSubjWidget?.value || "main subject";
                     const subjDescVal = subjDescWidget?.value || "main subject";
 
-                    const styleSocketIsUsedAsOutfit = usesOutfit && outfitSource === "style image";
+                    const styleSocketIsUsedAsOutfit = usesOutfit && !isFlexibleSubjectTransfer && outfitSource === "style image";
 
                     if (outfitSourceWidget) {
                         if (isSceneAutoOutfit) {
@@ -593,11 +620,13 @@ app.registerExtension({
                         } else {
                             outfitSourceWidget.disabled = false;
                             delete outfitSourceWidget.label;
-                            outfitSourceWidget.tooltip = "Source image socket to use for outfit conditioning.";
+                            outfitSourceWidget.tooltip = isFlexibleSubjectTransfer
+                                ? "Semantic Outfit source. Defaults to Subject and uses direct semantic conditioning."
+                                : "Source image socket to use for outfit conditioning.";
                         }
                     }
                     if (outfitInput) {
-                        outfitInput.disabled = isSceneAutoOutfit || !usesOutfit;
+                        outfitInput.disabled = isSceneAutoOutfit || !usesOutfit || isFlexibleSubjectTransfer;
                     }
 
                     if (styleSourceWidget) {

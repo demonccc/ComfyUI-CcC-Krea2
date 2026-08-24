@@ -82,8 +82,37 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "style"
-        assert "Apply the visual style from the style image while preserving the main subject identity" in text
-        assert "Do not copy subjects, objects, or scene content from the style image." in text
+        assert "Use the style image only as a visual style reference." in text
+        assert "Apply its color palette, lighting character, contrast, texture" in text
+        assert "Do not transfer subjects, identities, facial features" in text
+
+    def test_flexible_subject_transfer_subject_outfit_and_optional_style(self):
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="flexible_subject_transfer_1",
+            has_s=True,
+            has_sc=True,
+            has_o=True,
+            has_st=False,
+            outfit_source="subject image",
+        )
+        assert has_def is True
+        assert key == "flexible_subject_transfer_1"
+        assert "Preserve the face, body shape, body proportions, clothing, and accessories" in text
+        assert "Do not preserve the clothing" not in text
+
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="flexible_subject_transfer_2",
+            has_s=True,
+            has_sc=True,
+            has_o=True,
+            has_st=True,
+            outfit_source="scene image",
+            style_source="style image",
+        )
+        assert has_def is True
+        assert key == "subject_transfer_scene_outfit_style"
+        assert "Dress the transferred main subject using the clothing and accessories from the scene image." in text
+        assert "Use the style image only as a visual style reference." in text
 
     def test_placeholder_substitution_matrix(self):
         # Example A: identity_transfer with custom subjects

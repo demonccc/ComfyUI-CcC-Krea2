@@ -971,7 +971,7 @@ class TestIdentityTransferMatrix:
         assert route.style_active is True
         assert route.style_source is Sc
         assert route.style_config.style_processing == "2x2"
-        assert route.style_config.indirect_style_transfer is False
+        assert route.style_config.indirect_style_transfer is True
 
     def test_subject_scene_outfit_disabled(self, dummy_sources):
         S, Sc, Ou, _ = dummy_sources
@@ -1225,6 +1225,8 @@ class TestCommonMultiReferenceGeometry:
 
 
 def test_style_active_for_all_presets(dummy_sources):
+    from ccc_krea2.easy_routing import EASY_DEFAULT_STYLE_INSTRUCTION
+
     S, _, _, St = dummy_sources
     sources = resolve_easy_sources(subject=S, style=St)
 
@@ -1242,16 +1244,16 @@ def test_style_active_for_all_presets(dummy_sources):
         assert r.style_source is St
         assert r.style_config.style_fidelity == 1.0
         assert r.style_config.style_processing == "2x2"
-        assert r.style_config.indirect_style_transfer is False
-        assert r.style_config.vision_instruction == ""
+        assert r.style_config.indirect_style_transfer is True
+        assert r.style_config.vision_instruction == EASY_DEFAULT_STYLE_INSTRUCTION
 
     r_st = route_easy_preset(sources, preset="style_transfer")
     assert r_st.style_active is True
     assert r_st.style_source is St
     assert r_st.style_config.style_fidelity == 1.0
-    assert r_st.style_config.style_processing == "4x4"
-    assert r_st.style_config.indirect_style_transfer is False
-    assert "artistic style" in r_st.style_config.vision_instruction
+    assert r_st.style_config.style_processing == "2x2"
+    assert r_st.style_config.indirect_style_transfer is True
+    assert r_st.style_config.vision_instruction == EASY_DEFAULT_STYLE_INSTRUCTION
 
 
 # ---------------------------------------------------------------------------
@@ -1525,21 +1527,23 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
     [
         ("subject_transfer_1", 1.0, 5.0, "scene_auto"),
         ("subject_transfer_2", 1.0, 6.0, "scene_auto"),
-        ("flexible_subject_transfer_1", 2.5, 5.0, "scene_outfit_auto"),
-        ("flexible_subject_transfer_2", 2.5, 6.0, "scene_outfit_auto"),
+        ("flexible_subject_transfer_1", 2.5, 5.0, "user"),
+        ("flexible_subject_transfer_2", 2.5, 6.0, "user"),
     ],
 )
 def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, exp_style_policy):
-    """Verify protected Subject Transfer presets remain strictly unchanged in routing and capabilities."""
+    """Verify Subject Transfer appearance routing and the distinct fixed/flexible semantic policies."""
     from ccc_krea2.easy_routing import (
         resolve_easy_sources,
         route_easy_preset,
         get_easy_preset_capabilities,
         STYLE_POLICY_SCENE_AUTO,
-        STYLE_POLICY_SCENE_OUTFIT_AUTO,
+        STYLE_POLICY_USER,
+        OUTFIT_POLICY_USER,
         OUTFIT_POLICY_DISABLED,
-        EASY_SCENE_OUTFIT_STYLE_INSTRUCTION,
         EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION,
+        EASY_DEFAULT_STYLE_INSTRUCTION,
+        EASY_SEMANTIC_OUTFIT_INSTRUCTION,
     )
 
     S = object()
@@ -1548,11 +1552,18 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
     caps = get_easy_preset_capabilities(preset)
     if exp_style_policy == "scene_auto":
         assert caps.style_policy == STYLE_POLICY_SCENE_AUTO
+        assert caps.outfit_policy == OUTFIT_POLICY_DISABLED
     else:
-        assert caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO
-    assert caps.outfit_policy == OUTFIT_POLICY_DISABLED
+        assert caps.style_policy == STYLE_POLICY_USER
+        assert caps.outfit_policy == OUTFIT_POLICY_USER
 
-    src = resolve_easy_sources(subject=S, scene=Sc, preset=preset)
+    src = resolve_easy_sources(
+        subject=S,
+        scene=Sc,
+        preset=preset,
+        outfit_source="subject image",
+        style_source="none",
+    )
     route = route_easy_preset(src, preset)
 
     assert route.target_content_mode == "empty"
@@ -1560,13 +1571,49 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
     assert len(route.edit_references) == 2
     assert route.edit_references[0][:3] == (Sc, exp_sc_boost, "scene")
     assert route.edit_references[1][:3] == (S, exp_s_boost, "subject")
-    assert route.style_active is True
-    assert route.style_source is Sc
-    if exp_style_policy == "scene_outfit_auto":
-        assert route.style_config.vision_instruction == EASY_SCENE_OUTFIT_STYLE_INSTRUCTION
-        assert route.style_config.indirect_style_transfer is False
-    else:
+    if exp_style_policy == "scene_auto":
+        assert route.style_active is True
+        assert route.style_source is Sc
         assert route.style_config.vision_instruction == EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION
         assert route.style_config.indirect_style_transfer is True
         assert route.style_config.style_processing == "2x2"
         assert route.style_config.style_fidelity == 1.0
+        assert route.semantic_outfit_active is False
+    else:
+        assert route.style_active is False
+        assert route.style_source is None
+        assert route.style_config.vision_instruction == EASY_DEFAULT_STYLE_INSTRUCTION
+        assert route.semantic_outfit_active is True
+        assert route.semantic_outfit_source is S
+        assert route.semantic_outfit_config.indirect_style_transfer is False
+        assert route.semantic_outfit_config.vision_instruction == EASY_SEMANTIC_OUTFIT_INSTRUCTION
+
+
+@pytest.mark.parametrize("preset", ["flexible_subject_transfer_1", "flexible_subject_transfer_2"])
+def test_flexible_subject_transfer_supports_outfit_and_style_together(preset):
+    from ccc_krea2.easy_routing import (
+        EASY_DEFAULT_STYLE_INSTRUCTION,
+        EASY_SEMANTIC_OUTFIT_INSTRUCTION,
+        resolve_easy_sources,
+        route_easy_preset,
+    )
+
+    S, Sc, St = object(), object(), object()
+    src = resolve_easy_sources(
+        subject=S,
+        scene=Sc,
+        style=St,
+        outfit_source="scene image",
+        style_source="style image",
+        preset=preset,
+    )
+    route = route_easy_preset(src, preset)
+
+    assert route.semantic_outfit_active is True
+    assert route.semantic_outfit_source is Sc
+    assert route.semantic_outfit_config.indirect_style_transfer is False
+    assert route.semantic_outfit_config.vision_instruction == EASY_SEMANTIC_OUTFIT_INSTRUCTION
+    assert route.style_active is True
+    assert route.style_source is St
+    assert route.style_config.indirect_style_transfer is True
+    assert route.style_config.vision_instruction == EASY_DEFAULT_STYLE_INSTRUCTION

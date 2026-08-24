@@ -79,8 +79,16 @@ function createMockNode(comfyClass = "CcCKrea2EasyEdit", fixtureType = "legacy")
     const presetWidget = { name: "preset", value: "balanced", options: { values: [] } };
     const refSubjWidget = { name: "reference_subject", value: "main subject" };
     const subjDescWidget = { name: "subject_description", value: "main subject" };
-    const outfitSourceWidget = { name: "outfit_source", value: "outfit image" };
-    const styleSourceWidget = { name: "style_source", value: "style image" };
+    const outfitSourceWidget = {
+        name: "outfit_source",
+        value: "outfit image",
+        options: { values: ["none", "subject image", "scene image", "outfit image", "style image"] }
+    };
+    const styleSourceWidget = {
+        name: "style_source",
+        value: "none",
+        options: { values: ["none", "scene image", "subject image", "style image"] }
+    };
     const patchWidget = {
         name: comfyClass === "CcCKrea2EasyEditOstris" ? "apply_ostris_edit_patch" : "apply_krea2_edit_patch",
         value: true
@@ -236,18 +244,23 @@ async function runTests() {
         assert.strictEqual(node.inputs.find(i => i.name === "outfit").disabled, false);
     }
 
-    // 5. Preset with Auto Scene Outfit Style (flexible_subject_transfer_1)
+    // 5. Flexible Subject Transfer exposes independent semantic Outfit and artistic Style selectors
     {
-        const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
+        const { node, outfitSourceWidget, styleSourceWidget, posPromptWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
         setPreset("flexible_subject_transfer_1");
         await new Promise(r => setTimeout(r, 60));
 
-        assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene Outfit]");
-        assert.strictEqual(styleSourceWidget.disabled, true);
-        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
+        assert.deepStrictEqual(outfitSourceWidget.options.values, ["none", "subject image", "scene image"]);
+        assert.strictEqual(outfitSourceWidget.value, "subject image");
+        assert.strictEqual(outfitSourceWidget.disabled, false);
+        assert.strictEqual(styleSourceWidget.value, "none");
+        assert.strictEqual(styleSourceWidget.disabled, false);
+        assert.strictEqual(node.inputs.find(i => i.name === "outfit").disabled, true);
+        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, false);
+        assert(posPromptWidget.value.includes("Preserve the face, body shape, body proportions, clothing, and accessories"));
     }
 
     // 7. Workflow restoration sequence with modern widget ordering

@@ -13,7 +13,6 @@ from ..easy_routing import (
     get_easy_preset_capabilities,
     OUTFIT_POLICY_DISABLED,
     STYLE_POLICY_SCENE_AUTO,
-    STYLE_POLICY_SCENE_OUTFIT_AUTO,
     STYLE_POLICY_DISABLED,
 )
 from ..grounding import prepare_easy_krea_vision_image
@@ -83,8 +82,8 @@ class CcCKrea2EasyEdit:
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
                 ),
                 "style_source": (
-                    ["none", "style image", "scene image", "subject image"],
-                    {"default": "style image", "tooltip": "Source image socket to use for style conditioning."},
+                    ["none", "scene image", "subject image", "style image"],
+                    {"default": "none", "tooltip": "Source image socket to use for style conditioning."},
                 ),
                 "apply_krea2_edit_patch": (
                     "BOOLEAN",
@@ -114,7 +113,7 @@ class CcCKrea2EasyEdit:
         reference_subject: str = "main subject",
         subject_description: str = "main subject",
         outfit_source: str = "outfit image",
-        style_source: str = "style image",
+        style_source: str = "none",
         apply_krea2_edit_patch: bool = True,
         negative_prompt: str = "",
         subject: Optional[torch.Tensor] = None,
@@ -200,8 +199,8 @@ class CcCKrea2EasyEditOstris:
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
                 ),
                 "style_source": (
-                    ["none", "style image", "scene image", "subject image"],
-                    {"default": "style image", "tooltip": "Source image socket to use for style conditioning."},
+                    ["none", "scene image", "subject image", "style image"],
+                    {"default": "none", "tooltip": "Source image socket to use for style conditioning."},
                 ),
                 "apply_ostris_edit_patch": (
                     "BOOLEAN",
@@ -238,7 +237,7 @@ class CcCKrea2EasyEditOstris:
         reference_subject: str = "main subject",
         subject_description: str = "main subject",
         outfit_source: str = "outfit image",
-        style_source: str = "style image",
+        style_source: str = "none",
         apply_ostris_edit_patch: bool = True,
         ostris_kv_cache: bool = False,
         negative_prompt: str = "",
@@ -309,8 +308,8 @@ def _execute_easy_edit(
         has_sc=(resolved_sources.scene is not None),
         has_o=(resolved_sources.effective_outfit is not None),
         has_st=(resolved_sources.effective_style is not None),
-        outfit_source=outfit_source,
-        style_source=style_source,
+        outfit_source=resolved_sources.outfit_source,
+        style_source=resolved_sources.style_source,
         reference_subject=reference_subject,
         subject_description=subject_description,
     )
@@ -409,6 +408,27 @@ def _execute_easy_edit(
         )
         chain = chain.append(spec)
 
+    if route.semantic_outfit_active and route.semantic_outfit_source is not None:
+        outfit_style_vlm = prepare_easy_krea_vision_image(
+            route.semantic_outfit_source, preset=preset, role="outfit"
+        )
+        prep_outfit_style = prepare_image_for_qwen(
+            image=outfit_style_vlm,
+            clip=clip,
+            original_image=route.semantic_outfit_source,
+        )
+        outfit_style_spec = StyleReferenceSpec(
+            reference_path="style",
+            prepared_image=prep_outfit_style,
+            alias="outfit",
+            style_fidelity=route.semantic_outfit_config.style_fidelity,
+            style_processing=route.semantic_outfit_config.style_processing,
+            indirect_style_transfer=route.semantic_outfit_config.indirect_style_transfer,
+            vision_instruction=route.semantic_outfit_config.vision_instruction,
+            _legacy_role="outfit",
+        )
+        chain = chain.append(outfit_style_spec)
+
     if route.style_active and route.style_source is not None:
         style_vlm = prepare_easy_krea_vision_image(route.style_source, preset=preset, role="style")
         prep_style = prepare_image_for_qwen(image=style_vlm, clip=clip, original_image=route.style_source)
@@ -478,28 +498,26 @@ def _execute_easy_edit(
 
     caps = get_easy_preset_capabilities(preset)
     outfit_policy_str = caps.outfit_policy
+    effective_outfit_selector = resolved_sources.outfit_source
     if caps.style_policy == STYLE_POLICY_SCENE_AUTO:
         style_policy_str = "automatic scene"
-    elif caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
-        style_policy_str = "automatic scene outfit style"
     else:
         style_policy_str = caps.style_policy
 
     if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         resolved_outfit_str = "ignored by preset"
         outfit_selector_report = "ignored by preset"
-    elif outfit_source == "none":
+    elif effective_outfit_selector == "none":
         resolved_outfit_str = "none"
-        outfit_selector_report = outfit_source
+        outfit_selector_report = effective_outfit_selector
     else:
         status_str = "present" if resolved_sources.effective_outfit is not None else "missing"
-        resolved_outfit_str = f"{outfit_source} ({status_str})"
-        outfit_selector_report = outfit_source
+        resolved_outfit_str = f"{effective_outfit_selector} ({status_str})"
+        outfit_selector_report = effective_outfit_selector
 
-    if caps.style_policy in (STYLE_POLICY_SCENE_AUTO, STYLE_POLICY_SCENE_OUTFIT_AUTO):
+    if caps.style_policy == STYLE_POLICY_SCENE_AUTO:
         if resolved_sources.effective_style is not None:
-            kind_label = "automatic outfit style" if caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO else "automatic"
-            resolved_style_str = f"scene image ({kind_label})"
+            resolved_style_str = "scene image (automatic)"
         else:
             resolved_style_str = "none (scene unavailable)"
         style_selector_report = "automatic (scene image)"
@@ -611,18 +629,19 @@ def _execute_easy_edit(
     easy_header.extend(
         [
             f"Semantic-only Sources: {', '.join(sem_refs) if sem_refs else 'none'}",
+            f"Semantic Outfit Active: {'yes' if route.semantic_outfit_active else 'no'}",
             f"Style Active: {'yes' if route.style_active else 'no'}",
         ]
     )
 
-    if caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
+    if route.semantic_outfit_active:
         easy_header.extend(
             [
                 "Outfit Style Active: yes",
-                "Outfit Style Source: scene image",
-                "Outfit Style Processing: 2x2",
-                "Outfit Style Fidelity: 1.0",
-                "Outfit Style Indirect: no",
+                f"Outfit Style Source: {resolved_sources.outfit_source}",
+                f"Outfit Style Processing: {route.semantic_outfit_config.style_processing}",
+                f"Outfit Style Fidelity: {route.semantic_outfit_config.style_fidelity:.1f}",
+                f"Outfit Style Indirect: {'yes' if route.semantic_outfit_config.indirect_style_transfer else 'no'}",
                 "Outfit Style Instruction Active: yes",
             ]
         )
