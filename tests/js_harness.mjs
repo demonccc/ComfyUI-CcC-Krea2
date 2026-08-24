@@ -229,19 +229,22 @@ async function runTests() {
         }
     }
 
-    // 4. Scene Reinterpretation allows manual Style and Outfit selection
+    // 4. Scene Reinterpretation locks direct Scene Style and defaults Outfit to Scene
     {
-        const { node, outfitSourceWidget, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
+        const { node, outfitSourceWidget, styleSourceWidget, posPromptWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
         setPreset("scene_reinterpretation");
         await new Promise(r => setTimeout(r, 60));
 
-        assert.strictEqual(styleSourceWidget.disabled, false);
+        assert.strictEqual(styleSourceWidget.disabled, true);
+        assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene]");
         assert.strictEqual(outfitSourceWidget.disabled, false);
-        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, false);
+        assert.strictEqual(outfitSourceWidget.value, "scene image");
+        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
         assert.strictEqual(node.inputs.find(i => i.name === "outfit").disabled, false);
+        assert(posPromptWidget.value.includes("clothing, footwear, and accessories worn by the main subject in the scene image"));
     }
 
     // 5. Flexible Subject Transfer exposes independent semantic Outfit and artistic Style selectors

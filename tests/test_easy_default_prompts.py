@@ -58,7 +58,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "outfit_transfer"
-        assert "Transfer only the outfit and accessories from the outfit image to the main subject." in text
+        assert "Transfer only the principal outfit identified in the outfit image to the main subject." in text
 
     def test_4_subject_scene_outfit(self):
         has_def, text, key = resolve_default_positive_prompt(
@@ -70,7 +70,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "subject_scene_outfit"
-        assert "Place the main subject from the subject image naturally into the scene image wearing the outfit and accessories from the outfit image." in text
+        assert "Place the main subject from the subject image naturally into the scene image wearing the principal outfit identified in the outfit image." in text
 
     def test_5_style(self):
         has_def, text, key = resolve_default_positive_prompt(
@@ -111,7 +111,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "subject_transfer_scene_outfit_style"
-        assert "Dress the transferred main subject using the clothing and accessories from the scene image." in text
+        assert "Dress the transferred main subject using the clothing, footwear, and accessories worn by the main subject in the scene image." in text
         assert "Use the style image only as a visual style reference." in text
 
     def test_placeholder_substitution_matrix(self):
@@ -191,8 +191,7 @@ class TestDefaultPromptResolver:
         )
         assert has_def is True
         assert key == "scene_reinterpretation_outfit"
-        assert "Dress the portrait woman using the clothing and accessories from the subject image." in text
-        assert "Do not use the clothing or accessories worn by the dancer in the scene image." in text
+        assert "Dress the portrait woman using the clothing, footwear, and accessories worn by the portrait woman in the subject image." in text
 
         # Test empty/blank fallback
         has_def, text, key = resolve_default_positive_prompt(
@@ -316,7 +315,7 @@ class TestEasyEditNodeDefaultPromptBehavior:
             outfit=Ou,
         )
 
-        assert "Transfer only the outfit and accessories from the outfit image to the main subject." in captured["positive_prompt"]
+        assert "Transfer only the principal outfit identified in the outfit image to the main subject." in captured["positive_prompt"]
         assert "Use Default Prompt: yes" in report
         assert "Prompt Source: default" in report
         assert "Default Prompt Key: outfit_transfer" in report
@@ -590,7 +589,7 @@ class TestEasyEditReportLatentSource:
         assert "Appearance Ref 2: subject (boost=2.0, fit=contain)" in report_id
         assert "Target Content Fit: crop" in report_id
 
-        # Scene Reinterpretation + Subject + Scene + optional Outfit and Style
+        # Scene Reinterpretation + Subject + Scene + optional Outfit; Style is locked to Scene
         _, _, _, _, report2 = node.process(
             model="model",
             clip="clip",
@@ -607,8 +606,8 @@ class TestEasyEditReportLatentSource:
         assert "Target Content Role: none" in report2
         assert "Appearance Ref 1: subject (boost=7.0, fit=contain)" in report2
         assert "Appearance Ref 2: outfit (boost=4.0, fit=contain)" in report2
-        assert "Semantic-only Sources: scene_reinterpretation" in report2
-        assert "Resolved Style Source: style image (present)" in report2
+        assert "Semantic-only Sources: none" in report2
+        assert "Resolved Style Source: scene image (automatic)" in report2
 
         # Preserve Identity using Subject as target
         _, _, _, _, report3 = node.process(

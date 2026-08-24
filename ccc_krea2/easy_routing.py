@@ -57,6 +57,13 @@ EASY_SEMANTIC_OUTFIT_INSTRUCTION = (
     "Do not transfer the wearer's identity, facial features, hair, anatomy, body shape, body proportions, pose, "
     "background, environment, objects, composition, lighting, or photographic style."
 )
+EASY_SCENE_REINTERPRETATION_STYLE_INSTRUCTION = (
+    "Use the scene image as a direct visual reference for recreating the scene composition, framing, environment, "
+    "objects, lighting, color treatment, every other person, and all spatial relationships.\n\n"
+    "Preserve the position, pose, action, role, and interactions of the {reference_subject}.\n\n"
+    "Do not transfer the identity, facial features, hair, anatomy, body shape, body proportions, clothing, or "
+    "accessories of the {reference_subject}."
+)
 
 EASY_ROLE_INSTRUCTIONS = {
     "subject": EASY_SUBJECT_INSTRUCTION,
@@ -97,13 +104,13 @@ EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_BODY_SWAP = (
 EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT = (
     "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n"
     "Preserve the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
-    "Dress the transferred {subject} using the clothing and accessories from the {outfit_source}.\n\n"
-    "Do not preserve the clothing or accessories of the {subject} from the {subject_source} when an explicit outfit source is selected. Use the clothing and accessories from the {outfit_source} instead.\n\n"
+    "Dress the transferred {subject} using {outfit_reference}.\n\n"
+    "Do not preserve the clothing or accessories of the {subject} from the {subject_source} when an explicit outfit source is selected. Use {outfit_reference} instead.\n\n"
     "Keep every other person and the rest of the scene unchanged."
 )
 
 EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER = (
-    "Transfer only the outfit and accessories from the {outfit_source} to the {subject}.\n\n"
+    "Transfer only {outfit_reference} to the {subject}.\n\n"
     "Preserve the {subject} identity, body, pose, framing, and composition.\n\n"
     "Do not preserve the {subject} clothing.\n\n"
     "Fit the transferred outfit and accessories naturally to the {subject}.\n\n"
@@ -119,7 +126,7 @@ EASY_DEFAULT_PROMPT_SUBJECT_SCENE = (
 )
 
 EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT = (
-    "Place the {subject} from the {subject_source} naturally into the {scene_source} wearing the outfit and accessories from the {outfit_source}.\n\n"
+    "Place the {subject} from the {subject_source} naturally into the {scene_source} wearing {outfit_reference}.\n\n"
     "Preserve the {subject} identity, body shape, and body proportions.\n\n"
     "Preserve the scene composition, environment, framing, perspective, and spatial layout.\n\n"
     "Do not preserve the {subject} clothing.\n\n"
@@ -144,12 +151,6 @@ STYLE_POLICY_DISABLED = "disabled"
 
 SCENE_REINTERPRETATION_SUBJECT_BOOST = 7.0
 SCENE_REINTERPRETATION_OUTFIT_BOOST = 4.0
-
-EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
-    "Use this reference for the main subject's action, activity, pose, body dynamics, environment, spatial context, "
-    "camera framing, perspective, lighting, and broad outfit concept. Reinterpret these elements creatively for the "
-    "subject reference. Do not use the scene subject's identity as the generated subject identity."
-)
 
 EASY_PRESET_DISPLAY_LABELS = {
     "flexible": "Flexible",
@@ -185,15 +186,13 @@ EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION_WITH_OUTFIT = (
     "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n"
     "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
     "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n"
-    "Dress the {subject} using the clothing and accessories from the {outfit_source}. Do not use the clothing or accessories worn by the {reference_subject} in the {scene_source}.\n\n"
+    "Dress the {subject} using {outfit_reference}.\n\n"
     "Adapt the {subject} and the selected outfit naturally to the referenced action and environment.\n\n"
     "Generate a coherent new image rather than recreating the source scene exactly."
 )
 
 
 def get_easy_instruction_for_role(role: str) -> str:
-    if str(role).lower() == "scene_reinterpretation":
-        return EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
 
 
@@ -218,6 +217,11 @@ def render_easy_prompt(template: str, context: Dict[str, str]) -> str:
     subj_src = context.get("subject_source", "subject image")
     outfit_src = context.get("outfit_source", "outfit image")
     style_src = context.get("style_source", "style image")
+    outfit_reference = context.get("outfit_reference") or resolve_easy_outfit_reference_text(
+        outfit_source=outfit_src,
+        reference_subject=ref_subj,
+        subject_description=subj_desc,
+    )
 
     fmt_context = {
         "reference_subject": ref_subj,
@@ -226,9 +230,66 @@ def render_easy_prompt(template: str, context: Dict[str, str]) -> str:
         "scene_source": scene_src,
         "subject_source": subj_src,
         "outfit_source": outfit_src,
+        "outfit_reference": outfit_reference,
         "style_source": style_src,
     }
     return template.format(**fmt_context)
+
+
+def resolve_easy_outfit_reference_text(
+    outfit_source: str,
+    reference_subject: str = "main subject",
+    subject_description: str = "main subject",
+) -> str:
+    """Resolve the source-aware Outfit phrase used by automatic prompts."""
+    ref_subj = reference_subject.strip() if reference_subject and reference_subject.strip() else "main subject"
+    subj = subject_description.strip() if subject_description and subject_description.strip() else "main subject"
+    if outfit_source == "scene image":
+        return f"the clothing, footwear, and accessories worn by the {ref_subj} in the scene image"
+    if outfit_source == "subject image":
+        return f"the clothing, footwear, and accessories worn by the {subj} in the subject image"
+    if outfit_source == "style image":
+        return "the relevant clothing, footwear, and accessories interpreted from the style image"
+    return "the principal outfit identified in the outfit image"
+
+
+def resolve_easy_outfit_vision_instruction(
+    outfit_source_kind: str,
+    use_default_prompt: bool,
+    reference_subject: str = "main subject",
+    subject_description: str = "main subject",
+) -> str:
+    """Resolve Outfit vision guidance for appearance, semantic-only, and Style-path references."""
+    if not use_default_prompt:
+        return (
+            "Use this image as the outfit reference.\n\n"
+            "Identify and transfer the relevant clothing, footwear, and accessories visible in the image.\n\n"
+            "Do not transfer identity, facial features, hair, anatomy, body shape, body proportions, pose, "
+            "background, environment, objects, composition, lighting, or photographic style."
+        )
+
+    ref_subj = reference_subject.strip() if reference_subject and reference_subject.strip() else "main subject"
+    subj = subject_description.strip() if subject_description and subject_description.strip() else "main subject"
+    if outfit_source_kind == "scene":
+        selection = (
+            f"Use only the clothing, footwear, and accessories worn by the {ref_subj} in the scene image.\n\n"
+            "Do not use clothing or accessories from any other person in the image."
+        )
+    elif outfit_source_kind == "subject":
+        selection = (
+            f"Use only the clothing, footwear, and accessories worn by the {subj} in the subject image.\n\n"
+            "Do not use clothing or accessories from any other person in the image."
+        )
+    elif outfit_source_kind == "style":
+        selection = "Interpret and use the relevant clothing, footwear, and accessories visible in the style image."
+    else:
+        selection = "Identify and use the principal outfit, footwear, and accessories visible in the outfit image."
+
+    return (
+        f"{selection}\n\n"
+        "Do not transfer identity, facial features, hair, anatomy, body shape, body proportions, pose, background, "
+        "environment, objects, composition, lighting, or photographic style."
+    )
 
 
 def resolve_default_positive_prompt(
@@ -441,7 +502,7 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "outfit_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "style_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
     "scene_reinterpretation": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER
+        outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
 }
 
@@ -508,6 +569,16 @@ SUBJECT_TRANSFER_SCENE_STYLE_CONFIG = EasyStyleConfig(
     indirect_style_transfer=True,
     vision_instruction=EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION,
 )
+
+
+def make_scene_reinterpretation_style_config(reference_subject: str = "main subject") -> EasyStyleConfig:
+    ref_subj = reference_subject.strip() if reference_subject and reference_subject.strip() else "main subject"
+    return EasyStyleConfig(
+        style_fidelity=1.0,
+        style_processing="2x2",
+        indirect_style_transfer=False,
+        vision_instruction=EASY_SCENE_REINTERPRETATION_STYLE_INSTRUCTION.format(reference_subject=ref_subj),
+    )
 
 @dataclass(frozen=True)
 class EasyPresetRoute:
@@ -679,6 +750,7 @@ def _ref(image: Any, boost: float, alias: str) -> Tuple[Any, float, str, str]:
 def route_easy_preset(
     sources: EasyResolvedSources,
     preset: str = "balanced",
+    reference_subject: str = "main subject",
 ) -> EasyPresetRoute:
     """Phase 2: Evaluate preset routing matrix across all Easy Edit presets.
 
@@ -1076,9 +1148,6 @@ def route_easy_preset(
             refs.append(_ref(S, SCENE_REINTERPRETATION_SUBJECT_BOOST, "subject"))
         if has_o:
             refs.append(_ref(Ou, SCENE_REINTERPRETATION_OUTFIT_BOOST, "outfit"))
-        if has_sc:
-            semantic_only_refs.append((Sc, "scene_reinterpretation"))
-
         if not has_s:
             preset_warnings.append("Scene Reinterpretation selected but Subject source is missing.")
         if not has_sc:
@@ -1098,6 +1167,8 @@ def route_easy_preset(
     style_active = has_st
     if preset in ("subject_transfer_1", "subject_transfer_2"):
         style_config = SUBJECT_TRANSFER_SCENE_STYLE_CONFIG
+    elif preset == "scene_reinterpretation":
+        style_config = make_scene_reinterpretation_style_config(reference_subject)
     else:
         style_config = DEFAULT_EASY_STYLE_CONFIG
 

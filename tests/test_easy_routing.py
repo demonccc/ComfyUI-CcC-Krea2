@@ -1418,23 +1418,26 @@ def test_scene_reinterpretation_routing(dummy_sources):
     """Verify scene_reinterpretation preset behavior and routing contract."""
     S, Sc, Ou, St = dummy_sources
 
-    # Scene is semantic-only, Subject and optional Outfit are appearance refs, Style is user-selected.
+    # Scene provides Geometry plus locked direct Style. Subject and optional Outfit are appearance refs.
     sources = resolve_easy_sources(preset="scene_reinterpretation", subject=S, scene=Sc, outfit=Ou, style=St)
     assert sources.effective_outfit is Ou
-    assert sources.effective_style is St
+    assert sources.effective_style is Sc
 
-    route = route_easy_preset(sources, preset="scene_reinterpretation")
+    route = route_easy_preset(sources, preset="scene_reinterpretation", reference_subject="lead dancer")
     assert route.target_content_mode == "empty"
     assert route.target_content_source is None
     assert route.target_geometry_mode == "favor_image"
     assert route.target_geometry_source is Sc
-    assert route.style_source is St
+    assert route.style_source is Sc
+    assert route.style_config.indirect_style_transfer is False
+    assert "Preserve the position, pose, action, role, and interactions of the lead dancer." in route.style_config.vision_instruction
+    assert "clothing, or accessories of the lead dancer" in route.style_config.vision_instruction
 
     aliases = [alias for _, _, alias, _ in route.edit_references]
     assert aliases == ["subject", "outfit"]
     assert route.edit_references[0][1] == pytest.approx(7.0)
     assert route.edit_references[1][1] == pytest.approx(4.0)
-    assert route.semantic_only_references == ((Sc, "scene_reinterpretation"),)
+    assert route.semantic_only_references == ()
 
 
 @pytest.mark.parametrize(
@@ -1461,7 +1464,34 @@ def test_scene_reinterpretation_outfit_selectors(dummy_sources, outfit_source, e
     assert route.edit_references[0][:3] == (S, 7.0, "subject")
     assert route.edit_references[1][0].name == expected
     assert route.edit_references[1][1:3] == (4.0, "outfit")
-    assert route.semantic_only_references == ((Sc, "scene_reinterpretation"),)
+    assert route.semantic_only_references == ()
+
+
+def test_outfit_vision_instruction_uses_placeholders_only_for_automatic_prompts():
+    from ccc_krea2.easy_routing import resolve_easy_outfit_vision_instruction
+
+    scene_auto = resolve_easy_outfit_vision_instruction(
+        "scene", True, reference_subject="lead dancer", subject_description="portrait woman"
+    )
+    assert "worn by the lead dancer in the scene image" in scene_auto
+    assert "any other person" in scene_auto
+
+    subject_auto = resolve_easy_outfit_vision_instruction(
+        "subject", True, reference_subject="lead dancer", subject_description="portrait woman"
+    )
+    assert "worn by the portrait woman in the subject image" in subject_auto
+
+    outfit_auto = resolve_easy_outfit_vision_instruction("outfit", True)
+    assert "principal outfit" in outfit_auto
+    style_auto = resolve_easy_outfit_vision_instruction("style", True)
+    assert "Interpret and use the relevant clothing" in style_auto
+
+    custom = resolve_easy_outfit_vision_instruction(
+        "scene", False, reference_subject="lead dancer", subject_description="portrait woman"
+    )
+    assert "Identify and transfer the relevant clothing" in custom
+    assert "lead dancer" not in custom
+    assert "portrait woman" not in custom
 
 
 def test_none_sources_resolution(dummy_sources):

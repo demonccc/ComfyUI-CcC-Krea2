@@ -183,12 +183,12 @@ app.registerExtension({
                 const EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT =
                     "Replace only the {reference_subject} of the {scene_source} with the {subject} of the {subject_source}.\n\n" +
                     "Preserve the exact facial identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
-                    "Dress the transferred {subject} using the clothing and accessories from the {outfit_source}.\n\n" +
-                    "Do not preserve the clothing or accessories of the {subject} from the {subject_source} when an explicit outfit source is selected. Use the clothing and accessories from the {outfit_source} instead.\n\n" +
+                    "Dress the transferred {subject} using {outfit_reference}.\n\n" +
+                    "Do not preserve the clothing or accessories of the {subject} from the {subject_source} when an explicit outfit source is selected. Use {outfit_reference} instead.\n\n" +
                     "Keep every other person and the rest of the scene unchanged.";
 
                 const EASY_DEFAULT_PROMPT_OUTFIT_TRANSFER =
-                    "Transfer only the outfit and accessories from the {outfit_source} to the {subject}.\n\n" +
+                    "Transfer only {outfit_reference} to the {subject}.\n\n" +
                     "Preserve the {subject} identity, body, pose, framing, and composition.\n\n" +
                     "Do not preserve the {subject} clothing.\n\n" +
                     "Fit the transferred outfit and accessories naturally to the {subject}.\n\n" +
@@ -202,7 +202,7 @@ app.registerExtension({
                     "Adapt the {subject} naturally to the {scene_source} lighting and environment.";
 
                 const EASY_DEFAULT_PROMPT_SUBJECT_SCENE_OUTFIT =
-                    "Place the {subject} from the {subject_source} naturally into the {scene_source} wearing the outfit and accessories from the {outfit_source}.\n\n" +
+                    "Place the {subject} from the {subject_source} naturally into the {scene_source} wearing {outfit_reference}.\n\n" +
                     "Preserve the {subject} identity, body shape, and body proportions.\n\n" +
                     "Preserve the scene composition, environment, framing, perspective, and spatial layout.\n\n" +
                     "Do not preserve the {subject} clothing.\n\n" +
@@ -227,7 +227,7 @@ app.registerExtension({
                     "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n" +
                     "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
                     "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n" +
-                    "Dress the {subject} using the clothing and accessories from the {outfit_source}. Do not use the clothing or accessories worn by the {reference_subject} in the {scene_source}.\n\n" +
+                    "Dress the {subject} using {outfit_reference}.\n\n" +
                     "Adapt the {subject} and the selected outfit naturally to the referenced action and environment.\n\n" +
                     "Generate a coherent new image rather than recreating the source scene exactly.";
 
@@ -364,6 +364,14 @@ app.registerExtension({
                     const subjSrc = context.subject_source || "subject image";
                     const outfitSrc = context.outfit_source || "outfit image";
                     const styleSrc = context.style_source || "style image";
+                    let outfitReference = "the principal outfit identified in the outfit image";
+                    if (outfitSrc === "scene image") {
+                        outfitReference = `the clothing, footwear, and accessories worn by the ${refSubj} in the scene image`;
+                    } else if (outfitSrc === "subject image") {
+                        outfitReference = `the clothing, footwear, and accessories worn by the ${subjDesc} in the subject image`;
+                    } else if (outfitSrc === "style image") {
+                        outfitReference = "the relevant clothing, footwear, and accessories interpreted from the style image";
+                    }
 
                     return template
                         .replace(/\{reference_subject\}/g, refSubj)
@@ -372,6 +380,7 @@ app.registerExtension({
                         .replace(/\{scene_source\}/g, sceneSrc)
                         .replace(/\{subject_source\}/g, subjSrc)
                         .replace(/\{outfit_source\}/g, outfitSrc)
+                        .replace(/\{outfit_reference\}/g, outfitReference)
                         .replace(/\{style_source\}/g, styleSrc);
                 };
 
@@ -571,10 +580,11 @@ app.registerExtension({
                     const isGroupD = GROUP_D_PRESETS.includes(preset);
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
                     const isFlexibleSubjectTransfer = ["flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset);
+                    const isSceneReinterpretation = preset === "scene_reinterpretation";
                     const usesOutfit = !["preserve_scene", "style_transfer", "subject_transfer_1", "subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
                     const isStyleDisabled = isGroupD;
                     const isSceneOutfitStyle = GROUP_C_PRESETS.includes(preset);
-                    const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "identity_transfer", ...GROUP_B_PRESETS].includes(preset);
+                    const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "identity_transfer", "scene_reinterpretation", ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -583,6 +593,10 @@ app.registerExtension({
                     const styleInput = node.inputs?.find(i => i.name === "style");
 
                     const enteringFlexibleSubjectTransfer = isFlexibleSubjectTransfer
+                        && node._lastEasyPreset !== undefined
+                        && node._lastEasyPreset !== preset
+                        && !node._isRestoring;
+                    const enteringSceneReinterpretation = isSceneReinterpretation
                         && node._lastEasyPreset !== undefined
                         && node._lastEasyPreset !== preset
                         && !node._isRestoring;
@@ -598,6 +612,9 @@ app.registerExtension({
                     if (enteringFlexibleSubjectTransfer) {
                         if (outfitSourceWidget) outfitSourceWidget.value = "subject image";
                         if (styleSourceWidget) styleSourceWidget.value = "none";
+                    }
+                    if (enteringSceneReinterpretation && outfitSourceWidget) {
+                        outfitSourceWidget.value = "scene image";
                     }
                     node._lastEasyPreset = preset;
 
@@ -641,8 +658,10 @@ app.registerExtension({
                         } else if (isSceneAutoStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene]";
-                            let tooltipText = "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
-                            if (IDENTITY_TEST_PRESETS.includes(preset)) {
+                            let tooltipText = "Subject Transfer automatically uses its custom indirect Scene guidance. The stored Style Source value is preserved for other presets.";
+                            if (preset === "scene_reinterpretation") {
+                                tooltipText = "Scene Reinterpretation automatically uses Scene as a direct custom Style reference to recreate the scene while excluding the replaced subject and outfit.";
+                            } else if (IDENTITY_TEST_PRESETS.includes(preset)) {
                                 tooltipText = "Identity Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
                             }
                             styleSourceWidget.tooltip = tooltipText;

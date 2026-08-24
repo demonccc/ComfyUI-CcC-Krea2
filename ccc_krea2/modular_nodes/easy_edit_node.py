@@ -9,6 +9,7 @@ from ..easy_routing import (
     get_easy_instruction_for_role,
     resolve_default_positive_prompt,
     resolve_easy_visual_reference_fit,
+    resolve_easy_outfit_vision_instruction,
     EASY_PRESET_CAPABILITIES,
     get_easy_preset_capabilities,
     OUTFIT_POLICY_DISABLED,
@@ -344,7 +345,18 @@ def _execute_easy_edit(
             )
 
     # Phase 2: Preset Routing
-    route = route_easy_preset(resolved_sources, preset=preset)
+    route = route_easy_preset(
+        resolved_sources,
+        preset=preset,
+        reference_subject=reference_subject,
+    )
+
+    outfit_vision_instruction = resolve_easy_outfit_vision_instruction(
+        outfit_source_kind=resolved_sources.outfit_source_kind,
+        use_default_prompt=effective_use_default,
+        reference_subject=reference_subject,
+        subject_description=subject_description,
+    )
 
     is_ostris = backend_method == "ostris_edit"
 
@@ -369,6 +381,10 @@ def _execute_easy_edit(
     chain = ReferenceChain()
 
     for item_img, boost, alias_role, instruction in route.edit_references:
+        if alias_role == "outfit":
+            instruction = outfit_vision_instruction
+        elif alias_role == "scene+outfit":
+            instruction = f"{get_easy_instruction_for_role('scene')}\n\n{outfit_vision_instruction}"
         if is_ostris:
             vlm_img = preprocess_ostris_vision_image(item_img)
         else:
@@ -402,7 +418,9 @@ def _execute_easy_edit(
             reference_path="edit",
             prepared_image=prep,
             alias=alias_role,
-            vision_instruction=get_easy_instruction_for_role(alias_role),
+            vision_instruction=(
+                outfit_vision_instruction if alias_role == "outfit" else get_easy_instruction_for_role(alias_role)
+            ),
             appearance_reference=False,
             _legacy_role=alias_role,
         )
@@ -424,7 +442,7 @@ def _execute_easy_edit(
             style_fidelity=route.semantic_outfit_config.style_fidelity,
             style_processing=route.semantic_outfit_config.style_processing,
             indirect_style_transfer=route.semantic_outfit_config.indirect_style_transfer,
-            vision_instruction=route.semantic_outfit_config.vision_instruction,
+            vision_instruction=outfit_vision_instruction,
             _legacy_role="outfit",
         )
         chain = chain.append(outfit_style_spec)
@@ -630,6 +648,7 @@ def _execute_easy_edit(
         [
             f"Semantic-only Sources: {', '.join(sem_refs) if sem_refs else 'none'}",
             f"Semantic Outfit Active: {'yes' if route.semantic_outfit_active else 'no'}",
+            f"Outfit Selection Mode: {'placeholder-aware automatic' if effective_use_default else 'visual interpretation'}",
             f"Style Active: {'yes' if route.style_active else 'no'}",
         ]
     )
