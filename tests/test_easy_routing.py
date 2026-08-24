@@ -1534,7 +1534,7 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
-    assert len(all_presets) == 14
+    assert len(all_presets) == 13
 
     roles = ["subject", "scene", "outfit", "scene+outfit"]
 
@@ -1555,8 +1555,7 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
 @pytest.mark.parametrize(
     "preset,exp_sc_boost,exp_s_boost,exp_style_policy",
     [
-        ("subject_transfer_1", 1.0, 5.0, "scene_auto"),
-        ("subject_transfer_2", 1.0, 6.0, "scene_auto"),
+        ("subject_transfer_1", 1.0, 2.5, "scene_auto"),
         ("flexible_subject_transfer_1", 2.5, 5.0, "user"),
         ("flexible_subject_transfer_2", 2.5, 6.0, "user"),
     ],
@@ -1570,7 +1569,9 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
         STYLE_POLICY_SCENE_AUTO,
         STYLE_POLICY_USER,
         OUTFIT_POLICY_USER,
-        OUTFIT_POLICY_DISABLED,
+        OUTFIT_POLICY_SUBJECT_AUTO,
+        EASY_SUBJECT_TRANSFER_SCENE_REFERENCE_INSTRUCTION,
+        EASY_SUBJECT_TRANSFER_SUBJECT_REFERENCE_INSTRUCTION,
         EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION,
         EASY_DEFAULT_STYLE_INSTRUCTION,
         EASY_SEMANTIC_OUTFIT_INSTRUCTION,
@@ -1582,7 +1583,7 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
     caps = get_easy_preset_capabilities(preset)
     if exp_style_policy == "scene_auto":
         assert caps.style_policy == STYLE_POLICY_SCENE_AUTO
-        assert caps.outfit_policy == OUTFIT_POLICY_DISABLED
+        assert caps.outfit_policy == OUTFIT_POLICY_SUBJECT_AUTO
     else:
         assert caps.style_policy == STYLE_POLICY_USER
         assert caps.outfit_policy == OUTFIT_POLICY_USER
@@ -1602,13 +1603,19 @@ def test_protected_subject_transfer_presets(preset, exp_sc_boost, exp_s_boost, e
     assert route.edit_references[0][:3] == (Sc, exp_sc_boost, "scene")
     assert route.edit_references[1][:3] == (S, exp_s_boost, "subject")
     if exp_style_policy == "scene_auto":
+        assert src.effective_outfit is S
+        assert src.outfit_source_kind == "subject"
+        assert route.edit_references[0][3] == EASY_SUBJECT_TRANSFER_SCENE_REFERENCE_INSTRUCTION
+        assert route.edit_references[1][3] == EASY_SUBJECT_TRANSFER_SUBJECT_REFERENCE_INSTRUCTION
         assert route.style_active is True
         assert route.style_source is Sc
         assert route.style_config.vision_instruction == EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION
         assert route.style_config.indirect_style_transfer is True
         assert route.style_config.style_processing == "2x2"
         assert route.style_config.style_fidelity == 1.0
-        assert route.semantic_outfit_active is False
+        assert route.semantic_outfit_active is True
+        assert route.semantic_outfit_source is S
+        assert route.semantic_outfit_config.indirect_style_transfer is False
     else:
         assert route.style_active is False
         assert route.style_source is None

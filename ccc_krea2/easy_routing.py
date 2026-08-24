@@ -16,6 +16,7 @@ MAX_IDENTITY_SUBJECT_BOOST = 10.0
 IDENTITY_TRANSFER_SCENE_BOOST = 2.0
 IDENTITY_TRANSFER_SUBJECT_BOOST = 2.0
 SUBJECT_TRANSFER_SCENE_BOOST = 1.0
+SUBJECT_TRANSFER_SUBJECT_BOOST = 2.5
 FLEXIBLE_SUBJECT_TRANSFER_SCENE_BOOST = 2.5
 PRESERVE_SCENE_BOOST = 2.5
 OUTFIT_EMPHASIS_BOOST = 2.5
@@ -43,6 +44,17 @@ EASY_SUBJECT_TRANSFER_SCENE_STYLE_INSTRUCTION = (
     "Preserve the position, pose, action, role, and interactions of the person being replaced.\n\n"
     "Do not transfer the identity, facial features, hair, anatomy, body shape, body proportions, clothing, "
     "or accessories of that person."
+)
+EASY_SUBJECT_TRANSFER_SCENE_REFERENCE_INSTRUCTION = (
+    "Use this reference for the scene composition, environment, spatial relationships, camera framing, lighting, "
+    "and the position, pose, action, role, and interactions of the person being replaced.\n\n"
+    "Do not transfer the identity, facial features, hair, anatomy, body shape, body proportions, clothing, or "
+    "accessories of that person."
+)
+EASY_SUBJECT_TRANSFER_SUBJECT_REFERENCE_INSTRUCTION = (
+    "Use this reference for the exact subject identity, facial features, hair, anatomy, body shape, and body "
+    "proportions.\n\n"
+    "Do not transfer the subject's pose, position, background, environment, objects, framing, or scene composition."
 )
 EASY_DEFAULT_STYLE_INSTRUCTION = (
     "Use this image only as a visual style reference.\n\n"
@@ -141,6 +153,7 @@ EASY_DEFAULT_PROMPT_STYLE = (
 
 OUTFIT_POLICY_USER = "user"
 OUTFIT_POLICY_DISABLED = "disabled"
+OUTFIT_POLICY_SUBJECT_AUTO = "automatic subject"
 
 STYLE_POLICY_USER = "user"
 STYLE_POLICY_SCENE_AUTO = "scene_auto"
@@ -156,8 +169,7 @@ EASY_PRESET_DISPLAY_LABELS = {
     "preserve_identity": "Preserve Identity",
     "max_identity": "Max Identity",
     "identity_transfer": "Identity Transfer",
-    "subject_transfer_1": "Subject Transfer 1",
-    "subject_transfer_2": "Subject Transfer 2",
+    "subject_transfer_1": "Subject Transfer",
     "flexible_subject_transfer_1": "Flexible Subject Transfer 1",
     "flexible_subject_transfer_2": "Flexible Subject Transfer 2",
     "preserve_scene": "Preserve Scene",
@@ -356,7 +368,7 @@ def resolve_default_positive_prompt(
         base_key = preset
         return True, render_easy_prompt(base_template, context), base_key
 
-    elif preset in ("subject_transfer_1", "subject_transfer_2"):
+    elif preset == "subject_transfer_1":
         if not (has_s and has_sc):
             return False, "", "none"
 
@@ -458,7 +470,7 @@ def resolve_default_positive_prompt(
 class EasyPresetCapabilities:
     """Capability contract for Easy Edit presets."""
 
-    outfit_policy: str  # "user" | "disabled"
+    outfit_policy: str  # "user" | "disabled" | "automatic subject"
     style_policy: str  # "user" | "scene_auto" | "disabled"
 
     @property
@@ -480,10 +492,7 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
     "subject_transfer_1": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
-    ),
-    "subject_transfer_2": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
+        outfit_policy=OUTFIT_POLICY_SUBJECT_AUTO, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
     "flexible_subject_transfer_1": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER
@@ -626,7 +635,13 @@ def resolve_easy_sources(
 
     # Resolve outfit_source
     outfit_source_kind = "outfit"
-    if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
+    if caps.outfit_policy == OUTFIT_POLICY_SUBJECT_AUTO:
+        effective_outfit = subject
+        outfit_source = "subject image"
+        outfit_source_kind = "subject"
+        if subject is None:
+            warnings.append("Subject Transfer requires Subject for its automatic Outfit reference.")
+    elif caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         effective_outfit = None
         outfit_source_kind = "disabled"
     else:
@@ -1072,7 +1087,6 @@ def route_easy_preset(
 
     elif preset in IDENTITY_TEST_PRESETS or preset in (
         "subject_transfer_1",
-        "subject_transfer_2",
         "flexible_subject_transfer_1",
         "flexible_subject_transfer_2",
     ):
@@ -1097,7 +1111,6 @@ def route_easy_preset(
 
             elif preset in (
                 "subject_transfer_1",
-                "subject_transfer_2",
                 "flexible_subject_transfer_1",
                 "flexible_subject_transfer_2",
             ):
@@ -1106,14 +1119,27 @@ def route_easy_preset(
                 target_content_role = "none"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
-                s_boost = 6.0 if preset in ("subject_transfer_2", "flexible_subject_transfer_2") else 5.0
+                s_boost = 6.0 if preset == "flexible_subject_transfer_2" else 5.0
                 scene_boost = (
                     SUBJECT_TRANSFER_SCENE_BOOST
-                    if preset in ("subject_transfer_1", "subject_transfer_2")
+                    if preset == "subject_transfer_1"
                     else FLEXIBLE_SUBJECT_TRANSFER_SCENE_BOOST
                 )
-                refs.append(_ref(Sc, scene_boost, "scene"))
-                refs.append(_ref(S, s_boost, "subject"))
+                if preset == "subject_transfer_1":
+                    refs.append(
+                        (Sc, scene_boost, "scene", EASY_SUBJECT_TRANSFER_SCENE_REFERENCE_INSTRUCTION)
+                    )
+                    refs.append(
+                        (
+                            S,
+                            SUBJECT_TRANSFER_SUBJECT_BOOST,
+                            "subject",
+                            EASY_SUBJECT_TRANSFER_SUBJECT_REFERENCE_INSTRUCTION,
+                        )
+                    )
+                else:
+                    refs.append(_ref(Sc, scene_boost, "scene"))
+                    refs.append(_ref(S, s_boost, "subject"))
 
         else:
             target_content_mode = "empty"
@@ -1150,15 +1176,18 @@ def route_easy_preset(
     if target_geometry_source is None:
         target_geometry_mode, target_geometry_source = _resolve_default_geometry_source(Sc, S, Ou)
 
-    # Flexible Subject Transfer carries the selected Outfit through a separate direct
+    # Subject Transfer and Flexible Subject Transfer carry Outfit through a separate direct
     # semantic StyleReferenceSpec because Scene and Subject occupy both appearance slots.
-    semantic_outfit_active = preset in ("flexible_subject_transfer_1", "flexible_subject_transfer_2") and has_o
-    semantic_outfit_source = Ou if semantic_outfit_active else None
+    semantic_outfit_active = (
+        (preset == "subject_transfer_1" and has_s)
+        or (preset in ("flexible_subject_transfer_1", "flexible_subject_transfer_2") and has_o)
+    )
+    semantic_outfit_source = S if preset == "subject_transfer_1" and has_s else (Ou if semantic_outfit_active else None)
 
     # Artistic Style configuration: indirect by default so only Qwen's semantic
     # interpretation remains after the source image rows are removed.
     style_active = has_st
-    if preset in ("subject_transfer_1", "subject_transfer_2"):
+    if preset == "subject_transfer_1":
         style_config = SUBJECT_TRANSFER_SCENE_STYLE_CONFIG
     elif preset == "scene_reinterpretation":
         style_config = make_scene_reinterpretation_style_config(reference_subject)

@@ -229,7 +229,25 @@ async function runTests() {
         }
     }
 
-    // 4. Scene Reinterpretation locks direct Scene Style and defaults Outfit to Scene
+    // 4. Subject Transfer locks Outfit to Subject and Style to Scene
+    {
+        const { node, outfitSourceWidget, styleSourceWidget, posPromptWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
+        node.inputs.find(i => i.name === "subject").link = 1;
+        node.inputs.find(i => i.name === "scene").link = 2;
+
+        setPreset("subject_transfer_1");
+        await new Promise(r => setTimeout(r, 60));
+
+        assert.strictEqual(outfitSourceWidget.disabled, true);
+        assert.strictEqual(outfitSourceWidget.label, "Outfit Source [Auto: Subject]");
+        assert.strictEqual(styleSourceWidget.disabled, true);
+        assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene]");
+        assert.strictEqual(node.inputs.find(i => i.name === "outfit").disabled, true);
+        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
+        assert(posPromptWidget.value.includes("Replace only the main subject of the scene image"));
+    }
+
+    // 5. Scene Reinterpretation locks direct Scene Style and defaults Outfit to Scene
     {
         const { node, outfitSourceWidget, styleSourceWidget, posPromptWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
@@ -247,7 +265,7 @@ async function runTests() {
         assert(posPromptWidget.value.includes("clothing, footwear, and accessories worn by the main subject in the scene image"));
     }
 
-    // 5. Flexible Subject Transfer exposes independent semantic Outfit and artistic Style selectors
+    // 6. Flexible Subject Transfer exposes independent semantic Outfit and artistic Style selectors
     {
         const { node, outfitSourceWidget, styleSourceWidget, posPromptWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
@@ -305,8 +323,7 @@ async function runTests() {
             "Preserve Identity",
             "Max Identity",
             "Identity Transfer",
-            "Subject Transfer 1",
-            "Subject Transfer 2",
+            "Subject Transfer",
             "Flexible Subject Transfer 1",
             "Flexible Subject Transfer 2",
             "Preserve Scene",
@@ -315,9 +332,22 @@ async function runTests() {
             "Scene Reinterpretation"
         ];
 
-        const actualStableFirst = displayedValues.slice(0, 14);
-        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 14 presets must be stable presets in exact order");
-        assert.strictEqual(displayedValues.length, 14, "No experimental Test 5 preset should remain");
+        const actualStableFirst = displayedValues.slice(0, 13);
+        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 13 presets must be stable presets in exact order");
+        assert.strictEqual(displayedValues.length, 13, "Only one Subject Transfer preset should remain");
+    }
+
+    // 9. Removed Subject Transfer candidates migrate to the sole preset
+    {
+        const { node, presetWidget } = createMockNode("CcCKrea2EasyEdit", "modern");
+        const infoOld = {
+            widgets_values: ["", true, "subject_transfer_2", "main subject", "main subject", "outfit image", "style image"]
+        };
+        node.onConfigure(infoOld);
+        await new Promise(r => setTimeout(r, 60));
+
+        assert.strictEqual(infoOld.widgets_values[2], "subject_transfer_1");
+        assert.strictEqual(presetWidget.value, "subject_transfer_1");
     }
 
     console.log("All modern & legacy JavaScript frontend tests PASSED successfully!");

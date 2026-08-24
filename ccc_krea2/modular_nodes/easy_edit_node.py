@@ -13,6 +13,7 @@ from ..easy_routing import (
     EASY_PRESET_CAPABILITIES,
     get_easy_preset_capabilities,
     OUTFIT_POLICY_DISABLED,
+    OUTFIT_POLICY_SUBJECT_AUTO,
     STYLE_POLICY_SCENE_AUTO,
     STYLE_POLICY_DISABLED,
 )
@@ -522,7 +523,14 @@ def _execute_easy_edit(
     else:
         style_policy_str = caps.style_policy
 
-    if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
+    if caps.outfit_policy == OUTFIT_POLICY_SUBJECT_AUTO:
+        resolved_outfit_str = (
+            "subject image (automatic)"
+            if resolved_sources.effective_outfit is not None
+            else "none (subject unavailable)"
+        )
+        outfit_selector_report = "automatic (subject image)"
+    elif caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         resolved_outfit_str = "ignored by preset"
         outfit_selector_report = "ignored by preset"
     elif effective_outfit_selector == "none":

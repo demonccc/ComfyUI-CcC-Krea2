@@ -244,8 +244,7 @@ app.registerExtension({
                     "preserve_identity": "Preserve Identity",
                     "max_identity": "Max Identity",
                     "identity_transfer": "Identity Transfer",
-                    "subject_transfer_1": "Subject Transfer 1",
-                    "subject_transfer_2": "Subject Transfer 2",
+                    "subject_transfer_1": "Subject Transfer",
                     "flexible_subject_transfer_1": "Flexible Subject Transfer 1",
                     "flexible_subject_transfer_2": "Flexible Subject Transfer 2",
                     "preserve_scene": "Preserve Scene",
@@ -266,7 +265,6 @@ app.registerExtension({
                     "max_identity",
                     "identity_transfer",
                     "subject_transfer_1",
-                    "subject_transfer_2",
                     "flexible_subject_transfer_1",
                     "flexible_subject_transfer_2",
                     "preserve_scene",
@@ -277,7 +275,14 @@ app.registerExtension({
 
                 const LEGACY_PRESETS = [
                     ...STABLE_PRESET_IDS,
+                    "subject_transfer_2",
                 ];
+
+                const REMOVED_PRESET_ALIASES = {
+                    "subject_transfer_2": "subject_transfer_1",
+                    "Subject Transfer 2": "subject_transfer_1",
+                    "Subject Transfer 1": "subject_transfer_1",
+                };
 
                 const migrateLegacyEasyEditWidgets = (info) => {
                     if (!info || !Array.isArray(info.widgets_values)) return;
@@ -288,12 +293,18 @@ app.registerExtension({
                     const valAtIndex1 = vals[1];
                     if (typeof valAtIndex1 === "string" && (
                         LEGACY_PRESETS.includes(valAtIndex1) ||
+                        REMOVED_PRESET_ALIASES[valAtIndex1] ||
                         valAtIndex1.startsWith("transfer_identity_test_") ||
                         DISPLAY_TO_PRESET_ID[valAtIndex1] ||
                         Object.keys(PRESET_DISPLAY_LABELS).includes(valAtIndex1)
                     )) {
                         vals.splice(1, 0, true);
                         node._isPromptSystemManaged = true;
+                    }
+
+                    // Removed Subject Transfer candidates migrate to the sole surviving preset.
+                    if (REMOVED_PRESET_ALIASES[vals[2]]) {
+                        vals[2] = REMOVED_PRESET_ALIASES[vals[2]];
                     }
 
                     // 2. Schema check for reference_subject and subject_description fields (index 3 and 4)
@@ -397,7 +408,7 @@ app.registerExtension({
                         return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER, context) };
                     }
 
-                    if (["subject_transfer_1", "subject_transfer_2"].includes(preset)) {
+                    if (preset === "subject_transfer_1") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
                         return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER, context) };
                     }
@@ -573,11 +584,12 @@ app.registerExtension({
                     const isGroupD = GROUP_D_PRESETS.includes(preset);
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
                     const isFlexibleSubjectTransfer = ["flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset);
+                    const isSubjectTransfer = preset === "subject_transfer_1";
                     const isSceneReinterpretation = preset === "scene_reinterpretation";
-                    const usesOutfit = !["preserve_scene", "style_transfer", "subject_transfer_1", "subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
+                    const usesOutfit = !["preserve_scene", "style_transfer", "subject_transfer_1", ...IDENTITY_TEST_PRESETS].includes(preset);
                     const isStyleDisabled = isGroupD;
                     const isSceneOutfitStyle = GROUP_C_PRESETS.includes(preset);
-                    const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "identity_transfer", "scene_reinterpretation", ...GROUP_B_PRESETS].includes(preset);
+                    const isSceneAutoStyle = ["subject_transfer_1", "identity_transfer", "scene_reinterpretation", ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -619,7 +631,11 @@ app.registerExtension({
                     const styleSocketIsUsedAsOutfit = usesOutfit && !isFlexibleSubjectTransfer && outfitSource === "style image";
 
                     if (outfitSourceWidget) {
-                        if (isSceneAutoOutfit) {
+                        if (isSubjectTransfer) {
+                            outfitSourceWidget.disabled = true;
+                            outfitSourceWidget.label = "Outfit Source [Auto: Subject]";
+                            outfitSourceWidget.tooltip = "Automatically uses the clothing and accessories worn by the described Subject in the Subject image.";
+                        } else if (isSceneAutoOutfit) {
                             outfitSourceWidget.disabled = true;
                             outfitSourceWidget.label = "Outfit Source [Auto: Scene]";
                             outfitSourceWidget.tooltip = "Automatically uses the Scene image as the outfit reference.";
@@ -636,7 +652,7 @@ app.registerExtension({
                         }
                     }
                     if (outfitInput) {
-                        outfitInput.disabled = isSceneAutoOutfit || !usesOutfit || isFlexibleSubjectTransfer;
+                        outfitInput.disabled = isSubjectTransfer || isSceneAutoOutfit || !usesOutfit || isFlexibleSubjectTransfer;
                     }
 
                     if (styleSourceWidget) {
@@ -680,15 +696,15 @@ app.registerExtension({
                     const hasRawO = !!(outfitInput && outfitInput.link != null);
                     const hasRawSt = !!(styleInput && styleInput.link != null);
 
-                    const effectiveOutfitSource = isSceneAutoOutfit ? "scene image" : (usesOutfit ? outfitSource : "none");
+                    const effectiveOutfitSource = isSubjectTransfer ? "subject image" : (isSceneAutoOutfit ? "scene image" : (usesOutfit ? outfitSource : "none"));
                     const effectiveStyleSource = isStyleDisabled ? "none" : ((isSceneAutoStyle || isSceneOutfitStyle) ? "scene image" : styleSource);
 
-                    const hasO = isSceneAutoOutfit ? hasSc : (usesOutfit && (
+                    const hasO = isSubjectTransfer ? hasS : (isSceneAutoOutfit ? hasSc : (usesOutfit && (
                         (effectiveOutfitSource === "outfit image" && hasRawO) ||
                         (effectiveOutfitSource === "subject image" && hasS) ||
                         (effectiveOutfitSource === "scene image" && hasSc) ||
                         (effectiveOutfitSource === "style image" && hasRawSt)
-                    ));
+                    )));
 
                     const hasSt = isStyleDisabled ? false : ((isSceneAutoStyle || isSceneOutfitStyle) ? hasSc : (
                         (effectiveStyleSource === "style image" && hasRawSt) ||
@@ -702,7 +718,7 @@ app.registerExtension({
                     );
 
                     // Subject description widgets are enabled ONLY when use_default_prompt is ON and preset supports subject fields
-                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer", "scene_reinterpretation"].includes(preset);
+                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer_1", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer", "scene_reinterpretation"].includes(preset);
                     const enableSubjectFields = useDefaultWidget.value && supportsSubjectFields;
                     if (refSubjWidget) refSubjWidget.disabled = !enableSubjectFields;
                     if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;
