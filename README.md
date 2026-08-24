@@ -82,7 +82,7 @@ With both **Subject** and **Scene** connected, `Flexible`, `Balanced`, and `Cons
 
 Easy Edit nodes include a **Use Default Prompt** toggle (`use_default_prompt`, default `true`) and a **Use Preset as Custom** action button:
 
-- **Default Mode (`Use Default Prompt = true`)**: The node automatically resolves an optimized positive prompt based on the active preset and connected reference images (e.g., `subject_scene`, `subject_transfer`, `scene_reinterpretation`, `outfit_transfer`, `style`). When enabled, the prompt field displays the active system prompt and updates automatically as presets or inputs change.
+- **Default Mode (`Use Default Prompt = true`)**: The node automatically resolves an optimized positive prompt based on the active preset and connected reference images (e.g., `subject_scene`, `subject_transfer_1`, `scene_reinterpretation`, `outfit_transfer`, `style`). When enabled, the prompt field displays the active system prompt and updates automatically as presets or inputs change.
 - **Custom Mode (`Use Default Prompt = false`)**: Gives full prompt control to the user. The text area is editable and preserves user-entered text without being overwritten when presets or connections change.
 - **Use Preset as Custom Button**: Clicking this action button copies the current resolved preset prompt into the text area, sets `Use Default Prompt = false`, unlocks the prompt for editing, and disconnects future preset/input changes from overwriting user modifications.
 - **Subject-only Exception**: When only a Subject image is connected, no default edit intent exists. `Use Default Prompt` is disabled, forcing custom mode, and a non-empty positive prompt is strictly required.
@@ -101,8 +101,9 @@ Easy Edit nodes include a **Use Default Prompt** toggle (`use_default_prompt`, d
 
 The identity ladder covers subject preservation tasks. Additional task-specific presets provide targeted capabilities:
 
-- **Identity Transfer**: Transfers the identity of the Subject to the target person in the Scene while keeping the Scene clothing and surroundings intact. Uses the Subject image as target content and the Scene as geometry anchor. Naturally aligned with Conrad Identity Edit LoRA (`krea2_identity_edit_v1_2.safetensors`).
-- **Subject Transfer**: Transfers the complete Subject into the Scene context (including identity, body, and clothing/accessories unless overridden by Outfit source). Uses the Scene image as target content and geometry anchor. Naturally aligned with BFS Body Swap LoRA (`bfs_body_swap_v1_krea2.safetensors`).
+- **Identity Transfer**: Transfers the identity of the Subject to the target person in the Scene while keeping the Scene clothing, pose, and surroundings intact. Uses the Scene image as both target content and geometry anchor, with Scene and Subject appearance boosts of `2.0`. Naturally aligned with Conrad Identity Edit LoRA (`krea2_identity_edit_v1_2.safetensors`).
+- **Subject Transfer 1 / 2**: Current experimental candidates for transferring the complete Subject into the Scene context. Both start from an empty target latent with Scene geometry and differ in Subject appearance strength (`5.0` / `6.0`). Naturally aligned with BFS Body Swap LoRA (`bfs_body_swap_v1_krea2.safetensors`).
+- **[Experimental] Identity Transfer - Test 5**: Restored calibration preset using the Scene as target content and geometry, with only the Subject as an appearance reference (`7.0`); Outfit and Style are disabled.
 - **Scene Reinterpretation**: Creatively reinterprets the main subject's action, activity, pose, environment, spatial context, framing, and clothing from the Scene reference for the Subject reference without pixel-for-pixel scene reproduction or target image initialization (Subject boost: 4.0, Scene boost: 1.0, Outfit policy: disabled, Style policy: automatic scene).
 - **Preserve Scene**: Prioritizes preserving the connected Scene composition, background, and visual context (Outfit policy: disabled).
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
@@ -211,4 +212,3 @@ Users may alternatively use official or repackaged ComfyUI-ready Krea 2 models f
 ## License
 
 Licensed under the GNU General Public License v3.0 (GPL-3.0). See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full details.
-

@@ -162,10 +162,10 @@ async function runTests() {
             }
             assert(posPromptWidget.value.includes("Replace only the identity"), "User edit attempt restored to canonical prompt!");
 
-            // Test 3 on Modern Widget
-            setPreset("[Experimental] Identity Preserve Scene - Subject 1");
+            // Restored Test 5 on Modern Widget
+            setPreset("[Experimental] Identity Transfer - Test 5");
             await new Promise(r => setTimeout(r, 60));
-            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Family E");
+            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Test 5");
 
             // Switch to Manual Mode
             useDefaultWidget.value = false;
@@ -184,7 +184,7 @@ async function runTests() {
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
             // Preset change in Manual Mode must NOT overwrite user custom prompt
-            setPreset("[Experimental] Identity Preserve Scene - Scene 1 / Subject 1");
+            setPreset("[Experimental] Identity Transfer - Test 5");
             await new Promise(r => setTimeout(r, 60));
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
@@ -221,16 +221,16 @@ async function runTests() {
         }
     }
 
-    // 4. Family E preset (Auto Scene Style)
+    // 4. Restored Test 5 (style disabled)
     {
         const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
-        setPreset("transfer_identity_preserve_scene_subject_1");
+        setPreset("transfer_identity_test_5");
         await new Promise(r => setTimeout(r, 60));
 
-        assert.strictEqual(styleSourceWidget.label, "Style Source [Auto: Scene]");
+        assert.strictEqual(styleSourceWidget.label, "Style Source [Disabled]");
         assert.strictEqual(styleSourceWidget.disabled, true);
         assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
     }
@@ -292,15 +292,15 @@ async function runTests() {
             "Subject Transfer 2",
             "Flexible Subject Transfer 1",
             "Flexible Subject Transfer 2",
-            "Subject Transfer",
             "Preserve Scene",
             "Outfit Transfer",
             "Style Transfer",
             "Scene Reinterpretation"
         ];
 
-        const actualStableFirst = displayedValues.slice(0, 15);
-        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 15 presets must be stable presets in exact order");
+        const actualStableFirst = displayedValues.slice(0, 14);
+        assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 14 presets must be stable presets in exact order");
+        assert.strictEqual(displayedValues[14], "[Experimental] Identity Transfer - Test 5");
     }
 
     console.log("All modern & legacy JavaScript frontend tests PASSED successfully!");

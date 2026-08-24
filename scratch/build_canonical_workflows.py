@@ -773,8 +773,9 @@ def main():
     build_easy_workflow("01_easy_subject.json", "balanced", "outfit image", "style image", has_subj=True)
     subject_transfer_note = (
         "Note on Easy Transfer Presets, Helper LoRAs & Model Downloads:\n"
-        "• Identity Transfer: Preserves Subject identity in Scene. Uses Subject as target content/latent, Scene as geometry anchor. Outfit is disabled, Style is automatic Scene.\n"
-        "• Subject Transfer: Preserves full Subject in Scene. Uses Scene as target content/latent and geometry anchor. Outfit is supported, Style is automatic Scene.\n"
+        "• Identity Transfer: Uses Scene as target content/latent and geometry anchor, with Scene and Subject appearance boosts of 2.0. Outfit is disabled, Style is automatic Scene.\n"
+        "• Subject Transfer 1 / 2: Current full-Subject transfer test candidates. Both use an empty target latent with Scene geometry and Subject appearance boosts of 5.0 / 6.0.\n"
+        "• Identity Transfer Test 5: Restored calibration preset using Scene target content/geometry and only Subject appearance at 7.0. Outfit and Style are disabled.\n"
         "• Easy Visual References: Easy appearance references preserve the complete source image and fit them into the target latent geometry without destructive cropping.\n"
         "• Krea 2 Identity Edit LoRA (krea2_identity_edit_v1_2.safetensors at 1.0) recovers subject facial identity.\n"
         "• BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors at 0.35) is an experimental full-person replacement model where Scene acts as base image and Subject as reference person. Exact pose transfer is not guaranteed.\n"
@@ -791,7 +792,7 @@ def main():
     # 02
     build_easy_workflow(
         "02_easy_subject_scene.json",
-        "subject_transfer",
+        "subject_transfer_1",
         "outfit image",
         "style image",
         has_subj=True,

@@ -13,13 +13,9 @@ CONSISTENT_SUBJECT_BOOST = 4.0
 PRESERVE_IDENTITY_SUBJECT_BOOST = 6.0
 MAX_IDENTITY_SUBJECT_BOOST = 10.0
 
-IDENTITY_TRANSFER_SCENE_BOOST = 2.5
-IDENTITY_TRANSFER_SUBJECT_BOOST = 7.0
-
-SUBJECT_TRANSFER_SCENE_BOOST = 2.5
-SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST = 7.0
-SUBJECT_TRANSFER_SUBJECT_BOOST = 8.0
-SUBJECT_TRANSFER_OUTFIT_BOOST = 4.0
+IDENTITY_TRANSFER_SCENE_BOOST = 2.0
+IDENTITY_TRANSFER_SUBJECT_BOOST = 2.0
+IDENTITY_TEST_5_SUBJECT_BOOST = 7.0
 
 PRESERVE_SCENE_BOOST = 2.5
 OUTFIT_EMPHASIS_BOOST = 2.5
@@ -142,90 +138,16 @@ EASY_PRESET_DISPLAY_LABELS = {
     "subject_transfer_2": "Subject Transfer 2",
     "flexible_subject_transfer_1": "Flexible Subject Transfer 1",
     "flexible_subject_transfer_2": "Flexible Subject Transfer 2",
-    "subject_transfer": "Subject Transfer",
     "preserve_scene": "Preserve Scene",
     "outfit_transfer": "Outfit Transfer",
     "style_transfer": "Style Transfer",
     "scene_reinterpretation": "Scene Reinterpretation",
-    # Family E: Preserve Scene with Generic Scene Style
-    "transfer_identity_preserve_scene_subject_1": "[Experimental] Identity Preserve Scene - Subject 1",
-    "transfer_identity_preserve_scene_subject_2": "[Experimental] Identity Preserve Scene - Subject 2",
-    # Scene Boost variants (Subject 1)
-    "transfer_identity_scene_1_subject_1": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 1",
-    "transfer_identity_scene_2_subject_1": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 1",
-    "transfer_identity_scene_2_5_subject_1": "[Experimental] Identity Preserve Scene - Scene 2.5 / Subject 1",
-    "transfer_identity_scene_4_subject_1": "[Experimental] Identity Preserve Scene - Scene 4 / Subject 1",
-    "transfer_identity_scene_5_subject_1": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 1",
-    "transfer_identity_scene_6_subject_1": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 1",
-    "transfer_identity_scene_8_subject_1": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 1",
-    # Scene Boost variants (Subject 2)
-    "transfer_identity_scene_1_subject_2": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 2",
-    "transfer_identity_scene_2_subject_2": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 2",
-    "transfer_identity_scene_2_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 2.5 / Subject 2",
-    "transfer_identity_scene_4_subject_2": "[Experimental] Identity Preserve Scene - Scene 4 / Subject 2",
-    "transfer_identity_scene_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 2",
-    "transfer_identity_scene_6_subject_2": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 2",
-    "transfer_identity_scene_8_subject_2": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 2",
-}
-
-FAMILY_E_PRESETS = (
-    "transfer_identity_preserve_scene_subject_1",
-    "transfer_identity_preserve_scene_subject_2",
-    "transfer_identity_scene_1_subject_1",
-    "transfer_identity_scene_2_subject_1",
-    "transfer_identity_scene_2_5_subject_1",
-    "transfer_identity_scene_4_subject_1",
-    "transfer_identity_scene_5_subject_1",
-    "transfer_identity_scene_6_subject_1",
-    "transfer_identity_scene_8_subject_1",
-    "transfer_identity_scene_1_subject_2",
-    "transfer_identity_scene_2_subject_2",
-    "transfer_identity_scene_2_5_subject_2",
-    "transfer_identity_scene_4_subject_2",
-    "transfer_identity_scene_5_subject_2",
-    "transfer_identity_scene_6_subject_2",
-    "transfer_identity_scene_8_subject_2",
-)
-
-FAMILY_E_BOOSTS = {
-    "transfer_identity_preserve_scene_subject_1": 1.0,
-    "transfer_identity_preserve_scene_subject_2": 2.0,
-    "transfer_identity_scene_1_subject_1": 1.0,
-    "transfer_identity_scene_2_subject_1": 1.0,
-    "transfer_identity_scene_2_5_subject_1": 1.0,
-    "transfer_identity_scene_4_subject_1": 1.0,
-    "transfer_identity_scene_5_subject_1": 1.0,
-    "transfer_identity_scene_6_subject_1": 1.0,
-    "transfer_identity_scene_8_subject_1": 1.0,
-    "transfer_identity_scene_1_subject_2": 2.0,
-    "transfer_identity_scene_2_subject_2": 2.0,
-    "transfer_identity_scene_2_5_subject_2": 2.0,
-    "transfer_identity_scene_4_subject_2": 2.0,
-    "transfer_identity_scene_5_subject_2": 2.0,
-    "transfer_identity_scene_6_subject_2": 2.0,
-    "transfer_identity_scene_8_subject_2": 2.0,
-}
-
-FAMILY_E_SCENE_BOOSTS = {
-    "transfer_identity_scene_1_subject_1": 1.0,
-    "transfer_identity_scene_2_subject_1": 2.0,
-    "transfer_identity_scene_2_5_subject_1": 2.5,
-    "transfer_identity_scene_4_subject_1": 4.0,
-    "transfer_identity_scene_5_subject_1": 5.0,
-    "transfer_identity_scene_6_subject_1": 6.0,
-    "transfer_identity_scene_8_subject_1": 8.0,
-    "transfer_identity_scene_1_subject_2": 1.0,
-    "transfer_identity_scene_2_subject_2": 2.0,
-    "transfer_identity_scene_2_5_subject_2": 2.5,
-    "transfer_identity_scene_4_subject_2": 4.0,
-    "transfer_identity_scene_5_subject_2": 5.0,
-    "transfer_identity_scene_6_subject_2": 6.0,
-    "transfer_identity_scene_8_subject_2": 8.0,
+    "transfer_identity_test_5": "[Experimental] Identity Transfer - Test 5",
 }
 
 IDENTITY_TEST_PRESETS = (
     "identity_transfer",
-    *FAMILY_E_PRESETS,
+    "transfer_identity_test_5",
 )
 
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
@@ -292,7 +214,7 @@ def resolve_default_positive_prompt(
     Helper LoRA Workflow Alignment:
     - Conrad Identity Edit LoRA (krea2_identity_edit_v1_2.safetensors) is naturally aligned with identity_transfer
       (identity replacement while preserving Scene clothing).
-    - BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors) is naturally aligned with subject_transfer
+    - BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors) is naturally aligned with Subject Transfer presets
       (full-person replacement including Subject clothing).
     - Both LoRAs can be used with either preset and are not exclusive.
 
@@ -343,7 +265,7 @@ def resolve_default_positive_prompt(
         base_key = preset
         return True, render_easy_prompt(base_template, context), base_key
 
-    elif preset in ("subject_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2"):
+    elif preset in ("subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2"):
         if not (has_s and has_sc):
             return False, "", "none"
 
@@ -466,17 +388,15 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "flexible_subject_transfer_2": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_OUTFIT_AUTO
     ),
-    "subject_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_SCENE_AUTO),
     "preserve_scene": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
     "outfit_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "style_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
     "scene_reinterpretation": EasyPresetCapabilities(
         outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
     ),
-    **{
-        p: EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO)
-        for p in FAMILY_E_PRESETS
-    },
+    "transfer_identity_test_5": EasyPresetCapabilities(
+        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+    ),
 }
 
 
@@ -1036,13 +956,21 @@ def route_easy_preset(
         if has_sc and has_s:
             if preset == "identity_transfer":
                 target_content_mode = "image"
-                target_content_source = S
-                target_content_role = "subject"
-                target_content_fit = "contain_no_upscale"
+                target_content_source = Sc
+                target_content_role = "scene"
                 target_geometry_mode, target_geometry_source = "favor_image", Sc
 
                 refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
                 refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
+
+            elif preset == "transfer_identity_test_5":
+                target_content_mode = "image"
+                target_content_source = Sc
+                target_content_role = "scene"
+                target_content_fit = "contain_no_upscale"
+                target_geometry_mode, target_geometry_source = "favor_image", Sc
+
+                refs.append(_ref(S, IDENTITY_TEST_5_SUBJECT_BOOST, "subject"))
 
             elif preset in (
                 "subject_transfer_1",
@@ -1059,64 +987,20 @@ def route_easy_preset(
                 refs.append(_ref(Sc, 2.5, "scene"))
                 refs.append(_ref(S, s_boost, "subject"))
 
-            elif preset in FAMILY_E_PRESETS:
-                target_content_mode = "image"
-                target_content_source = Sc
-                target_content_role = "scene"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                sc_boost = FAMILY_E_SCENE_BOOSTS.get(preset, 2.5)
-                subj_boost = FAMILY_E_BOOSTS.get(preset, 5.0)
-                refs.append(_ref(Sc, sc_boost, "scene"))
-                refs.append(_ref(S, subj_boost, "subject"))
         else:
             target_content_mode = "empty"
             target_content_source = None
             target_content_role = "none"
             target_geometry_mode, target_geometry_source = "favor_image", (Sc if has_sc else (S if has_s else None))
             if has_s:
-                refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
-            elif has_sc:
-                refs.append(_ref(Sc, 2.5, "scene"))
-
-    elif preset == "subject_transfer":
-        if not has_s:
-            preset_warnings.append(
-                "preset 'subject_transfer' selected but Subject source is missing; no subject can be transferred."
-            )
-
-        if has_sc:
-            target_content_mode = "image"
-            target_content_source = Sc
-            target_content_role = "scene+outfit" if outfit_is_scene_physically else "scene"
-            target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-            if outfit_is_scene_physically:
-                refs.append(_combined_scene_outfit_ref(Sc, SUBJECT_TRANSFER_OUTFIT_BOOST))
-                if has_s:
-                    refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
-            else:
-                refs.append(_ref(Sc, SUBJECT_TRANSFER_SCENE_BOOST, "scene"))
-                if has_s:
-                    refs.append(_ref(S, SUBJECT_TRANSFER_WITH_SCENE_SUBJECT_BOOST, "subject"))
-                if has_o:
-                    refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
-        else:
-            target_content_mode = "empty"
-            target_content_source = None
-            target_content_role = "none"
-            if has_s:
-                target_geometry_mode, target_geometry_source = "favor_image", S
-            elif has_o:
-                target_geometry_mode, target_geometry_source = "favor_image", Ou
-            else:
-                target_geometry_mode, target_geometry_source = "favor_image", None
-
-            if has_s:
-                refs.append(_ref(S, SUBJECT_TRANSFER_SUBJECT_BOOST, "subject"))
-
-            if has_o:
-                refs.append(_ref(Ou, SUBJECT_TRANSFER_OUTFIT_BOOST, "outfit"))
+                subject_boost = (
+                    IDENTITY_TEST_5_SUBJECT_BOOST
+                    if preset == "transfer_identity_test_5"
+                    else IDENTITY_TRANSFER_SUBJECT_BOOST
+                )
+                refs.append(_ref(S, subject_boost, "subject"))
+            elif has_sc and preset == "identity_transfer":
+                refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
 
     elif preset == "scene_reinterpretation":
         target_content_mode = "empty"
@@ -1173,4 +1057,3 @@ def route_easy_preset(
         style_config=style_config,
         warnings=tuple(preset_warnings),
     )
-

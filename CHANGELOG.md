@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Promoted the former Identity Preserve Scene `Scene 2 / Subject 2` routing to `identity_transfer` (Scene target/geometry, Scene and Subject boosts `2.0`), removed obsolete experimental presets and the old stable `subject_transfer`, and restored `transfer_identity_test_5`.
+
 ### Added
 - Modular Krea2 Pipeline Surgical Correction Pass (`feat/easy-edit-and-reference-backends`).
 - Decoupled 3-phase Easy Routing Engine (`easy_routing.py`) with strict 8-preset matrix and independent target content/geometry sources.

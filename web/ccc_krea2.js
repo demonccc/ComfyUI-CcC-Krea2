@@ -214,43 +214,9 @@ app.registerExtension({
                     "Creatively reinterpret the clothing and accessories worn by the {reference_subject} in the {scene_source} so they are appropriate for the {subject} and the newly generated image. Do not copy the original scene outfit literally.\n\n" +
                     "Generate a coherent new image rather than recreating the source scene exactly.";
 
-                const FAMILY_E_PRESETS = [
-                    "transfer_identity_preserve_scene_subject_1",
-                    "transfer_identity_preserve_scene_subject_2",
-                    "transfer_identity_scene_1_subject_1",
-                    "transfer_identity_scene_2_subject_1",
-                    "transfer_identity_scene_2_5_subject_1",
-                    "transfer_identity_scene_4_subject_1",
-                    "transfer_identity_scene_5_subject_1",
-                    "transfer_identity_scene_6_subject_1",
-                    "transfer_identity_scene_8_subject_1",
-                    "transfer_identity_scene_1_subject_2",
-                    "transfer_identity_scene_2_subject_2",
-                    "transfer_identity_scene_2_5_subject_2",
-                    "transfer_identity_scene_4_subject_2",
-                    "transfer_identity_scene_5_subject_2",
-                    "transfer_identity_scene_6_subject_2",
-                    "transfer_identity_scene_8_subject_2",
-                ];
-
                 const IDENTITY_TEST_PRESETS = [
                     "identity_transfer",
-                    "transfer_identity_preserve_scene_subject_1",
-                    "transfer_identity_preserve_scene_subject_2",
-                    "transfer_identity_scene_1_subject_1",
-                    "transfer_identity_scene_2_subject_1",
-                    "transfer_identity_scene_2_5_subject_1",
-                    "transfer_identity_scene_4_subject_1",
-                    "transfer_identity_scene_5_subject_1",
-                    "transfer_identity_scene_6_subject_1",
-                    "transfer_identity_scene_8_subject_1",
-                    "transfer_identity_scene_1_subject_2",
-                    "transfer_identity_scene_2_subject_2",
-                    "transfer_identity_scene_2_5_subject_2",
-                    "transfer_identity_scene_4_subject_2",
-                    "transfer_identity_scene_5_subject_2",
-                    "transfer_identity_scene_6_subject_2",
-                    "transfer_identity_scene_8_subject_2",
+                    "transfer_identity_test_5",
                 ];
 
                 const GROUP_A_PRESETS = [];
@@ -269,30 +235,11 @@ app.registerExtension({
                     "subject_transfer_2": "Subject Transfer 2",
                     "flexible_subject_transfer_1": "Flexible Subject Transfer 1",
                     "flexible_subject_transfer_2": "Flexible Subject Transfer 2",
-                    "subject_transfer": "Subject Transfer",
                     "preserve_scene": "Preserve Scene",
                     "outfit_transfer": "Outfit Transfer",
                     "style_transfer": "Style Transfer",
                     "scene_reinterpretation": "Scene Reinterpretation",
-                    // Family E: Preserve Scene with Generic Scene Style
-                    "transfer_identity_preserve_scene_subject_1": "[Experimental] Identity Preserve Scene - Subject 1",
-                    "transfer_identity_preserve_scene_subject_2": "[Experimental] Identity Preserve Scene - Subject 2",
-                    // Scene Boost variants (Subject 1)
-                    "transfer_identity_scene_1_subject_1": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 1",
-                    "transfer_identity_scene_2_subject_1": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 1",
-                    "transfer_identity_scene_2_5_subject_1": "[Experimental] Identity Preserve Scene - Scene 2.5 / Subject 1",
-                    "transfer_identity_scene_4_subject_1": "[Experimental] Identity Preserve Scene - Scene 4 / Subject 1",
-                    "transfer_identity_scene_5_subject_1": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 1",
-                    "transfer_identity_scene_6_subject_1": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 1",
-                    "transfer_identity_scene_8_subject_1": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 1",
-                    // Scene Boost variants (Subject 2)
-                    "transfer_identity_scene_1_subject_2": "[Experimental] Identity Preserve Scene - Scene 1 / Subject 2",
-                    "transfer_identity_scene_2_subject_2": "[Experimental] Identity Preserve Scene - Scene 2 / Subject 2",
-                    "transfer_identity_scene_2_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 2.5 / Subject 2",
-                    "transfer_identity_scene_4_subject_2": "[Experimental] Identity Preserve Scene - Scene 4 / Subject 2",
-                    "transfer_identity_scene_5_subject_2": "[Experimental] Identity Preserve Scene - Scene 5 / Subject 2",
-                    "transfer_identity_scene_6_subject_2": "[Experimental] Identity Preserve Scene - Scene 6 / Subject 2",
-                    "transfer_identity_scene_8_subject_2": "[Experimental] Identity Preserve Scene - Scene 8 / Subject 2",
+                    "transfer_identity_test_5": "[Experimental] Identity Transfer - Test 5",
                 };
 
                 const DISPLAY_TO_PRESET_ID = Object.fromEntries(
@@ -310,7 +257,6 @@ app.registerExtension({
                     "subject_transfer_2",
                     "flexible_subject_transfer_1",
                     "flexible_subject_transfer_2",
-                    "subject_transfer",
                     "preserve_scene",
                     "outfit_transfer",
                     "style_transfer",
@@ -319,34 +265,7 @@ app.registerExtension({
 
                 const LEGACY_PRESETS = [
                     ...STABLE_PRESET_IDS,
-                    "transfer_identity_test_2",
-                    "transfer_identity_test_3",
-                    "transfer_identity_test_4",
                     "transfer_identity_test_5",
-                    "transfer_identity_test_6",
-                    "transfer_identity_test_5_subject_5",
-                    "transfer_identity_test_5_subject_6",
-                    "transfer_identity_test_5_subject_8",
-                    "transfer_identity_test_a_4_4",
-                    "transfer_identity_test_a_4_5",
-                    "transfer_identity_test_a_4_6",
-                    "transfer_identity_test_b_2_5_4",
-                    "transfer_identity_test_b_2_5_5",
-                    "transfer_identity_test_b_2_5_6",
-                    "transfer_identity_test_c_4_4",
-                    "transfer_identity_test_c_4_5",
-                    "transfer_identity_test_c_4_6",
-                    "transfer_identity_test_c_4_7",
-                    "transfer_identity_test_c_2_5_4",
-                    "transfer_identity_test_c_2_5_5",
-                    "transfer_identity_test_c_2_5_6",
-                    "transfer_identity_test_c_2_5_9",
-                    "transfer_identity_test_d_s2_5_o2_5",
-                    "transfer_identity_test_d_s2_5_o4",
-                    "transfer_identity_test_d_s4_o4",
-                    "transfer_identity_test_d_s5_o4",
-                    "transfer_identity_test_d_s6_o4",
-                    "transfer_identity_test_d_s7_o4",
                 ];
 
                 const migrateLegacyEasyEditWidgets = (info) => {
@@ -458,7 +377,7 @@ app.registerExtension({
                         return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_IDENTITY_TRANSFER, context) };
                     }
 
-                    if (["subject_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset)) {
+                    if (["subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2"].includes(preset)) {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
                         const template = hasO ? EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_WITH_OUTFIT : EASY_DEFAULT_PROMPT_SUBJECT_TRANSFER_NO_OUTFIT;
                         return { hasDefault: true, text: renderJsEasyPrompt(template, context) };
@@ -623,9 +542,9 @@ app.registerExtension({
                     const isGroupD = GROUP_D_PRESETS.includes(preset);
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
                     const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
-                    const isStyleDisabled = isGroupD;
+                    const isStyleDisabled = isGroupD || preset === "transfer_identity_test_5";
                     const isSceneOutfitStyle = ["flexible_subject_transfer_1", "flexible_subject_transfer_2", ...GROUP_C_PRESETS].includes(preset);
-                    const isSceneAutoStyle = ["subject_transfer", "subject_transfer_1", "subject_transfer_2", "scene_reinterpretation", "identity_transfer", ...FAMILY_E_PRESETS, ...GROUP_B_PRESETS].includes(preset);
+                    const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "scene_reinterpretation", "identity_transfer", ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -676,8 +595,6 @@ app.registerExtension({
                             let tooltipText = "Scene Reinterpretation automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
                             if (IDENTITY_TEST_PRESETS.includes(preset)) {
                                 tooltipText = "Identity Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
-                            } else if (preset === "subject_transfer") {
-                                tooltipText = "Subject Transfer automatically uses the Scene reference for style integration. The stored Style Source value is preserved for other presets.";
                             }
                             styleSourceWidget.tooltip = tooltipText;
                         } else {
@@ -723,7 +640,7 @@ app.registerExtension({
                     );
 
                     // Subject description widgets are enabled ONLY when use_default_prompt is ON and preset supports subject fields
-                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer"].includes(preset);
+                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer"].includes(preset);
                     const enableSubjectFields = useDefaultWidget.value && supportsSubjectFields;
                     if (refSubjWidget) refSubjWidget.disabled = !enableSubjectFields;
                     if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;

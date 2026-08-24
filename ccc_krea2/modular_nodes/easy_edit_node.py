@@ -333,16 +333,11 @@ def _execute_easy_edit(
         prompt_source_str = "custom"
         resolved_key_str = "none"
 
-        requires_explicit_custom_prompt = preset in {"subject_transfer", "scene_reinterpretation"} and not has_default
+        requires_explicit_custom_prompt = preset == "scene_reinterpretation" and not has_default
         if requires_explicit_custom_prompt and not effective_positive_prompt:
-            if preset == "subject_transfer":
-                raise ValueError(
-                    "Subject Transfer requires a custom positive prompt when both Subject and Scene are not available."
-                )
-            elif preset == "scene_reinterpretation":
-                raise ValueError(
-                    "Scene Reinterpretation requires a custom positive prompt when both Subject and Scene are not available."
-                )
+            raise ValueError(
+                "Scene Reinterpretation requires a custom positive prompt when both Subject and Scene are not available."
+            )
 
         if is_subject_only and not effective_positive_prompt:
             raise ValueError(
@@ -490,10 +485,7 @@ def _execute_easy_edit(
     else:
         style_policy_str = caps.style_policy
 
-    if preset.startswith("transfer_identity_test_d_"):
-        resolved_outfit_str = "scene image (automatic outfit reference)"
-        outfit_selector_report = "automatic (scene image)"
-    elif caps.outfit_policy == OUTFIT_POLICY_DISABLED:
+    if caps.outfit_policy == OUTFIT_POLICY_DISABLED:
         resolved_outfit_str = "ignored by preset"
         outfit_selector_report = "ignored by preset"
     elif outfit_source == "none":
@@ -623,7 +615,7 @@ def _execute_easy_edit(
         ]
     )
 
-    if preset.startswith("transfer_identity_test_c_") or caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
+    if caps.style_policy == STYLE_POLICY_SCENE_OUTFIT_AUTO:
         easy_header.extend(
             [
                 "Outfit Style Active: yes",
@@ -632,19 +624,6 @@ def _execute_easy_edit(
                 "Outfit Style Fidelity: 1.0",
                 "Outfit Style Indirect: no",
                 "Outfit Style Instruction Active: yes",
-            ]
-        )
-
-    if preset.startswith("transfer_identity_test_d_"):
-        outfit_ref = next((r for r in route.edit_references if r[2] == "outfit"), None)
-        actual_outfit_boost = outfit_ref[1] if outfit_ref else 4.0
-        easy_header.extend(
-            [
-                "Outfit Reference Active: yes",
-                "Outfit Reference Source: scene image",
-                "Outfit Reference Role: outfit",
-                f"Outfit Reference Boost: {actual_outfit_boost:.1f}",
-                "Scene Generic Appearance Reference Active: no",
             ]
         )
 

@@ -127,9 +127,9 @@ class TestDefaultPromptResolver:
                 "Preserve the position, action, pose, role, interaction, clothing, and accessories of the hero from the scene image."
             )
 
-        # Example B: subject_transfer without outfit
+        # Example B: the current Subject Transfer candidate
         has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
+            preset="subject_transfer_1",
             has_s=True,
             has_sc=True,
             has_o=False,
@@ -138,27 +138,10 @@ class TestDefaultPromptResolver:
             subject_description="cyberpunk warrior",
         )
         assert has_def is True
-        assert key == "subject_transfer"
+        assert key == "subject_transfer_1"
         assert "Replace only the target model of the scene image with the cyberpunk warrior of the subject image." in text
         assert "Transfer the complete cyberpunk warrior from the subject image, including the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories." in text
         assert "Preserve the face, body shape, body proportions, clothing, and accessories of the cyberpunk warrior from the subject image." in text
-
-        # Example C: subject_transfer with outfit
-        has_def, text, key = resolve_default_positive_prompt(
-            preset="subject_transfer",
-            has_s=True,
-            has_sc=True,
-            has_o=True,
-            has_st=False,
-            outfit_source="outfit image",
-            reference_subject="astronaut",
-            subject_description="superhero",
-        )
-        assert has_def is True
-        assert key == "subject_transfer_outfit"
-        assert "Replace only the astronaut of the scene image with the superhero of the subject image." in text
-        assert "Dress the transferred superhero using the clothing and accessories from the outfit image." in text
-        assert "Use the clothing and accessories from the outfit image instead." in text
 
         # Test empty/blank fallback
         has_def, text, key = resolve_default_positive_prompt(
@@ -347,85 +330,6 @@ class TestEasyEditNodeDefaultPromptBehavior:
         assert "Use Default Prompt: no" in report
         assert "Prompt Source: custom" in report
         assert "Default Prompt Key: none" in report
-
-    def test_partial_subject_transfer_empty_custom_prompt_raises(self, dummy_images):
-        S, Sc, _, _ = dummy_images
-        node = CcCKrea2EasyEdit()
-
-        # Subject-only Subject Transfer
-        with pytest.raises(
-            ValueError,
-            match="Subject Transfer requires a custom positive prompt when both Subject and Scene are not available.",
-        ):
-            node.process(
-                model="model",
-                clip="clip",
-                vae="vae",
-                positive_prompt="",
-                use_default_prompt=True,
-                preset="subject_transfer",
-                subject=S,
-            )
-
-        # Scene-only Subject Transfer
-        with pytest.raises(
-            ValueError,
-            match="Subject Transfer requires a custom positive prompt when both Subject and Scene are not available.",
-        ):
-            node.process(
-                model="model",
-                clip="clip",
-                vae="vae",
-                positive_prompt="",
-                use_default_prompt=True,
-                preset="subject_transfer",
-                scene=Sc,
-            )
-
-    def test_partial_subject_transfer_with_custom_prompt_succeeds(self, dummy_images, monkeypatch):
-        S, Sc, _, _ = dummy_images
-        node = CcCKrea2EasyEdit()
-        captured = {}
-
-        class DummyVAE:
-            def encode(self, x):
-                return torch.zeros((1, 16, 8, 8), dtype=torch.float32)
-
-        def mock_orchestrator(*args, **kwargs):
-            captured["positive_prompt"] = kwargs.get("positive_prompt")
-            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
-
-        monkeypatch.setattr(
-            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
-            mock_orchestrator,
-        )
-
-        # Subject-only + Custom
-        _, _, _, _, report1 = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="My custom subject transfer prompt",
-            use_default_prompt=True,
-            preset="subject_transfer",
-            subject=S,
-        )
-        assert captured["positive_prompt"] == "My custom subject transfer prompt"
-        assert "Prompt Source: custom" in report1
-
-        # Scene-only + Custom
-        _, _, _, _, report2 = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="My custom scene-only subject transfer prompt",
-            use_default_prompt=True,
-            preset="subject_transfer",
-            scene=Sc,
-        )
-        assert captured["positive_prompt"] == "My custom scene-only subject transfer prompt"
-        assert "Prompt Source: custom" in report2
-        assert "Subject source is missing" in report2
 
     def test_partial_scene_reinterpretation_empty_custom_prompt_raises(self, dummy_images):
         S, Sc, _, _ = dummy_images
@@ -617,24 +521,6 @@ class TestEasyEditReportLatentSource:
             mock_orchestrator,
         )
 
-        # Subject Transfer + Subject + Scene (no outfit)
-        _, _, _, _, report1 = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="",
-            use_default_prompt=True,
-            preset="subject_transfer",
-            subject=S,
-            scene=Sc,
-        )
-        assert "Resolved Latent Source: scene image" in report1
-        assert "Target Content Role: scene" in report1
-        assert "Resolved Style Source: scene image (automatic)" in report1
-        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report1
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report1
-        assert "Semantic-only Sources: none" in report1
-
         # Identity Transfer + Subject + Scene
         _, _, _, _, report_id = node.process(
             model="model",
@@ -646,60 +532,30 @@ class TestEasyEditReportLatentSource:
             subject=S,
             scene=Sc,
         )
-        assert "Resolved Latent Source: subject image" in report_id
-        assert "Target Content Role: subject" in report_id
+        assert "Resolved Latent Source: scene image" in report_id
+        assert "Target Content Role: scene" in report_id
         assert "Resolved Style Source: scene image (automatic)" in report_id
-        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report_id
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report_id
+        assert "Appearance Ref 1: scene (boost=2.0, fit=contain)" in report_id
+        assert "Appearance Ref 2: subject (boost=2.0, fit=contain)" in report_id
+        assert "Target Content Fit: crop" in report_id
 
-        # Subject Transfer + Subject + Scene + Outfit Image
-        _, _, _, _, report_outfit = node.process(
+        # Restored Identity Transfer Test 5
+        _, _, _, _, report_test_5 = node.process(
             model="model",
             clip="clip",
             vae=DummyVAE(),
             positive_prompt="",
             use_default_prompt=True,
-            preset="subject_transfer",
+            preset="transfer_identity_test_5",
             subject=S,
             scene=Sc,
-            outfit=Ou,
         )
-        assert "Resolved Latent Source: scene image" in report_outfit
-        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report_outfit
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report_outfit
-        assert "Appearance Ref 3: outfit (boost=4.0, fit=contain)" in report_outfit
-        assert "Semantic-only Sources: none" in report_outfit
-
-        # Subject Transfer + Subject + Scene + Outfit Source = Scene Image
-        _, _, _, _, report_scene_outfit = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="",
-            use_default_prompt=True,
-            preset="subject_transfer",
-            subject=S,
-            scene=Sc,
-            outfit_source="scene image",
-        )
-        assert "Resolved Latent Source: scene image" in report_scene_outfit
-        assert "Appearance Ref 1: scene+outfit (boost=4.0, fit=contain)" in report_scene_outfit
-        assert "Appearance Ref 2: subject (boost=7.0, fit=contain)" in report_scene_outfit
-        assert "Semantic-only Sources: none" in report_scene_outfit
-
-        # Subject Transfer + Subject Only (no Scene)
-        _, _, _, _, report_subject_only = node.process(
-            model="model",
-            clip="clip",
-            vae="vae",
-            positive_prompt="Custom prompt for subject transfer",
-            use_default_prompt=False,
-            preset="subject_transfer",
-            subject=S,
-        )
-        assert "Resolved Latent Source: empty" in report_subject_only
-        assert "Appearance Ref 1: subject" in report_subject_only
-        assert "Appearance Ref 2: none" in report_subject_only
+        assert "Resolved Latent Source: scene image" in report_test_5
+        assert "Target Content Role: scene" in report_test_5
+        assert "Resolved Style Source: ignored by preset" in report_test_5
+        assert "Appearance Ref 1: subject (boost=7.0, fit=contain)" in report_test_5
+        assert "Appearance Ref 2: none" in report_test_5
+        assert "Target Content Fit: contain_no_upscale" in report_test_5
 
         # Scene Reinterpretation + Subject + Scene
         _, _, _, _, report2 = node.process(
@@ -732,7 +588,7 @@ class TestEasyEditReportLatentSource:
         """Verify prompt parity across all identity transfer test presets."""
         from ccc_krea2.easy_routing import IDENTITY_TEST_PRESETS
 
-        assert len(IDENTITY_TEST_PRESETS) == 17
+        assert len(IDENTITY_TEST_PRESETS) == 2
 
         expected_prompt_text = (
             "Replace only the identity of the volleyball player of the scene image with the identity of the portrait subject from the subject image.\n\n"
@@ -756,38 +612,3 @@ class TestEasyEditReportLatentSource:
             assert "style" not in text.lower()
             assert "outfit" not in text.lower()
             assert "woman" not in text.lower()
-
-    def test_group_c_runtime_reporting_explicit_fields(self, dummy_images, monkeypatch):
-        """Verify Group C presets report all required explicit outfit style metrics in the Easy Edit report."""
-        S, Sc, _, _ = dummy_images
-        node = CcCKrea2EasyEdit()
-
-        class DummyVAE:
-            def encode(self, x):
-                return torch.zeros((1, 16, 8, 8), dtype=torch.float32)
-
-        def mock_orchestrator(*args, **kwargs):
-            return ("patched_model", "pos", "neg", "lat", "orchestrator_report")
-
-        monkeypatch.setattr(
-            "ccc_krea2.modular_nodes.easy_edit_node.run_krea2_edit_orchestrator",
-            mock_orchestrator,
-        )
-
-        _, _, _, _, report = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="",
-            use_default_prompt=True,
-            preset="transfer_identity_test_c_2_5_5",
-            subject=S,
-            scene=Sc,
-        )
-
-        assert "Outfit Style Active: yes" in report
-        assert "Outfit Style Source: scene image" in report
-        assert "Outfit Style Processing: 2x2" in report
-        assert "Outfit Style Fidelity: 1.0" in report
-        assert "Outfit Style Indirect: no" in report
-        assert "Outfit Style Instruction Active: yes" in report

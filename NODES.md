@@ -9,12 +9,12 @@ This document provides the complete specification of all public nodes in the `Co
 ### 1.1 CcC Krea2 - Easy Edit & Ostris Easy Edit
 - **Class Name**: `CcCKrea2EasyEdit` / `CcCKrea2EasyEditOstris`
 - **Category**: `CcC/Krea2`
-- **Description**: Opinionated 10-preset all-in-one nodes that bypass manual Reference Chain construction. Implements a unified policy-driven routing matrix to automatically assemble semantic instructions, style processing, and identity preservation based on a single workflow preset.
+- **Description**: Opinionated all-in-one nodes that bypass manual Reference Chain construction. Implements a unified policy-driven routing matrix to automatically assemble semantic instructions, style processing, and identity preservation based on a single workflow preset.
 - **Required Inputs**:
   - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`): Core models.
   - `positive_prompt` (`STRING`, default: `""`, multiline: `True`): Positive text prompt.
   - `use_default_prompt` (`BOOLEAN`, default: `True`): Controls system-managed default prompt resolution vs custom user prompt.
-  - `preset` (`CHOICE`): `flexible`, `balanced`, `consistent`, `preserve_identity`, `max_identity`, `subject_transfer`, `preserve_scene`, `outfit_transfer`, `style_transfer`, `scene_reinterpretation`.
+  - `preset` (`CHOICE`): `flexible`, `balanced`, `consistent`, `preserve_identity`, `max_identity`, `identity_transfer`, `subject_transfer_1`, `subject_transfer_2`, `flexible_subject_transfer_1`, `flexible_subject_transfer_2`, `preserve_scene`, `outfit_transfer`, `style_transfer`, `scene_reinterpretation`, `transfer_identity_test_5`.
   - `outfit_source` (`CHOICE`): `none`, `outfit image`, `scene image`, `style image` (default: `outfit image`).
   - `style_source` (`CHOICE`): `none`, `style image`, `scene image`, `subject image` (default: `style image`).
   - `apply_krea2_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEdit`.
@@ -36,7 +36,8 @@ Easy Edit nodes provide centralized default positive prompt resolution:
 - `subject_scene`: `Place the subject from the subject reference naturally into the scene reference. Preserve the subject identity, body shape, and body proportions. Preserve the scene composition, environment, framing, perspective, and spatial layout. Adapt the subject naturally to the scene lighting and environment.`
 - `subject_scene_outfit`: `Place the subject from the subject reference naturally into the scene reference wearing the outfit and accessories from the outfit reference. Preserve the subject identity, body shape, and body proportions. Preserve the scene composition, environment, framing, perspective, and spatial layout. Do not preserve the subject clothing. Fit the transferred outfit and accessories naturally to the subject and the scene. Keep accessories physically attached to the subject in a natural way and never floating. Do not duplicate accessories.`
 - `style`: `Apply the visual style from the style reference while preserving the subject identity, content, geometry, framing, and composition. Transfer only the visual style, including its color palette, texture, lighting character, and overall visual mood. Do not copy subjects, objects, or scene content from the style reference.`
-- `subject_transfer`: `Replace the main subject in the scene reference with the subject from the subject reference... [with outfit clause based on outfit_source]`
+- `identity_transfer` / `transfer_identity_test_5`: canonical identity-only replacement prompt preserving the Scene subject's position, action, pose, role, interaction, clothing, and accessories.
+- `subject_transfer_1` / `subject_transfer_2` / flexible variants: canonical complete-subject replacement prompt.
 - `scene_reinterpretation`: `Create a new image of the subject from the subject reference performing the main action or activity shown by the main subject in the scene reference. Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the subject reference. Use the scene reference as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel. Adapt the subject naturally to the referenced action and environment. Creatively reinterpret the clothing and accessories worn by the main subject in the scene so they are appropriate for the subject and the newly generated image. Do not copy the original scene outfit literally. Generate a coherent new image rather than recreating the source scene exactly.`
 
 - **Optional Inputs**:
