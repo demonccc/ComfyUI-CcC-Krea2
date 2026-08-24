@@ -162,10 +162,10 @@ async function runTests() {
             }
             assert(posPromptWidget.value.includes("Replace only the identity"), "User edit attempt restored to canonical prompt!");
 
-            // Restored Test 5 on Modern Widget
-            setPreset("[Experimental] Identity Transfer - Test 5");
+            // Scene Reinterpretation promoted from the useful Test 5 routing
+            setPreset("Scene Reinterpretation");
             await new Promise(r => setTimeout(r, 60));
-            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt retained for Test 5");
+            assert(posPromptWidget.value.includes("Create a new image"), "Scene Reinterpretation prompt assigned");
 
             // Switch to Manual Mode
             useDefaultWidget.value = false;
@@ -184,7 +184,7 @@ async function runTests() {
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
             // Preset change in Manual Mode must NOT overwrite user custom prompt
-            setPreset("[Experimental] Identity Transfer - Test 5");
+            setPreset("Scene Reinterpretation");
             await new Promise(r => setTimeout(r, 60));
             assert.strictEqual(posPromptWidget.value, "User custom prompt in manual mode");
 
@@ -194,7 +194,7 @@ async function runTests() {
             await new Promise(r => setTimeout(r, 60));
 
             assert.strictEqual(node._isPromptSystemManaged, true);
-            assert(posPromptWidget.value.includes("Replace only the identity"), "Canonical prompt returned on toggling default prompt ON");
+            assert(posPromptWidget.value.includes("Create a new image"), "Scene Reinterpretation prompt returned on toggling default prompt ON");
         }
 
         // 3. Delayed Render Fixture Test
@@ -221,18 +221,19 @@ async function runTests() {
         }
     }
 
-    // 4. Restored Test 5 (style disabled)
+    // 4. Scene Reinterpretation allows manual Style and Outfit selection
     {
-        const { node, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
+        const { node, outfitSourceWidget, styleSourceWidget, setPreset } = createMockNode("CcCKrea2EasyEdit", "legacy");
         node.inputs.find(i => i.name === "subject").link = 1;
         node.inputs.find(i => i.name === "scene").link = 2;
 
-        setPreset("transfer_identity_test_5");
+        setPreset("scene_reinterpretation");
         await new Promise(r => setTimeout(r, 60));
 
-        assert.strictEqual(styleSourceWidget.label, "Style Source [Disabled]");
-        assert.strictEqual(styleSourceWidget.disabled, true);
-        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, true);
+        assert.strictEqual(styleSourceWidget.disabled, false);
+        assert.strictEqual(outfitSourceWidget.disabled, false);
+        assert.strictEqual(node.inputs.find(i => i.name === "style").disabled, false);
+        assert.strictEqual(node.inputs.find(i => i.name === "outfit").disabled, false);
     }
 
     // 5. Preset with Auto Scene Outfit Style (flexible_subject_transfer_1)
@@ -300,7 +301,7 @@ async function runTests() {
 
         const actualStableFirst = displayedValues.slice(0, 14);
         assert.deepStrictEqual(actualStableFirst, expectedStableFirst, "First 14 presets must be stable presets in exact order");
-        assert.strictEqual(displayedValues[14], "[Experimental] Identity Transfer - Test 5");
+        assert.strictEqual(displayedValues.length, 14, "No experimental Test 5 preset should remain");
     }
 
     console.log("All modern & legacy JavaScript frontend tests PASSED successfully!");

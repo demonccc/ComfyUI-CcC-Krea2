@@ -15,8 +15,6 @@ MAX_IDENTITY_SUBJECT_BOOST = 10.0
 
 IDENTITY_TRANSFER_SCENE_BOOST = 2.0
 IDENTITY_TRANSFER_SUBJECT_BOOST = 2.0
-IDENTITY_TEST_5_SUBJECT_BOOST = 7.0
-
 PRESERVE_SCENE_BOOST = 2.5
 OUTFIT_EMPHASIS_BOOST = 2.5
 OUTFIT_TRANSFER_SUBJECT_BOOST = 8.0
@@ -113,7 +111,8 @@ STYLE_POLICY_SCENE_AUTO = "scene_auto"
 STYLE_POLICY_SCENE_OUTFIT_AUTO = "scene_outfit_auto"
 STYLE_POLICY_DISABLED = "disabled"
 
-SCENE_REINTERPRETATION_SUBJECT_BOOST = 4.0
+SCENE_REINTERPRETATION_SUBJECT_BOOST = 7.0
+SCENE_REINTERPRETATION_OUTFIT_BOOST = 4.0
 
 EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION = (
     "Use this reference for the main subject's action, activity, pose, body dynamics, environment, spatial context, "
@@ -142,12 +141,10 @@ EASY_PRESET_DISPLAY_LABELS = {
     "outfit_transfer": "Outfit Transfer",
     "style_transfer": "Style Transfer",
     "scene_reinterpretation": "Scene Reinterpretation",
-    "transfer_identity_test_5": "[Experimental] Identity Transfer - Test 5",
 }
 
 IDENTITY_TEST_PRESETS = (
     "identity_transfer",
-    "transfer_identity_test_5",
 )
 
 EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
@@ -159,8 +156,19 @@ EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION = (
     "Generate a coherent new image rather than recreating the source scene exactly."
 )
 
+EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION_WITH_OUTFIT = (
+    "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n"
+    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n"
+    "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n"
+    "Dress the {subject} using the clothing and accessories from the {outfit_source}. Do not use the clothing or accessories worn by the {reference_subject} in the {scene_source}.\n\n"
+    "Adapt the {subject} and the selected outfit naturally to the referenced action and environment.\n\n"
+    "Generate a coherent new image rather than recreating the source scene exactly."
+)
+
 
 def get_easy_instruction_for_role(role: str) -> str:
+    if str(role).lower() == "scene_reinterpretation":
+        return EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION
     return EASY_ROLE_INSTRUCTIONS.get(str(role).lower(), "")
 
 
@@ -234,7 +242,7 @@ def resolve_default_positive_prompt(
     subj_desc = subject_description.strip() if subject_description and subject_description.strip() else "main subject"
 
     # Resolve effective outfit_source placeholder string
-    if outfit_source in {"outfit image", "scene image", "style image"}:
+    if outfit_source in {"subject image", "outfit image", "scene image", "style image"}:
         eff_outfit_source = outfit_source
     else:
         eff_outfit_source = "outfit image"
@@ -288,8 +296,12 @@ def resolve_default_positive_prompt(
     elif preset == "scene_reinterpretation":
         if not (has_s and has_sc):
             return False, "", "none"
-        base_template = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION
-        base_key = "scene_reinterpretation"
+        if has_o:
+            base_template = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION_WITH_OUTFIT
+            base_key = "scene_reinterpretation_outfit"
+        else:
+            base_template = EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION
+            base_key = "scene_reinterpretation"
         return True, render_easy_prompt(base_template, context), base_key
 
     elif preset == "outfit_transfer":
@@ -392,10 +404,7 @@ EASY_PRESET_CAPABILITIES: Dict[str, EasyPresetCapabilities] = {
     "outfit_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER),
     "style_transfer": EasyPresetCapabilities(outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_USER),
     "scene_reinterpretation": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_SCENE_AUTO
-    ),
-    "transfer_identity_test_5": EasyPresetCapabilities(
-        outfit_policy=OUTFIT_POLICY_DISABLED, style_policy=STYLE_POLICY_DISABLED
+        outfit_policy=OUTFIT_POLICY_USER, style_policy=STYLE_POLICY_USER
     ),
 }
 
@@ -420,7 +429,7 @@ class EasyResolvedSources:
     effective_outfit: Optional[Any]
     effective_style: Optional[Any]
     outfit_source: str
-    outfit_source_kind: str  # "outfit" | "scene" | "style"
+    outfit_source_kind: str  # "outfit" | "scene" | "style" | "subject"
     style_source: str
     style_source_kind: str  # "style" | "scene" | "subject"
     warnings: Tuple[str, ...]
@@ -526,6 +535,13 @@ def resolve_easy_sources(
             else:
                 effective_outfit = None
                 warnings.append("outfit_source set to 'style image' but style image is disconnected.")
+        elif outfit_source == "subject image":
+            outfit_source_kind = "subject"
+            if subject is not None:
+                effective_outfit = subject
+            else:
+                effective_outfit = None
+                warnings.append("outfit_source set to 'subject image' but subject image is disconnected.")
         else:
             effective_outfit = outfit
 
@@ -963,15 +979,6 @@ def route_easy_preset(
                 refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
                 refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
 
-            elif preset == "transfer_identity_test_5":
-                target_content_mode = "image"
-                target_content_source = Sc
-                target_content_role = "scene"
-                target_content_fit = "contain_no_upscale"
-                target_geometry_mode, target_geometry_source = "favor_image", Sc
-
-                refs.append(_ref(S, IDENTITY_TEST_5_SUBJECT_BOOST, "subject"))
-
             elif preset in (
                 "subject_transfer_1",
                 "subject_transfer_2",
@@ -993,12 +1000,7 @@ def route_easy_preset(
             target_content_role = "none"
             target_geometry_mode, target_geometry_source = "favor_image", (Sc if has_sc else (S if has_s else None))
             if has_s:
-                subject_boost = (
-                    IDENTITY_TEST_5_SUBJECT_BOOST
-                    if preset == "transfer_identity_test_5"
-                    else IDENTITY_TRANSFER_SUBJECT_BOOST
-                )
-                refs.append(_ref(S, subject_boost, "subject"))
+                refs.append(_ref(S, IDENTITY_TRANSFER_SUBJECT_BOOST, "subject"))
             elif has_sc and preset == "identity_transfer":
                 refs.append(_ref(Sc, IDENTITY_TRANSFER_SCENE_BOOST, "scene"))
 
@@ -1014,10 +1016,12 @@ def route_easy_preset(
         else:
             target_geometry_mode, target_geometry_source = "fixed", None
 
-        if has_sc:
-            refs.append((Sc, NORMAL_BOOST, "scene", EASY_SCENE_REINTERPRETATION_SCENE_INSTRUCTION))
         if has_s:
             refs.append(_ref(S, SCENE_REINTERPRETATION_SUBJECT_BOOST, "subject"))
+        if has_o:
+            refs.append(_ref(Ou, SCENE_REINTERPRETATION_OUTFIT_BOOST, "outfit"))
+        if has_sc:
+            semantic_only_refs.append((Sc, "scene_reinterpretation"))
 
         if not has_s:
             preset_warnings.append("Scene Reinterpretation selected but Subject source is missing.")

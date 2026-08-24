@@ -214,9 +214,16 @@ app.registerExtension({
                     "Creatively reinterpret the clothing and accessories worn by the {reference_subject} in the {scene_source} so they are appropriate for the {subject} and the newly generated image. Do not copy the original scene outfit literally.\n\n" +
                     "Generate a coherent new image rather than recreating the source scene exactly.";
 
+                const EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION_WITH_OUTFIT =
+                    "Create a new image of the {subject} from the {subject_source} performing the main action or activity shown by the {reference_subject} in the {scene_source}.\n\n" +
+                    "Preserve the identity, facial features, hair, anatomy, body shape, and body proportions of the {subject} from the {subject_source}.\n\n" +
+                    "Use the {scene_source} as inspiration for the action, pose, body dynamics, environment, spatial context, camera framing, perspective, and lighting, but reinterpret the scene creatively rather than reproducing it pixel-for-pixel.\n\n" +
+                    "Dress the {subject} using the clothing and accessories from the {outfit_source}. Do not use the clothing or accessories worn by the {reference_subject} in the {scene_source}.\n\n" +
+                    "Adapt the {subject} and the selected outfit naturally to the referenced action and environment.\n\n" +
+                    "Generate a coherent new image rather than recreating the source scene exactly.";
+
                 const IDENTITY_TEST_PRESETS = [
                     "identity_transfer",
-                    "transfer_identity_test_5",
                 ];
 
                 const GROUP_A_PRESETS = [];
@@ -239,7 +246,6 @@ app.registerExtension({
                     "outfit_transfer": "Outfit Transfer",
                     "style_transfer": "Style Transfer",
                     "scene_reinterpretation": "Scene Reinterpretation",
-                    "transfer_identity_test_5": "[Experimental] Identity Transfer - Test 5",
                 };
 
                 const DISPLAY_TO_PRESET_ID = Object.fromEntries(
@@ -265,7 +271,6 @@ app.registerExtension({
 
                 const LEGACY_PRESETS = [
                     ...STABLE_PRESET_IDS,
-                    "transfer_identity_test_5",
                 ];
 
                 const migrateLegacyEasyEditWidgets = (info) => {
@@ -286,8 +291,8 @@ app.registerExtension({
                     }
 
                     // 2. Schema check for reference_subject and subject_description fields (index 3 and 4)
-                    // If index 3 is outfit_source (e.g. "outfit image", "scene image", "style image", "none"), splice subject defaults
-                    if (typeof vals[3] === "string" && ["none", "outfit image", "scene image", "style image"].includes(vals[3])) {
+                    // If index 3 is an outfit_source value, splice subject defaults.
+                    if (typeof vals[3] === "string" && ["none", "subject image", "outfit image", "scene image", "style image"].includes(vals[3])) {
                         vals.splice(3, 0, "main subject", "main subject");
                     }
 
@@ -385,7 +390,10 @@ app.registerExtension({
 
                     if (preset === "scene_reinterpretation") {
                         if (!hasS || !hasSc) return { hasDefault: false, text: "" };
-                        return { hasDefault: true, text: renderJsEasyPrompt(EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION, context) };
+                        const template = hasO
+                            ? EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION_WITH_OUTFIT
+                            : EASY_DEFAULT_PROMPT_SCENE_REINTERPRETATION;
+                        return { hasDefault: true, text: renderJsEasyPrompt(template, context) };
                     }
 
                     let baseTemplate = "";
@@ -541,10 +549,10 @@ app.registerExtension({
                     const preset = DISPLAY_TO_PRESET_ID[presetWidget?.value] || presetWidget?.value || "balanced";
                     const isGroupD = GROUP_D_PRESETS.includes(preset);
                     const isGroupC = GROUP_C_PRESETS.includes(preset);
-                    const usesOutfit = !["preserve_scene", "style_transfer", "scene_reinterpretation", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
-                    const isStyleDisabled = isGroupD || preset === "transfer_identity_test_5";
+                    const usesOutfit = !["preserve_scene", "style_transfer", "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", ...IDENTITY_TEST_PRESETS].includes(preset);
+                    const isStyleDisabled = isGroupD;
                     const isSceneOutfitStyle = ["flexible_subject_transfer_1", "flexible_subject_transfer_2", ...GROUP_C_PRESETS].includes(preset);
-                    const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "scene_reinterpretation", "identity_transfer", ...GROUP_B_PRESETS].includes(preset);
+                    const isSceneAutoStyle = ["subject_transfer_1", "subject_transfer_2", "identity_transfer", ...GROUP_B_PRESETS].includes(preset);
                     const isSceneAutoOutfit = isGroupD;
 
                     const subjectInput = node.inputs?.find(i => i.name === "subject");
@@ -582,9 +590,7 @@ app.registerExtension({
                         if (isStyleDisabled) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Disabled]";
-                            styleSourceWidget.tooltip = isGroupD
-                                ? "Transfer Identity Test D intentionally disables style reinforcement in favor of Scene-as-Outfit appearance reference."
-                                : "Transfer Identity Test 5 intentionally disables Scene style reinforcement.";
+                            styleSourceWidget.tooltip = "This preset disables style conditioning.";
                         } else if (isSceneOutfitStyle) {
                             styleSourceWidget.disabled = true;
                             styleSourceWidget.label = "Style Source [Auto: Scene Outfit]";
@@ -624,6 +630,7 @@ app.registerExtension({
 
                     const hasO = isSceneAutoOutfit ? hasSc : (usesOutfit && (
                         (effectiveOutfitSource === "outfit image" && hasRawO) ||
+                        (effectiveOutfitSource === "subject image" && hasS) ||
                         (effectiveOutfitSource === "scene image" && hasSc) ||
                         (effectiveOutfitSource === "style image" && hasRawSt)
                     ));
@@ -640,7 +647,7 @@ app.registerExtension({
                     );
 
                     // Subject description widgets are enabled ONLY when use_default_prompt is ON and preset supports subject fields
-                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer"].includes(preset);
+                    const supportsSubjectFields = [...IDENTITY_TEST_PRESETS, "subject_transfer_1", "subject_transfer_2", "flexible_subject_transfer_1", "flexible_subject_transfer_2", "outfit_transfer", "scene_reinterpretation"].includes(preset);
                     const enableSubjectFields = useDefaultWidget.value && supportsSubjectFields;
                     if (refSubjWidget) refSubjWidget.disabled = !enableSubjectFields;
                     if (subjDescWidget) subjDescWidget.disabled = !enableSubjectFields;

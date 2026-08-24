@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Promoted the former Identity Preserve Scene `Scene 2 / Subject 2` routing to `identity_transfer` (Scene target/geometry, Scene and Subject boosts `2.0`), removed obsolete experimental presets and the old stable `subject_transfer`, and restored `transfer_identity_test_5`.
+- Promoted the former Identity Preserve Scene `Scene 2 / Subject 2` routing to `identity_transfer` (Scene target/geometry, Scene and Subject boosts `2.0`) and removed obsolete experimental presets and the old stable `subject_transfer`.
+- Promoted the useful Test 5 behavior into `scene_reinterpretation`: Empty latent, Scene geometry and semantic-only guidance, Subject appearance `7.0`, optional selectable Outfit appearance `4.0`, and selectable Style. Removed the standalone Test 5 preset.
 
 ### Added
 - Modular Krea2 Pipeline Surgical Correction Pass (`feat/easy-edit-and-reference-backends`).

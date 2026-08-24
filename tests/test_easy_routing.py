@@ -11,7 +11,6 @@ from ccc_krea2.easy_routing import (
     MAX_IDENTITY_SUBJECT_BOOST,
     IDENTITY_TRANSFER_SCENE_BOOST,
     IDENTITY_TRANSFER_SUBJECT_BOOST,
-    IDENTITY_TEST_5_SUBJECT_BOOST,
     PRESERVE_SCENE_BOOST,
     OUTFIT_EMPHASIS_BOOST,
     OUTFIT_TRANSFER_SUBJECT_BOOST,
@@ -993,21 +992,6 @@ class TestIdentityTransferMatrix:
         assert len(route.edit_references) == 2
 
 
-class TestIdentityTest5Matrix:
-    def test_subject_scene(self, dummy_sources):
-        S, Sc, _, _ = dummy_sources
-        sources = resolve_easy_sources(preset="transfer_identity_test_5", subject=S, scene=Sc)
-        route = route_easy_preset(sources, preset="transfer_identity_test_5")
-        assert route.target_content_mode == "image"
-        assert route.target_content_source is Sc
-        assert route.target_content_role == "scene"
-        assert route.target_content_fit == "contain_no_upscale"
-        assert route.target_geometry_source is Sc
-        assert_refs(route.edit_references, [(S, IDENTITY_TEST_5_SUBJECT_BOOST, "subject")])
-        assert route.style_active is False
-        assert route.style_source is None
-
-
 class TestCommonMultiReferenceGeometry:
     """Test suite for generalized Easy Edit common multi-reference geometry logic."""
 
@@ -1411,7 +1395,7 @@ def test_bounded_appearance_refs(dummy_sources, preset):
 
 
 def test_preset_capability_gating_outfit(dummy_sources):
-    """Verify preserve_scene, style_transfer, and scene_reinterpretation ignore Outfit even when connected."""
+    """Verify preserve_scene and style_transfer ignore Outfit even when connected."""
     S, Sc, Ou, _ = dummy_sources
 
     # preserve_scene with connected outfit
@@ -1428,30 +1412,54 @@ def test_preset_capability_gating_outfit(dummy_sources):
     st_aliases = [alias for _, _, alias, _ in route_st.edit_references]
     assert "outfit" not in st_aliases
 
-    # scene_reinterpretation with connected outfit
-    sources_sr = resolve_easy_sources(preset="scene_reinterpretation", subject=S, scene=Sc, outfit=Ou)
-    assert sources_sr.effective_outfit is None
-
-
 def test_scene_reinterpretation_routing(dummy_sources):
     """Verify scene_reinterpretation preset behavior and routing contract."""
     S, Sc, Ou, St = dummy_sources
 
-    # Scene + Subject -> target content empty, geometry Scene, style source scene
+    # Scene is semantic-only, Subject and optional Outfit are appearance refs, Style is user-selected.
     sources = resolve_easy_sources(preset="scene_reinterpretation", subject=S, scene=Sc, outfit=Ou, style=St)
-    assert sources.effective_outfit is None
-    assert sources.effective_style is Sc
+    assert sources.effective_outfit is Ou
+    assert sources.effective_style is St
 
     route = route_easy_preset(sources, preset="scene_reinterpretation")
     assert route.target_content_mode == "empty"
+    assert route.target_content_source is None
     assert route.target_geometry_mode == "favor_image"
     assert route.target_geometry_source is Sc
-    assert route.style_source is Sc
+    assert route.style_source is St
 
     aliases = [alias for _, _, alias, _ in route.edit_references]
-    assert aliases == ["scene", "subject"]
-    assert route.edit_references[0][1] == pytest.approx(1.0)  # Scene boost
-    assert route.edit_references[1][1] == pytest.approx(4.0)  # Subject boost
+    assert aliases == ["subject", "outfit"]
+    assert route.edit_references[0][1] == pytest.approx(7.0)
+    assert route.edit_references[1][1] == pytest.approx(4.0)
+    assert route.semantic_only_references == ((Sc, "scene_reinterpretation"),)
+
+
+@pytest.mark.parametrize(
+    "outfit_source,expected",
+    [
+        ("subject image", "Subject"),
+        ("scene image", "Scene"),
+        ("outfit image", "Outfit"),
+        ("style image", "Style"),
+    ],
+)
+def test_scene_reinterpretation_outfit_selectors(dummy_sources, outfit_source, expected):
+    S, Sc, Ou, St = dummy_sources
+    sources = resolve_easy_sources(
+        preset="scene_reinterpretation",
+        subject=S,
+        scene=Sc,
+        outfit=Ou,
+        style=St,
+        outfit_source=outfit_source,
+        style_source="none",
+    )
+    route = route_easy_preset(sources, preset="scene_reinterpretation")
+    assert route.edit_references[0][:3] == (S, 7.0, "subject")
+    assert route.edit_references[1][0].name == expected
+    assert route.edit_references[1][1:3] == (4.0, "outfit")
+    assert route.semantic_only_references == ((Sc, "scene_reinterpretation"),)
 
 
 def test_none_sources_resolution(dummy_sources):
@@ -1494,7 +1502,7 @@ def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
-    assert len(all_presets) == 15
+    assert len(all_presets) == 14
 
     roles = ["subject", "scene", "outfit", "scene+outfit"]
 

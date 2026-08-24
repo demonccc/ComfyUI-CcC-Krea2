@@ -143,6 +143,23 @@ class TestDefaultPromptResolver:
         assert "Transfer the complete cyberpunk warrior from the subject image, including the exact facial identity, facial features, hair, anatomy, body shape, body proportions, clothing, and accessories." in text
         assert "Preserve the face, body shape, body proportions, clothing, and accessories of the cyberpunk warrior from the subject image." in text
 
+        # Scene Reinterpretation with an explicit Outfit source
+        has_def, text, key = resolve_default_positive_prompt(
+            preset="scene_reinterpretation",
+            has_s=True,
+            has_sc=True,
+            has_o=True,
+            has_st=True,
+            outfit_source="subject image",
+            style_source="scene image",
+            reference_subject="dancer",
+            subject_description="portrait woman",
+        )
+        assert has_def is True
+        assert key == "scene_reinterpretation_outfit"
+        assert "Dress the portrait woman using the clothing and accessories from the subject image." in text
+        assert "Do not use the clothing or accessories worn by the dancer in the scene image." in text
+
         # Test empty/blank fallback
         has_def, text, key = resolve_default_positive_prompt(
             preset="identity_transfer",
@@ -539,25 +556,7 @@ class TestEasyEditReportLatentSource:
         assert "Appearance Ref 2: subject (boost=2.0, fit=contain)" in report_id
         assert "Target Content Fit: crop" in report_id
 
-        # Restored Identity Transfer Test 5
-        _, _, _, _, report_test_5 = node.process(
-            model="model",
-            clip="clip",
-            vae=DummyVAE(),
-            positive_prompt="",
-            use_default_prompt=True,
-            preset="transfer_identity_test_5",
-            subject=S,
-            scene=Sc,
-        )
-        assert "Resolved Latent Source: scene image" in report_test_5
-        assert "Target Content Role: scene" in report_test_5
-        assert "Resolved Style Source: ignored by preset" in report_test_5
-        assert "Appearance Ref 1: subject (boost=7.0, fit=contain)" in report_test_5
-        assert "Appearance Ref 2: none" in report_test_5
-        assert "Target Content Fit: contain_no_upscale" in report_test_5
-
-        # Scene Reinterpretation + Subject + Scene
+        # Scene Reinterpretation + Subject + Scene + optional Outfit and Style
         _, _, _, _, report2 = node.process(
             model="model",
             clip="clip",
@@ -567,9 +566,15 @@ class TestEasyEditReportLatentSource:
             preset="scene_reinterpretation",
             subject=S,
             scene=Sc,
+            outfit=Ou,
+            style=St,
         )
         assert "Resolved Latent Source: empty" in report2
         assert "Target Content Role: none" in report2
+        assert "Appearance Ref 1: subject (boost=7.0, fit=contain)" in report2
+        assert "Appearance Ref 2: outfit (boost=4.0, fit=contain)" in report2
+        assert "Semantic-only Sources: scene_reinterpretation" in report2
+        assert "Resolved Style Source: style image (present)" in report2
 
         # Preserve Identity using Subject as target
         _, _, _, _, report3 = node.process(
@@ -588,7 +593,7 @@ class TestEasyEditReportLatentSource:
         """Verify prompt parity across all identity transfer test presets."""
         from ccc_krea2.easy_routing import IDENTITY_TEST_PRESETS
 
-        assert len(IDENTITY_TEST_PRESETS) == 2
+        assert len(IDENTITY_TEST_PRESETS) == 1
 
         expected_prompt_text = (
             "Replace only the identity of the volleyball player of the scene image with the identity of the portrait subject from the subject image.\n\n"

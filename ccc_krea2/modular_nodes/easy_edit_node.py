@@ -79,7 +79,7 @@ class CcCKrea2EasyEdit:
                     },
                 ),
                 "outfit_source": (
-                    ["none", "outfit image", "scene image", "style image"],
+                    ["none", "subject image", "scene image", "outfit image", "style image"],
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
                 ),
                 "style_source": (
@@ -196,7 +196,7 @@ class CcCKrea2EasyEditOstris:
                     },
                 ),
                 "outfit_source": (
-                    ["none", "outfit image", "scene image", "style image"],
+                    ["none", "subject image", "scene image", "outfit image", "style image"],
                     {"default": "outfit image", "tooltip": "Source image socket to use for outfit conditioning."},
                 ),
                 "style_source": (

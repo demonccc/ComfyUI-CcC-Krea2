@@ -775,7 +775,7 @@ def main():
         "Note on Easy Transfer Presets, Helper LoRAs & Model Downloads:\n"
         "• Identity Transfer: Uses Scene as target content/latent and geometry anchor, with Scene and Subject appearance boosts of 2.0. Outfit is disabled, Style is automatic Scene.\n"
         "• Subject Transfer 1 / 2: Current full-Subject transfer test candidates. Both use an empty target latent with Scene geometry and Subject appearance boosts of 5.0 / 6.0.\n"
-        "• Identity Transfer Test 5: Restored calibration preset using Scene target content/geometry and only Subject appearance at 7.0. Outfit and Style are disabled.\n"
+        "• Scene Reinterpretation: Uses Empty target content, Scene geometry and semantic-only guidance, Subject appearance at 7.0, optional Outfit appearance at 4.0, and selectable Style.\n"
         "• Easy Visual References: Easy appearance references preserve the complete source image and fit them into the target latent geometry without destructive cropping.\n"
         "• Krea 2 Identity Edit LoRA (krea2_identity_edit_v1_2.safetensors at 1.0) recovers subject facial identity.\n"
         "• BFS Body Swap LoRA (bfs_body_swap_v1_krea2.safetensors at 0.35) is an experimental full-person replacement model where Scene acts as base image and Subject as reference person. Exact pose transfer is not guaranteed.\n"
