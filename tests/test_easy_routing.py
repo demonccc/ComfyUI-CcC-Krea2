@@ -1530,25 +1530,30 @@ def test_scene_auto_ignores_stale_style_source_selector(dummy_sources):
 
 
 def test_easy_visual_reference_fit_invariant_all_presets_and_sources():
-    """Verify that every registered Easy Edit preset uses contain for appearance references."""
+    """Verify role-specific non-cropping fit modes for every registered Easy Edit preset."""
     from ccc_krea2.easy_routing import EASY_PRESET_CAPABILITIES, resolve_easy_visual_reference_fit
 
     all_presets = list(EASY_PRESET_CAPABILITIES.keys())
     assert len(all_presets) == 13
 
-    roles = ["subject", "scene", "outfit", "scene+outfit"]
+    expected_by_role = {
+        "subject": "contain_no_upscale",
+        "scene": "contain",
+        "outfit": "contain_no_upscale",
+        "scene+outfit": "contain",
+    }
 
     for preset in all_presets:
-        for role in roles:
+        for role, expected in expected_by_role.items():
             # Multi-source / common geometry active
             fit_multi = resolve_easy_visual_reference_fit(preset, role, common_geometry_active=True)
-            assert fit_multi == "contain", (
-                f"Preset '{preset}' for role '{role}' under multi-source returned '{fit_multi}', expected 'contain'"
+            assert fit_multi == expected, (
+                f"Preset '{preset}' for role '{role}' under multi-source returned '{fit_multi}', expected '{expected}'"
             )
             # Single-source / common geometry inactive
             fit_single = resolve_easy_visual_reference_fit(preset, role, common_geometry_active=False)
-            assert fit_single == "contain", (
-                f"Preset '{preset}' for role '{role}' under single-source returned '{fit_single}', expected 'contain'"
+            assert fit_single == expected, (
+                f"Preset '{preset}' for role '{role}' under single-source returned '{fit_single}', expected '{expected}'"
             )
 
 

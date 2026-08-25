@@ -208,10 +208,16 @@ def get_easy_instruction_for_role(role: str) -> str:
 def resolve_easy_visual_reference_fit(preset: str = "", role: str = "", common_geometry_active: bool = True) -> str:
     """Resolve visual reference fit mode.
 
-    INVARIANT: EVERY visual appearance reference in Easy Edit MUST fit completely inside
-    the target latent geometry with 'contain'. No Easy appearance reference
-    may crop away face, hair, clothing, or subject context.
+    Subject and Outfit references preserve their complete source image and native size
+    whenever they already fit, downscaling only when required. Scene references may
+    scale in either direction to fill their spatial-reference role without cropping.
+
+    A combined Scene+Outfit reference remains Scene-led because one physical reference
+    must preserve the Scene's spatial scale for both logical roles.
     """
+    normalized_role = str(role).strip().lower()
+    if normalized_role in {"subject", "outfit"}:
+        return "contain_no_upscale"
     return "contain"
 
 

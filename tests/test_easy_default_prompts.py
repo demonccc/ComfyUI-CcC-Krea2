@@ -590,7 +590,7 @@ class TestEasyEditReportLatentSource:
         assert "Target Content Role: scene" in report_id
         assert "Resolved Style Source: scene image (automatic)" in report_id
         assert "Appearance Ref 1: scene (boost=2.0, fit=contain)" in report_id
-        assert "Appearance Ref 2: subject (boost=2.0, fit=contain)" in report_id
+        assert "Appearance Ref 2: subject (boost=2.0, fit=contain_no_upscale)" in report_id
         assert "Target Content Fit: crop" in report_id
 
         # Scene Reinterpretation + Subject + Scene + optional Outfit; Style is locked to Scene
@@ -608,8 +608,8 @@ class TestEasyEditReportLatentSource:
         )
         assert "Resolved Latent Source: empty" in report2
         assert "Target Content Role: none" in report2
-        assert "Appearance Ref 1: subject (boost=7.0, fit=contain)" in report2
-        assert "Appearance Ref 2: outfit (boost=4.0, fit=contain)" in report2
+        assert "Appearance Ref 1: subject (boost=7.0, fit=contain_no_upscale)" in report2
+        assert "Appearance Ref 2: outfit (boost=4.0, fit=contain_no_upscale)" in report2
         assert "Semantic-only Sources: none" in report2
         assert "Resolved Style Source: scene image (automatic)" in report2
 

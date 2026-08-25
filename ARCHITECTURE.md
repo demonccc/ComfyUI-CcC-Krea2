@@ -124,6 +124,7 @@ The single source of truth for reference ordering is `easy_routing.py` for Easy 
    - *Style Policies*: `identity_transfer` and `subject_transfer_1` automatically assign Scene to Style. `scene_reinterpretation` locks Scene as a direct custom Style reference.
 2. **Advanced Pipeline**: Generic edit references are semantic-role neutral and receive meaning only through explicit `alias` + `vision_instruction`. Both Easy and Advanced then use `reference_slots.py` for final logical/physical ordering.
 3. **Non-Style References**: Map 1:1 to physical Qwen images and assign sequential 1-based VAE Reference Frames (`Frame 1`, `Frame 2`, etc.). Under Ostris Backend, all edit-path references (including semantic-only references) undergo strict VLM Area Preprocessing (<= 384x384) before text/vision encoding.
+   - Easy Subject and Outfit appearance references use `contain_no_upscale`: preserve the complete source, never enlarge it, and downscale only when required. Scene and combined Scene+Outfit references use `contain` because they provide spatial Scene guidance.
 4. **Style References**: Expand to 1 (full), 4 (2x2), or 16 (4x4) physical Qwen vision images. Style references receive VAE Reference Frame = `none` and do not participate in spatial VAE latent attention patching or negative conditioning.
 
 ---

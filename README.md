@@ -109,6 +109,8 @@ The identity ladder covers subject preservation tasks. Additional task-specific 
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
 - **Style Transfer**: Uses the dedicated indirect Style/Moodboard path to transfer artistic style, palette, texture, and visual mood without retaining the source Style image rows (Outfit policy: disabled).
 
+Easy appearance-reference fitting is role-specific: Subject and Outfit use `contain_no_upscale` so they are never enlarged and are reduced only when necessary; Scene and combined Scene+Outfit references use `contain` for spatial Scene guidance.
+
 > [!NOTE]
 > **Placeholder-Driven Default Prompts & Subject Fields**:
 > Easy Edit preset prompts dynamically substitute `{reference_subject}`, `{subject}`, `{scene_source}`, `{subject_source}`, `{outfit_source}`, and `{style_source}`.
