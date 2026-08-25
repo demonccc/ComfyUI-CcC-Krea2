@@ -4,6 +4,7 @@ Ported and attributed from ComfyUI-Krea2Edit by lbouaraba (GPL-3.0 / MIT).
 https://github.com/lbouaraba/comfyui-krea2edit
 """
 
+import math
 import torch
 import torch.nn.functional as F
 from dataclasses import dataclass
@@ -128,17 +129,24 @@ def resolve_krea2edit_geometry(
         sc = min(1.0, tgt_h / float(src_h), tgt_w / float(src_w))
         target_cap_h = max(16, (tgt_h // 16) * 16)
         target_cap_w = max(16, (tgt_w // 16) * 16)
-        fitted_h = min(max(16, (int(round(src_h * sc)) // 16) * 16), target_cap_h)
-        fitted_w = min(max(16, (int(round(src_w * sc)) // 16) * 16), target_cap_w)
 
         crop_h = src_h
         crop_w = src_w
         left = 0
         top = 0
-        vae_input_w = fitted_w
-        vae_input_h = fitted_h
-        interp_occurred = (crop_w, crop_h) != (fitted_w, fitted_h)
-        interp_method = "bicubic"
+        if sc >= 1.0:
+            # Preserve every source pixel. Pad only for /16 VAE alignment instead of resizing down.
+            vae_input_h = min(max(16, int(math.ceil(src_h / 16.0)) * 16), target_cap_h)
+            vae_input_w = min(max(16, int(math.ceil(src_w / 16.0)) * 16), target_cap_w)
+            interp_occurred = False
+            interp_method = "pad" if (crop_w, crop_h) != (vae_input_w, vae_input_h) else "none"
+        else:
+            fitted_h = min(max(16, (int(round(src_h * sc)) // 16) * 16), target_cap_h)
+            fitted_w = min(max(16, (int(round(src_w * sc)) // 16) * 16), target_cap_w)
+            vae_input_w = fitted_w
+            vae_input_h = fitted_h
+            interp_occurred = (crop_w, crop_h) != (fitted_w, fitted_h)
+            interp_method = "bicubic"
 
     elif resolved_mode == "crop":
         # Manual Visual Reference Fit = crop: center crop to exact target aspect ratio & resize to exact target pixel dimensions
@@ -225,7 +233,16 @@ def process_image_and_mask_geometry(
     cropped_img = image[:, top : top + crop_h, left : left + crop_w, :]
 
     # 2. Resize image if required
-    if (cropped_img.shape[1], cropped_img.shape[2]) != (vae_h, vae_w):
+    if geom.interpolation_method == "pad":
+        pad_h = vae_h - cropped_img.shape[1]
+        pad_w = vae_w - cropped_img.shape[2]
+        pad_top = pad_h // 2
+        pad_bottom = pad_h - pad_top
+        pad_left = pad_w // 2
+        pad_right = pad_w - pad_left
+        nchw = cropped_img.permute(0, 3, 1, 2)
+        processed_img = F.pad(nchw, (pad_left, pad_right, pad_top, pad_bottom), mode="replicate").permute(0, 2, 3, 1)
+    elif (cropped_img.shape[1], cropped_img.shape[2]) != (vae_h, vae_w):
         processed_img = resize_tensor(cropped_img, target_h=vae_h, target_w=vae_w, method=geom.interpolation_method)
     else:
         processed_img = cropped_img
@@ -240,7 +257,20 @@ def process_image_and_mask_geometry(
         cropped_mask = mask[:, top : top + crop_h, left : left + crop_w]
 
         # Resize mask using nearest-exact for binary integrity or bilinear if smooth
-        if (cropped_mask.shape[1], cropped_mask.shape[2]) != (vae_h, vae_w):
+        if geom.interpolation_method == "pad":
+            pad_h = vae_h - cropped_mask.shape[1]
+            pad_w = vae_w - cropped_mask.shape[2]
+            pad_top = pad_h // 2
+            pad_bottom = pad_h - pad_top
+            pad_left = pad_w // 2
+            pad_right = pad_w - pad_left
+            processed_mask = F.pad(
+                cropped_mask.unsqueeze(1),
+                (pad_left, pad_right, pad_top, pad_bottom),
+                mode="constant",
+                value=0.0,
+            ).squeeze(1)
+        elif (cropped_mask.shape[1], cropped_mask.shape[2]) != (vae_h, vae_w):
             # Convert to [B, 1, H, W] for interpolation
             m_4d = cropped_mask.unsqueeze(1)
             resized_m = F.interpolate(m_4d, size=(vae_h, vae_w), mode="nearest-exact")

@@ -42,6 +42,22 @@ def test_visual_fit_fit_mode():
     assert out_img.shape[2] == fw
 
 
+def test_contain_no_upscale_preserves_native_pixels_and_pads_for_alignment():
+    img = torch.rand(1, 701, 603, 3)
+    out_img, _, meta = resolve_visual_reference_fit(
+        img,
+        target_h=800,
+        target_w=1200,
+        mode="contain_no_upscale",
+    )
+
+    assert out_img.shape == (1, 704, 608, 3)
+    assert meta["mode_resolved"] == "contain_no_upscale"
+    assert meta["whether_interpolation_occurred"] is False
+    assert meta["interpolation_method"] == "pad"
+    assert torch.equal(out_img[:, 1:702, 2:605, :], img)
+
+
 def test_style_slicing():
     img = torch.rand(1, 1000, 1000, 3)
     crops_full = slice_style_image(img, mode="full")

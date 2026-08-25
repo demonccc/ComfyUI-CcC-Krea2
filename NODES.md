@@ -19,6 +19,7 @@ This document provides the complete specification of all public nodes in the `Co
   - `style_source` (`CHOICE`): `none`, `scene image`, `subject image`, `style image` (default: `none`). Selectable Style sources use indirect conditioning with a style-only semantic guardrail unless a preset locks a custom Style profile.
   - `flexible_subject_transfer_1/2` restrict `outfit_source` to `none`, `subject image` (default), or `scene image`. The selected Outfit uses a separate direct semantic Style path and can coexist with the independently selected indirect artistic Style.
   - Easy appearance-reference fitting is role-specific: Subject and Outfit use `contain_no_upscale`; Scene and combined Scene+Outfit use `contain`.
+  - With Subject + Scene, target geometry is Subject-aware: Scene is first capped at 2 MP; the latent then expands with Scene aspect ratio only when needed to contain Subject, up to 2 MP. Subject is downscaled only if it still cannot fit at that limit.
   - `apply_krea2_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEdit`.
   - `apply_ostris_edit_patch` (`BOOLEAN`, default: `True`): For `CcCKrea2EasyEditOstris`.
   - `ostris_kv_cache` (`BOOLEAN`, default: `False`): For `CcCKrea2EasyEditOstris`.

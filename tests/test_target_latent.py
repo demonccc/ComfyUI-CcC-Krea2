@@ -4,7 +4,12 @@ import torch
 import pytest
 from unittest.mock import MagicMock
 from ccc_krea2.vision_prep import prepare_vision_image
-from ccc_krea2.target_latent import create_target_latent, resolve_target_geometry, normalize_vae_output
+from ccc_krea2.target_latent import (
+    calculate_subject_aware_scene_geometry,
+    create_target_latent,
+    normalize_vae_output,
+    resolve_target_geometry,
+)
 from ccc_krea2.modular_nodes.target_latent_node import CcCKrea2TargetLatent
 
 
@@ -336,7 +341,78 @@ def test_target_latent_contain_no_upscale_small_image():
         batch_size=1,
     )
 
-    # 400x300 fits within 1000x1000 without upscaling, aligned to 16 = 400x288 or 400x300 aligned
+    # 400x300 fits without resampling; only the height is padded to the next /16 boundary.
     assert "Content Fit: contain_no_upscale" in info
     assert "Content Source Size: 400 x 300" in info
-    assert "Content Resolved Size: 400 x 288" in info
+    assert "Content Resolved Size: 400 x 304" in info
+
+
+def _shape_only_image(width, height):
+    return torch.empty((1, height, width, 3), device="meta")
+
+
+def test_subject_aware_geometry_keeps_scene_when_subject_already_fits():
+    plan = calculate_subject_aware_scene_geometry(
+        scene_image=_shape_only_image(1200, 800),
+        subject_image=_shape_only_image(600, 700),
+    )
+    assert (plan.target_width, plan.target_height) == (1200, 800)
+    assert plan.scene_was_downscaled is False
+    assert plan.latent_was_expanded is False
+    assert plan.subject_requires_downscale is False
+
+
+def test_subject_aware_geometry_uses_subject_ceiling_alignment_as_fit_constraint():
+    plan = calculate_subject_aware_scene_geometry(
+        scene_image=_shape_only_image(1200, 800),
+        subject_image=_shape_only_image(1199, 799),
+    )
+    assert (plan.aligned_subject_width, plan.aligned_subject_height) == (1200, 800)
+    assert (plan.target_width, plan.target_height) == (1200, 800)
+    assert plan.latent_was_expanded is False
+    assert plan.subject_requires_downscale is False
+
+
+def test_subject_aware_geometry_expands_scene_below_two_mp_without_touching_subject():
+    plan = calculate_subject_aware_scene_geometry(
+        scene_image=_shape_only_image(1200, 800),
+        subject_image=_shape_only_image(900, 960),
+    )
+    assert (plan.target_width, plan.target_height) == (1440, 960)
+    assert plan.latent_was_expanded is True
+    assert plan.latent_was_capped is False
+    assert plan.subject_requires_downscale is False
+
+
+def test_subject_aware_geometry_resizes_scene_to_two_mp_before_fit_check():
+    plan = calculate_subject_aware_scene_geometry(
+        scene_image=_shape_only_image(2400, 1600),
+        subject_image=_shape_only_image(1000, 1000),
+    )
+    assert (plan.target_width, plan.target_height) == (1728, 1152)
+    assert plan.scene_was_downscaled is True
+    assert plan.subject_requires_downscale is False
+
+
+def test_subject_aware_geometry_uses_full_two_mp_when_expansion_from_small_scene_exceeds_cap():
+    plan = calculate_subject_aware_scene_geometry(
+        scene_image=_shape_only_image(1200, 800),
+        subject_image=_shape_only_image(1400, 1600),
+    )
+    assert (plan.target_width, plan.target_height) == (1728, 1152)
+    assert plan.scene_was_downscaled is False
+    assert plan.latent_was_expanded is True
+    assert plan.latent_was_capped is True
+    assert plan.subject_requires_downscale is True
+
+
+def test_subject_aware_geometry_downscales_subject_only_when_two_mp_canvas_cannot_contain_it():
+    plan = calculate_subject_aware_scene_geometry(
+        scene_image=_shape_only_image(2400, 1600),
+        subject_image=_shape_only_image(1400, 1600),
+    )
+    assert (plan.target_width, plan.target_height) == (1728, 1152)
+    assert plan.scene_was_downscaled is True
+    assert plan.latent_was_expanded is False
+    assert plan.latent_was_capped is True
+    assert plan.subject_requires_downscale is True

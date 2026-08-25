@@ -109,7 +109,7 @@ The identity ladder covers subject preservation tasks. Additional task-specific 
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
 - **Style Transfer**: Uses the dedicated indirect Style/Moodboard path to transfer artistic style, palette, texture, and visual mood without retaining the source Style image rows (Outfit policy: disabled).
 
-Easy appearance-reference fitting is role-specific: Subject and Outfit use `contain_no_upscale` so they are never enlarged and are reduced only when necessary; Scene and combined Scene+Outfit references use `contain` for spatial Scene guidance.
+With Subject + Scene, Easy Edit first reduces Scene geometry only when it exceeds 2 MP. The Subject dimensions are rounded up to their `/16` conditioning bounds without interpolation. If those bounds fit, the latent keeps the Scene size and Subject remains untouched. Otherwise the latent expands with the Scene aspect ratio until Subject fits, capped at 2 MP; Subject is reduced only when it still cannot fit after that cap. Subject and Outfit appearance references use `contain_no_upscale`, while Scene and combined Scene+Outfit use `contain`.
 
 > [!NOTE]
 > **Placeholder-Driven Default Prompts & Subject Fields**:
@@ -117,7 +117,7 @@ Easy appearance-reference fitting is role-specific: Subject and Outfit use `cont
 > Two user-editable fields (`Reference Subject` and `Subject`) allow customization of target/subject roles when default prompts are enabled.
 
 > [!NOTE]
-> All Easy Edit visual appearance references enforce `contain` fit. The complete source reference image is preserved for conditioning without cropping away facial features, head structure, garments, or surrounding context.
+> Easy Edit never destructively crops Subject or Outfit appearance references. Subject downscaling occurs only when the Subject cannot fit inside the final Scene-aspect latent after its 2 MP cap is applied.
 
 ---
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Added Subject-aware Scene geometry for Easy Edit: normalize Scene to at most 2 MP, round Subject conditioning bounds upward to `/16` without interpolation, preserve Subject at native size whenever those bounds fit, expand the Scene-aspect latent when necessary, and downscale Subject only if the final 2 MP canvas still cannot contain it.
 - Restored role-specific Easy appearance fitting: Subject and Outfit use `contain_no_upscale`, while Scene and combined Scene+Outfit references use `contain`.
 - Consolidated the Subject Transfer candidates into the single `subject_transfer_1` preset displayed as **Subject Transfer**. It now uses guarded Scene/Subject appearance references at `1.0` / `2.5`, automatic direct Outfit guidance sourced from Subject, and automatic indirect Scene Style guidance. Removed `subject_transfer_2`.
 - Reworked `scene_reinterpretation` to use Scene as Geometry plus a locked direct custom Style reference, removed the duplicate Scene semantic-only reference, and made Scene the default Outfit source. Added source-aware Outfit resolution across all presets: automatic prompts use `{reference_subject}` for Scene and `{subject}` for Subject, while Outfit/Style images are interpreted visually; custom prompt mode always uses visual Outfit interpretation without placeholders.

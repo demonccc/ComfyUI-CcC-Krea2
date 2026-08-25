@@ -19,6 +19,24 @@ class TargetVisionContext:
     target_image: Optional[PreparedVisionImage] = None
 
 
+@dataclass(frozen=True)
+class SubjectAwareSceneGeometry:
+    """Scene-led target geometry that preserves Subject pixels until the 2 MP cap requires fitting."""
+
+    target_height: int
+    target_width: int
+    scene_height: int
+    scene_width: int
+    subject_height: int
+    subject_width: int
+    aligned_subject_height: int
+    aligned_subject_width: int
+    scene_was_downscaled: bool
+    latent_was_expanded: bool
+    latent_was_capped: bool
+    subject_requires_downscale: bool
+
+
 def get_image_dims(image_tensor: torch.Tensor) -> Tuple[int, int]:
     """Helper to extract (height, width) safely from 3D or 4D image tensor."""
     if image_tensor.ndim == 4:
@@ -27,6 +45,97 @@ def get_image_dims(image_tensor: torch.Tensor) -> Tuple[int, int]:
         return int(image_tensor.shape[0]), int(image_tensor.shape[1])
     else:
         raise ValueError(f"Unsupported image tensor shape: {image_tensor.shape}")
+
+
+def _scene_dimensions_at_pixel_budget(
+    scene_width: int,
+    scene_height: int,
+    max_pixels: int,
+    allow_upscale: bool = False,
+) -> Tuple[int, int]:
+    """Preserve Scene aspect ratio while fitting inside a pixel budget and /16 geometry."""
+    scene_pixels = scene_width * scene_height
+    budget_scale = math.sqrt(max_pixels / float(scene_pixels))
+    scale = budget_scale if allow_upscale else min(1.0, budget_scale)
+    raw_width = scene_width * scale
+    raw_height = scene_height * scale
+
+    if scale < 1.0:
+        width = max(128, int(math.floor(raw_width / 16.0)) * 16)
+        height = max(128, int(math.floor(raw_height / 16.0)) * 16)
+    else:
+        width = max(128, int(round(raw_width / 16.0)) * 16)
+        height = max(128, int(round(raw_height / 16.0)) * 16)
+        if width * height > max_pixels:
+            width = max(128, int(math.floor(raw_width / 16.0)) * 16)
+            height = max(128, int(math.floor(raw_height / 16.0)) * 16)
+
+    return width, height
+
+
+def calculate_subject_aware_scene_geometry(
+    scene_image: torch.Tensor,
+    subject_image: torch.Tensor,
+    max_megapixels: float = 2.0,
+) -> SubjectAwareSceneGeometry:
+    """Calculate Scene geometry while avoiding Subject downscale unless the 2 MP cap makes it unavoidable."""
+    scene_height, scene_width = get_image_dims(scene_image)
+    subject_height, subject_width = get_image_dims(subject_image)
+    aligned_subject_width = max(16, int(math.ceil(subject_width / 16.0)) * 16)
+    aligned_subject_height = max(16, int(math.ceil(subject_height / 16.0)) * 16)
+    max_pixels = max(1, int(max_megapixels * 1_000_000))
+
+    base_width, base_height = _scene_dimensions_at_pixel_budget(
+        scene_width,
+        scene_height,
+        max_pixels,
+    )
+    scene_was_downscaled = base_width < scene_width or base_height < scene_height
+
+    subject_fits_base = aligned_subject_width <= base_width and aligned_subject_height <= base_height
+    latent_was_expanded = False
+    latent_was_capped = scene_was_downscaled
+    target_width, target_height = base_width, base_height
+
+    if not subject_fits_base:
+        # Scale the original Scene dimensions so its aspect ratio remains the geometry source.
+        expansion = max(
+            base_width / float(scene_width),
+            base_height / float(scene_height),
+            aligned_subject_width / float(scene_width),
+            aligned_subject_height / float(scene_height),
+        )
+        expanded_width = max(128, int(math.ceil((scene_width * expansion) / 16.0)) * 16)
+        expanded_height = max(128, int(math.ceil((scene_height * expansion) / 16.0)) * 16)
+        if expanded_width * expanded_height <= max_pixels:
+            target_width, target_height = expanded_width, expanded_height
+        else:
+            target_width, target_height = _scene_dimensions_at_pixel_budget(
+                scene_width,
+                scene_height,
+                max_pixels,
+                allow_upscale=True,
+            )
+            latent_was_capped = True
+
+        latent_was_expanded = target_width > base_width or target_height > base_height
+
+    subject_requires_downscale = aligned_subject_width > target_width or aligned_subject_height > target_height
+
+    return SubjectAwareSceneGeometry(
+        target_height=target_height,
+        target_width=target_width,
+        scene_height=scene_height,
+        scene_width=scene_width,
+        subject_height=subject_height,
+        subject_width=subject_width,
+        aligned_subject_height=aligned_subject_height,
+        aligned_subject_width=aligned_subject_width,
+        scene_was_downscaled=scene_was_downscaled,
+        latent_was_expanded=latent_was_expanded,
+        latent_was_capped=latent_was_capped,
+        subject_requires_downscale=subject_requires_downscale,
+    )
 
 
 def calculate_target_latent_resolution(
@@ -316,6 +425,8 @@ def build_target_latent(
     target_alias: str = "",
     target_vision_instruction: str = "",
     force_target_megapixels: bool = False,
+    target_width: Optional[int] = None,
+    target_height: Optional[int] = None,
     **kwargs: Any,
 ) -> Tuple[Dict[str, Any], str]:
     """Build formatted target LATENT dict and latent_info string."""
@@ -368,6 +479,12 @@ def build_target_latent(
         scene_image=scene_image,
         force_target_megapixels=force_target_mp,
     )
+
+    if target_width is not None and target_height is not None:
+        target_w = max(128, int(target_width) // 16 * 16)
+        target_h = max(128, int(target_height) // 16 * 16)
+        active_mp = (target_w * target_h) / 1_000_000.0
+        geom_src = f"{geom_src}_subject_aware"
 
     latent_h = target_h // 8
     latent_w = target_w // 8

@@ -20,7 +20,7 @@ from ..easy_routing import (
 from ..grounding import prepare_easy_krea_vision_image
 from ..vision_prep import prepare_image_for_qwen
 from ..reference_specs import ReferenceSpec, StyleReferenceSpec, ReferenceChain
-from ..target_latent import build_target_latent
+from ..target_latent import build_target_latent, calculate_subject_aware_scene_geometry
 from ..edit_engine import run_krea2_edit_orchestrator
 from ..ostris_backend import preprocess_ostris_vision_image
 from ..constants import NODE_CATEGORY
@@ -486,6 +486,14 @@ def _execute_easy_edit(
                 g_vlm = prepare_easy_krea_vision_image(effective_geometry_source, preset=preset, role="target_geometry")
             geometry_prep = prepare_image_for_qwen(image=g_vlm, clip=clip, original_image=effective_geometry_source)
 
+    subject_geometry = None
+    if has_scene and has_subject and effective_geometry_source is resolved_sources.scene:
+        subject_geometry = calculate_subject_aware_scene_geometry(
+            scene_image=resolved_sources.scene,
+            subject_image=resolved_sources.subject,
+            max_megapixels=2.0,
+        )
+
     latent_dict, latent_info = build_target_latent(
         vae=vae,
         target_content=route.target_content_mode,
@@ -494,12 +502,30 @@ def _execute_easy_edit(
         target_image=target_content_prep,
         geometry_image=geometry_prep,
         batch_size=1,
-        force_target_megapixels=common_geometry_active,
+        force_target_megapixels=common_geometry_active and subject_geometry is None,
+        target_width=subject_geometry.target_width if subject_geometry is not None else None,
+        target_height=subject_geometry.target_height if subject_geometry is not None else None,
         target_alias=route.target_content_role if route.target_content_role else "",
         target_vision_instruction=get_easy_instruction_for_role(route.target_content_role)
         if route.target_content_role
         else "",
     )
+
+    if subject_geometry is not None:
+        latent_info = "\n".join(
+            [
+                latent_info,
+                "Subject-Aware Scene Geometry: yes",
+                f"Scene Original Size: {subject_geometry.scene_width} x {subject_geometry.scene_height}",
+                f"Subject Original Size: {subject_geometry.subject_width} x {subject_geometry.subject_height}",
+                f"Subject /16 Conditioning Size: {subject_geometry.aligned_subject_width} x {subject_geometry.aligned_subject_height}",
+                f"Subject-Aware Target Size: {subject_geometry.target_width} x {subject_geometry.target_height}",
+                f"Scene Downscaled To 2 MP: {'yes' if subject_geometry.scene_was_downscaled else 'no'}",
+                f"Latent Expanded For Subject: {'yes' if subject_geometry.latent_was_expanded else 'no'}",
+                f"Latent Capped At 2 MP: {'yes' if subject_geometry.latent_was_capped else 'no'}",
+                f"Subject Requires Downscale: {'yes' if subject_geometry.subject_requires_downscale else 'no'}",
+            ]
+        )
 
     # Delegate to canonical shared orchestrator
     patched_model, pos, neg, lat, orchestrator_info = run_krea2_edit_orchestrator(
