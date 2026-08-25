@@ -419,8 +419,6 @@ def _execute_easy_edit(
         fit_mode = resolve_easy_visual_reference_fit(
             preset=preset, role=alias_role, common_geometry_active=common_geometry_active
         )
-        if aspect_ratio != "auto" and alias_role in ("scene", "scene+outfit"):
-            fit_mode = "contain_no_upscale"
 
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(

@@ -593,6 +593,26 @@ class TestEasyEditReportLatentSource:
         assert "Appearance Ref 2: subject (boost=2.0, fit=contain_no_upscale)" in report_id
         assert "Target Content Fit: crop" in report_id
 
+        # An explicit canvas aspect ratio must not prevent the Scene reference
+        # from scaling up to fill the conditioning canvas. Subject still keeps
+        # the no-upscale invariant.
+        _, _, _, _, report_ratio = node.process(
+            model="model",
+            clip="clip",
+            vae=DummyVAE(),
+            positive_prompt="Replace the target person.",
+            use_default_prompt=False,
+            preset="flexible_subject_transfer_1",
+            subject=S,
+            scene=Sc,
+            outfit_source="none",
+            style_source="none",
+            aspect_ratio="4:3",
+        )
+        assert "Aspect Ratio: 4:3" in report_ratio
+        assert "Appearance Ref 1: scene (boost=2.5, fit=contain)" in report_ratio
+        assert "Appearance Ref 2: subject (boost=5.0, fit=contain_no_upscale)" in report_ratio
+
         # Scene Reinterpretation + Subject + Scene + optional Outfit; Style is locked to Scene
         _, _, _, _, report2 = node.process(
             model="model",
