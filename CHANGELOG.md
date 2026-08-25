@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Set every bundled workflow KSampler to 8 steps for Krea Turbo models.
 - Added the Easy **Aspect Ratio** control (`auto`, `1:1`, `3:2`, `2:3`, `4:3`, `3:4`, `16:9`, `9:16`). Explicit ratios outpaint the smallest canvas around Subject first, otherwise Scene, and preserve the anchor at native size unless the 2.5 MP hard cap makes proportional downscaling unavoidable.
 - Added Subject-aware Scene geometry for Easy Edit with a 2.5 MP hard cap: normalize Scene to that limit, round Subject conditioning bounds upward to `/16` without interpolation, preserve Subject at native size whenever those bounds fit, expand the Scene-aspect latent when necessary, and downscale Subject only if the final capped canvas still cannot contain it.
 - Restored role-specific Easy appearance fitting: Subject and Outfit use `contain_no_upscale`, while Scene and combined Scene+Outfit references use `contain`.

@@ -343,7 +343,7 @@ def validate_workflow_schema(wf, filename="<workflow>"):
 
         # Explicit frontend serialization tests
         if ntype == "KSampler":
-            assert widgets == [0, "randomize", 20, 1.0, "euler", "normal", 1.0], (
+            assert widgets == [0, "randomize", 8, 1.0, "euler", "normal", 1.0], (
                 f"KSampler widgets do not match frontend spec in {filename}: {widgets}"
             )
         elif ntype == "LoadImage":

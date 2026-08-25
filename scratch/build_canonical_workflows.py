@@ -489,7 +489,7 @@ def build_base_graph(
         widgets_values={
             "seed": 0,
             "control_after_generate": "randomize",
-            "steps": 20,
+            "steps": 8,
             "cfg": 1.0,
             "sampler_name": "euler",
             "scheduler": "normal",
