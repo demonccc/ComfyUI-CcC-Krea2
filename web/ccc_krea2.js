@@ -284,6 +284,8 @@ app.registerExtension({
                     "Subject Transfer 1": "subject_transfer_1",
                 };
 
+                const EASY_ASPECT_RATIOS = ["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"];
+
                 const migrateLegacyEasyEditWidgets = (info) => {
                     if (!info || !Array.isArray(info.widgets_values)) return;
                     const vals = info.widgets_values;
@@ -311,6 +313,11 @@ app.registerExtension({
                     // If index 3 is an outfit_source value, splice subject defaults.
                     if (typeof vals[3] === "string" && ["none", "subject image", "outfit image", "scene image", "style image"].includes(vals[3])) {
                         vals.splice(3, 0, "main subject", "main subject");
+                    }
+
+                    // Aspect Ratio was added after style_source at index 7.
+                    if (!EASY_ASPECT_RATIOS.includes(vals[7])) {
+                        vals.splice(7, 0, "auto");
                     }
 
                     if (node.widgets && Array.isArray(node.widgets)) {

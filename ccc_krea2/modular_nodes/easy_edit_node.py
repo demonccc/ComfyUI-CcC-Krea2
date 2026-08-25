@@ -20,7 +20,13 @@ from ..easy_routing import (
 from ..grounding import prepare_easy_krea_vision_image
 from ..vision_prep import prepare_image_for_qwen
 from ..reference_specs import ReferenceSpec, StyleReferenceSpec, ReferenceChain
-from ..target_latent import build_target_latent, calculate_subject_aware_scene_geometry
+from ..target_latent import (
+    EASY_ASPECT_RATIOS,
+    EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
+    build_target_latent,
+    calculate_canvas_aspect_geometry,
+    calculate_subject_aware_scene_geometry,
+)
 from ..edit_engine import run_krea2_edit_orchestrator
 from ..ostris_backend import preprocess_ostris_vision_image
 from ..constants import NODE_CATEGORY
@@ -87,6 +93,13 @@ class CcCKrea2EasyEdit:
                     ["none", "scene image", "subject image", "style image"],
                     {"default": "none", "tooltip": "Source image socket to use for style conditioning."},
                 ),
+                "aspect_ratio": (
+                    list(EASY_ASPECT_RATIOS),
+                    {
+                        "default": "auto",
+                        "tooltip": "Output canvas ratio. Explicit ratios expand around Subject first, otherwise Scene, without resizing the anchor unless the 2.5 MP hard cap requires it.",
+                    },
+                ),
                 "apply_krea2_edit_patch": (
                     "BOOLEAN",
                     {
@@ -116,6 +129,7 @@ class CcCKrea2EasyEdit:
         subject_description: str = "main subject",
         outfit_source: str = "outfit image",
         style_source: str = "none",
+        aspect_ratio: str = "auto",
         apply_krea2_edit_patch: bool = True,
         negative_prompt: str = "",
         subject: Optional[torch.Tensor] = None,
@@ -135,6 +149,7 @@ class CcCKrea2EasyEdit:
             subject_description=subject_description,
             outfit_source=outfit_source,
             style_source=style_source,
+            aspect_ratio=aspect_ratio,
             backend_method="krea2_edit",
             apply_patch=apply_krea2_edit_patch,
             ostris_kv_cache=False,
@@ -204,6 +219,13 @@ class CcCKrea2EasyEditOstris:
                     ["none", "scene image", "subject image", "style image"],
                     {"default": "none", "tooltip": "Source image socket to use for style conditioning."},
                 ),
+                "aspect_ratio": (
+                    list(EASY_ASPECT_RATIOS),
+                    {
+                        "default": "auto",
+                        "tooltip": "Output canvas ratio. Explicit ratios expand around Subject first, otherwise Scene, without resizing the anchor unless the 2.5 MP hard cap requires it.",
+                    },
+                ),
                 "apply_ostris_edit_patch": (
                     "BOOLEAN",
                     {
@@ -240,6 +262,7 @@ class CcCKrea2EasyEditOstris:
         subject_description: str = "main subject",
         outfit_source: str = "outfit image",
         style_source: str = "none",
+        aspect_ratio: str = "auto",
         apply_ostris_edit_patch: bool = True,
         ostris_kv_cache: bool = False,
         negative_prompt: str = "",
@@ -260,6 +283,7 @@ class CcCKrea2EasyEditOstris:
             subject_description=subject_description,
             outfit_source=outfit_source,
             style_source=style_source,
+            aspect_ratio=aspect_ratio,
             backend_method="ostris_edit",
             apply_patch=apply_ostris_edit_patch,
             ostris_kv_cache=ostris_kv_cache,
@@ -279,6 +303,7 @@ def _execute_easy_edit(
     preset: str,
     outfit_source: str,
     style_source: str,
+    aspect_ratio: str,
     backend_method: str,
     apply_patch: bool,
     ostris_kv_cache: bool,
@@ -394,6 +419,8 @@ def _execute_easy_edit(
         fit_mode = resolve_easy_visual_reference_fit(
             preset=preset, role=alias_role, common_geometry_active=common_geometry_active
         )
+        if aspect_ratio != "auto" and alias_role in ("scene", "scene+outfit"):
+            fit_mode = "contain_no_upscale"
 
         prep = prepare_image_for_qwen(image=vlm_img, clip=clip, original_image=item_img)
         spec = ReferenceSpec(
@@ -486,25 +513,68 @@ def _execute_easy_edit(
                 g_vlm = prepare_easy_krea_vision_image(effective_geometry_source, preset=preset, role="target_geometry")
             geometry_prep = prepare_image_for_qwen(image=g_vlm, clip=clip, original_image=effective_geometry_source)
 
+    canvas_geometry = None
+    canvas_anchor_role = "none"
+    use_single_anchor_canvas = (has_subject and not has_scene) or (has_scene and not has_subject)
+    if aspect_ratio != "auto" or use_single_anchor_canvas:
+        if has_subject:
+            canvas_anchor_role = "subject"
+            canvas_anchor_image = resolved_sources.subject
+        elif has_scene:
+            canvas_anchor_role = "scene"
+            canvas_anchor_image = resolved_sources.scene
+        else:
+            canvas_anchor_image = None
+
+        if canvas_anchor_image is not None:
+            canvas_geometry = calculate_canvas_aspect_geometry(
+                anchor_image=canvas_anchor_image,
+                aspect_ratio=aspect_ratio,
+                max_megapixels=EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
+            )
+
     subject_geometry = None
-    if has_scene and has_subject and effective_geometry_source is resolved_sources.scene:
+    if (
+        canvas_geometry is None
+        and aspect_ratio == "auto"
+        and has_scene
+        and has_subject
+        and effective_geometry_source is resolved_sources.scene
+    ):
         subject_geometry = calculate_subject_aware_scene_geometry(
             scene_image=resolved_sources.scene,
             subject_image=resolved_sources.subject,
-            max_megapixels=2.0,
+            max_megapixels=EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
         )
+
+    explicit_target_width = None
+    explicit_target_height = None
+    if canvas_geometry is not None:
+        explicit_target_width = canvas_geometry.target_width
+        explicit_target_height = canvas_geometry.target_height
+    elif subject_geometry is not None:
+        explicit_target_width = subject_geometry.target_width
+        explicit_target_height = subject_geometry.target_height
+
+    effective_target_content_fit = (
+        "contain_no_upscale"
+        if canvas_geometry is not None and route.target_content_source is not None
+        else route.target_content_fit
+    )
 
     latent_dict, latent_info = build_target_latent(
         vae=vae,
         target_content=route.target_content_mode,
-        content_fit=route.target_content_fit,
+        content_fit=effective_target_content_fit,
         geometry_mode=effective_geometry_mode,
         target_image=target_content_prep,
         geometry_image=geometry_prep,
         batch_size=1,
-        force_target_megapixels=common_geometry_active and subject_geometry is None,
-        target_width=subject_geometry.target_width if subject_geometry is not None else None,
-        target_height=subject_geometry.target_height if subject_geometry is not None else None,
+        force_target_megapixels=(
+            common_geometry_active and subject_geometry is None and canvas_geometry is None
+        ),
+        target_width=explicit_target_width,
+        target_height=explicit_target_height,
         target_alias=route.target_content_role if route.target_content_role else "",
         target_vision_instruction=get_easy_instruction_for_role(route.target_content_role)
         if route.target_content_role
@@ -520,10 +590,26 @@ def _execute_easy_edit(
                 f"Subject Original Size: {subject_geometry.subject_width} x {subject_geometry.subject_height}",
                 f"Subject /16 Conditioning Size: {subject_geometry.aligned_subject_width} x {subject_geometry.aligned_subject_height}",
                 f"Subject-Aware Target Size: {subject_geometry.target_width} x {subject_geometry.target_height}",
-                f"Scene Downscaled To 2 MP: {'yes' if subject_geometry.scene_was_downscaled else 'no'}",
+                f"Geometry Hard Cap: {subject_geometry.max_megapixels:.1f} MP",
+                f"Scene Downscaled To Hard Cap: {'yes' if subject_geometry.scene_was_downscaled else 'no'}",
                 f"Latent Expanded For Subject: {'yes' if subject_geometry.latent_was_expanded else 'no'}",
-                f"Latent Capped At 2 MP: {'yes' if subject_geometry.latent_was_capped else 'no'}",
+                f"Latent Reached Hard Cap: {'yes' if subject_geometry.latent_was_capped else 'no'}",
                 f"Subject Requires Downscale: {'yes' if subject_geometry.subject_requires_downscale else 'no'}",
+            ]
+        )
+
+    if canvas_geometry is not None:
+        latent_info = "\n".join(
+            [
+                latent_info,
+                f"Aspect Ratio: {canvas_geometry.aspect_ratio}",
+                f"Canvas Anchor: {canvas_anchor_role}",
+                f"Canvas Anchor Original Size: {canvas_geometry.anchor_width} x {canvas_geometry.anchor_height}",
+                f"Canvas Anchor /16 Size: {canvas_geometry.aligned_anchor_width} x {canvas_geometry.aligned_anchor_height}",
+                f"Canvas Target Size: {canvas_geometry.target_width} x {canvas_geometry.target_height}",
+                f"Canvas Hard Cap: {canvas_geometry.max_megapixels:.1f} MP",
+                f"Canvas Reached Hard Cap: {'yes' if canvas_geometry.latent_was_capped else 'no'}",
+                f"Canvas Anchor Requires Downscale: {'yes' if canvas_geometry.anchor_requires_downscale else 'no'}",
             ]
         )
 
@@ -589,6 +675,8 @@ def _execute_easy_edit(
         fit_str = resolve_easy_visual_reference_fit(
             preset=preset, role=alias, common_geometry_active=common_geometry_active
         )
+        if aspect_ratio != "auto" and alias in ("scene", "scene+outfit"):
+            fit_str = "contain_no_upscale"
         app_refs.append(f"{alias} (boost={boost:.1f}, fit={fit_str})")
     sem_refs = [f"{alias}" for _, alias in route.semantic_only_references]
 
@@ -662,12 +750,14 @@ def _execute_easy_edit(
         f"Resolved Scene: {'present' if resolved_sources.scene is not None else 'missing'}",
         f"Resolved Outfit Source: {resolved_outfit_str}",
         f"Resolved Style Source: {resolved_style_str}",
+        f"Aspect Ratio: {aspect_ratio}",
+        f"Canvas Anchor: {canvas_anchor_role if canvas_geometry is not None else 'automatic'}",
         f"Common Geometry: {'yes' if common_geometry_active else 'no'}",
         f"Common Geometry Anchor: {common_geometry_anchor_role}",
         f"Target Content Mode: {route.target_content_mode}",
         f"Target Content Role: {target_content_role_str}",
         f"Resolved Latent Source: {resolved_latent_source_str}",
-        f"Target Content Fit: {route.target_content_fit}",
+        f"Target Content Fit: {effective_target_content_fit}",
         f"Target Geometry Mode: {effective_geometry_mode}",
         f"Target Geometry Source: {target_geometry_source_str}",
     ]

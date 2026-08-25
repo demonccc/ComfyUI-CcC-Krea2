@@ -5,6 +5,7 @@ import pytest
 from unittest.mock import MagicMock
 from ccc_krea2.vision_prep import prepare_vision_image
 from ccc_krea2.target_latent import (
+    calculate_canvas_aspect_geometry,
     calculate_subject_aware_scene_geometry,
     create_target_latent,
     normalize_vae_output,
@@ -373,7 +374,7 @@ def test_subject_aware_geometry_uses_subject_ceiling_alignment_as_fit_constraint
     assert plan.subject_requires_downscale is False
 
 
-def test_subject_aware_geometry_expands_scene_below_two_mp_without_touching_subject():
+def test_subject_aware_geometry_expands_scene_below_hard_cap_without_touching_subject():
     plan = calculate_subject_aware_scene_geometry(
         scene_image=_shape_only_image(1200, 800),
         subject_image=_shape_only_image(900, 960),
@@ -384,35 +385,76 @@ def test_subject_aware_geometry_expands_scene_below_two_mp_without_touching_subj
     assert plan.subject_requires_downscale is False
 
 
-def test_subject_aware_geometry_resizes_scene_to_two_mp_before_fit_check():
+def test_subject_aware_geometry_resizes_scene_to_hard_cap_before_fit_check():
     plan = calculate_subject_aware_scene_geometry(
         scene_image=_shape_only_image(2400, 1600),
         subject_image=_shape_only_image(1000, 1000),
     )
-    assert (plan.target_width, plan.target_height) == (1728, 1152)
+    assert (plan.target_width, plan.target_height) == (1936, 1280)
     assert plan.scene_was_downscaled is True
+    assert plan.max_megapixels == 2.5
     assert plan.subject_requires_downscale is False
 
 
-def test_subject_aware_geometry_uses_full_two_mp_when_expansion_from_small_scene_exceeds_cap():
+def test_subject_aware_geometry_uses_full_hard_cap_when_expansion_from_small_scene_exceeds_cap():
     plan = calculate_subject_aware_scene_geometry(
         scene_image=_shape_only_image(1200, 800),
         subject_image=_shape_only_image(1400, 1600),
     )
-    assert (plan.target_width, plan.target_height) == (1728, 1152)
+    assert (plan.target_width, plan.target_height) == (1936, 1280)
     assert plan.scene_was_downscaled is False
     assert plan.latent_was_expanded is True
     assert plan.latent_was_capped is True
     assert plan.subject_requires_downscale is True
 
 
-def test_subject_aware_geometry_downscales_subject_only_when_two_mp_canvas_cannot_contain_it():
+def test_subject_aware_geometry_downscales_subject_only_when_hard_cap_canvas_cannot_contain_it():
     plan = calculate_subject_aware_scene_geometry(
         scene_image=_shape_only_image(2400, 1600),
         subject_image=_shape_only_image(1400, 1600),
     )
-    assert (plan.target_width, plan.target_height) == (1728, 1152)
+    assert (plan.target_width, plan.target_height) == (1936, 1280)
     assert plan.scene_was_downscaled is True
     assert plan.latent_was_expanded is False
     assert plan.latent_was_capped is True
     assert plan.subject_requires_downscale is True
+
+
+def test_canvas_aspect_square_expands_around_portrait_subject_without_resize():
+    plan = calculate_canvas_aspect_geometry(
+        anchor_image=_shape_only_image(100, 500),
+        aspect_ratio="1:1",
+    )
+    assert (plan.aligned_anchor_width, plan.aligned_anchor_height) == (112, 512)
+    assert (plan.target_width, plan.target_height) == (512, 512)
+    assert plan.latent_was_capped is False
+    assert plan.anchor_requires_downscale is False
+
+
+def test_canvas_aspect_auto_keeps_subject_native_bounds_without_resize():
+    plan = calculate_canvas_aspect_geometry(
+        anchor_image=_shape_only_image(100, 500),
+        aspect_ratio="auto",
+    )
+    assert (plan.target_width, plan.target_height) == (112, 512)
+    assert plan.latent_was_capped is False
+    assert plan.anchor_requires_downscale is False
+
+
+def test_canvas_aspect_landscape_expands_around_portrait_subject_without_resize():
+    plan = calculate_canvas_aspect_geometry(
+        anchor_image=_shape_only_image(100, 500),
+        aspect_ratio="3:2",
+    )
+    assert (plan.target_width, plan.target_height) == (768, 512)
+    assert plan.anchor_requires_downscale is False
+
+
+def test_canvas_aspect_only_downscales_anchor_after_hard_cap():
+    plan = calculate_canvas_aspect_geometry(
+        anchor_image=_shape_only_image(2000, 1600),
+        aspect_ratio="1:1",
+    )
+    assert (plan.target_width, plan.target_height) == (1568, 1568)
+    assert plan.latent_was_capped is True
+    assert plan.anchor_requires_downscale is True

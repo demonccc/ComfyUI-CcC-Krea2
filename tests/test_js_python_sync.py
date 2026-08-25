@@ -221,6 +221,7 @@ def test_python_js_widget_order_sync():
         "subject_description",
         "outfit_source",
         "style_source",
+        "aspect_ratio",
     ]
 
     for node_cls in [CcCKrea2EasyEdit, CcCKrea2EasyEditOstris]:
@@ -237,8 +238,6 @@ def test_python_js_widget_order_sync():
             f"{node_cls.__name__} primitive widget order {primitive_widgets} does not match "
             f"expected migration order {expected_widget_order}"
         )
-
-
 
 
 

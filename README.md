@@ -109,7 +109,9 @@ The identity ladder covers subject preservation tasks. Additional task-specific 
 - **Outfit Transfer**: Prioritizes transferring clothing from the selected Outfit source onto the Subject.
 - **Style Transfer**: Uses the dedicated indirect Style/Moodboard path to transfer artistic style, palette, texture, and visual mood without retaining the source Style image rows (Outfit policy: disabled).
 
-With Subject + Scene, Easy Edit first reduces Scene geometry only when it exceeds 2 MP. The Subject dimensions are rounded up to their `/16` conditioning bounds without interpolation. If those bounds fit, the latent keeps the Scene size and Subject remains untouched. Otherwise the latent expands with the Scene aspect ratio until Subject fits, capped at 2 MP; Subject is reduced only when it still cannot fit after that cap. Subject and Outfit appearance references use `contain_no_upscale`, while Scene and combined Scene+Outfit use `contain`.
+With Subject + Scene, Easy Edit first reduces Scene geometry only when it exceeds the 2.5 MP hard cap. The Subject dimensions are rounded up to their `/16` conditioning bounds without interpolation. If those bounds fit, the latent keeps the Scene size and Subject remains untouched. Otherwise the latent expands with the Scene aspect ratio until Subject fits, capped at 2.5 MP; Subject is reduced only when it still cannot fit after that cap. Subject and Outfit appearance references use `contain_no_upscale`, while Scene and combined Scene+Outfit use `contain`.
+
+Easy Edit also exposes **Aspect Ratio** with `auto`, `1:1`, `3:2`, `2:3`, `4:3`, `3:4`, `16:9`, and `9:16`. `auto` keeps the source-driven behavior. An explicit ratio creates the smallest output canvas that contains the complete Subject at native size; if Subject is absent, Scene becomes the anchor. The selected ratio expands the canvas rather than stretching or cropping the anchor. Only the 2.5 MP hard cap may force a proportional downscale.
 
 > [!NOTE]
 > **Placeholder-Driven Default Prompts & Subject Fields**:
@@ -117,7 +119,7 @@ With Subject + Scene, Easy Edit first reduces Scene geometry only when it exceed
 > Two user-editable fields (`Reference Subject` and `Subject`) allow customization of target/subject roles when default prompts are enabled.
 
 > [!NOTE]
-> Easy Edit never destructively crops Subject or Outfit appearance references. Subject downscaling occurs only when the Subject cannot fit inside the final Scene-aspect latent after its 2 MP cap is applied.
+> Easy Edit never destructively crops Subject or Outfit appearance references. Subject downscaling occurs only when the Subject cannot fit inside the final Scene-aspect latent after its 2.5 MP hard cap is applied.
 
 ---
 

@@ -1,11 +1,16 @@
 """Target latent creation, target vision context, and geometry resolution for Krea 2 modular pipeline."""
 
 import torch
+import torch.nn.functional as F
 import math
 from dataclasses import dataclass
 from typing import Dict, Any, Tuple, Optional
 from .reference_specs import PreparedVisionImage, ReferenceChain
 from .geometry import resize_tensor
+
+
+EASY_GEOMETRY_HARD_CAP_MEGAPIXELS = 2.5
+EASY_ASPECT_RATIOS = ("auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
 
 
 @dataclass(frozen=True)
@@ -21,7 +26,7 @@ class TargetVisionContext:
 
 @dataclass(frozen=True)
 class SubjectAwareSceneGeometry:
-    """Scene-led target geometry that preserves Subject pixels until the 2 MP cap requires fitting."""
+    """Scene-led target geometry that preserves Subject pixels until the hard cap requires fitting."""
 
     target_height: int
     target_width: int
@@ -31,10 +36,27 @@ class SubjectAwareSceneGeometry:
     subject_width: int
     aligned_subject_height: int
     aligned_subject_width: int
+    max_megapixels: float
     scene_was_downscaled: bool
     latent_was_expanded: bool
     latent_was_capped: bool
     subject_requires_downscale: bool
+
+
+@dataclass(frozen=True)
+class CanvasAspectGeometry:
+    """Smallest selected-aspect canvas that contains its anchor until the hard cap is reached."""
+
+    aspect_ratio: str
+    target_height: int
+    target_width: int
+    anchor_height: int
+    anchor_width: int
+    aligned_anchor_height: int
+    aligned_anchor_width: int
+    max_megapixels: float
+    latent_was_capped: bool
+    anchor_requires_downscale: bool
 
 
 def get_image_dims(image_tensor: torch.Tensor) -> Tuple[int, int]:
@@ -76,9 +98,9 @@ def _scene_dimensions_at_pixel_budget(
 def calculate_subject_aware_scene_geometry(
     scene_image: torch.Tensor,
     subject_image: torch.Tensor,
-    max_megapixels: float = 2.0,
+    max_megapixels: float = EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
 ) -> SubjectAwareSceneGeometry:
-    """Calculate Scene geometry while avoiding Subject downscale unless the 2 MP cap makes it unavoidable."""
+    """Calculate Scene geometry while avoiding Subject downscale unless the hard cap makes it unavoidable."""
     scene_height, scene_width = get_image_dims(scene_image)
     subject_height, subject_width = get_image_dims(subject_image)
     aligned_subject_width = max(16, int(math.ceil(subject_width / 16.0)) * 16)
@@ -131,10 +153,65 @@ def calculate_subject_aware_scene_geometry(
         subject_width=subject_width,
         aligned_subject_height=aligned_subject_height,
         aligned_subject_width=aligned_subject_width,
+        max_megapixels=max_megapixels,
         scene_was_downscaled=scene_was_downscaled,
         latent_was_expanded=latent_was_expanded,
         latent_was_capped=latent_was_capped,
         subject_requires_downscale=subject_requires_downscale,
+    )
+
+
+def calculate_canvas_aspect_geometry(
+    anchor_image: torch.Tensor,
+    aspect_ratio: str,
+    max_megapixels: float = EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
+) -> CanvasAspectGeometry:
+    """Build a /16 canvas of the requested aspect that contains the anchor without resize when possible."""
+    if aspect_ratio not in EASY_ASPECT_RATIOS:
+        raise ValueError(f"Unsupported explicit canvas aspect ratio: {aspect_ratio!r}")
+
+    anchor_height, anchor_width = get_image_dims(anchor_image)
+    aligned_anchor_width = max(16, int(math.ceil(anchor_width / 16.0)) * 16)
+    aligned_anchor_height = max(16, int(math.ceil(anchor_height / 16.0)) * 16)
+
+    if aspect_ratio == "auto":
+        ratio_width, ratio_height = aligned_anchor_width, aligned_anchor_height
+        target_width, target_height = aligned_anchor_width, aligned_anchor_height
+    else:
+        ratio_width, ratio_height = (int(value) for value in aspect_ratio.split(":"))
+        ratio = ratio_width / float(ratio_height)
+
+        # The anchor, especially Subject, governs the minimum canvas size. The selected
+        # aspect expands the missing axis instead of resizing or cropping the anchor.
+        raw_height = max(aligned_anchor_height, aligned_anchor_width / ratio)
+        raw_width = raw_height * ratio
+        target_width = max(128, int(math.ceil(raw_width / 16.0)) * 16)
+        target_height = max(128, int(math.ceil(raw_height / 16.0)) * 16)
+
+    max_pixels = max(1, int(max_megapixels * 1_000_000))
+    latent_was_capped = target_width * target_height > max_pixels
+    if latent_was_capped:
+        target_width, target_height = _scene_dimensions_at_pixel_budget(
+            ratio_width,
+            ratio_height,
+            max_pixels,
+            allow_upscale=True,
+        )
+
+    anchor_requires_downscale = (
+        aligned_anchor_width > target_width or aligned_anchor_height > target_height
+    )
+    return CanvasAspectGeometry(
+        aspect_ratio=aspect_ratio,
+        target_height=target_height,
+        target_width=target_width,
+        anchor_height=anchor_height,
+        anchor_width=anchor_width,
+        aligned_anchor_height=aligned_anchor_height,
+        aligned_anchor_width=aligned_anchor_width,
+        max_megapixels=max_megapixels,
+        latent_was_capped=latent_was_capped,
+        anchor_requires_downscale=anchor_requires_downscale,
     )
 
 
@@ -484,7 +561,7 @@ def build_target_latent(
         target_w = max(128, int(target_width) // 16 * 16)
         target_h = max(128, int(target_height) // 16 * 16)
         active_mp = (target_w * target_h) / 1_000_000.0
-        geom_src = f"{geom_src}_subject_aware"
+        geom_src = f"{geom_src}_explicit_target"
 
     latent_h = target_h // 8
     latent_w = target_w // 8
@@ -530,8 +607,8 @@ def build_target_latent(
                 if contained_h > target_h:
                     contained_h = int(math.floor(raw_contained_h / 16.0)) * 16
             else:
-                contained_w = min(target_w, int(math.floor(src_w / 16.0)) * 16)
-                contained_h = min(target_h, int(math.floor(src_h / 16.0)) * 16)
+                contained_w = min(target_w, int(math.ceil(src_w / 16.0)) * 16)
+                contained_h = min(target_h, int(math.ceil(src_h / 16.0)) * 16)
                 contained_w = max(16, contained_w)
                 contained_h = max(16, contained_h)
 
@@ -540,8 +617,20 @@ def build_target_latent(
             else:
                 img_4d = orig_img
 
-            if (src_w, src_h) != (contained_w, contained_h):
+            if scale < 1.0:
                 adapted_img = resize_tensor(img_4d, target_h=contained_h, target_w=contained_w, method="bicubic")
+            elif (src_w, src_h) != (contained_w, contained_h):
+                pad_h = contained_h - src_h
+                pad_w = contained_w - src_w
+                pad_top = pad_h // 2
+                pad_bottom = pad_h - pad_top
+                pad_left = pad_w // 2
+                pad_right = pad_w - pad_left
+                adapted_img = F.pad(
+                    img_4d.permute(0, 3, 1, 2),
+                    (pad_left, pad_right, pad_top, pad_bottom),
+                    mode="replicate",
+                ).permute(0, 2, 3, 1)
             else:
                 adapted_img = img_4d
             adapted_img = torch.clamp(adapted_img, 0.0, 1.0)

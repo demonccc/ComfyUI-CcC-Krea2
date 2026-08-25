@@ -499,6 +499,7 @@
         "main subject",
         "scene image",
         "style image",
+        "auto",
         true,
         "bad quality"
       ]

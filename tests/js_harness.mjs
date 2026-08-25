@@ -89,6 +89,11 @@ function createMockNode(comfyClass = "CcCKrea2EasyEdit", fixtureType = "legacy")
         value: "none",
         options: { values: ["none", "scene image", "subject image", "style image"] }
     };
+    const aspectRatioWidget = {
+        name: "aspect_ratio",
+        value: "auto",
+        options: { values: ["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"] }
+    };
     const patchWidget = {
         name: comfyClass === "CcCKrea2EasyEditOstris" ? "apply_ostris_edit_patch" : "apply_krea2_edit_patch",
         value: true
@@ -102,6 +107,7 @@ function createMockNode(comfyClass = "CcCKrea2EasyEdit", fixtureType = "legacy")
         subjDescWidget,
         outfitSourceWidget,
         styleSourceWidget,
+        aspectRatioWidget,
         patchWidget
     ];
 
@@ -123,6 +129,7 @@ function createMockNode(comfyClass = "CcCKrea2EasyEdit", fixtureType = "legacy")
         subjDescWidget,
         outfitSourceWidget,
         styleSourceWidget,
+        aspectRatioWidget,
         patchWidget,
         setPreset
     };
