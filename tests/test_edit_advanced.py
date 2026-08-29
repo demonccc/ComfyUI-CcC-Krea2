@@ -4,9 +4,12 @@ import torch
 
 from ccc_krea2.modular_nodes.edit_advanced_node import (
     CcCKrea2EditAdvanced,
+    _channel_alias,
     _resolve_target_geometry,
 )
 from ccc_krea2.patch import _build_incontext_3d_rope_pos_ids
+from ccc_krea2.reference_slots import resolve_reference_slots_and_aliases
+from ccc_krea2.reference_specs import ReferenceChain, ReferenceSpec
 
 
 def test_advanced_node_exposes_manual_lab_controls():
@@ -52,6 +55,31 @@ def test_grid_size_and_geometry_sources_are_independent():
     assert (width, height) == (1344, 1680)
     assert size_label == "subject"
     assert geometry_label == "scene"
+
+
+def test_same_image_can_be_reused_by_multiple_advanced_channels():
+    channels = (
+        ("reference 1", True),
+        ("reference 2", True),
+        ("latent semantic", False),
+        ("semantic 1", False),
+        ("semantic 2", False),
+    )
+    chain = ReferenceChain(
+        tuple(
+            ReferenceSpec(
+                alias=_channel_alias(channel, "scene"),
+                appearance_reference=appearance,
+                include_in_vision=True,
+            )
+            for channel, appearance in channels
+        )
+    )
+
+    resolved, _ = resolve_reference_slots_and_aliases(chain)
+    aliases = [alias for item in resolved for alias in item["expanded_aliases"]]
+    assert len(aliases) == len(channels)
+    assert len(set(aliases)) == len(channels)
 
 
 def test_rope_directions_place_reference_fully_outside_target():

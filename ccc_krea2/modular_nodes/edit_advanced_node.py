@@ -24,6 +24,11 @@ SEMANTIC_MODES = ("semantic_only", "style_direct", "style_indirect")
 STYLE_PROCESSING = ("full", "2x2", "4x4")
 
 
+def _channel_alias(channel: str, source_name: str) -> str:
+    """Return one readable, parser-safe alias unique to an Advanced channel."""
+    return f"{channel} ({source_name} image)"
+
+
 def _source_image(name: str, sources: Dict[str, Optional[torch.Tensor]], *, allow_none: bool = False):
     if name in ("none", "empty", ""):
         if allow_none:
@@ -308,7 +313,7 @@ class CcCKrea2EditAdvanced:
                 ReferenceSpec(
                     reference_path="edit",
                     prepared_image=prep,
-                    alias=f"reference {index}, {source_name}",
+                    alias=_channel_alias(f"reference {index}", source_name),
                     vision_instruction=kwargs.get(f"reference_{index}_instruction", "").strip(),
                     appearance_reference=True,
                     include_in_vision=bool(kwargs.get(f"reference_{index}_semantic", True)),
@@ -329,7 +334,7 @@ class CcCKrea2EditAdvanced:
                 clip=clip,
                 instruction=kwargs.get("latent_semantic_instruction", ""),
                 grounding_px=int(kwargs.get("latent_grounding_px", 768)),
-                alias=f"latent semantic, {latent_source}",
+                alias=_channel_alias("latent semantic", latent_source),
             )
 
         pending_styles = []
@@ -347,7 +352,7 @@ class CcCKrea2EditAdvanced:
                 mode=mode,
                 processing=kwargs.get(f"semantic_{index}_processing", "2x2"),
                 fidelity=float(kwargs.get(f"semantic_{index}_fidelity", 1.0)),
-                alias=f"semantic {index}, {source_name}",
+                alias=_channel_alias(f"semantic {index}", source_name),
             )
             if mode == "semantic_only":
                 chain = _append_semantic(chain=chain, **payload)
