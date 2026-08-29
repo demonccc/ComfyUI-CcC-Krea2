@@ -209,14 +209,11 @@ def test_image_latent_batching_repetition():
 
 def test_all_node_registrations():
     expected = {
-        "CcCKrea2QwenVisionImagePrep",
-        "CcCKrea2TargetLatent",
+        "CcCKrea2EditAdvanced",
         "CcCKrea2SubjectImage",
         "CcCKrea2SceneImage",
         "CcCKrea2OutfitImage",
         "CcCKrea2StyleImage",
-        "CcCKrea2ReferenceImage",
-        "CcCKrea2Edit",
         "CcCKrea2EasyEdit",
         "CcCKrea2EasyEditOstris",
         "CcCKrea2Subject",
@@ -226,8 +223,6 @@ def test_all_node_registrations():
         "CcCKrea2Inpaint",
         "CcCKrea2InpaintSubjectOutfit",
         "CcCKrea2InpaintSubjectScene",
-        "CcCKrea2ImageAdvancedSettings",
-        "CcCKrea2EditAdvancedSettings",
         "CcCKrea2LoRAPromptSettings",
         "CcCKrea2LoRAStack",
         "CcCKrea2TextToImage",

@@ -121,52 +121,42 @@ The table below details the technical routing contract resolved when running Eas
 
 ## 2. Advanced Nodes
 
-### 2.1 CcC Krea2 - Qwen Vision Image Prep
-- **Class Name**: `CcCKrea2QwenVisionImagePrep`
+### 2.1 CcC Krea2 - Edit Advanced
+- **Class Name**: `CcCKrea2EditAdvanced`
 - **Category**: `CcC/Krea2`
-- **Description**: Prepares a derivative vision image (`vision_image`) optimized for Qwen Vision tokenization while preserving the untouched raw source image (`original_image`) for VAE processing.
+- **Description**: Single manual Krea2 Edit laboratory. It has no presets, default prompt, placeholders, automatic Outfit selector, automatic Style selector, or hidden routing decisions.
 - **Required Inputs**:
-  - `clip` (`CLIP`), `image` (`IMAGE`), `mode` (`CHOICE`), `min_mp` (`FLOAT`), `max_mp` (`FLOAT`), `fixed_mp` (`FLOAT`), `downscale_method` (`CHOICE`), `upscale_method` (`CHOICE`).
-- **Outputs**:
-  - `prepared_image` (`PREPARED_VISION_IMAGE`), `vision_image` (`IMAGE`), `vision_info` (`STRING`).
-
-### 2.2 CcC Krea2 - Target Latent
-- **Class Name**: `CcCKrea2TargetLatent`
-- **Category**: `CcC/Krea2`
-- **Description**: Creates the target latent container.
-- **Required Inputs**:
-  - `target_content` (`CHOICE`), `geometry_mode` (`CHOICE`), `target_megapixels` (`FLOAT`), `fixed_megapixels` (`FLOAT`), `aspect_ratio` (`CHOICE`), `batch_size` (`INT`).
+  - Core: `model`, `clip`, `vae`, `positive_prompt`, `negative_prompt`, `batch_size`, `apply_krea2_edit_patch`.
+  - Target: `latent`, `aspect_ratio`, `resolution`, `grid_size_source`, `grid_geometry_source`.
+  - Reference 1: `reference_1`, `reference_1_boost`, `reference_1_rope_position`, `reference_1_semantic`, `reference_1_instruction`, `reference_1_grounding_px`.
+  - Reference 2: same controls with the `reference_2_` prefix.
+  - Latent Qwen path: `latent_semantic`, `latent_semantic_instruction`, `latent_grounding_px`.
+  - Additional Qwen slots: `semantic_1_source`, `semantic_1_mode`, `semantic_1_instruction`, `semantic_1_grounding_px`, `semantic_1_processing`, `semantic_1_fidelity`; the same controls are available for Semantic 2.
 - **Optional Inputs**:
-  - `include_in_vision` (`CHOICE`: `auto`, `yes`, `no`), `target_vision_slot` (`CHOICE`), `target_alias` (`STRING`), `target_vision_instruction` (`STRING`), `vae` (`VAE`), `target_image` (`PREPARED_VISION_IMAGE`), `geometry_image` (`PREPARED_VISION_IMAGE`).
-- **Legacy Compatibility Optional Inputs**:
-  - `subject_image` (`PREPARED_VISION_IMAGE`), `scene_image` (`PREPARED_VISION_IMAGE`).
-- **Outputs**:
-  - `target_latent` (`LATENT`), `latent_info` (`STRING`).
-
-### 2.3 CcC Krea2 - Reference Image
-- **Class Name**: `CcCKrea2ReferenceImage`
-- **Category**: `CcC/Krea2`
-- **Description**: Generic reference configuration for edit (appearance/semantic) and style paths.
-- **Required Inputs**:
-  - `reference_path` (`CHOICE`), `prepared_image` (`PREPARED_VISION_IMAGE`), `vision_slot` (`CHOICE`), `alias` (`STRING`), `vision_instruction` (`STRING`), `attention_boost` (`FLOAT`), `masked_attention_boost` (`FLOAT`), `visual_reference_fit` (`CHOICE`), `style_fidelity` (`FLOAT`), `style_processing` (`CHOICE`), `indirect_style_transfer` (`BOOLEAN`).
-- **Optional Inputs**:
-  - `previous_references` (`REFERENCE_CHAIN`), `attention_mask` (`MASK`).
-- **Outputs**:
-  - `reference_chain` (`REFERENCE_CHAIN`).
-
-### 2.4 CcC Krea2 - Edit Orchestrator
-- **Class Name**: `CcCKrea2Edit`
-- **Category**: `CcC/Krea2`
-- **Description**: Layer 5 orchestrator node executing Qwen tokenization, model patching, and report formatting.
-- **Required Inputs**:
-  - `model` (`MODEL`), `clip` (`CLIP`), `vae` (`VAE`), `references` (`REFERENCE_CHAIN`), `target_latent` (`LATENT`), `positive_prompt` (`STRING`), `negative_prompt` (`STRING`).
-- **Optional Inputs**:
-  - `global_vision_directive` (`STRING`), `reference_method` (`CHOICE`), `ostris_kv_cache` (`BOOLEAN`), `prompt_augmentation` (`CCC_KREA2_PROMPT_AUGMENTATION`).
+  - `subject`, `scene`, `outfit`, `style` (`IMAGE`). Connecting an image only makes it selectable; it does not activate it.
 - **Outputs**:
   - `patched_model` (`MODEL`), `positive` (`CONDITIONING`), `negative` (`CONDITIONING`), `latent` (`LATENT`), `edit_info` (`STRING`).
-- **Notes**:
-  - Backend `reference_method` values: `native` (ComfyUI native standard reference logic), `krea2_edit` (the original Krea2 backend), `ostris_edit` (the Ostris upstream-aligned backend).
-  - `ostris_kv_cache=true` is currently unsupported and raises `NotImplementedError` when requested.
+
+#### Grid controls
+
+- `grid_size_source`: `none`, `subject`, `scene`, `outfit`, `style`. With `resolution = from source`, the selected image supplies the target pixel budget (its megapixel count). The target canvas keeps that resolution after applying the selected grid geometry.
+- `grid_geometry_source`: the same choices. With `aspect_ratio = from source`, the selected image supplies the target width-to-height ratio.
+- Explicit `resolution` overrides image-driven grid size. Explicit `aspect_ratio` overrides image-driven grid geometry.
+- An image latent is scaled proportionally to fit the resolved canvas and remaining pixels are filled with white. It is never cropped or stretched.
+
+#### Reference geometry and RoPE experiment
+
+- Both appearance references always use the Krea2 Identity Edit training-matched `fit` protocol before VAE encoding.
+- `reference_X_rope_position = none` uses the normal centered position.
+- `up`, `down`, `left`, and `right` keep every reference token in the transformer sequence but move its RoPE coordinates completely outside and immediately adjacent to the corresponding target-grid edge.
+
+#### Qwen Vision conditioning
+
+- `reference_X_semantic = true` sends the same reference through Qwen Vision in addition to its VAE frame.
+- `reference_X_semantic = false` keeps the VAE frame but omits its Qwen image rows.
+- Semantic 1 and Semantic 2 are UI-independent selectors that merge into the same Qwen conditioning stream. They do not create VAE frames.
+- `semantic_only` preserves normal Qwen visual rows. `style_direct` uses Moodboard processing and retains Style rows. `style_indirect` contextualizes with Style and then removes its visual rows.
+- Every `grounding_px` is a downscale-only maximum for the copy sent to Qwen. `0` leaves the source at native size before Qwen performs its own required alignment.
 
 ---
 
@@ -180,7 +170,7 @@ The table below details the technical routing contract resolved when running Eas
 
 ## 4. Legacy Nodes
 
-The following nodes are deprecated in favor of `CcCKrea2ReferenceImage` and the Easy presets, but remain for backward compatibility:
+The following role nodes remain registered only for backward compatibility. New workflows should use Easy Edit or Edit Advanced:
 - **CcCKrea2SubjectImage**
 - **CcCKrea2SceneImage**
 - **CcCKrea2OutfitImage**

@@ -2,34 +2,31 @@
 
 [![CI](https://github.com/demonccc/ComfyUI-CcC-Krea2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/demonccc/ComfyUI-CcC-Krea2/actions/workflows/ci.yml)
 
-`ComfyUI-CcC-Krea2` is a 5-layer modular architecture for advanced Krea 2 image editing, reference conditioning, identity preservation, and Ostris edit workflows in ComfyUI.
+`ComfyUI-CcC-Krea2` provides opinionated Easy Edit nodes and a single manual Edit Advanced laboratory for Krea 2 image editing, reference conditioning, identity preservation, and RoPE experiments in ComfyUI.
 
 ---
 
 ## Key Documentation
 
 - 📖 **[Node Reference (NODES.md)](NODES.md)**: Complete parameter, input type, socket, and node specifications.
-- 📐 **[Technical Architecture and Workflow Strategy (ARCHITECTURE.md)](ARCHITECTURE.md)**: Detailed breakdown of the 5-layer pipeline, Native vs Krea2Edit vs Ostris backends, Qwen Vision context mechanics, and resolution math.
+- 📐 **[Technical Architecture and Workflow Strategy (ARCHITECTURE.md)](ARCHITECTURE.md)**: Internal edit pipeline, Qwen Vision context mechanics, target-grid resolution, and RoPE positioning.
 - 📜 **[Changelog (CHANGELOG.md)](CHANGELOG.md)**: Revision history and version logs.
 
 ---
 
-## 5-Layer Modular Architecture
+## Public Editing Nodes
 
 ```mermaid
 graph TD
-    L1["Layer 1: Qwen Vision Prep<br/>(CcCKrea2QwenVisionImagePrep)"] -->|Prepared Image| L3["Layer 3: Generic Reference<br/>(CcCKrea2ReferenceImage)"]
-    L2["Layer 2: Target Latent<br/>(CcCKrea2TargetLatent)"] -->|Target Latent| L5["Layer 5: Edit Orchestrator<br/>(CcCKrea2Edit / EasyEdit)"]
-    L3 -->|Reference Spec| L4["Layer 4: Reference Chain<br/>(Immutable Specs Chain)"]
-    L4 -->|Ordered Reference Chain| L5
-    L5 -->|Output| OUT["Patched Model, Positive, Negative, Latent, Edit Info"]
+    IMG["Subject / Scene / Outfit / Style"] --> EASY["Easy Edit"]
+    IMG --> ADV["Edit Advanced"]
+    EASY --> OUT["Model / Conditioning / Latent / Report"]
+    ADV --> OUT
 ```
 
-1. **Layer 1: Qwen Vision Prep (`CcCKrea2QwenVisionImagePrep`)**: Prepares derivative images (`vision_image`) optimized for Qwen Vision tokenization (Native, Adaptive, or Fixed MP) while retaining original pixel tensors for VAE processing.
-2. **Layer 2: Target Latent (`CcCKrea2TargetLatent`)**: Creates the target latent container, independently configuring `target_content` (`empty`, `image`) and `geometry_mode` (`fixed`, `favor_image`). Supports Target Vision Context inclusion without triggering VAE appearance frames.
-3. **Layer 3: Declarative Reference Node (`CcCKrea2ReferenceImage`)**: Generic reference configuration for edit (appearance/semantic) and style paths. Legacy role nodes (`Subject`, `Scene`, `Outfit`, `Style`) are deprecated in favor of generic reference nodes and Easy presets.
-4. **Layer 4: Immutable Reference Chain**: Links reference specifications in strict non-Style before Style order.
-5. **Layer 5: CcC Edit Orchestrator (`CcCKrea2Edit`, `CcCKrea2EasyEdit`, `CcCKrea2EasyEditOstris`)**: Executes Qwen tokenization using `KREA2_TEMPLATE`, backend-specific reference transport (Krea2 RoPE/Boost wrapper, Ostris `index_timestep_zero`, or Native `reference_latents`), and report generation.
+- **Easy Edit / Easy Edit Ostris** retain their existing preset-driven routing.
+- **Edit Advanced (`CcCKrea2EditAdvanced`)** exposes latent source, two appearance references, boosts, target-grid size and geometry sources, Qwen Vision participation, two additional Qwen slots, and experimental RoPE directions. It contains no presets or automatic prompt generation.
+- The former public multi-node Advanced pipeline and Advanced Settings nodes are no longer registered.
 
 ---
 
@@ -126,13 +123,11 @@ Easy Edit also exposes **Aspect Ratio** with `auto`, `1:1`, `3:2`, `2:3`, `4:3`,
 ## Quick-Start Workflow Example
 
 1. Load CLIP using **CLIPLoader** configured with model type `krea2`.
-2. Connect `CLIP` and source image to **CcC Krea2 - Qwen Vision Image Prep**.
-3. Connect the prepared image output (`prepared_image`) to both:
-   - **CcC Krea2 - Reference Image** (`prepared_image` input) for reference attention guidance;
-   - **CcC Krea2 - Target Latent** (`geometry_image` input) to compute output resolution geometry when favoring image geometry.
-4. Configure **CcC Krea2 - Target Latent** (`target_content` = `"empty"`, `geometry_mode` = `"favor_image"`). Selecting `target_content` = `"empty"` means denoising starts from pure noise, while `geometry_mode` = `"favor_image"` uses the connected `geometry_image` input to calculate output dimensions.
-5. Connect Reference Chain output (`reference_chain`) to `references` input and Target Latent output (`target_latent`) to `target_latent` input on **CcC Krea2 - Edit**.
-6. Connect outputs `patched_model`, `positive`, `negative`, and `latent` to KSampler (`latent` connects to `KSampler.latent_image`).
+2. Connect `MODEL`, `CLIP`, `VAE`, Subject, and Scene directly to **CcC Krea2 - Edit Advanced**.
+3. Select `latent = empty`, `reference_1 = scene`, and `reference_2 = subject`.
+4. For image-driven target geometry, use `aspect_ratio = from source`, `resolution = from source`, `grid_size_source = subject`, and `grid_geometry_source = scene`.
+5. Leave both RoPE positions in `none` for the training-matched baseline. Change one direction at a time for controlled out-of-grid experiments.
+6. Connect `patched_model`, `positive`, `negative`, and `latent` to KSampler.
 
 ---
 
@@ -147,9 +142,7 @@ Find pre-built workflow JSON files in the `workflows/` directory:
 - 👕 [`05_easy_outfit_from_scene.json`](workflows/05_easy_outfit_from_scene.json): Extract Outfit from Scene Context
 - 🖼️ [`06_easy_style_transfer.json`](workflows/06_easy_style_transfer.json): Easy Style Transfer
 - 🧪 [`07_easy_ostris.json`](workflows/07_easy_ostris.json): Easy Edit using Ostris Backend
-- ⚙️ [`08_advanced_krea2_edit.json`](workflows/08_advanced_krea2_edit.json): Advanced Reference Chain (Krea2 Edit)
-- 🏛️ [`09_advanced_native.json`](workflows/09_advanced_native.json): Advanced Reference Chain (Native ComfyUI backend)
-- 🧪 [`10_advanced_ostris.json`](workflows/10_advanced_ostris.json): Advanced Reference Chain (Ostris backend)
+- ⚙️ [`08_edit_advanced.json`](workflows/08_edit_advanced.json): Edit Advanced geometry, conditioning, boost, and RoPE laboratory
 - 🎭 [`11_easy_scene_reinterpretation.json`](workflows/11_easy_scene_reinterpretation.json): Scene Reinterpretation Easy Edit
 
 Legacy workflow files targeting earlier role-node contracts are stored in [`workflows/additional/`](workflows/additional/).

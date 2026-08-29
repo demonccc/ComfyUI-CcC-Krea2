@@ -38,6 +38,7 @@ class PreparedReference:
     lat_hw: Tuple[int, int] = (64, 64)
     mask_mode: str = "hard"
     ref_fit_meta: Optional[Dict[str, Any]] = None
+    rope_position: str = "none"
 
 
 def prepare_reference(

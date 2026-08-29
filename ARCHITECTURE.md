@@ -1,6 +1,22 @@
 # CcC Krea2 Technical Architecture and Workflow Strategy
 
-This document provides the canonical technical architecture and workflow strategy for `ComfyUI-CcC-Krea2`. It details the 5-layer modular pipeline, image representation models, Target Latent combinations, reference order resolution, and practical workflow strategies for production deployment.
+This document describes the internal Krea2 processing pipeline used by the public Easy Edit nodes and the single `CcCKrea2EditAdvanced` laboratory node. The former public multi-node Advanced pipeline is no longer registered; its preparation, reference-chain, target-latent, and orchestration classes remain internal implementation components.
+
+## Public Advanced Contract
+
+`CcCKrea2EditAdvanced` receives `MODEL`, `CLIP`, `VAE`, and optional Subject, Scene, Outfit, and Style images directly. It provides manual control over:
+
+- latent source (`empty`, `subject`, `scene`, `outfit`, `style`);
+- two appearance references and their attention boosts;
+- `aspect_ratio` and `resolution`, including `from source`;
+- `grid_size_source` and `grid_geometry_source`;
+- Qwen Vision participation and grounding resolution;
+- two additional Qwen-only conditioning slots;
+- per-reference RoPE positions (`none`, `up`, `down`, `left`, `right`).
+
+Every appearance reference uses the Krea2 Identity Edit training-matched fit before VAE encoding. A RoPE direction changes only its positional IDs after fit. All reference tokens remain in the joint transformer sequence.
+
+`grid_size_source` and `grid_geometry_source` are independent: the first supplies the image pixel budget used when resolution is `from source`; the second supplies width-to-height geometry when aspect ratio is `from source`. The resulting `/16` canvas combines that resolution and geometry. Explicit resolution or aspect-ratio choices override the corresponding image-driven source.
 
 ---
 

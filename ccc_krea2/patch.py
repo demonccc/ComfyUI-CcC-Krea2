@@ -73,6 +73,7 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
     ref_masked_boosts: List[float] = []
     ref_masks: List[Optional[torch.Tensor]] = []
     mask_modes: List[str] = []
+    ref_rope_positions: List[str] = []
 
     for ref in prepared_refs:
         if ref.vae_latent is not None:
@@ -82,6 +83,7 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             ref_masked_boosts.append(getattr(ref, "masked_boost", 1.0))
             ref_masks.append(ref.spatial_attention_mask)
             mask_modes.append(ref.mask_mode)
+            ref_rope_positions.append(getattr(ref, "rope_position", "none"))
 
     def krea2_edit_wrapper(
         executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any
@@ -108,6 +110,7 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             ref_masked_boosts=ref_masked_boosts,
             ref_masks=ref_masks,
             mask_modes=mask_modes,
+            ref_rope_positions=ref_rope_positions,
             transformer_options=transformer_options,
         )
 
@@ -232,6 +235,7 @@ def krea2_dit_incontext_forward(
     mask_modes: List[str],
     transformer_options: Dict[str, Any],
     ref_masked_boosts: Optional[List[float]] = None,
+    ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
     """Execute Krea 2 SingleStreamDiT edit forward using exact model member API and signatures."""
     orig_ndim = x.ndim
@@ -304,6 +308,7 @@ def krea2_dit_incontext_forward(
         txt_len=txt_len,
         ref_token_grids=ref_token_grids,
         target_grid=(target_gh, target_gw),
+        ref_rope_positions=ref_rope_positions,
         device=x.device,
     )
 
@@ -369,6 +374,7 @@ def _build_incontext_3d_rope_pos_ids(
     ref_token_grids: List[Tuple[int, int]],
     target_grid: Tuple[int, int],
     device: torch.device,
+    ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
     """Build 3D RoPE position IDs with shape [batch_size, seq_len, 3]."""
     tgt_gh, tgt_gw = target_grid
@@ -380,8 +386,25 @@ def _build_incontext_3d_rope_pos_ids(
 
     for i, (r_gh, r_gw) in enumerate(ref_token_grids):
         frame_idx = i + 1
+        position = (
+            ref_rope_positions[i]
+            if ref_rope_positions is not None and i < len(ref_rope_positions)
+            else "none"
+        )
         y_off = (tgt_gh - r_gh) / 2.0
         x_off = (tgt_gw - r_gw) / 2.0
+        if position == "up":
+            y_off = -float(r_gh)
+        elif position == "down":
+            y_off = float(tgt_gh)
+        elif position == "left":
+            x_off = -float(r_gw)
+        elif position == "right":
+            x_off = float(tgt_gw)
+        elif position != "none":
+            raise ValueError(
+                f"Invalid reference RoPE position '{position}'. Expected none, up, down, left, or right."
+            )
 
         grid_y = torch.arange(r_gh, device=device, dtype=torch.float32) + y_off
         grid_x = torch.arange(r_gw, device=device, dtype=torch.float32) + x_off

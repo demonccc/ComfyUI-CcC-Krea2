@@ -50,6 +50,8 @@ def build_krea2_user_content(
     blocks = []
     for item in resolved_references:
         spec = item.get("spec")
+        if spec is not None and not getattr(spec, "include_in_vision", True):
+            continue
         expanded_aliases = item.get("expanded_aliases", ())
         alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
         instruction = getattr(spec, "vision_instruction", "") if spec else ""
@@ -99,6 +101,8 @@ def build_krea2_negative_user_content(
     for item in resolved_references:
         spec = item.get("spec")
         if spec is None:
+            continue
+        if not getattr(spec, "include_in_vision", True):
             continue
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
         if ref_path == "style":

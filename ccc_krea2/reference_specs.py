@@ -40,6 +40,7 @@ class ReferenceSpec:
     alias: str = ""
     parsed_aliases: Tuple[str, ...] = ()
     vision_instruction: str = ""
+    include_in_vision: bool = True
 
     # Edit-path parameters
     appearance_reference: bool = True
@@ -47,6 +48,7 @@ class ReferenceSpec:
     masked_attention_boost: float = 1.0
     attention_mask: Optional[torch.Tensor] = None
     visual_reference_fit: str = "auto"
+    rope_position: str = "none"  # "none", "up", "down", "left", "right"
 
     # Style-path parameters
     style_fidelity: float = 0.5

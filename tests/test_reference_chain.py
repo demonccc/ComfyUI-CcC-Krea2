@@ -160,6 +160,34 @@ def test_target_vision_context_ordering_and_vae_frames():
     assert resolved[1]["vae_reference_frame"] == 1
 
 
+def test_appearance_reference_can_skip_qwen_without_losing_vae_frame():
+    from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
+
+    img = torch.rand(1, 512, 512, 3)
+    prep = prepare_vision_image(image=img, clip=None, mode="native")
+    vae_only = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        alias="vae only",
+        appearance_reference=True,
+        include_in_vision=False,
+    )
+    qwen_and_vae = ReferenceSpec(
+        reference_path="edit",
+        prepared_image=prep,
+        alias="qwen and vae",
+        appearance_reference=True,
+        include_in_vision=True,
+    )
+
+    resolved, _ = resolve_reference_slots_and_aliases(ReferenceChain((vae_only, qwen_and_vae)))
+
+    assert resolved[0]["vae_reference_frame"] == 1
+    assert resolved[0]["physical_qwen_range"] is None
+    assert resolved[1]["vae_reference_frame"] == 2
+    assert resolved[1]["physical_qwen_range"] == (1, 1)
+
+
 def test_target_vision_context_style_ordering():
     from ccc_krea2.reference_specs import ReferenceSpec, ReferenceChain
 

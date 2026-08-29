@@ -10,34 +10,22 @@ from .constants import (
     ROLE_ORDER_INPAINT,
     ROLE_ORDER_INPAINT_SUBJECT_OUTFIT,
     ROLE_ORDER_INPAINT_SUBJECT_SCENE,
-    GROUNDING_RESIZE_MODES,
-    SAMPLING_RESIZE_MODES,
-    LEGACY_REFERENCE_FIT_MODES,
-    ATTENTION_MASK_MODES,
 )
 from .settings import (
     CCC_KREA2_IMAGE_ADVANCED_SETTINGS,
     CCC_KREA2_EDIT_ADVANCED_SETTINGS,
     PRESET_CHOICES,
-    RESIZE_METHODS,
-    ROLE_CHOICES,
-    ImageRoleSettings,
-    ImageAdvancedSettingsBundle,
-    EditAdvancedSettings,
 )
 from .prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
 from .engine import Krea2EditEngine, NodeExecutionRequest
 from .t2i import CcCKrea2TextToImage
-from .modular_nodes.vision_prep_node import CcCKrea2QwenVisionImagePrep
-from .modular_nodes.target_latent_node import CcCKrea2TargetLatent
-from .modular_nodes.reference_node import CcCKrea2ReferenceImage
 from .modular_nodes.easy_edit_node import CcCKrea2EasyEdit, CcCKrea2EasyEditOstris
 from .modular_nodes.subject_node import CcCKrea2SubjectImage
 from .modular_nodes.scene_node import CcCKrea2SceneImage
 from .modular_nodes.outfit_node import CcCKrea2OutfitImage
 from .modular_nodes.style_node import CcCKrea2StyleImage
-from .modular_nodes.edit_node import CcCKrea2Edit
+from .modular_nodes.edit_advanced_node import CcCKrea2EditAdvanced
 
 
 class BaseKrea2Node:
@@ -45,123 +33,6 @@ class BaseKrea2Node:
     RETURN_NAMES = ("patched_model", "positive", "negative", "latent")
     FUNCTION = "process"
     CATEGORY = NODE_CATEGORY
-
-
-class CcCKrea2ImageAdvancedSettings:
-    """Image Advanced Settings node for per-role attention, grounding, and geometry overrides."""
-
-    RETURN_TYPES = (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,)
-    RETURN_NAMES = ("image_advanced_settings",)
-    FUNCTION = "process"
-    CATEGORY = NODE_CATEGORY
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "role": (ROLE_CHOICES, {"default": "subject"}),
-                "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 8.0, "step": 0.05}),
-                "mask_invert": ("BOOLEAN", {"default": False}),
-                "grounding_resize_mode": (GROUNDING_RESIZE_MODES, {"default": "normalize"}),
-                "grounding_px": ("INT", {"default": 768, "min": 128, "max": 4096, "step": 16}),
-                "grounding_min_px": ("INT", {"default": 512, "min": 128, "max": 4096, "step": 16}),
-                "grounding_max_px": ("INT", {"default": 1024, "min": 128, "max": 4096, "step": 16}),
-                "grounding_resize_method": (RESIZE_METHODS, {"default": "auto"}),
-                "reference_fit_mode": (LEGACY_REFERENCE_FIT_MODES, {"default": "fit"}),
-                "reference_resize_method": (RESIZE_METHODS, {"default": "auto"}),
-            },
-            "optional": {
-                "image_advanced_settings": (CCC_KREA2_IMAGE_ADVANCED_SETTINGS,),
-            },
-        }
-
-    def process(
-        self,
-        role: str,
-        boost: float,
-        mask_invert: bool,
-        grounding_resize_mode: str,
-        grounding_px: int,
-        grounding_min_px: int,
-        grounding_max_px: int,
-        grounding_resize_method: str,
-        reference_fit_mode: str,
-        reference_resize_method: str,
-        image_advanced_settings=None,
-    ):
-        role_set = ImageRoleSettings(
-            boost=boost,
-            mask_invert=mask_invert,
-            grounding_resize_mode=grounding_resize_mode,
-            grounding_px=grounding_px,
-            grounding_min_px=grounding_min_px,
-            grounding_max_px=grounding_max_px,
-            grounding_resize_method=grounding_resize_method,
-            reference_fit_mode=reference_fit_mode,
-            reference_resize_method=reference_resize_method,
-        )
-        bundle = image_advanced_settings if image_advanced_settings is not None else ImageAdvancedSettingsBundle()
-        return (bundle.with_role(role, role_set),)
-
-
-class CcCKrea2EditAdvancedSettings:
-    """Edit Advanced Settings node for sampling, mask modes, and aspect ratio overrides."""
-
-    RETURN_TYPES = (CCC_KREA2_EDIT_ADVANCED_SETTINGS,)
-    RETURN_NAMES = ("edit_advanced_settings",)
-    FUNCTION = "process"
-    CATEGORY = NODE_CATEGORY
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
-                "sampling_resize_mode": (SAMPLING_RESIZE_MODES, {"default": "fit"}),
-                "sampling_resize_method": (RESIZE_METHODS, {"default": "auto"}),
-                "attention_mask_mode": (ATTENTION_MASK_MODES, {"default": "hard"}),
-                "role_resolution_limit_mode": (["off", "max_megapixels"], {"default": "max_megapixels"}),
-                "role_resolution_max_megapixels": ("FLOAT", {"default": 2.0, "min": 0.25, "max": 12.0, "step": 0.25}),
-                "custom_aspect_source": (["auto", "subject", "scene", "source"], {"default": "auto"}),
-                "prompt_instructions_mode": (["automatic", "append"], {"default": "automatic"}),
-                "prompt_instructions": ("STRING", {"multiline": True, "default": ""}),
-                "inpaint_mask_invert": ("BOOLEAN", {"default": False}),
-                "inpaint_mask_grow": ("INT", {"default": 0, "min": 0, "max": 256}),
-                "inpaint_mask_blur": ("INT", {"default": 0, "min": 0, "max": 256}),
-            }
-        }
-
-    def process(
-        self,
-        batch_size: int,
-        sampling_resize_mode: str,
-        sampling_resize_method: str,
-        attention_mask_mode: str,
-        role_resolution_limit_mode: str,
-        role_resolution_max_megapixels: float,
-        custom_aspect_source: str,
-        prompt_instructions_mode: str,
-        prompt_instructions: str,
-        inpaint_mask_invert: bool,
-        inpaint_mask_grow: int,
-        inpaint_mask_blur: int,
-    ):
-        return (
-            EditAdvancedSettings(
-                batch_size=batch_size,
-                sampling_resize_mode=sampling_resize_mode,
-                sampling_resize_method=sampling_resize_method,
-                attention_mask_mode=attention_mask_mode,
-                role_resolution_limit_mode=role_resolution_limit_mode,
-                role_resolution_max_megapixels=role_resolution_max_megapixels,
-                custom_aspect_source=custom_aspect_source,
-                prompt_instructions_mode=prompt_instructions_mode,
-                prompt_instructions=prompt_instructions,
-                inpaint_mask_invert=inpaint_mask_invert,
-                inpaint_mask_grow=inpaint_mask_grow,
-                inpaint_mask_blur=inpaint_mask_blur,
-            ),
-        )
 
 
 class CcCKrea2Subject(BaseKrea2Node):
@@ -534,11 +405,7 @@ NODE_CLASS_MAPPINGS = {
     # Modular Easy Nodes
     "CcCKrea2EasyEdit": CcCKrea2EasyEdit,
     "CcCKrea2EasyEditOstris": CcCKrea2EasyEditOstris,
-    # Modular Reference Pipeline Nodes
-    "CcCKrea2QwenVisionImagePrep": CcCKrea2QwenVisionImagePrep,
-    "CcCKrea2TargetLatent": CcCKrea2TargetLatent,
-    "CcCKrea2ReferenceImage": CcCKrea2ReferenceImage,
-    "CcCKrea2Edit": CcCKrea2Edit,
+    "CcCKrea2EditAdvanced": CcCKrea2EditAdvanced,
     # Compatibility Nodes
     "CcCKrea2SubjectImage": CcCKrea2SubjectImage,
     "CcCKrea2SceneImage": CcCKrea2SceneImage,
@@ -556,19 +423,13 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2Inpaint": CcCKrea2Inpaint,
     "CcCKrea2InpaintSubjectOutfit": CcCKrea2InpaintSubjectOutfit,
     "CcCKrea2InpaintSubjectScene": CcCKrea2InpaintSubjectScene,
-    "CcCKrea2ImageAdvancedSettings": CcCKrea2ImageAdvancedSettings,
-    "CcCKrea2EditAdvancedSettings": CcCKrea2EditAdvancedSettings,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     # Modular Easy Nodes
     "CcCKrea2EasyEdit": "CcC Krea2 - Easy Edit",
     "CcCKrea2EasyEditOstris": "CcC Krea2 - Easy Edit Ostris",
-    # Modular Reference Pipeline Nodes
-    "CcCKrea2QwenVisionImagePrep": "CcC Krea2 - Qwen Vision Image Prep",
-    "CcCKrea2TargetLatent": "CcC Krea2 - Target Latent",
-    "CcCKrea2ReferenceImage": "CcC Krea2 - Reference Image",
-    "CcCKrea2Edit": "CcC Krea2 - Edit",
+    "CcCKrea2EditAdvanced": "CcC Krea2 - Edit Advanced",
     # Compatibility Nodes
     "CcCKrea2SubjectImage": "CcC Krea2 - Subject Image (Legacy)",
     "CcCKrea2SceneImage": "CcC Krea2 - Scene Image (Legacy)",
@@ -586,6 +447,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2Inpaint": "CcC Krea2 - Inpaint (Legacy)",
     "CcCKrea2InpaintSubjectOutfit": "CcC Krea2 - Inpaint Subject + Outfit (Legacy)",
     "CcCKrea2InpaintSubjectScene": "CcC Krea2 - Inpaint Subject + Scene (Legacy)",
-    "CcCKrea2ImageAdvancedSettings": "CcC Krea2 - Image Advanced Settings (Legacy)",
-    "CcCKrea2EditAdvancedSettings": "CcC Krea2 - Edit Advanced Settings (Legacy)",
 }

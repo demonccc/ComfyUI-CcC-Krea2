@@ -7,19 +7,15 @@ from ccc_krea2.prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION
 
 
 def test_node_mappings_count_and_keys():
-    assert len(NODE_CLASS_MAPPINGS) == 22
-    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 22
+    assert len(NODE_CLASS_MAPPINGS) == 17
+    assert len(NODE_DISPLAY_NAME_MAPPINGS) == 17
 
     expected_keys = [
-        # Modular Reference Pipeline Nodes
-        "CcCKrea2QwenVisionImagePrep",
-        "CcCKrea2TargetLatent",
+        "CcCKrea2EditAdvanced",
         "CcCKrea2SubjectImage",
         "CcCKrea2SceneImage",
         "CcCKrea2OutfitImage",
         "CcCKrea2StyleImage",
-        "CcCKrea2ReferenceImage",
-        "CcCKrea2Edit",
         "CcCKrea2EasyEdit",
         "CcCKrea2EasyEditOstris",
         # Existing Nodes
@@ -30,8 +26,6 @@ def test_node_mappings_count_and_keys():
         "CcCKrea2Inpaint",
         "CcCKrea2InpaintSubjectOutfit",
         "CcCKrea2InpaintSubjectScene",
-        "CcCKrea2ImageAdvancedSettings",
-        "CcCKrea2EditAdvancedSettings",
         "CcCKrea2LoRAPromptSettings",
         "CcCKrea2LoRAStack",
         "CcCKrea2TextToImage",
@@ -137,70 +131,18 @@ def test_main_nodes_widget_signature_refactor():
         assert opt["prompt_augmentation"] == (CCC_KREA2_PROMPT_AUGMENTATION,)
 
 
-def test_image_advanced_settings_node_widgets_and_chaining():
-    cls = NODE_CLASS_MAPPINGS["CcCKrea2ImageAdvancedSettings"]
-    inputs = cls.INPUT_TYPES()
-    req = inputs["required"]
+def test_removed_advanced_nodes_are_not_registered():
+    for removed in (
+        "CcCKrea2QwenVisionImagePrep",
+        "CcCKrea2TargetLatent",
+        "CcCKrea2ReferenceImage",
+        "CcCKrea2Edit",
+        "CcCKrea2ImageAdvancedSettings",
+        "CcCKrea2EditAdvancedSettings",
+    ):
+        assert removed not in NODE_CLASS_MAPPINGS
 
-    # 1. Prove override widgets no longer exist
-    assert "override_attention" not in req
-    assert "override_grounding" not in req
-    assert "override_reference_geometry" not in req
-
-    # 2. Prove all remaining image settings widgets remain present
-    expected_widgets = [
-        "role",
-        "boost",
-        "mask_invert",
-        "grounding_resize_mode",
-        "grounding_px",
-        "grounding_min_px",
-        "grounding_max_px",
-        "grounding_resize_method",
-        "reference_fit_mode",
-        "reference_resize_method",
-    ]
-    for w in expected_widgets:
-        assert w in req, f"Widget '{w}' must be present in CcCKrea2ImageAdvancedSettings"
-
-    node = cls()
-
-    # Step 1: Configure subject
-    out1 = node.process(
-        role="subject",
-        boost=3.0,
-        mask_invert=False,
-        grounding_resize_mode="normalize",
-        grounding_px=768,
-        grounding_min_px=512,
-        grounding_max_px=1024,
-        grounding_resize_method="auto",
-        reference_fit_mode="fit",
-        reference_resize_method="auto",
-        image_advanced_settings=None,
-    )
-    bundle1 = out1[0]
-    assert "subject" in bundle1.role_settings
-    assert bundle1.role_settings["subject"].boost == 3.0
-
-    # Step 2: Chain scene configuration
-    out2 = node.process(
-        role="scene",
-        boost=1.5,
-        mask_invert=False,
-        grounding_resize_mode="normalize",
-        grounding_px=768,
-        grounding_min_px=512,
-        grounding_max_px=1024,
-        grounding_resize_method="auto",
-        reference_fit_mode="fit",
-        reference_resize_method="auto",
-        image_advanced_settings=bundle1,
-    )
-    bundle2 = out2[0]
-    assert "subject" in bundle2.role_settings
-    assert "scene" in bundle2.role_settings
-    assert bundle2.role_settings["scene"].boost == 1.5
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2EditAdvanced"] == "CcC Krea2 - Edit Advanced"
 
 
 def test_role_instructions_formatting():

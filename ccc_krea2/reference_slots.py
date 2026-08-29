@@ -120,7 +120,16 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
         ref_path = getattr(spec, "reference_path", spec.role.lower())
         is_appearance = getattr(spec, "appearance_reference", True)
 
-        if ref_path == "style" or spec.role.lower() == "style":
+        include_in_vision = getattr(spec, "include_in_vision", True)
+
+        if not include_in_vision:
+            if ref_path == "style" or spec.role.lower() == "style":
+                raise ValueError("Style references must participate in Qwen Vision conditioning.")
+            vae_frame = vae_frame_counter if is_appearance else None
+            if is_appearance:
+                vae_frame_counter += 1
+            physical_qwen_range = None
+        elif ref_path == "style" or spec.role.lower() == "style":
             vae_frame = None
             style_proc = getattr(spec, "style_processing", "2x2")
             span_len = get_style_processing_image_count(style_proc)

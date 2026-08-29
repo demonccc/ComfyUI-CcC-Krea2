@@ -12,9 +12,7 @@ CANONICAL_NAMES = [
     "05_easy_outfit_from_scene.json",
     "06_easy_style_transfer.json",
     "07_easy_ostris.json",
-    "08_advanced_krea2_edit.json",
-    "09_advanced_native.json",
-    "10_advanced_ostris.json",
+    "08_edit_advanced.json",
     "11_easy_scene_reinterpretation.json",
 ]
 
@@ -34,10 +32,9 @@ def test_readme_links_and_quickstart_contract():
 
     # Quick Start parameter and connection assertions
     assert "target_content = empty" in content or "target_content: empty" in content or "target_content" in content
-    assert "geometry_mode" in content
-    assert "geometry_image" in content
-    assert "CcCKrea2QwenVisionImagePrep" in content
-    assert "CcCKrea2QwenVisionPrep" not in content
+    assert "grid_size_source" in content
+    assert "grid_geometry_source" in content
+    assert "CcCKrea2EditAdvanced" in content
 
     for cname in CANONICAL_NAMES:
         assert cname in content, f"Canonical workflow {cname} missing from README"
@@ -50,22 +47,16 @@ def test_readme_links_and_quickstart_contract():
 def test_architecture_doc_contracts():
     content = read_repo_file("ARCHITECTURE.md")
 
-    # Canonical Target modes
+    # Canonical target modes
     assert "empty" in content
     assert "image" in content
     assert "fixed" in content
-    assert "favor_image" in content
+    assert "from source" in content
 
     # Check new requirements
-    assert (
-        "Layer 3: Generic Reference Image" in content
-        or "Layer 3 (Declarative References)**: Defines per-reference specs (Generic Reference Image)" in content
-    )
-    assert (
-        "Advanced pipeline is **generic infrastructure**, while the Easy Edit node provides the **opinionated recipe**."
-        in content
-    )
-    assert "VAE-encoded target_image" in content
+    assert "CcCKrea2EditAdvanced" in content
+    assert "RoPE" in content
+    assert "Qwen Vision" in content
     assert (
         "Global Vision Directive, negative prompt" not in content
     )  # negative context shouldn't have global vision directive
@@ -77,37 +68,23 @@ def test_nodes_doc_has_modular_node_class_names_and_fit_outcomes():
     # Ensure stale properties are removed
     assert "appearance_reference" not in content
 
-    # Check prompt_augmentation is only in Advanced, not Easy
+    # Advanced is manual and contains no automatic prompt routing.
     easy_section = content.split("## 2. Advanced Nodes")[0]
     advanced_section = content.split("## 2. Advanced Nodes")[1]
 
     assert "prompt_augmentation" not in easy_section, "prompt_augmentation must not be an Easy input"
-    assert "prompt_augmentation" in advanced_section, "prompt_augmentation must be documented in Advanced"
+    assert "preset" not in advanced_section.split("## 3.")[0]
 
     # Check updated schemas
-    assert "target_latent" in content, "target_latent output missing from NODES.md"
-    assert "vision_slot" in content, "vision_slot missing from CcCKrea2ReferenceImage in NODES.md"
-    assert "masked_attention_boost" in content, "masked_attention_boost missing from CcCKrea2ReferenceImage in NODES.md"
-
-    # Target Latent type checks
-    assert "include_in_vision" in content
-    assert "auto" in content
-    assert "yes" in content
-    assert "no" in content
-    assert "PREPARED_VISION_IMAGE" in content
-    assert "target_image" in content
-    assert "geometry_image" in content
-    assert "include_in_vision (`BOOLEAN`)" not in content
-    assert "`target_image` (`PREPARED_VISION_IMAGE`)" in content
-    assert "`geometry_image` (`PREPARED_VISION_IMAGE`)" in content
+    assert "grid_size_source" in content
+    assert "grid_geometry_source" in content
+    assert "reference_1_rope_position" in content
+    assert "semantic_1_source" in content
 
     required_nodes = [
         "CcCKrea2EasyEdit",
         "CcCKrea2EasyEditOstris",
-        "CcCKrea2QwenVisionImagePrep",
-        "CcCKrea2TargetLatent",
-        "CcCKrea2ReferenceImage",
-        "CcCKrea2Edit",
+        "CcCKrea2EditAdvanced",
     ]
     for node_name in required_nodes:
         assert node_name in content, f"Node class name {node_name} not found in NODES.md"

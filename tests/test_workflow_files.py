@@ -171,9 +171,7 @@ MODERN_CANONICAL = [
     "05_easy_outfit_from_scene.json",
     "06_easy_style_transfer.json",
     "07_easy_ostris.json",
-    "08_advanced_krea2_edit.json",
-    "09_advanced_native.json",
-    "10_advanced_ostris.json",
+    "08_edit_advanced.json",
     "11_easy_scene_reinterpretation.json",
 ]
 
@@ -426,31 +424,29 @@ def test_easy_workflows_sockets_and_presets():
 
 
 def test_advanced_workflows():
-    for filename in MODERN_CANONICAL[7:10]:
-        with open(f"workflows/{filename}", "r", encoding="utf-8") as f:
-            wf = json.load(f)
+    with open("workflows/08_edit_advanced.json", "r", encoding="utf-8") as f:
+        wf = json.load(f)
 
-        edit_nodes = _get_nodes_by_type(wf, "CcCKrea2Edit")
-        assert len(edit_nodes) == 1
-        edit = edit_nodes[0]
+    edit_nodes = _get_nodes_by_type(wf, "CcCKrea2EditAdvanced")
+    assert len(edit_nodes) == 1
+    values = get_serialized_widget_values_by_name(edit_nodes[0], NODE_CLASS_MAPPINGS["CcCKrea2EditAdvanced"])
+    assert values["latent"] == "empty"
+    assert values["reference_1"] == "scene"
+    assert values["reference_2"] == "subject"
+    assert values["grid_size_source"] == "subject"
+    assert values["grid_geometry_source"] == "scene"
+    assert values["reference_1_rope_position"] == "none"
+    assert values["reference_2_rope_position"] == "none"
 
-        values = get_serialized_widget_values_by_name(edit, NODE_CLASS_MAPPINGS["CcCKrea2Edit"])
-        ref_method = values.get("reference_method")
-
-        assert "apply_patch" not in values, "apply_patch must be removed from CcCKrea2Edit widgets"
-
-        if "krea2_edit" in filename:
-            assert ref_method == "krea2_edit"
-        elif "native" in filename:
-            assert ref_method == "native"
-        elif "ostris" in filename:
-            assert ref_method == "ostris_edit"
-
-        gen_refs = _get_nodes_by_type(wf, "CcCKrea2ReferenceImage")
-        assert len(gen_refs) >= 2
-
-        for ntype in ["CcCKrea2SubjectImage", "CcCKrea2SceneImage", "CcCKrea2OutfitImage", "CcCKrea2StyleImage"]:
-            assert len(_get_nodes_by_type(wf, ntype)) == 0, f"No legacy {ntype} allowed in canonical advanced"
+    for removed in (
+        "CcCKrea2QwenVisionImagePrep",
+        "CcCKrea2TargetLatent",
+        "CcCKrea2ReferenceImage",
+        "CcCKrea2Edit",
+        "CcCKrea2ImageAdvancedSettings",
+        "CcCKrea2EditAdvancedSettings",
+    ):
+        assert not _get_nodes_by_type(wf, removed)
 
 
 def test_lora_serialization():
@@ -459,10 +455,6 @@ def test_lora_serialization():
             wf = json.load(f)
 
         loras = _get_nodes_by_type(wf, "CcCKrea2LoRAStack")
-
-        if "09_advanced_native" in filename:
-            assert not loras, f"Native workflow {filename} must not contain CcCKrea2LoRAStack"
-            continue
 
         if not loras:
             continue
@@ -531,7 +523,7 @@ def test_builder_validation():
     import pytest
 
     with pytest.raises(ValueError, match="Unknown widget values"):
-        builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"apply_patch": True})
+        builder.add_node("CcCKrea2EditAdvanced", pos=[0, 0], size=[200, 200], widgets_values={"apply_patch": True})
 
     with pytest.raises(ValueError, match="Unknown widget values"):
         builder.add_node("CcCKrea2EasyEdit", pos=[0, 0], size=[200, 200], widgets_values={"some_fake_widget": 123})
@@ -539,7 +531,7 @@ def test_builder_validation():
     # Test strict combo validation bypass prevention
     with pytest.raises(ValueError, match="not in choices"):
         builder.add_node(
-            "CcCKrea2Edit", pos=[0, 0], size=[200, 200], widgets_values={"reference_method": "invalid.safetensors"}
+            "CcCKrea2EditAdvanced", pos=[0, 0], size=[200, 200], widgets_values={"latent": "invalid"}
         )
 
 
@@ -551,11 +543,16 @@ def test_builder_duplicate_link_rejection():
     import build_canonical_workflows
 
     builder = build_canonical_workflows.WorkflowBuilder()
-    n1 = builder.add_node("CcCKrea2TargetLatent", pos=[0, 0], size=[1, 1])
-    n2 = builder.add_node("CcCKrea2Edit", pos=[0, 0], size=[1, 1], inputs=["target_latent"])
+    n1 = builder.add_node(
+        "CLIPLoader",
+        pos=[0, 0],
+        size=[1, 1],
+        widgets_values={"clip_name": "clip.safetensors", "type": "krea2", "device": "default"},
+    )
+    n2 = builder.add_node("CcCKrea2EditAdvanced", pos=[0, 0], size=[1, 1], inputs={"clip": None})
 
     # First link should succeed
-    builder.link(n1, "target_latent", n2, "target_latent")
+    builder.link(n1, "CLIP", n2, "clip")
 
     links_before = copy.deepcopy(builder.links)
     source_links_before = copy.deepcopy(n1["outputs"][0]["links"])
@@ -565,7 +562,7 @@ def test_builder_duplicate_link_rejection():
     import pytest
 
     with pytest.raises(ValueError, match="already has a link"):
-        builder.link(n1, "target_latent", n2, "target_latent")
+        builder.link(n1, "CLIP", n2, "clip")
 
     assert builder.links == links_before
     assert n1["outputs"][0]["links"] == source_links_before

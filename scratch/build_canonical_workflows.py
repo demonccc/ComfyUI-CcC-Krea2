@@ -204,9 +204,7 @@ CANONICAL_NAMES = [
     "05_easy_outfit_from_scene.json",
     "06_easy_style_transfer.json",
     "07_easy_ostris.json",
-    "08_advanced_krea2_edit.json",
-    "09_advanced_native.json",
-    "10_advanced_ostris.json",
+    "08_edit_advanced.json",
     "11_easy_scene_reinterpretation.json",
 ]
 
@@ -612,158 +610,79 @@ def build_easy_workflow(
     save_json(b.build(), f"workflows/{filename}")
 
 
-def build_advanced_workflow(filename, is_ostris=False, is_native=False):
+def build_edit_advanced_workflow(filename="08_edit_advanced.json"):
     b = WorkflowBuilder()
     b.add_group("Loaders", [0, -50, 700, 500])
-    b.add_group("Load Images", [0, 500, 320, 540])
-    b.add_group("References", [340, 500, 1050, 600])
-    b.add_group("Edit Orchestrator", [1450, -50, 500, 700])
-    b.add_group("Sampling", [2000, -50, 1050, 500])
-    b.add_group("Output", [3060, -50, 680, 500])
+    b.add_group("Load Images", [0, 470, 350, 540])
+    b.add_group("Edit Advanced", [750, -50, 760, 1050])
+    b.add_group("Sampling", [1480, -50, 1050, 500])
+    b.add_group("Output", [2540, -50, 680, 500])
 
-    if is_native:
-        b.add_group("Native / compatible reference runtime required", [320, 0, 30, 30])
-
-    unet, clip, vae, lora, auraflow, sampler = build_base_graph(b, is_ostris, is_native)
-
-    # Subject ref
-    sub_img = b.add_node(
-        "LoadImage", [20, 550], [280, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image"
+    unet, clip, vae, lora, auraflow, sampler = build_base_graph(
+        b,
+        note_text=(
+            "Edit Advanced geometry and RoPE laboratory.\n\n"
+            "Default experiment:\n"
+            "- Empty latent\n"
+            "- Scene as Reference 1 (boost 1.0)\n"
+            "- Subject as Reference 2 (boost 4.0)\n"
+            "- Subject fixes grid size\n"
+            "- Scene fixes grid geometry\n"
+            "- Training-matched reference fit\n"
+            "- Both references participate in Qwen Vision\n\n"
+            "Change either RoPE Position to up/down/left/right to place that reference grid fully outside "
+            "the target grid without removing its tokens."
+        ),
     )
-    sub_prep = b.add_node(
-        "CcCKrea2QwenVisionImagePrep",
-        [360, 550],
-        [300, 200],
-        inputs={"clip": None, "image": None},
+
+    advanced = b.add_node(
+        "CcCKrea2EditAdvanced",
+        [800, 0],
+        [520, 920],
+        inputs={"model": None, "clip": None, "vae": None, "subject": None, "scene": None},
         widgets_values={
-            "mode": "native",
-            "min_mp": 0.0,
-            "max_mp": 1.0,
-            "fixed_mp": 1.0,
-            "downscale_method": "auto",
-            "upscale_method": "auto",
-        },
-    )
-    sub_ref = b.add_node(
-        "CcCKrea2ReferenceImage",
-        [700, 550],
-        [300, 200],
-        inputs={"prepared_image": None},
-        widgets_values={
-            "reference_path": "edit",
-            "vision_slot": "auto",
-            "alias": "subject",
-            "vision_instruction": "Use this reference for subject identity, facial features, hair, anatomy, body shape and body proportions.",
-            "attention_boost": 1.0,
-            "masked_attention_boost": 1.0,
-            "visual_reference_fit": "auto",
-            "style_fidelity": 0.5,
-            "style_processing": "2x2",
-            "indirect_style_transfer": True,
-        },
-    )
-
-    b.link(clip, "CLIP", sub_prep, "clip")
-    b.link(sub_img, "IMAGE", sub_prep, "image")
-    b.link(sub_prep, "prepared_image", sub_ref, "prepared_image")
-
-    # Outfit ref
-    outf_img = b.add_node(
-        "LoadImage", [20, 800], [280, 200], widgets_values={"image": "outfit.jpg"}, title="Outfit Image"
-    )
-    outf_prep = b.add_node(
-        "CcCKrea2QwenVisionImagePrep",
-        [360, 800],
-        [300, 200],
-        inputs={"clip": None, "image": None},
-        widgets_values={
-            "mode": "native",
-            "min_mp": 0.0,
-            "max_mp": 1.0,
-            "fixed_mp": 1.0,
-            "downscale_method": "auto",
-            "upscale_method": "auto",
-        },
-    )
-    outf_ref = b.add_node(
-        "CcCKrea2ReferenceImage",
-        [700, 800],
-        [300, 200],
-        inputs={"prepared_image": None, "previous_references": None},
-        widgets_values={
-            "reference_path": "edit",
-            "vision_slot": "auto",
-            "alias": "outfit",
-            "vision_instruction": "Use this reference for clothing, garments and accessories.\nDo not use the wearer's identity as the subject identity.",
-            "attention_boost": 1.0,
-            "masked_attention_boost": 1.0,
-            "visual_reference_fit": "auto",
-            "style_fidelity": 0.5,
-            "style_processing": "2x2",
-            "indirect_style_transfer": True,
-        },
-    )
-
-    b.link(clip, "CLIP", outf_prep, "clip")
-    b.link(outf_img, "IMAGE", outf_prep, "image")
-    b.link(outf_prep, "prepared_image", outf_ref, "prepared_image")
-    b.link(sub_ref, "reference_chain", outf_ref, "previous_references")
-
-    # Target Latent
-    t_latent = b.add_node(
-        "CcCKrea2TargetLatent",
-        [1050, 550],
-        [300, 250],
-        inputs={"vae": None, "geometry_image": None},
-        widgets_values={
-            "target_content": "empty",
-            "geometry_mode": "favor_image",
-            "target_megapixels": 2.0,
-            "fixed_megapixels": 2.0,
-            "aspect_ratio": "1:1",
+            "positive_prompt": "Replace the person in the scene image with the person from the subject image.",
+            "negative_prompt": "bad quality",
+            "latent": "empty",
+            "reference_1": "scene",
+            "reference_1_boost": 1.0,
+            "reference_1_rope_position": "none",
+            "reference_1_semantic": True,
+            "reference_1_instruction": "Use this image for the scene, composition, pose, action, and interactions.",
+            "reference_1_grounding_px": 768,
+            "reference_2": "subject",
+            "reference_2_boost": 4.0,
+            "reference_2_rope_position": "none",
+            "reference_2_semantic": True,
+            "reference_2_instruction": "Use this image for the subject identity and appearance.",
+            "reference_2_grounding_px": 768,
+            "aspect_ratio": "from source",
+            "resolution": "from source",
+            "grid_size_source": "subject",
+            "grid_geometry_source": "scene",
+            "latent_semantic": False,
+            "semantic_1_source": "none",
+            "semantic_2_source": "none",
             "batch_size": 1,
-            "include_in_vision": "auto",
-            "target_vision_slot": "auto",
-            "target_alias": "",
-            "target_vision_instruction": "",
+            "apply_krea2_edit_patch": True,
         },
     )
-    b.link(vae, "VAE", t_latent, "vae")
-    b.link(sub_prep, "prepared_image", t_latent, "geometry_image")
+    subject = b.add_node(
+        "LoadImage", [20, 500], [300, 200], widgets_values={"image": "subject.jpg"}, title="Subject Image"
+    )
+    scene = b.add_node(
+        "LoadImage", [20, 750], [300, 200], widgets_values={"image": "scene.jpg"}, title="Scene Image"
+    )
 
-    # Edit Orchestrator
-    edit_inputs = {"model": None, "clip": None, "vae": None, "references": None, "target_latent": None}
-
-    ref_method = "krea2_edit"
-    if is_native:
-        ref_method = "native"
-    elif is_ostris:
-        ref_method = "ostris_edit"
-
-    edit_widgets = {
-        "positive_prompt": "A photo of a person",
-        "negative_prompt": "bad quality",
-        "global_vision_directive": "",
-        "reference_method": ref_method,
-        "ostris_kv_cache": False,
-    }
-    edit = b.add_node("CcCKrea2Edit", [1500, 0], [400, 400], inputs=edit_inputs, widgets_values=edit_widgets)
-
-    if is_native:
-        b.link(unet, "MODEL", edit, "model")
-    else:
-        b.link(lora, "model", edit, "model")
-
-    b.link(clip, "CLIP", edit, "clip")
-    b.link(vae, "VAE", edit, "vae")
-    b.link(outf_ref, "reference_chain", edit, "references")
-    b.link(t_latent, "target_latent", edit, "target_latent")
-
-    b.link(edit, "patched_model", auraflow, "model")
-    b.link(edit, "positive", sampler, "positive")
-    b.link(edit, "negative", sampler, "negative")
-    b.link(edit, "latent", sampler, "latent_image")
-
+    b.link(lora, "model", advanced, "model")
+    b.link(clip, "CLIP", advanced, "clip")
+    b.link(vae, "VAE", advanced, "vae")
+    b.link(subject, "IMAGE", advanced, "subject")
+    b.link(scene, "IMAGE", advanced, "scene")
+    b.link(advanced, "patched_model", auraflow, "model")
+    b.link(advanced, "positive", sampler, "positive")
+    b.link(advanced, "negative", sampler, "negative")
+    b.link(advanced, "latent", sampler, "latent_image")
     save_json(b.build(), f"workflows/{filename}")
 
 
@@ -828,11 +747,7 @@ def main():
         "07_easy_ostris.json", "balanced", "outfit image", "style image", is_ostris=True, has_subj=True, has_scene=True
     )
     # 08
-    build_advanced_workflow("08_advanced_krea2_edit.json", is_ostris=False)
-    # 09
-    build_advanced_workflow("09_advanced_native.json", is_native=True)
-    # 10
-    build_advanced_workflow("10_advanced_ostris.json", is_ostris=True)
+    build_edit_advanced_workflow()
     # 11
     build_easy_workflow(
         "11_easy_scene_reinterpretation.json",

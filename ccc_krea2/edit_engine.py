@@ -237,6 +237,9 @@ def run_krea2_edit_orchestrator(
                     }
                 )
 
+            if not getattr(spec, "include_in_vision", True):
+                continue
+
             # Vision image enters positive Qwen list
             pos_idx = len(pos_qwen_images) + 1
             # For Ostris: apply VLM preprocessing to ALL edit-path refs (appearance + semantic-only)
@@ -364,6 +367,7 @@ def run_krea2_edit_orchestrator(
                 lat_hw=ref_dict["geom"].vae_latent_grid_size,
                 mask_mode="hard",
                 ref_fit_meta={"geom": ref_dict["geom"]},
+                rope_position=getattr(sp, "rope_position", "none"),
             )
             prepared_refs.append(pr)
 
@@ -485,10 +489,11 @@ def run_krea2_edit_orchestrator(
         b_boost = getattr(sp, "attention_boost", 1.0)
         m_boost = getattr(sp, "masked_attention_boost", 1.0)
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
-        phys_idx = ref_item.get("physical_qwen_range", (1, 1))[0]
+        phys_range = ref_item.get("physical_qwen_range")
+        phys_idx = phys_range[0] if phys_range else None
         span_str = (
             str(pos_qwen_context.vision_row_spans[phys_idx - 1])
-            if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans)
+            if phys_idx is not None and (phys_idx - 1) < len(pos_qwen_context.vision_row_spans)
             else "N/A"
         )
         is_appearance = getattr(sp, "appearance_reference", True)
@@ -497,7 +502,7 @@ def run_krea2_edit_orchestrator(
             [
                 f"Reference [Slot {ref['slot']} - {ref['role'].capitalize()}]:",
                 f"  Logical Vision Slot: {ref['slot']}",
-                f"  Physical Qwen Image Index: {phys_idx}",
+                f"  Physical Qwen Image Index: {phys_idx if phys_idx is not None else 'none'}",
                 f"  Actual Conditioning Row Span: {span_str}",
                 f"  VAE Reference Frame: {ref_item.get('vae_reference_frame') if is_appearance else 'none'}",
                 f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
@@ -507,6 +512,18 @@ def run_krea2_edit_orchestrator(
         if reference_method == "krea2_edit":
             geom = ref.get("geom")
             if geom:
+                rope_position = getattr(sp, "rope_position", "none")
+                target_grid_w, target_grid_h = geom.target_grid_size
+                ref_grid_w, ref_grid_h = geom.vae_latent_grid_size
+                rope_y, rope_x = geom.centered_fractional_offset
+                if rope_position == "up":
+                    rope_y = -float(ref_grid_h)
+                elif rope_position == "down":
+                    rope_y = float(target_grid_h)
+                elif rope_position == "left":
+                    rope_x = -float(ref_grid_w)
+                elif rope_position == "right":
+                    rope_x = float(target_grid_w)
                 info_lines.extend(
                     [
                         f"  Requested Visual Reference Fit: {geom.mode_requested}",
@@ -515,7 +532,9 @@ def run_krea2_edit_orchestrator(
                         f"  VAE Input Size: {geom.vae_input_pixel_size[0]} x {geom.vae_input_pixel_size[1]}",
                         f"  VAE Latent Grid: {geom.vae_latent_grid_size[0]} x {geom.vae_latent_grid_size[1]}",
                         f"  Target Grid: {geom.target_grid_size[0]} x {geom.target_grid_size[1]}",
-                        f"  RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
+                        f"  Centered RoPE Offset: Y={geom.centered_fractional_offset[0]:.2f}, X={geom.centered_fractional_offset[1]:.2f}",
+                        f"  RoPE Position Override: {rope_position}",
+                        f"  Effective RoPE Offset: Y={rope_y:.2f}, X={rope_x:.2f}",
                     ]
                 )
             info_lines.extend(

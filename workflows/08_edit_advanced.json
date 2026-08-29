@@ -1,6 +1,6 @@
 {
-  "last_node_id": 18,
-  "last_link_id": 24,
+  "last_node_id": 13,
+  "last_link_id": 15,
   "nodes": [
     {
       "id": 1,
@@ -63,9 +63,7 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            7,
-            10,
-            17
+            8
           ]
         }
       ],
@@ -106,8 +104,7 @@
           "type": "VAE",
           "links": [
             5,
-            14,
-            18
+            9
           ]
         }
       ],
@@ -153,7 +150,7 @@
           "name": "model",
           "type": "MODEL",
           "links": [
-            16
+            7
           ]
         },
         {
@@ -171,6 +168,13 @@
             "directory": "loras",
             "hash": "6adf9a69cc9502d286db7b69964d37da7e9cfe4b05b4d004bc275f087d3fd3cf",
             "hash_type": "SHA256"
+          },
+          {
+            "name": "bfs_body_swap_v1_krea2.safetensors",
+            "url": "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap/resolve/main/bfs_body_swap_v1_krea2.safetensors",
+            "directory": "loras",
+            "hash": "0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79",
+            "hash_type": "SHA256"
           }
         ]
       },
@@ -180,9 +184,9 @@
         true,
         "krea2_identity_edit_v1_2.safetensors",
         1.0,
-        false,
-        "None",
-        1.0,
+        true,
+        "bfs_body_swap_v1_krea2.safetensors",
+        0.35,
         false,
         "None",
         1.0,
@@ -209,7 +213,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 21
+          "link": 12
         }
       ],
       "outputs": [
@@ -273,8 +277,8 @@
         150
       ],
       "size": [
-        300,
-        150
+        470,
+        360
       ],
       "flags": {},
       "order": 7,
@@ -285,7 +289,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Note on Blackwell GPUs:\n`BlackwellAttentionFix` is recommended for NVIDIA Blackwell GPUs (RTX 5090, 5080, 5070 family) to prevent NaN/black image sampling issues. On non-Blackwell systems, this node acts as a pass-through or can be muted/bypassed."
+        "Edit Advanced geometry and RoPE laboratory.\n\nDefault experiment:\n- Empty latent\n- Scene as Reference 1 (boost 1.0)\n- Subject as Reference 2 (boost 4.0)\n- Subject fixes grid size\n- Scene fixes grid geometry\n- Training-matched reference fit\n- Both references participate in Qwen Vision\n\nChange each RoPE Position from none to up/down/left/right to place that reference grid fully outside the target grid without removing its tokens."
       ]
     },
     {
@@ -311,17 +315,17 @@
         {
           "name": "positive",
           "type": "CONDITIONING",
-          "link": 22
+          "link": 13
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
-          "link": 23
+          "link": 14
         },
         {
           "name": "latent_image",
           "type": "LATENT",
-          "link": 24
+          "link": 15
         }
       ],
       "outputs": [
@@ -417,17 +421,135 @@
     },
     {
       "id": 11,
-      "type": "LoadImage",
+      "type": "CcCKrea2EditAdvanced",
       "pos": [
-        20,
-        550
+        800,
+        0
       ],
       "size": [
-        280,
-        200
+        520,
+        920
       ],
       "flags": {},
       "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 7
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 8
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 9
+        },
+        {
+          "name": "subject",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "name": "scene",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            14
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "edit_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2EasyEdit"
+      },
+      "widgets_values": [
+        "Replace the person in the scene image with the person from the subject image.",
+        "bad quality",
+        "empty",
+        "scene",
+        1.0,
+        "none",
+        true,
+        "Use this image for the scene, composition, pose, action, and interactions.",
+        768,
+        "subject",
+        4.0,
+        "none",
+        true,
+        "Use this image for the subject identity and appearance.",
+        768,
+        "from source",
+        "from source",
+        "subject",
+        "scene",
+        false,
+        "",
+        768,
+        "none",
+        "semantic_only",
+        "",
+        768,
+        "2x2",
+        1.0,
+        "none",
+        "semantic_only",
+        "",
+        768,
+        "2x2",
+        1.0,
+        1,
+        true
+      ]
+    },
+    {
+      "id": 12,
+      "type": "LoadImage",
+      "pos": [
+        20,
+        500
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 12,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -435,7 +557,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            8
+            10
           ]
         },
         {
@@ -453,69 +575,11 @@
       "title": "Subject Image"
     },
     {
-      "id": 12,
-      "type": "CcCKrea2QwenVisionImagePrep",
-      "pos": [
-        360,
-        550
-      ],
-      "size": [
-        300,
-        200
-      ],
-      "flags": {},
-      "order": 12,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 7
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 8
-        }
-      ],
-      "outputs": [
-        {
-          "name": "prepared_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "links": [
-            9,
-            15
-          ]
-        },
-        {
-          "name": "vision_image",
-          "type": "IMAGE",
-          "links": []
-        },
-        {
-          "name": "vision_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2QwenVisionImagePrep"
-      },
-      "widgets_values": [
-        "native",
-        0.0,
-        1.0,
-        1.0,
-        "auto",
-        "auto"
-      ]
-    },
-    {
       "id": 13,
-      "type": "CcCKrea2ReferenceImage",
+      "type": "LoadImage",
       "pos": [
-        700,
-        550
+        20,
+        750
       ],
       "size": [
         300,
@@ -523,52 +587,6 @@
       ],
       "flags": {},
       "order": 13,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "prepared_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": 9
-        }
-      ],
-      "outputs": [
-        {
-          "name": "reference_chain",
-          "type": "REFERENCE_CHAIN",
-          "links": [
-            13
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2ReferenceImage"
-      },
-      "widgets_values": [
-        "edit",
-        "auto",
-        "subject",
-        "Use this reference for subject identity, facial features, hair, anatomy, body shape and body proportions.",
-        1.0,
-        1.0,
-        "auto",
-        0.5,
-        "2x2",
-        true
-      ]
-    },
-    {
-      "id": 14,
-      "type": "LoadImage",
-      "pos": [
-        20,
-        800
-      ],
-      "size": [
-        280,
-        200
-      ],
-      "flags": {},
-      "order": 14,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -589,260 +607,9 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "outfit.jpg"
+        "scene.jpg"
       ],
-      "title": "Outfit Image"
-    },
-    {
-      "id": 15,
-      "type": "CcCKrea2QwenVisionImagePrep",
-      "pos": [
-        360,
-        800
-      ],
-      "size": [
-        300,
-        200
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 10
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 11
-        }
-      ],
-      "outputs": [
-        {
-          "name": "prepared_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "links": [
-            12
-          ]
-        },
-        {
-          "name": "vision_image",
-          "type": "IMAGE",
-          "links": []
-        },
-        {
-          "name": "vision_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2QwenVisionImagePrep"
-      },
-      "widgets_values": [
-        "native",
-        0.0,
-        1.0,
-        1.0,
-        "auto",
-        "auto"
-      ]
-    },
-    {
-      "id": 16,
-      "type": "CcCKrea2ReferenceImage",
-      "pos": [
-        700,
-        800
-      ],
-      "size": [
-        300,
-        200
-      ],
-      "flags": {},
-      "order": 16,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "prepared_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": 12
-        },
-        {
-          "name": "previous_references",
-          "type": "REFERENCE_CHAIN",
-          "link": 13
-        }
-      ],
-      "outputs": [
-        {
-          "name": "reference_chain",
-          "type": "REFERENCE_CHAIN",
-          "links": [
-            19
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2ReferenceImage"
-      },
-      "widgets_values": [
-        "edit",
-        "auto",
-        "outfit",
-        "Use this reference for clothing, garments and accessories.\nDo not use the wearer's identity as the subject identity.",
-        1.0,
-        1.0,
-        "auto",
-        0.5,
-        "2x2",
-        true
-      ]
-    },
-    {
-      "id": 17,
-      "type": "CcCKrea2TargetLatent",
-      "pos": [
-        1050,
-        550
-      ],
-      "size": [
-        300,
-        250
-      ],
-      "flags": {},
-      "order": 17,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 14
-        },
-        {
-          "name": "geometry_image",
-          "type": "PREPARED_VISION_IMAGE",
-          "link": 15
-        }
-      ],
-      "outputs": [
-        {
-          "name": "target_latent",
-          "type": "LATENT",
-          "links": [
-            20
-          ]
-        },
-        {
-          "name": "latent_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2TargetLatent"
-      },
-      "widgets_values": [
-        "empty",
-        "favor_image",
-        2.0,
-        2.0,
-        "1:1",
-        1,
-        "auto",
-        "auto",
-        "",
-        ""
-      ]
-    },
-    {
-      "id": 18,
-      "type": "CcCKrea2Edit",
-      "pos": [
-        1500,
-        0
-      ],
-      "size": [
-        400,
-        400
-      ],
-      "flags": {},
-      "order": 18,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 16
-        },
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 17
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 18
-        },
-        {
-          "name": "references",
-          "type": "REFERENCE_CHAIN",
-          "link": 19
-        },
-        {
-          "name": "target_latent",
-          "type": "LATENT",
-          "link": 20
-        }
-      ],
-      "outputs": [
-        {
-          "name": "patched_model",
-          "type": "MODEL",
-          "links": [
-            21
-          ]
-        },
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "links": [
-            22
-          ]
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "links": [
-            23
-          ]
-        },
-        {
-          "name": "latent",
-          "type": "LATENT",
-          "links": [
-            24
-          ]
-        },
-        {
-          "name": "edit_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2Edit"
-      },
-      "widgets_values": [
-        "A photo of a person",
-        "bad quality",
-        "",
-        "krea2_edit",
-        false
-      ]
+      "title": "Scene Image"
     }
   ],
   "links": [
@@ -896,143 +663,71 @@
     ],
     [
       7,
-      2,
-      0,
-      12,
-      0,
-      "CLIP"
-    ],
-    [
-      8,
-      11,
-      0,
-      12,
-      1,
-      "IMAGE"
-    ],
-    [
-      9,
-      12,
-      0,
-      13,
-      0,
-      "PREPARED_VISION_IMAGE"
-    ],
-    [
-      10,
-      2,
-      0,
-      15,
-      0,
-      "CLIP"
-    ],
-    [
-      11,
-      14,
-      0,
-      15,
-      1,
-      "IMAGE"
-    ],
-    [
-      12,
-      15,
-      0,
-      16,
-      0,
-      "PREPARED_VISION_IMAGE"
-    ],
-    [
-      13,
-      13,
-      0,
-      16,
-      1,
-      "REFERENCE_CHAIN"
-    ],
-    [
-      14,
-      3,
-      0,
-      17,
-      0,
-      "VAE"
-    ],
-    [
-      15,
-      12,
-      0,
-      17,
-      1,
-      "PREPARED_VISION_IMAGE"
-    ],
-    [
-      16,
       4,
       0,
-      18,
+      11,
       0,
       "MODEL"
     ],
     [
-      17,
+      8,
       2,
       0,
-      18,
+      11,
       1,
       "CLIP"
     ],
     [
-      18,
+      9,
       3,
       0,
-      18,
+      11,
       2,
       "VAE"
     ],
     [
-      19,
-      16,
+      10,
+      12,
       0,
-      18,
+      11,
       3,
-      "REFERENCE_CHAIN"
+      "IMAGE"
     ],
     [
-      20,
-      17,
+      11,
+      13,
       0,
-      18,
+      11,
       4,
-      "LATENT"
+      "IMAGE"
     ],
     [
-      21,
-      18,
+      12,
+      11,
       0,
       5,
       0,
       "MODEL"
     ],
     [
-      22,
-      18,
+      13,
+      11,
       1,
       8,
       1,
       "CONDITIONING"
     ],
     [
-      23,
-      18,
+      14,
+      11,
       2,
       8,
       2,
       "CONDITIONING"
     ],
     [
-      24,
-      18,
+      15,
+      11,
       3,
       8,
       3,
@@ -1051,39 +746,19 @@
       "color": "#3f789e"
     },
     {
-      "title": "Load Images",
+      "title": "Easy Edit",
       "bounding": [
-        0,
-        500,
-        320,
-        540
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "References",
-      "bounding": [
-        340,
-        500,
-        1050,
-        600
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Edit Orchestrator",
-      "bounding": [
-        1450,
+        750,
         -50,
-        500,
-        700
+        700,
+        500
       ],
       "color": "#3f789e"
     },
     {
       "title": "Sampling",
       "bounding": [
-        2000,
+        1480,
         -50,
         1050,
         500
@@ -1093,10 +768,20 @@
     {
       "title": "Output",
       "bounding": [
-        3060,
+        2540,
         -50,
         680,
         500
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Load Images",
+      "bounding": [
+        0,
+        470,
+        350,
+        540
       ],
       "color": "#3f789e"
     }
