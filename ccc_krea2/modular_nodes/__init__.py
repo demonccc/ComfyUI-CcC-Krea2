@@ -1,19 +1,11 @@
-"""Package initialization for modular reference nodes."""
+"""Package initialization for the split Krea2 Edit nodes."""
 
-from .vision_prep_node import CcCKrea2QwenVisionImagePrep
-from .target_latent_node import CcCKrea2TargetLatent
-from .subject_node import CcCKrea2SubjectImage
-from .scene_node import CcCKrea2SceneImage
-from .outfit_node import CcCKrea2OutfitImage
-from .style_node import CcCKrea2StyleImage
+from .visual_reference_node import CcCKrea2VisualReference
+from .semantic_reference_node import CcCKrea2SemanticReference
 from .edit_node import CcCKrea2Edit
 
 __all__ = [
-    "CcCKrea2QwenVisionImagePrep",
-    "CcCKrea2TargetLatent",
-    "CcCKrea2SubjectImage",
-    "CcCKrea2SceneImage",
-    "CcCKrea2OutfitImage",
-    "CcCKrea2StyleImage",
+    "CcCKrea2VisualReference",
+    "CcCKrea2SemanticReference",
     "CcCKrea2Edit",
 ]
