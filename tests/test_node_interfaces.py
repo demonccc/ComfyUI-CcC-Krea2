@@ -7,6 +7,7 @@ def test_public_node_mappings():
     expected = {
         "CcCKrea2VisualReference",
         "CcCKrea2SemanticReference",
+        "CcCKrea2Latent",
         "CcCKrea2Edit",
         "CcCKrea2LoRAPromptSettings",
         "CcCKrea2LoRAStack",
@@ -19,6 +20,7 @@ def test_public_node_mappings():
 def test_split_edit_display_names():
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2VisualReference"] == "Krea2 CcC Visual Reference"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2SemanticReference"] == "Krea2 CcC Semantic Reference"
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Latent"] == "Krea2 CcC Latent"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Edit"] == "Krea2 CcC Edit"
 
 

@@ -2,7 +2,8 @@
 
 import torch
 
-from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _resolve_target_geometry
+from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit
+from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _resolve_target_geometry
 from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
 
@@ -82,7 +83,28 @@ def test_semantic_reference_exposes_advanced_semantic_controls():
     assert required["fidelity"][1]["default"] == 1.0
 
 
-def test_edit_exposes_global_and_target_controls_without_advanced_slots():
+def test_latent_owns_all_previous_target_and_grid_controls():
+    inputs = CcCKrea2Latent.INPUT_TYPES()
+    required = inputs["required"]
+    optional = inputs["optional"]
+
+    assert list(required) == [
+        "vae",
+        "aspect_ratio",
+        "resolution",
+        "latent_semantic",
+        "latent_semantic_instruction",
+        "latent_grounding_px",
+        "batch_size",
+    ]
+    assert list(optional) == [
+        "target_image",
+        "grid_size_image",
+        "grid_geometry_image",
+    ]
+
+
+def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
     inputs = CcCKrea2Edit.INPUT_TYPES()
     required = inputs["required"]
     optional = inputs["optional"]
@@ -91,35 +113,29 @@ def test_edit_exposes_global_and_target_controls_without_advanced_slots():
         "model",
         "clip",
         "vae",
+        "latent",
         "positive_prompt",
         "negative_prompt",
+        "apply_krea2_edit_patch",
+    ]
+    assert list(optional) == [
+        "visual_references",
+        "semantic_references",
+    ]
+
+    for moved in (
+        "target_image",
+        "grid_size_image",
+        "grid_geometry_image",
         "aspect_ratio",
         "resolution",
         "latent_semantic",
         "latent_semantic_instruction",
         "latent_grounding_px",
         "batch_size",
-        "apply_krea2_edit_patch",
-    ]
-    assert list(optional) == [
-        "target_image",
-        "grid_size_image",
-        "grid_geometry_image",
-        "visual_references",
-        "semantic_references",
-    ]
-
-    for removed in (
-        "reference_1",
-        "reference_2",
-        "semantic_1_source",
-        "semantic_2_source",
-        "latent",
-        "grid_size_source",
-        "grid_geometry_source",
     ):
-        assert removed not in required
-        assert removed not in optional
+        assert moved not in required
+        assert moved not in optional
 
 
 def test_grid_size_and_geometry_images_are_independent():
@@ -137,3 +153,28 @@ def test_grid_size_and_geometry_images_are_independent():
     assert (width, height) == (1344, 1680)
     assert size_label == "grid size image"
     assert geometry_label == "grid geometry image"
+
+
+class _MockVAE:
+    def encode(self, image):
+        batch, height, width, _ = image.shape
+        return torch.zeros((batch, 16, height // 8, width // 8))
+
+
+def test_latent_semantic_metadata_is_preserved_for_edit():
+    image = torch.zeros((1, 128, 128, 3))
+    latent, _ = CcCKrea2Latent().process(
+        vae=_MockVAE(),
+        aspect_ratio="1:1",
+        resolution="0.5 MP",
+        latent_semantic=True,
+        latent_semantic_instruction="Reimagine the target content",
+        latent_grounding_px=768,
+        target_image=image,
+    )
+
+    metadata = latent["ccc_krea2_latent_semantic"]
+    assert metadata["enabled"] is True
+    assert metadata["image"] is image
+    assert metadata["instruction"] == "Reimagine the target content"
+    assert metadata["grounding_px"] == 768

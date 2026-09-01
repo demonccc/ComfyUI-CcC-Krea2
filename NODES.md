@@ -4,80 +4,84 @@
 
 Declares one ordered visual reference for Krea2 Edit.
 
-### Inputs
-
 | Control | Values | Default | Behavior |
 | --- | --- | --- | --- |
 | `image` | `IMAGE` | — | Visual edit reference. |
-| `boost` | `0.0 .. 10.0` step `0.05` | `1.0` | Existing per-reference attention boost. |
-| `rope_position` | `none`, `up`, `down`, `left`, `right` | `none` | Existing experimental per-reference RoPE position. |
-| `semantic` | boolean | `true` | Controls whether the same visual reference also participates in Qwen Vision. |
-| `semantic_role` | text | empty | Optional semantic name attached to this image in the Qwen prompt. |
-| `instruction` | multiline text | empty | Existing per-reference Qwen instruction. |
-| `grounding_px` | `0 .. 4096` step `16` | `768` | Existing Qwen grounding size. |
-| `previous_references` | visual reference chain | optional | Chains this reference after the previous visual reference. |
+| `boost` | `0.0 .. 10.0` | `1.0` | Per-reference attention boost. |
+| `rope_position` | `none`, `up`, `down`, `left`, `right` | `none` | Per-reference RoPE position. |
+| `semantic` | boolean | `true` | Also participates in Qwen Vision. |
+| `semantic_role` | text | empty | Optional semantic name for this image. |
+| `instruction` | multiline text | empty | Per-reference Qwen instruction. |
+| `grounding_px` | `0 .. 4096` | `768` | Qwen grounding size. |
+| `previous_references` | visual reference chain | optional | Appends after the previous visual reference. |
 
-### Semantic role rules
+Rules:
 
 - `semantic = false`: `semantic_role`, `instruction`, and `grounding_px` are disabled and ignored.
-- `semantic = true` + empty `semantic_role`: positional Krea2 Edit behavior; no extra semantic alias is attached.
-- `semantic = true` + non-empty `semantic_role`: that exact text is attached to the corresponding Qwen vision block.
-
-The chain order is also the Krea2 physical edit-reference order.
+- `semantic = true` + empty `semantic_role`: positional Krea2 Edit behavior.
+- `semantic = true` + non-empty `semantic_role`: the role text is attached to the corresponding Qwen image.
 
 ## Krea2 CcC Semantic Reference
 
 Declares one semantic/style reference.
 
-### Inputs
+| Control | Values | Default |
+| --- | --- | --- |
+| `image` | `IMAGE` | — |
+| `mode` | `semantic_only`, `style_direct`, `style_indirect` | `semantic_only` |
+| `instruction` | multiline text | empty |
+| `grounding_px` | `0 .. 4096` | `768` |
+| `processing` | `full`, `2x2`, `4x4` | `2x2` |
+| `fidelity` | `0.0 .. 1.0` | `1.0` |
+| `previous_references` | semantic reference chain | optional |
 
-| Control | Values | Default | Behavior |
-| --- | --- | --- | --- |
-| `image` | `IMAGE` | — | Source image for Qwen semantic/style conditioning. |
-| `mode` | `semantic_only`, `style_direct`, `style_indirect` | `semantic_only` | Existing semantic/style mode. |
-| `instruction` | multiline text | empty | Existing Qwen instruction. |
-| `grounding_px` | `0 .. 4096` step `16` | `768` | Existing grounding size. |
-| `processing` | `full`, `2x2`, `4x4` | `2x2` | Existing style processing mode. |
-| `fidelity` | `0.0 .. 1.0` step `0.05` | `1.0` | Existing style fidelity. |
-| `previous_references` | semantic reference chain | optional | Chains this reference after the previous semantic reference. |
+## Krea2 CcC Latent
 
-`processing` and `fidelity` are consumed by the style modes. `semantic_only` stays on the Qwen semantic path.
-
-## Krea2 CcC Edit
-
-Consumes the ordered reference chains and executes Krea2 Edit.
+Builds the target latent before Edit.
 
 ### Required controls
 
-| Control | Values | Default |
-| --- | --- | --- |
-| `model` | `MODEL` | — |
-| `clip` | `CLIP` | — |
-| `vae` | `VAE` | — |
-| `positive_prompt` | multiline text | empty |
-| `negative_prompt` | multiline text | empty |
-| `aspect_ratio` | `from source`, `1:1`, `3:2`, `2:3`, `4:3`, `3:4`, `16:9`, `9:16` | `1:1` |
-| `resolution` | `from source`, `0.5 MP`, `1.0 MP`, `1.5 MP`, `2.0 MP`, `2.5 MP`, `3.0 MP`, `4.0 MP` | `2.0 MP` |
-| `latent_semantic` | boolean | `false` |
-| `latent_semantic_instruction` | multiline text | empty |
-| `latent_grounding_px` | `0 .. 4096` step `16` | `768` |
-| `batch_size` | `1 .. 64` | `1` |
-| `apply_krea2_edit_patch` | boolean | `true` |
+| Control | Values | Default | Behavior |
+| --- | --- | --- | --- |
+| `vae` | `VAE` | — | Encodes `target_image` when present. |
+| `aspect_ratio` | `from source`, `1:1`, `3:2`, `2:3`, `4:3`, `3:4`, `16:9`, `9:16` | `1:1` | Target aspect ratio. |
+| `resolution` | `from source`, `0.5 MP` ... `4.0 MP` | `2.0 MP` | Target pixel budget. |
+| `latent_semantic` | boolean | `false` | Reuses the target image as semantic/Qwen context so the target content can be reimagined. |
+| `latent_semantic_instruction` | multiline text | empty | Instruction for the target semantic reference. |
+| `latent_grounding_px` | `0 .. 4096` | `768` | Grounding size for latent semantic context. |
+| `batch_size` | `1 .. 64` | `1` | Latent batch size. |
 
-### Optional sockets
+### Optional image sockets
 
-| Socket | Type | Behavior |
-| --- | --- | --- |
-| `target_image` | `IMAGE` | Connected = image target latent. Unconnected = empty target latent. |
-| `grid_size_image` | `IMAGE` | Supplies source pixel budget when `resolution = from source`. Falls back to `target_image`. |
-| `grid_geometry_image` | `IMAGE` | Supplies source aspect ratio when `aspect_ratio = from source`. Falls back to `target_image`. |
-| `visual_references` | visual reference chain | Ordered visual Krea2 Edit references. |
-| `semantic_references` | semantic reference chain | Qwen semantic/style references. |
+| Socket | Behavior |
+| --- | --- |
+| `target_image` | Connected = VAE image-init latent. Unconnected = empty latent. |
+| `grid_size_image` | Supplies pixel budget when `resolution = from source`; otherwise falls back to `target_image`. |
+| `grid_geometry_image` | Supplies aspect ratio when `aspect_ratio = from source`; otherwise falls back to `target_image`. |
 
-The Edit node always builds the final reference order as:
+The latent carries its semantic configuration as internal metadata so the Edit node can preserve the same ordering and behavior that existed before the split.
+
+## Krea2 CcC Edit
+
+Consumes a pre-built latent and executes Krea2 Edit.
+
+### Required
+
+- `model`
+- `clip`
+- `vae`
+- `latent`
+- `positive_prompt`
+- `negative_prompt`
+- `apply_krea2_edit_patch`
+
+### Optional
+
+- `visual_references`
+- `semantic_references`
+
+Final ordering:
 
 ```text
-visual references -> target semantic (when enabled) -> semantic-only references -> style references
+visual references -> latent semantic (when enabled) -> semantic-only references -> style references
 ```
-
-This keeps style spans after edit references and preserves deterministic physical Qwen ordering.

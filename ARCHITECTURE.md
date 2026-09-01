@@ -2,83 +2,56 @@
 
 ## Edit Pipeline
 
-The editing surface is split into three responsibilities.
+The editing surface is split into four responsibilities:
 
 ```text
 IMAGE -> Krea2 CcC Visual Reference --+
                                        |
 IMAGE -> Krea2 CcC Visual Reference --+--> Krea2 CcC Edit --> MODEL / CONDITIONING / LATENT
-                                       |
-IMAGE -> Krea2 CcC Semantic Reference +
+                                       |          ^
+IMAGE -> Krea2 CcC Semantic Reference +          |
+                                                  |
+Images / VAE -> Krea2 CcC Latent ----------------+
 ```
 
 ## Visual References
 
-Visual Reference nodes are declarative. They keep the raw image plus the controls that previously lived in `reference_1_*` and `reference_2_*`.
-
-Chaining is append-only and order-sensitive. For the two-reference identity/body edit contract used by the current test workflow:
+Visual Reference nodes are ordered and append-only. For the current two-reference test contract the order is:
 
 ```text
 scene -> subject
 ```
 
-That order becomes both:
-
-```text
-Qwen physical image order: scene, subject
-Krea2 visual reference order: scene, subject
-```
-
-The visual path therefore does not infer `scene` or `subject` from socket names.
-
-### Semantic naming
-
-A Visual Reference may also participate in Qwen Vision.
-
-- With an empty `semantic_role`, the image is represented positionally, matching the original Krea2 Edit behavior.
-- With a non-empty `semantic_role`, the exact text is attached to that image's Qwen vision block.
-- With `semantic = false`, the image remains a visual edit reference but is omitted from Qwen Vision.
-
-This separates physical reference ordering from optional semantic naming.
+That order becomes both the Qwen physical image order for visual references and the Krea2 visual-reference order. Optional `semantic_role` metadata names a visual reference for Qwen without changing its physical order.
 
 ## Semantic References
 
-Semantic Reference nodes carry the controls previously exposed as `semantic_1_*` and `semantic_2_*`.
+Semantic Reference nodes add Qwen-only semantic or style context. Semantic-only references stay before style references. Style references remain last because a logical style reference may expand into several physical Qwen images.
 
-`semantic_only` produces a non-appearance edit-path reference for Qwen.
+## Latent
 
-`style_direct` and `style_indirect` produce style references using the existing `processing` and `fidelity` behavior.
+`Krea2 CcC Latent` owns target construction independently from the Edit node. It preserves the former Edit behavior for:
 
-Style references are appended after every visual and semantic-only reference because one logical style reference may expand into multiple physical Qwen images.
+- empty target latent
+- VAE image-init target latent
+- explicit aspect ratio and megapixel resolution
+- `from source` grid size
+- `from source` grid geometry
+- batch size
+- optional semantic reinterpretation of the target image
+
+`grid_size_image` and `grid_geometry_image` remain independent. One image can define the target pixel budget while another defines the target aspect ratio.
+
+When `latent_semantic` is enabled, the target image, instruction, and grounding size are stored with the latent as CcC metadata. Edit consumes that metadata and inserts the target semantic reference after visual references, exactly where the former integrated Edit path inserted it.
 
 ## Edit
 
-Edit owns target creation and final orchestration.
+`Krea2 CcC Edit` receives a pre-built `LATENT`; it no longer receives target/grid images or geometry controls.
 
-The old `subject/scene/outfit/style` source selectors are no longer required. The source is represented directly by the connected image socket:
-
-- `target_image`
-- `grid_size_image`
-- `grid_geometry_image`
-
-When `target_image` is not connected, the target latent is empty.
-
-`grid_size_image` and `grid_geometry_image` remain independent. This preserves the experiment where Subject provides the target pixel budget while Scene provides the target aspect ratio.
-
-The final orchestration still uses:
+The final conditioning order is:
 
 ```text
-reference_method = krea2_edit
+visual references -> latent semantic -> semantic-only references -> style references
 ```
 
-and `apply_krea2_edit_patch` controls whether the model patch is applied.
-
-## Repository Workflow Policy
-
-During this refactor only one workflow is kept:
-
-```text
-workflows/01_scene_subject.json
-```
-
-It is the canonical test bed for the split nodes until their contracts are stable.
+The latent is then passed unchanged into the Krea2 Edit orchestrator, which derives target geometry from its tensor shape, prepares visual reference VAE latents, builds Qwen conditioning, and applies the optional Krea2 Edit model patch.

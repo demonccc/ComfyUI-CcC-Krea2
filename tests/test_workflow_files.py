@@ -20,9 +20,11 @@ def test_scene_subject_workflow_uses_split_nodes():
     workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
 
     visual_nodes = _nodes_by_type(workflow, "CcCKrea2VisualReference")
+    latent_nodes = _nodes_by_type(workflow, "CcCKrea2Latent")
     edit_nodes = _nodes_by_type(workflow, "CcCKrea2Edit")
 
     assert len(visual_nodes) == 2
+    assert len(latent_nodes) == 1
     assert len(edit_nodes) == 1
     assert not _nodes_by_type(workflow, "CcCKrea2EasyEdit")
     assert not _nodes_by_type(workflow, "CcCKrea2EasyEditOstris")
@@ -39,24 +41,31 @@ def test_scene_subject_workflow_uses_split_nodes():
     assert previous["link"] is not None
 
 
-def test_scene_subject_edit_geometry_sources_and_empty_target():
+def test_scene_subject_latent_owns_grid_and_edit_consumes_latent():
     workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
+    latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
     edit = _nodes_by_type(workflow, "CcCKrea2Edit")[0]
 
-    input_names = {item["name"] for item in edit["inputs"]}
-    assert "target_image" not in input_names
-    assert "grid_size_image" in input_names
-    assert "grid_geometry_image" in input_names
-    assert "visual_references" in input_names
+    latent_inputs = {item["name"] for item in latent["inputs"]}
+    edit_inputs = {item["name"] for item in edit["inputs"]}
 
-    values = edit["widgets_values"]
-    assert values[2] == "from source"
-    assert values[3] == "from source"
-    assert values[4] is False
-    assert values[-1] is True
+    assert "grid_size_image" in latent_inputs
+    assert "grid_geometry_image" in latent_inputs
+    assert "target_image" not in latent_inputs
+    assert "latent" in edit_inputs
+    assert "grid_size_image" not in edit_inputs
+    assert "grid_geometry_image" not in edit_inputs
+
+    latent_values = latent["widgets_values"]
+    assert latent_values[0] == "from source"
+    assert latent_values[1] == "from source"
+    assert latent_values[2] is False
+
+    edit_values = edit["widgets_values"]
+    assert edit_values[-1] is True
 
 
-def test_workflow_reference_chain_link_types_are_consistent():
+def test_workflow_link_types_are_consistent():
     workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
     nodes = {node["id"]: node for node in workflow["nodes"]}
 

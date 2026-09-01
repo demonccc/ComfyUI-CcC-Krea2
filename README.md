@@ -4,78 +4,61 @@ CcC nodes for Krea 2 generation and editing in ComfyUI.
 
 ## Current Edit Architecture
 
-The Edit surface is intentionally split into three nodes:
+The Edit surface is split into four nodes:
 
 - **Krea2 CcC Visual Reference**
 - **Krea2 CcC Semantic Reference**
+- **Krea2 CcC Latent**
 - **Krea2 CcC Edit**
 
-The split keeps visual reference transport, semantic/style conditioning, and final edit orchestration independent while preserving the behavior already tested in the former Advanced Edit laboratory.
+The split keeps visual references, semantic/style references, target latent construction, and final edit orchestration independent.
 
 ### Visual Reference
 
-Use one node per visual Krea2 Edit reference and chain them in the exact physical reference order expected by the model.
-
-For the bundled scene + subject test:
+Use one node per visual Krea2 Edit reference and chain them in the exact physical reference order expected by the model. For the bundled scene + subject test:
 
 ```text
 scene -> subject
 ```
 
-Each Visual Reference exposes:
-
-- `boost`
-- `rope_position`
-- `semantic`
-- `semantic_role`
-- `instruction`
-- `grounding_px`
-
-`semantic_role` is optional. When `semantic = true` and `semantic_role` is empty, the reference behaves like the original positional Krea2 Edit conditioning: Qwen receives the image in order, without an extra semantic alias. When a value is provided, that exact text is attached to the corresponding vision block so the prompt can reference it semantically.
-
-When `semantic = false`, `semantic_role`, `instruction`, and `grounding_px` are disabled in the UI and the reference is transported only through the visual/edit path.
+`semantic_role` is optional. With `semantic = true` and an empty role, Qwen keeps positional Krea2 Edit behavior. With a value, that text identifies the corresponding image semantically. With `semantic = false`, semantic role/instruction/grounding are ignored.
 
 ### Semantic Reference
 
-Use one node per Qwen-only semantic or style reference.
+Use one node per Qwen-only semantic or style reference. Existing modes remain `semantic_only`, `style_direct`, and `style_indirect`.
 
-Available modes:
+### Latent
 
-- `semantic_only`
-- `style_direct`
-- `style_indirect`
+`Krea2 CcC Latent` now owns everything that previously built the target latent inside Edit:
 
-Existing controls are preserved:
+- empty latent generation
+- image-initialized latent through VAE
+- `aspect_ratio`
+- `resolution`
+- independent `grid_size_image` and `grid_geometry_image`
+- `batch_size`
+- latent semantic reinterpretation (`latent_semantic`, instruction, grounding size)
 
-- `instruction`
-- `grounding_px`
-- `processing`
-- `fidelity`
+When latent semantic is enabled, the target image and its semantic instruction travel with the LATENT metadata and are consumed by Edit in the same reference ordering position used before the split.
 
 ### Edit
 
-The Edit node owns the global edit contract:
+`Krea2 CcC Edit` now receives a pre-built `LATENT` and owns only the final edit contract:
 
-- `positive_prompt`
-- `negative_prompt`
-- `aspect_ratio`
-- `resolution`
-- target latent semantic participation
-- `batch_size`
-- `apply_krea2_edit_patch`
+- `MODEL`
+- `CLIP`
+- `VAE`
+- `LATENT`
+- positive/negative prompts
+- Krea2 Edit patch toggle
+- optional visual reference chain
+- optional semantic reference chain
 
-Optional image sockets replace the old source selectors:
+Reference ordering remains:
 
-- `target_image`
-- `grid_size_image`
-- `grid_geometry_image`
-
-Optional reference sockets:
-
-- `visual_references`
-- `semantic_references`
-
-Visual references are resolved first. Semantic-only references follow them. Style references are kept last because they may expand into multiple physical Qwen image spans.
+```text
+visual references -> latent semantic (when enabled) -> semantic-only references -> style references
+```
 
 ## Test Workflow
 
@@ -83,18 +66,7 @@ For now the repository intentionally contains a single edit workflow:
 
 [`workflows/01_scene_subject.json`](workflows/01_scene_subject.json)
 
-It reproduces the current scene + subject experiment:
-
-- empty target latent
-- scene as Visual Reference 1
-- subject as Visual Reference 2
-- scene boost `1.0`
-- subject boost `4.0`
-- both references participate in Qwen semantic conditioning
-- semantic roles are `scene image` and `subject image`
-- Subject supplies grid size
-- Scene supplies grid geometry
-- KSampler uses 8 steps
+It uses scene -> subject visual references, Subject for grid size, Scene for grid geometry, an empty latent, and passes the generated latent into Edit. KSampler remains at 8 steps.
 
 ## Other Public Nodes
 
