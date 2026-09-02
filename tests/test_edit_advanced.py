@@ -2,7 +2,7 @@
 
 import torch
 
-from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit
+from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _runtime_latent
 from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _resolve_target_geometry
 from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
@@ -178,3 +178,24 @@ def test_latent_semantic_metadata_is_preserved_for_edit():
     assert metadata["image"] is image
     assert metadata["instruction"] == "Reimagine the target content"
     assert metadata["grounding_px"] == 768
+
+
+def test_edit_runtime_latent_matches_pre_split_contract():
+    samples = torch.zeros((1, 16, 64, 80))
+    target_vision_context = object()
+    latent = {
+        "samples": samples,
+        "batch_index": [0],
+        "target_vision_context": target_vision_context,
+        "ccc_krea2_latent_semantic": {"enabled": True, "image": object()},
+        "ccc_krea2_latent_info": "diagnostics",
+    }
+
+    runtime = _runtime_latent(latent)
+
+    assert set(runtime) == {"samples", "batch_index", "target_vision_context"}
+    assert runtime["samples"] is samples
+    assert runtime["batch_index"] == [0]
+    assert runtime["target_vision_context"] is target_vision_context
+    assert "ccc_krea2_latent_semantic" not in runtime
+    assert "ccc_krea2_latent_info" not in runtime

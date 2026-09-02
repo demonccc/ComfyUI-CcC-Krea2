@@ -65,6 +65,20 @@ def _append_semantic(
     return chain.append(spec)
 
 
+def _runtime_latent(latent: dict) -> dict:
+    """Restore the exact target-latent contract used before the Latent/Edit split."""
+    runtime = {
+        "samples": latent["samples"],
+        "batch_index": latent.get("batch_index"),
+        "target_vision_context": latent.get("target_vision_context"),
+    }
+    if runtime["batch_index"] is None:
+        runtime.pop("batch_index")
+    if runtime["target_vision_context"] is None:
+        runtime.pop("target_vision_context")
+    return runtime
+
+
 def _combine_reference_chains(
     clip: Any,
     visual_references: Optional[VisualReferenceChain],
@@ -179,13 +193,14 @@ class CcCKrea2Edit:
             semantic_references=semantic_references,
             latent=latent,
         )
+        runtime_latent = _runtime_latent(latent)
 
         patched_model, positive, negative, latent_out, pipeline_info = run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
             vae=vae,
             references=chain,
-            target_latent=latent,
+            target_latent=runtime_latent,
             positive_prompt=positive_prompt,
             negative_prompt=negative_prompt,
             reference_method="krea2_edit",
