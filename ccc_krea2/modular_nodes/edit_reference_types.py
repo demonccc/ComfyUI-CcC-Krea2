@@ -12,11 +12,19 @@ class VisualReferenceEntry:
 
     image: torch.Tensor
     boost: float = 1.0
-    rope_position: str = "none"
+    fit_to_latent: bool = True
+    rope_grid: str = "inside"
+    rope_horizontal: str = "center"
+    rope_vertical: str = "center"
     semantic: bool = True
     semantic_role: str = ""
     instruction: str = ""
     grounding_px: int = 768
+
+    @property
+    def rope_position(self) -> str:
+        """Compact transport representation consumed by the Krea2 patch."""
+        return f"{self.rope_grid}:{self.rope_horizontal}:{self.rope_vertical}"
 
 
 @dataclass(frozen=True)

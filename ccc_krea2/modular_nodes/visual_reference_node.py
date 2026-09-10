@@ -8,7 +8,9 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
-ROPE_POSITIONS = ("none", "up", "down", "left", "right")
+ROPE_GRIDS = ("inside", "outside")
+ROPE_HORIZONTAL = ("center", "left", "right")
+ROPE_VERTICAL = ("center", "up", "down")
 
 
 class CcCKrea2VisualReference:
@@ -20,8 +22,8 @@ class CcCKrea2VisualReference:
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one visual Krea2 Edit reference. Chaining order is the physical Krea2 reference order. "
-        "When Semantic is enabled, Semantic Role can optionally name the image for Qwen; an empty role "
-        "keeps the original positional Krea2 Edit behavior."
+        "Fit To Latent controls whether the VAE reference is contained inside target geometry or keeps its native "
+        "scale. RoPE grid/horizontal/vertical controls position relative to the target grid."
     )
 
     @classmethod
@@ -30,7 +32,19 @@ class CcCKrea2VisualReference:
             "required": {
                 "image": ("IMAGE",),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
-                "rope_position": (ROPE_POSITIONS, {"default": "none"}),
+                "fit_to_latent": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": (
+                            "True: resize the full reference to fit inside target latent geometry. "
+                            "False: keep native scale (only /16 alignment), allowing the reference to extend outside the target grid."
+                        ),
+                    },
+                ),
+                "rope_grid": (ROPE_GRIDS, {"default": "inside"}),
+                "rope_horizontal": (ROPE_HORIZONTAL, {"default": "center"}),
+                "rope_vertical": (ROPE_VERTICAL, {"default": "center"}),
                 "semantic": ("BOOLEAN", {"default": True}),
                 "semantic_role": (
                     "STRING",
@@ -54,7 +68,10 @@ class CcCKrea2VisualReference:
         self,
         image: torch.Tensor,
         boost: float = 1.0,
-        rope_position: str = "none",
+        fit_to_latent: bool = True,
+        rope_grid: str = "inside",
+        rope_horizontal: str = "center",
+        rope_vertical: str = "center",
         semantic: bool = True,
         semantic_role: str = "",
         instruction: str = "",
@@ -67,7 +84,10 @@ class CcCKrea2VisualReference:
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
-            rope_position=rope_position,
+            fit_to_latent=bool(fit_to_latent),
+            rope_grid=rope_grid,
+            rope_horizontal=rope_horizontal,
+            rope_vertical=rope_vertical,
             semantic=semantic_enabled,
             semantic_role=semantic_role.strip() if semantic_enabled else "",
             instruction=instruction.strip() if semantic_enabled else "",

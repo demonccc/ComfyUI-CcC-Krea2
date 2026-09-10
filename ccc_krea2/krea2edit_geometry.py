@@ -91,6 +91,8 @@ def resolve_krea2edit_geometry(
         resolved_mode = "crop"
     elif fit_mode == "contain":
         resolved_mode = "contain"
+    elif fit_mode == "native":
+        resolved_mode = "native"
     elif fit_mode in ("contain_no_upscale", "fit_no_upscale"):
         resolved_mode = "contain_no_upscale"
     else:
@@ -106,6 +108,17 @@ def resolve_krea2edit_geometry(
         vae_input_h = tgt_h
         interp_occurred = False
         interp_method = "none"
+
+    elif resolved_mode == "native":
+        # Keep native reference scale. Only pad to /16 for VAE alignment; do not constrain to target bounds.
+        crop_h = src_h
+        crop_w = src_w
+        left = 0
+        top = 0
+        vae_input_h = max(16, int(math.ceil(src_h / 16.0)) * 16)
+        vae_input_w = max(16, int(math.ceil(src_w / 16.0)) * 16)
+        interp_occurred = False
+        interp_method = "pad" if (crop_w, crop_h) != (vae_input_w, vae_input_h) else "none"
 
     elif resolved_mode == "contain":
         # Contain with upscale allowed: preserve source AR and full image, scale to fit inside target bounds without crop

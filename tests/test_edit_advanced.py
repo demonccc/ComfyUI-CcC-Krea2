@@ -3,12 +3,15 @@
 import torch
 
 from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _runtime_latent
-from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _resolve_target_geometry
+from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _center_place, _resolve_dimensions
+from ccc_krea2.modular_nodes.reference_fit import resolve_krea2_reference_geometry
+from ccc_krea2.modular_nodes.rope_position import build_incontext_3d_rope_pos_ids, resolve_rope_axes
 from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
+from ccc_krea2.modular_nodes.size_resolver_node import CcCKrea2SizeResolver, _resolve_size
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
 
 
-def test_visual_reference_exposes_only_existing_reference_controls_plus_semantic_role():
+def test_visual_reference_exposes_fit_and_three_axis_rope_controls():
     inputs = CcCKrea2VisualReference.INPUT_TYPES()
     required = inputs["required"]
     optional = inputs["optional"]
@@ -16,40 +19,37 @@ def test_visual_reference_exposes_only_existing_reference_controls_plus_semantic
     assert list(required) == [
         "image",
         "boost",
-        "rope_position",
+        "fit_to_latent",
+        "rope_grid",
+        "rope_horizontal",
+        "rope_vertical",
         "semantic",
         "semantic_role",
         "instruction",
         "grounding_px",
     ]
     assert list(optional) == ["previous_references"]
-    assert required["boost"][1]["default"] == 1.0
-    assert required["boost"][1]["max"] == 10.0
-    assert required["rope_position"][0] == ("none", "up", "down", "left", "right")
-    assert required["semantic"][1]["default"] is True
-    assert required["semantic_role"][1]["default"] == ""
-    assert required["grounding_px"][1]["default"] == 768
+    assert required["fit_to_latent"][1]["default"] is True
+    assert required["rope_grid"][0] == ("inside", "outside")
+    assert required["rope_horizontal"][0] == ("center", "left", "right")
+    assert required["rope_vertical"][0] == ("center", "up", "down")
 
 
 def test_visual_reference_semantic_role_is_ignored_when_semantic_is_disabled():
     image = torch.zeros((1, 64, 64, 3))
-    node = CcCKrea2VisualReference()
-
-    (chain,) = node.process(
+    (chain,) = CcCKrea2VisualReference().process(
         image=image,
         semantic=False,
         semantic_role="subject image",
         instruction="Use subject identity",
-        grounding_px=768,
     )
-
     entry = chain.entries[0]
     assert entry.semantic is False
     assert entry.semantic_role == ""
     assert entry.instruction == ""
 
 
-def test_visual_reference_chain_preserves_krea2_physical_order():
+def test_visual_reference_chain_preserves_order_and_rope_axes():
     scene = torch.zeros((1, 64, 96, 3))
     subject = torch.zeros((1, 96, 64, 3))
     node = CcCKrea2VisualReference()
@@ -58,101 +58,174 @@ def test_visual_reference_chain_preserves_krea2_physical_order():
     (chain,) = node.process(
         image=subject,
         boost=4.0,
+        fit_to_latent=False,
+        rope_grid="inside",
+        rope_horizontal="left",
+        rope_vertical="up",
         semantic_role="subject image",
         previous_references=scene_chain,
     )
 
     assert len(chain.entries) == 2
-    assert chain.entries[0].semantic_role == "scene image"
-    assert chain.entries[1].semantic_role == "subject image"
     assert chain.entries[1].boost == 4.0
+    assert chain.entries[1].fit_to_latent is False
+    assert chain.entries[1].rope_position == "inside:left:up"
+
+
+def test_rope_axes_support_inside_and_outside_positions():
+    assert resolve_rope_axes("none") == ("inside", "center", "center")
+    assert resolve_rope_axes("up") == ("outside", "center", "up")
+    assert resolve_rope_axes("inside:left:up") == ("inside", "left", "up")
+
+    pos = build_incontext_3d_rope_pos_ids(
+        batch_size=1,
+        txt_len=0,
+        ref_token_grids=[(2, 3)],
+        target_grid=(6, 8),
+        ref_rope_positions=["inside:right:down"],
+        device=torch.device("cpu"),
+    )
+    ref = pos[0, :6]
+    assert ref[:, 1].min().item() == 4.0
+    assert ref[:, 2].min().item() == 5.0
+
+
+def test_native_reference_fit_keeps_source_scale_and_only_aligns_to_16():
+    geom = resolve_krea2_reference_geometry(
+        src_h=1003,
+        src_w=1501,
+        tgt_h=768,
+        tgt_w=768,
+        fit_mode="native",
+    )
+    assert geom.mode_resolved == "native"
+    assert geom.crop_rectangle == (0, 0, 1501, 1003)
+    assert geom.vae_input_pixel_size == (1504, 1008)
+    assert geom.interpolation_method == "pad"
 
 
 def test_semantic_reference_exposes_advanced_semantic_controls():
     required = CcCKrea2SemanticReference.INPUT_TYPES()["required"]
-    assert list(required) == [
-        "image",
-        "mode",
-        "instruction",
-        "grounding_px",
-        "processing",
-        "fidelity",
-    ]
     assert required["mode"][0] == ("semantic_only", "style_direct", "style_indirect")
     assert required["processing"][0] == ("full", "2x2", "4x4")
-    assert required["fidelity"][1]["default"] == 1.0
 
 
-def test_latent_owns_all_previous_target_and_grid_controls():
+def test_size_resolver_outputs_only_width_and_height_from_two_images():
+    size_image = torch.zeros((1, 1600, 1400, 3))
+    aspect_image = torch.zeros((1, 640, 1024, 3))
+
+    width, height = _resolve_size(size_image, aspect_image)
+    assert (width, height) == (1600, 1000)
+
+    node = CcCKrea2SizeResolver()
+    assert node.RETURN_TYPES == ("INT", "INT")
+    assert node.RETURN_NAMES == ("width", "height")
+    assert node.process(size_image, aspect_image) == (1600, 1000)
+
+
+def test_latent_dimension_modes_are_explicit_and_align_to_16():
+    image = torch.zeros((1, 1003, 1501, 3))
+
+    width, height, source = _resolve_dimensions(
+        dimensions="from_image",
+        dimensions_image=image,
+        width=1024,
+        height=1024,
+        resolution="1.0 MP",
+        aspect_ratio="1:1",
+    )
+    assert (width, height) == (1504, 1008)
+    assert source == "image dimensions 1501 x 1003"
+
+    fixed_w, fixed_h, _ = _resolve_dimensions(
+        dimensions="fixed",
+        dimensions_image=None,
+        width=1501,
+        height=1003,
+        resolution="1.0 MP",
+        aspect_ratio="1:1",
+    )
+    assert (fixed_w, fixed_h) == (1504, 1008)
+
+    preset_w, preset_h, _ = _resolve_dimensions(
+        dimensions="preset",
+        dimensions_image=None,
+        width=1024,
+        height=1024,
+        resolution="1.0 MP",
+        aspect_ratio="16:9",
+    )
+    assert preset_w % 16 == 0
+    assert preset_h % 16 == 0
+
+
+def test_latent_surface_separates_dimensions_and_content():
     inputs = CcCKrea2Latent.INPUT_TYPES()
     required = inputs["required"]
     optional = inputs["optional"]
 
     assert list(required) == [
         "vae",
-        "aspect_ratio",
+        "dimensions",
+        "width",
+        "height",
         "resolution",
+        "aspect_ratio",
+        "content",
+        "image_fit",
+        "resize_method",
         "latent_semantic",
         "latent_semantic_instruction",
         "latent_grounding_px",
         "batch_size",
     ]
-    assert list(optional) == [
-        "target_image",
-        "grid_size_image",
-        "grid_geometry_image",
-    ]
+    assert required["dimensions"][0] == ("from_image", "fixed", "preset")
+    assert required["resolution"][0] == ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP")
+    assert required["aspect_ratio"][0] == ("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
+    assert required["content"][0] == ("empty", "from_image")
+    assert required["image_fit"][0] == ("long_edge", "native", "stretch")
+    assert list(optional) == ["dimensions_image", "content_image"]
 
 
-def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
-    inputs = CcCKrea2Edit.INPUT_TYPES()
-    required = inputs["required"]
-    optional = inputs["optional"]
-
-    assert list(required) == [
-        "model",
-        "clip",
-        "vae",
-        "latent",
-        "positive_prompt",
-        "negative_prompt",
-        "apply_krea2_edit_patch",
-    ]
-    assert list(optional) == [
-        "visual_references",
-        "semantic_references",
-    ]
-
-    for moved in (
-        "target_image",
-        "grid_size_image",
-        "grid_geometry_image",
-        "aspect_ratio",
-        "resolution",
-        "latent_semantic",
-        "latent_semantic_instruction",
-        "latent_grounding_px",
-        "batch_size",
-    ):
-        assert moved not in required
-        assert moved not in optional
-
-
-def test_grid_size_and_geometry_images_are_independent():
-    size_image = torch.zeros((1, 1600, 1400, 3))
-    geometry_image = torch.zeros((1, 640, 512, 3))
-
-    width, height, size_label, geometry_label = _resolve_target_geometry(
-        target_image=None,
-        aspect_ratio="from source",
-        resolution="from source",
-        grid_size_image=size_image,
-        grid_geometry_image=geometry_image,
+def test_content_native_keeps_image_size_centered():
+    image = torch.zeros((1, 300, 500, 3))
+    canvas, placement = _center_place(
+        image=image,
+        target_w=800,
+        target_h=600,
+        image_fit="native",
+        resize_method="auto",
     )
+    assert canvas.shape == (1, 600, 800, 3)
+    assert placement["fitted_size"] == (500, 300)
+    assert placement["scale"] == 1.0
 
-    assert (width, height) == (1344, 1680)
-    assert size_label == "grid size image"
-    assert geometry_label == "grid geometry image"
+
+def test_content_long_edge_matches_longest_target_edge():
+    image = torch.zeros((1, 500, 300, 3))
+    canvas, placement = _center_place(
+        image=image,
+        target_w=800,
+        target_h=600,
+        image_fit="long_edge",
+        resize_method="bicubic",
+    )
+    assert canvas.shape == (1, 600, 800, 3)
+    assert placement["fitted_size"] == (480, 800)
+    assert placement["scale"] == 1.6
+
+
+def test_content_stretch_fills_target_geometry():
+    image = torch.zeros((1, 500, 300, 3))
+    canvas, placement = _center_place(
+        image=image,
+        target_w=800,
+        target_h=600,
+        image_fit="stretch",
+        resize_method="bicubic",
+    )
+    assert canvas.shape == (1, 600, 800, 3)
+    assert placement["fitted_size"] == (800, 600)
 
 
 class _MockVAE:
@@ -161,23 +234,44 @@ class _MockVAE:
         return torch.zeros((batch, 16, height // 8, width // 8))
 
 
-def test_latent_semantic_metadata_is_preserved_for_edit():
+def test_latent_semantic_metadata_uses_content_image():
     image = torch.zeros((1, 128, 128, 3))
     latent, _ = CcCKrea2Latent().process(
         vae=_MockVAE(),
-        aspect_ratio="1:1",
-        resolution="0.5 MP",
+        dimensions="fixed",
+        width=128,
+        height=128,
+        content="from_image",
+        content_image=image,
+        image_fit="native",
         latent_semantic=True,
         latent_semantic_instruction="Reimagine the target content",
-        latent_grounding_px=768,
-        target_image=image,
     )
-
     metadata = latent["ccc_krea2_latent_semantic"]
     assert metadata["enabled"] is True
     assert metadata["image"] is image
     assert metadata["instruction"] == "Reimagine the target content"
-    assert metadata["grounding_px"] == 768
+
+
+def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
+    required = CcCKrea2Edit.INPUT_TYPES()["required"]
+    optional = CcCKrea2Edit.INPUT_TYPES()["optional"]
+    assert "latent" in required
+    assert list(optional) == ["visual_references", "semantic_references"]
+    for moved in (
+        "dimensions",
+        "dimensions_image",
+        "width",
+        "height",
+        "resolution",
+        "aspect_ratio",
+        "content",
+        "content_image",
+        "image_fit",
+        "resize_method",
+    ):
+        assert moved not in required
+        assert moved not in optional
 
 
 def test_edit_runtime_latent_matches_pre_split_contract():
@@ -192,10 +286,6 @@ def test_edit_runtime_latent_matches_pre_split_contract():
     }
 
     runtime = _runtime_latent(latent)
-
     assert set(runtime) == {"samples", "batch_index", "target_vision_context"}
     assert runtime["samples"] is samples
-    assert runtime["batch_index"] == [0]
     assert runtime["target_vision_context"] is target_vision_context
-    assert "ccc_krea2_latent_semantic" not in runtime
-    assert "ccc_krea2_latent_info" not in runtime

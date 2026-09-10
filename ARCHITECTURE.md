@@ -2,8 +2,6 @@
 
 ## Edit Pipeline
 
-The editing surface is split into four responsibilities:
-
 ```text
 IMAGE -> Krea2 CcC Visual Reference --+
                                        |
@@ -11,47 +9,76 @@ IMAGE -> Krea2 CcC Visual Reference --+--> Krea2 CcC Edit --> MODEL / CONDITIONI
                                        |          ^
 IMAGE -> Krea2 CcC Semantic Reference +          |
                                                   |
-Images / VAE -> Krea2 CcC Latent ----------------+
+Images -> Krea2 CcC Size Resolver -> width/height |
+                                                  |
+VAE / dimensions / content -> Krea2 CcC Latent ---+
 ```
 
 ## Visual References
 
-Visual Reference nodes are ordered and append-only. For the current two-reference test contract the order is:
+Visual Reference nodes are ordered and append-only. The current two-reference workflow uses:
 
 ```text
 scene -> subject
 ```
 
-That order becomes both the Qwen physical image order for visual references and the Krea2 visual-reference order. Optional `semantic_role` metadata names a visual reference for Qwen without changing its physical order.
+`fit_to_latent=true` contains the VAE reference inside target geometry. `fit_to_latent=false` keeps native image scale and only pads to the VAE /16 requirement, so its RoPE grid can extend beyond the target.
 
-## Semantic References
+RoPE placement is represented by three independent controls: grid, horizontal alignment, and vertical alignment.
 
-Semantic Reference nodes add Qwen-only semantic or style context. Semantic-only references stay before style references. Style references remain last because a logical style reference may expand into several physical Qwen images.
+## Size Resolver
+
+Size Resolver is intentionally stateless and image-content agnostic.
+
+It combines:
+
+```text
+long_edge = max(width, height) from long_edge_image
+aspect    = width / height from aspect_ratio_image
+```
+
+and returns only:
+
+```text
+width
+height
+```
+
+It does not align dimensions or create a latent.
 
 ## Latent
 
-`Krea2 CcC Latent` owns target construction independently from the Edit node. It preserves the former Edit behavior for:
+Latent owns final target geometry and VAE alignment.
 
-- empty target latent
-- VAE image-init target latent
-- explicit aspect ratio and megapixel resolution
-- `from source` grid size
-- `from source` grid geometry
-- batch size
-- optional semantic reinterpretation of the target image
+Dimension source is explicit:
 
-`grid_size_image` and `grid_geometry_image` remain independent. One image can define the target pixel budget while another defines the target aspect ratio.
+```text
+from_image -> dimensions_image
+fixed      -> width + height
+preset     -> resolution + aspect_ratio
+```
 
-When `latent_semantic` is enabled, the target image, instruction, and grounding size are stored with the latent as CcC metadata. Edit consumes that metadata and inserts the target semantic reference after visual references, exactly where the former integrated Edit path inserted it.
+Regardless of the source, final pixel width and height are aligned to multiples of 16.
+
+Content source is separate:
+
+```text
+empty
+from_image -> content_image
+```
+
+Image-content placement supports `long_edge`, `native`, and `stretch`. Resizing method is relevant only to the modes that resize.
+
+There is no automatic megapixel hard cap.
+
+When `latent_semantic` is enabled, the original `content_image`, semantic instruction, and grounding size are stored as CcC metadata. Edit consumes that metadata without passing it into the runtime latent contract.
 
 ## Edit
 
-`Krea2 CcC Edit` receives a pre-built `LATENT`; it no longer receives target/grid images or geometry controls.
+`Krea2 CcC Edit` receives a pre-built `LATENT`; it does not own target dimensions or image placement.
 
-The final conditioning order is:
+Conditioning order remains:
 
 ```text
 visual references -> latent semantic -> semantic-only references -> style references
 ```
-
-The latent is then passed unchanged into the Krea2 Edit orchestrator, which derives target geometry from its tensor shape, prepares visual reference VAE latents, builds Qwen conditioning, and applies the optional Krea2 Edit model patch.

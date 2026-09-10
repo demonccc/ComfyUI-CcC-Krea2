@@ -10,6 +10,10 @@ from ..grounding import resize_grounding_image
 from ..reference_specs import ReferenceChain, ReferenceSpec, StyleReferenceSpec
 from ..vision_prep import prepare_image_for_qwen
 from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
+from .rope_position import install_krea2_rope_positioning
+
+
+install_krea2_rope_positioning()
 
 
 def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
@@ -102,7 +106,7 @@ def _combine_reference_chains(
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=entry.boost,
-                visual_reference_fit="fit",
+                visual_reference_fit="contain" if entry.fit_to_latent else "native",
                 rope_position=entry.rope_position,
                 _legacy_role=f"reference_{index}",
             )
@@ -222,8 +226,8 @@ class CcCKrea2Edit:
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
             lines.append(
-                f"Visual Reference {index}: boost={entry.boost}, rope={entry.rope_position}, "
-                f"semantic={entry.semantic}, semantic_role={role}"
+                f"Visual Reference {index}: boost={entry.boost}, fit_to_latent={entry.fit_to_latent}, "
+                f"rope={entry.rope_position}, semantic={entry.semantic}, semantic_role={role}"
             )
 
         latent_info = latent.get("ccc_krea2_latent_info")

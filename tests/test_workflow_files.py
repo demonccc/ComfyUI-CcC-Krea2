@@ -20,49 +20,49 @@ def test_scene_subject_workflow_uses_split_nodes():
     workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
 
     visual_nodes = _nodes_by_type(workflow, "CcCKrea2VisualReference")
+    resolver_nodes = _nodes_by_type(workflow, "CcCKrea2SizeResolver")
     latent_nodes = _nodes_by_type(workflow, "CcCKrea2Latent")
     edit_nodes = _nodes_by_type(workflow, "CcCKrea2Edit")
 
     assert len(visual_nodes) == 2
+    assert len(resolver_nodes) == 1
     assert len(latent_nodes) == 1
     assert len(edit_nodes) == 1
-    assert not _nodes_by_type(workflow, "CcCKrea2EasyEdit")
-    assert not _nodes_by_type(workflow, "CcCKrea2EasyEditOstris")
-    assert not _nodes_by_type(workflow, "CcCKrea2EditAdvanced")
+    assert not _nodes_by_type(workflow, "CcCKrea2Geometry")
 
     scene = next(node for node in visual_nodes if node.get("title") == "Scene Visual Reference")
     subject = next(node for node in visual_nodes if node.get("title") == "Subject Visual Reference")
 
-    assert scene["widgets_values"][:4] == [1.0, "none", True, "scene image"]
-    assert subject["widgets_values"][:4] == [4.0, "none", True, "subject image"]
+    assert scene["widgets_values"][:6] == [1.0, True, "inside", "center", "center", True]
+    assert subject["widgets_values"][:6] == [4.0, True, "inside", "center", "center", True]
 
     previous = next(inp for inp in subject["inputs"] if inp["name"] == "previous_references")
     assert previous["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"
     assert previous["link"] is not None
 
 
-def test_scene_subject_latent_owns_grid_and_edit_consumes_latent():
+def test_scene_subject_size_resolver_feeds_fixed_latent_dimensions():
     workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
+
+    resolver = _nodes_by_type(workflow, "CcCKrea2SizeResolver")[0]
     latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
     edit = _nodes_by_type(workflow, "CcCKrea2Edit")[0]
 
-    latent_inputs = {item["name"] for item in latent["inputs"]}
-    edit_inputs = {item["name"] for item in edit["inputs"]}
+    resolver_inputs = {item["name"]: item for item in resolver["inputs"]}
+    latent_inputs = {item["name"]: item for item in latent["inputs"]}
+    edit_inputs = {item["name"]: item for item in edit["inputs"]}
 
-    assert "grid_size_image" in latent_inputs
-    assert "grid_geometry_image" in latent_inputs
-    assert "target_image" not in latent_inputs
+    assert resolver_inputs["long_edge_image"]["link"] is not None
+    assert resolver_inputs["aspect_ratio_image"]["link"] is not None
+    assert latent_inputs["width"]["link"] is not None
+    assert latent_inputs["height"]["link"] is not None
+    assert latent_inputs["width"]["type"] == "INT"
+    assert latent_inputs["height"]["type"] == "INT"
     assert "latent" in edit_inputs
-    assert "grid_size_image" not in edit_inputs
-    assert "grid_geometry_image" not in edit_inputs
 
     latent_values = latent["widgets_values"]
-    assert latent_values[0] == "from source"
-    assert latent_values[1] == "from source"
-    assert latent_values[2] is False
-
-    edit_values = edit["widgets_values"]
-    assert edit_values[-1] is True
+    assert latent_values[0] == "fixed"
+    assert "empty" in latent_values
 
 
 def test_workflow_link_types_are_consistent():

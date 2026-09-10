@@ -4,9 +4,14 @@
 
 ### Changed
 - Removed Easy Edit and the previous simple/Advanced Edit public surfaces.
-- Split the former Edit Advanced laboratory into `Krea2 CcC Visual Reference`, `Krea2 CcC Semantic Reference`, and `Krea2 CcC Edit`.
-- Visual references now keep physical Krea2 reference order separately from optional Qwen semantic naming.
-- Added optional `semantic_role` to Visual Reference. Empty keeps positional Krea2 Edit behavior; non-empty attaches the role to the corresponding Qwen vision block.
-- `semantic_role`, `instruction`, and `grounding_px` are disabled and ignored when Visual Reference semantic participation is disabled.
-- Replaced the old subject/scene/outfit/style source selectors for target geometry with direct `target_image`, `grid_size_image`, and `grid_geometry_image` sockets.
-- Removed old Easy Edit workflows and kept only `workflows/01_scene_subject.json` as the current split-node test workflow.
+- Split Edit responsibilities into Visual Reference, Semantic Reference, Size Resolver, Latent, and Edit nodes.
+- Visual Reference now exposes `fit_to_latent` and independent RoPE grid/horizontal/vertical controls.
+- `fit_to_latent=false` preserves native reference scale apart from /16 VAE padding.
+- Replaced the intermediate Geometry object with `Krea2 CcC Size Resolver`, which outputs only `width` and `height`.
+- Size Resolver combines the long edge from one image with the aspect ratio from another image.
+- Latent now has explicit `dimensions` modes: `from_image`, `fixed`, and `preset`.
+- Latent preset resolution is limited to the selectable range `0.5 MP` through `2.5 MP`; no automatic hard cap is applied to other dimension modes.
+- Latent content is now explicit (`empty` or `from_image`) and uses `content_image`.
+- Image content fit modes are `long_edge`, `native`, and `stretch`, with selectable resize method for resizing modes.
+- Final Latent width and height are aligned to multiples of 16.
+- Updated the scene + subject workflow so Subject supplies long-edge scale, Scene supplies aspect ratio, and Size Resolver feeds fixed Latent width/height.
