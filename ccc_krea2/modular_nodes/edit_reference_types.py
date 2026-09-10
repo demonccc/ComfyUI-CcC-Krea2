@@ -12,7 +12,6 @@ class VisualReferenceEntry:
 
     image: torch.Tensor
     boost: float = 1.0
-    fit_to_latent: bool = True
     rope_grid: str = "inside"
     rope_horizontal: str = "center"
     rope_vertical: str = "center"

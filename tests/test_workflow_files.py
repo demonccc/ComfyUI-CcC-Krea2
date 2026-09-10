@@ -33,8 +33,10 @@ def test_scene_subject_workflow_uses_split_nodes():
     scene = next(node for node in visual_nodes if node.get("title") == "Scene Visual Reference")
     subject = next(node for node in visual_nodes if node.get("title") == "Subject Visual Reference")
 
-    assert scene["widgets_values"][:6] == [1.0, True, "inside", "center", "center", True]
-    assert subject["widgets_values"][:6] == [4.0, True, "inside", "center", "center", True]
+    assert scene["widgets_values"][:5] == [1.0, "inside", "center", "center", True]
+    assert subject["widgets_values"][:5] == [4.0, "inside", "center", "center", True]
+    assert len(scene["widgets_values"]) == 8
+    assert len(subject["widgets_values"]) == 8
 
     previous = next(inp for inp in subject["inputs"] if inp["name"] == "previous_references")
     assert previous["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"

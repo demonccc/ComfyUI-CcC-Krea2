@@ -2,16 +2,17 @@
 
 import torch
 
+from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
 from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _runtime_latent
 from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _center_place, _resolve_dimensions
-from ccc_krea2.modular_nodes.reference_fit import resolve_krea2_reference_geometry
 from ccc_krea2.modular_nodes.rope_position import build_incontext_3d_rope_pos_ids, resolve_rope_axes
 from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from ccc_krea2.modular_nodes.size_resolver_node import CcCKrea2SizeResolver, _resolve_size
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
+from ccc_krea2.patch import attach_reference_boosts_to_conditioning, _normalize_runtime_boosts
 
 
-def test_visual_reference_exposes_fit_and_three_axis_rope_controls():
+def test_visual_reference_exposes_three_axis_rope_controls_without_reference_sizing_toggle():
     inputs = CcCKrea2VisualReference.INPUT_TYPES()
     required = inputs["required"]
     optional = inputs["optional"]
@@ -19,7 +20,6 @@ def test_visual_reference_exposes_fit_and_three_axis_rope_controls():
     assert list(required) == [
         "image",
         "boost",
-        "fit_to_latent",
         "rope_grid",
         "rope_horizontal",
         "rope_vertical",
@@ -29,7 +29,7 @@ def test_visual_reference_exposes_fit_and_three_axis_rope_controls():
         "grounding_px",
     ]
     assert list(optional) == ["previous_references"]
-    assert required["fit_to_latent"][1]["default"] is True
+    assert "fit_to_latent" not in required
     assert required["rope_grid"][0] == ("inside", "outside")
     assert required["rope_horizontal"][0] == ("center", "left", "right")
     assert required["rope_vertical"][0] == ("center", "up", "down")
@@ -49,7 +49,7 @@ def test_visual_reference_semantic_role_is_ignored_when_semantic_is_disabled():
     assert entry.instruction == ""
 
 
-def test_visual_reference_chain_preserves_order_and_rope_axes():
+def test_visual_reference_chain_preserves_order_boost_and_rope_axes():
     scene = torch.zeros((1, 64, 96, 3))
     subject = torch.zeros((1, 96, 64, 3))
     node = CcCKrea2VisualReference()
@@ -58,7 +58,6 @@ def test_visual_reference_chain_preserves_order_and_rope_axes():
     (chain,) = node.process(
         image=subject,
         boost=4.0,
-        fit_to_latent=False,
         rope_grid="inside",
         rope_horizontal="left",
         rope_vertical="up",
@@ -68,11 +67,45 @@ def test_visual_reference_chain_preserves_order_and_rope_axes():
 
     assert len(chain.entries) == 2
     assert chain.entries[1].boost == 4.0
-    assert chain.entries[1].fit_to_latent is False
+    assert not hasattr(chain.entries[1], "fit_to_latent")
     assert chain.entries[1].rope_position == "inside:left:up"
 
 
-def test_rope_axes_support_inside_and_outside_positions():
+def test_krea2_v12_fit_regression_for_1719x1164_reference_against_992_square_target():
+    geom = resolve_krea2edit_geometry(
+        src_h=1164,
+        src_w=1719,
+        tgt_h=992,
+        tgt_w=992,
+        fit_mode="fit",
+    )
+
+    assert geom.mode_resolved == "fit"
+    assert geom.vae_input_pixel_size == (992, 656)
+    assert geom.vae_latent_grid_size == (124, 82)
+    assert geom.target_grid_size == (124, 124)
+    assert geom.interpolation_method == "bicubic"
+    assert geom.whether_interpolation_occurred is True
+
+
+def test_rope_center_matches_rednode_integer_center_after_v12_fit():
+    # VAE latent grids 124x82 (ref) and 124x124 (target) become DiT patch grids
+    # 62x41 and 62x62 with Krea2 patch size 2.
+    pos = build_incontext_3d_rope_pos_ids(
+        batch_size=1,
+        txt_len=0,
+        ref_token_grids=[(41, 62)],
+        target_grid=(62, 62),
+        ref_rope_positions=["inside:center:center"],
+        device=torch.device("cpu"),
+    )
+
+    ref = pos[0, : 41 * 62]
+    assert ref[:, 1].min().item() == 10.0
+    assert ref[:, 2].min().item() == 0.0
+
+
+def test_rope_axes_preserve_optional_outside_displacement():
     assert resolve_rope_axes("none") == ("inside", "center", "center")
     assert resolve_rope_axes("up") == ("outside", "center", "up")
     assert resolve_rope_axes("inside:left:up") == ("inside", "left", "up")
@@ -82,26 +115,29 @@ def test_rope_axes_support_inside_and_outside_positions():
         txt_len=0,
         ref_token_grids=[(2, 3)],
         target_grid=(6, 8),
-        ref_rope_positions=["inside:right:down"],
+        ref_rope_positions=["outside:left:center"],
         device=torch.device("cpu"),
     )
     ref = pos[0, :6]
-    assert ref[:, 1].min().item() == 4.0
-    assert ref[:, 2].min().item() == 5.0
+    assert ref[:, 1].min().item() == 2.0
+    assert ref[:, 2].min().item() == -3.0
 
 
-def test_native_reference_fit_keeps_source_scale_and_only_aligns_to_16():
-    geom = resolve_krea2_reference_geometry(
-        src_h=1003,
-        src_w=1501,
-        tgt_h=768,
-        tgt_w=768,
-        fit_mode="native",
-    )
-    assert geom.mode_resolved == "native"
-    assert geom.crop_rectangle == (0, 0, 1501, 1003)
-    assert geom.vae_input_pixel_size == (1504, 1008)
-    assert geom.interpolation_method == "pad"
+def test_positive_reference_boost_metadata_is_explicit_and_negative_defaults_to_neutral():
+    positive_conditioning = [[torch.zeros((1, 4, 8)), {}]]
+    negative_conditioning = [[torch.zeros((1, 4, 8)), {}]]
+
+    positive = attach_reference_boosts_to_conditioning(positive_conditioning, [4.0])
+
+    assert positive[0][1]["reference_boosts"] == [4.0]
+    assert "reference_boosts" not in negative_conditioning[0][1]
+    assert _normalize_runtime_boosts(None, 1) == [1.0]
+
+
+def test_runtime_reference_boosts_default_to_neutral_and_align_to_reference_count():
+    assert _normalize_runtime_boosts(None, 2) == [1.0, 1.0]
+    assert _normalize_runtime_boosts([4.0], 2) == [1.0, 4.0]
+    assert _normalize_runtime_boosts([2.0, 3.0, 4.0], 2) == [3.0, 4.0]
 
 
 def test_semantic_reference_exposes_advanced_semantic_controls():

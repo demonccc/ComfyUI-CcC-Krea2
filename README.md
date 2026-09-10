@@ -16,9 +16,13 @@ The Edit surface is split into focused nodes:
 
 Use one node per visual Krea2 Edit reference and chain them in physical reference order.
 
-`fit_to_latent` controls whether the reference is resized to fit the target latent geometry. RoPE positioning is split into grid (`inside` / `outside`), horizontal (`center` / `left` / `right`) and vertical (`center` / `up` / `down`) controls.
+Reference sizing is deliberately not a user control: every visual reference is always fitted to the already-resolved target latent with the Krea2 Identity Edit v1.2 pixel-space `fit` geometry before VAE encoding.
+
+RoPE positioning is independent from that fit and is split into grid (`inside` / `outside`), horizontal (`center` / `left` / `right`) and vertical (`center` / `up` / `down`) controls. This keeps the proven edit geometry while allowing CcC experiments that move the reference coordinates outside the target grid.
 
 `semantic_role` is optional. With `semantic = true` and an empty role, Qwen keeps positional Krea2 Edit behavior. With a value, that text identifies the corresponding image semantically.
+
+`boost` applies to the positive pass. The grounded negative uses the same reference images with boost fixed to `1.0`, matching the v1.2 Identity Edit recipe.
 
 ### Size Resolver
 
@@ -55,6 +59,18 @@ Image content fit modes are:
 
 Final latent pixel dimensions are aligned to multiples of 16. There is no automatic megapixel hard cap.
 
+The important boundary is:
+
+```text
+build target latent however needed
+        ->
+resolve final target geometry
+        ->
+fit every Krea2 Edit visual reference to that target with v1.2 fit
+        ->
+optionally move only its RoPE coordinates
+```
+
 ### Edit
 
 `Krea2 CcC Edit` consumes the pre-built latent, visual references, and semantic references, then builds conditioning and applies the optional Krea2 Edit patch.
@@ -71,7 +87,7 @@ The repository intentionally contains one edit workflow:
 
 [`workflows/01_scene_subject.json`](workflows/01_scene_subject.json)
 
-It uses Subject as the long-edge reference and Scene as the aspect-ratio reference. Size Resolver outputs feed Latent `width` and `height` in `fixed` dimensions mode.
+It uses Subject as the long-edge reference and Scene as the aspect-ratio reference. Size Resolver outputs feed Latent `width` and `height` in `fixed` dimensions mode. Both visual references are then fitted to the resolved latent with Krea2 Identity Edit v1.2 geometry.
 
 ## Other Public Nodes
 

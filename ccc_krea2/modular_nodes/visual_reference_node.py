@@ -22,8 +22,9 @@ class CcCKrea2VisualReference:
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one visual Krea2 Edit reference. Chaining order is the physical Krea2 reference order. "
-        "Fit To Latent controls whether the VAE reference is contained inside target geometry or keeps its native "
-        "scale. RoPE grid/horizontal/vertical controls position relative to the target grid."
+        "The reference image is always fitted to the resolved target latent using the Krea2 Edit v1.2 "
+        "pixel-space fit geometry before VAE encoding. RoPE grid/horizontal/vertical only controls where "
+        "the fitted reference coordinates are placed relative to the target grid."
     )
 
     @classmethod
@@ -32,16 +33,6 @@ class CcCKrea2VisualReference:
             "required": {
                 "image": ("IMAGE",),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
-                "fit_to_latent": (
-                    "BOOLEAN",
-                    {
-                        "default": True,
-                        "tooltip": (
-                            "True: resize the full reference to fit inside target latent geometry. "
-                            "False: keep native scale (only /16 alignment), allowing the reference to extend outside the target grid."
-                        ),
-                    },
-                ),
                 "rope_grid": (ROPE_GRIDS, {"default": "inside"}),
                 "rope_horizontal": (ROPE_HORIZONTAL, {"default": "center"}),
                 "rope_vertical": (ROPE_VERTICAL, {"default": "center"}),
@@ -68,7 +59,6 @@ class CcCKrea2VisualReference:
         self,
         image: torch.Tensor,
         boost: float = 1.0,
-        fit_to_latent: bool = True,
         rope_grid: str = "inside",
         rope_horizontal: str = "center",
         rope_vertical: str = "center",
@@ -84,7 +74,6 @@ class CcCKrea2VisualReference:
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
-            fit_to_latent=bool(fit_to_latent),
             rope_grid=rope_grid,
             rope_horizontal=rope_horizontal,
             rope_vertical=rope_vertical,

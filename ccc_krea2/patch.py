@@ -2,11 +2,99 @@
 
 import math
 from typing import List, Dict, Any, Optional, Tuple
+
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 
 from .references import PreparedReference, _process_latent_in_if_available
+
+
+def install_krea2_reference_boost_conditioning() -> None:
+    """Allow per-conditioning reference boosts, matching the proven Krea2 Identity Edit contract.
+
+    Positive and negative conditioning are evaluated separately by ComfyUI. Transporting boosts
+    through conditioning metadata lets the positive pass use the configured reference fidelity
+    while the grounded negative pass stays at 1.0, as used by the v1.2 Identity Edit workflow.
+    """
+    try:
+        import comfy.conds
+        import comfy.model_base
+    except (ImportError, AttributeError):
+        return
+
+    krea2_cls = getattr(comfy.model_base, "Krea2", None)
+    if krea2_cls is None or getattr(krea2_cls, "_ccc_krea2_reference_boost_patched", False):
+        return
+
+    original_extra_conds = krea2_cls.extra_conds
+
+    def _ccc_krea2_extra_conds(self, **kwargs):
+        out = original_extra_conds(self, **kwargs)
+
+        ref_boosts = kwargs.get("reference_boosts")
+        if ref_boosts is not None:
+            out["ref_boosts"] = comfy.conds.CONDConstant(list(ref_boosts))
+
+        masked_boosts = kwargs.get("reference_masked_boosts")
+        if masked_boosts is not None:
+            out["ccc_ref_masked_boosts"] = comfy.conds.CONDConstant(list(masked_boosts))
+
+        return out
+
+    krea2_cls.extra_conds = _ccc_krea2_extra_conds
+    krea2_cls._ccc_krea2_reference_boost_patched = True
+
+
+def attach_reference_boosts_to_conditioning(
+    conditioning: List[Any],
+    reference_boosts: List[float],
+    reference_masked_boosts: Optional[List[float]] = None,
+) -> List[Any]:
+    """Attach pass-specific reference boost metadata to a conditioning object."""
+    if not conditioning:
+        return conditioning
+
+    values = {"reference_boosts": [float(v) for v in reference_boosts]}
+    if reference_masked_boosts is not None:
+        values["reference_masked_boosts"] = [float(v) for v in reference_masked_boosts]
+
+    try:
+        import node_helpers
+
+        return node_helpers.conditioning_set_values(conditioning, values)
+    except (ImportError, AttributeError):
+        updated = []
+        for entry in conditioning:
+            if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                extras = dict(entry[1]) if isinstance(entry[1], dict) else {}
+                extras.update(values)
+                updated.append([entry[0], extras])
+            else:
+                updated.append(entry)
+        return updated
+
+
+def _normalize_runtime_boosts(value: Any, count: int, default: float = 1.0) -> List[float]:
+    """Normalize condition-provided boost values to the active visual-reference count."""
+    if count <= 0:
+        return []
+    if value is None:
+        return [float(default)] * count
+
+    if torch.is_tensor(value):
+        raw = value.detach().flatten().tolist()
+    elif isinstance(value, (list, tuple)):
+        raw = list(value)
+    else:
+        raw = [value]
+
+    resolved = [float(v) for v in raw]
+    if len(resolved) < count:
+        resolved = [float(default)] * (count - len(resolved)) + resolved
+    elif len(resolved) > count:
+        resolved = resolved[-count:]
+    return resolved
 
 
 def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> bool:
@@ -17,7 +105,7 @@ def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> b
     if hasattr(model, "wrappers"):
         w_dict = getattr(model, "wrappers", {})
         if isinstance(w_dict, dict):
-            for k, wrappers_list in w_dict.items():
+            for _, wrappers_list in w_dict.items():
                 if isinstance(wrappers_list, dict) and patch_key in wrappers_list:
                     return True
                 if isinstance(wrappers_list, list):
@@ -32,7 +120,7 @@ def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> b
             if isinstance(t_opts, dict):
                 wrappers = t_opts.get("wrappers", {})
                 if isinstance(wrappers, dict):
-                    for k, diff_w in wrappers.items():
+                    for _, diff_w in wrappers.items():
                         if isinstance(diff_w, dict) and patch_key in diff_w:
                             return True
 
@@ -54,9 +142,11 @@ def check_patch_safety(model: Any, target_patch: str) -> None:
 
 
 def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any:
-    """Clone MODEL and register canonical DIFFUSION_MODEL wrapper with closure transport.
+    """Clone MODEL and register the Krea2 Edit DIFFUSION_MODEL wrapper.
 
-    Contract: patch_krea2_model(model, prepared_refs)
+    Reference geometry and latents are captured by the wrapper. Attention boosts are deliberately
+    *not* captured as a single global value: they arrive per conditioning pass so the positive can
+    use the configured boost while the grounded negative remains at 1.0.
     """
     if is_model_already_patched(model, "ccc_krea2_edit"):
         raise RuntimeError(
@@ -65,12 +155,12 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             "latents in a closure. Connect this Edit node to the unpatched upstream MODEL instead."
         )
 
+    install_krea2_reference_boost_conditioning()
+
     patched_model = model.clone()
     patched_model._ccc_patch_key = "ccc_krea2_edit"
 
     processed_ref_latents: List[torch.Tensor] = []
-    ref_boosts: List[float] = []
-    ref_masked_boosts: List[float] = []
     ref_masks: List[Optional[torch.Tensor]] = []
     mask_modes: List[str] = []
     ref_rope_positions: List[str] = []
@@ -79,14 +169,17 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
         if ref.vae_latent is not None:
             proc_lat = _process_latent_in_if_available(patched_model, ref.vae_latent)
             processed_ref_latents.append(proc_lat)
-            ref_boosts.append(ref.boost)
-            ref_masked_boosts.append(getattr(ref, "masked_boost", 1.0))
             ref_masks.append(ref.spatial_attention_mask)
             mask_modes.append(ref.mask_mode)
             ref_rope_positions.append(getattr(ref, "rope_position", "none"))
 
     def krea2_edit_wrapper(
-        executor: Any, x: torch.Tensor, timesteps: torch.Tensor, context: torch.Tensor, *wargs: Any, **kwargs: Any
+        executor: Any,
+        x: torch.Tensor,
+        timesteps: torch.Tensor,
+        context: torch.Tensor,
+        *wargs: Any,
+        **kwargs: Any,
     ) -> torch.Tensor:
         """Canonical ComfyUI DIFFUSION_MODEL wrapper signature."""
         dit_model = getattr(executor, "class_obj", None)
@@ -98,7 +191,16 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             transformer_options = kwargs["transformer_options"]
 
         if not processed_ref_latents or dit_model is None:
-            return executor(x, timesteps, context, *wargs, **kwargs)
+            fallback_kwargs = dict(kwargs)
+            fallback_kwargs.pop("ref_boosts", None)
+            fallback_kwargs.pop("ccc_ref_masked_boosts", None)
+            return executor(x, timesteps, context, *wargs, **fallback_kwargs)
+
+        count = len(processed_ref_latents)
+        runtime_ref_boosts = _normalize_runtime_boosts(kwargs.get("ref_boosts"), count, default=1.0)
+        runtime_masked_boosts = _normalize_runtime_boosts(
+            kwargs.get("ccc_ref_masked_boosts"), count, default=1.0
+        )
 
         return krea2_dit_incontext_forward(
             dit_model=dit_model,
@@ -106,8 +208,8 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
             timesteps=timesteps,
             context=context,
             ref_latents=processed_ref_latents,
-            ref_boosts=ref_boosts,
-            ref_masked_boosts=ref_masked_boosts,
+            ref_boosts=runtime_ref_boosts,
+            ref_masked_boosts=runtime_masked_boosts,
             ref_masks=ref_masks,
             mask_modes=mask_modes,
             ref_rope_positions=ref_rope_positions,
@@ -198,12 +300,12 @@ def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
         curr_b = tensor.shape[0]
         if curr_b == target_bs:
             return tensor
-        elif curr_b > target_bs:
+        if curr_b > target_bs:
             return tensor[:target_bs]
-        else:
-            repeats = (target_bs + curr_b - 1) // curr_b
-            tiled = tensor.repeat(repeats, *([1] * (tensor.ndim - 1)))
-            return tiled[:target_bs]
+
+        repeats = (target_bs + curr_b - 1) // curr_b
+        tiled = tensor.repeat(repeats, *([1] * (tensor.ndim - 1)))
+        return tiled[:target_bs]
 
 
 def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
@@ -215,7 +317,9 @@ def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 100
     except (ImportError, AttributeError):
         half = dim // 2
         freqs = torch.exp(
-            -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32, device=timesteps.device) / half
+            -math.log(max_period)
+            * torch.arange(start=0, end=half, dtype=torch.float32, device=timesteps.device)
+            / half
         )
         args = timesteps[:, None].float() * freqs[None, :]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
@@ -263,7 +367,12 @@ def krea2_dit_incontext_forward(
     target_gw = padded_w // patch_size
     tgt_n_toks = target_gh * target_gw
 
-    x_patch = rearrange(x_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
+    x_patch = rearrange(
+        x_padded,
+        "b c (h p1) (w p2) -> b (h w) (c p1 p2)",
+        p1=patch_size,
+        p2=patch_size,
+    )
 
     ref_patches: List[torch.Tensor] = []
     ref_token_grids: List[Tuple[int, int]] = []
@@ -281,7 +390,12 @@ def krea2_dit_incontext_forward(
         r_gh = r_ph // patch_size
         r_gw = r_pw // patch_size
 
-        r_patch = rearrange(ref_padded, "b c (h p1) (w p2) -> b (h w) (c p1 p2)", p1=patch_size, p2=patch_size)
+        r_patch = rearrange(
+            ref_padded,
+            "b c (h p1) (w p2) -> b (h w) (c p1 p2)",
+            p1=patch_size,
+            p2=patch_size,
+        )
         ref_patches.append(r_patch)
         ref_token_grids.append((r_gh, r_gw))
         ref_token_lens.append(r_gh * r_gw)
@@ -376,7 +490,11 @@ def _build_incontext_3d_rope_pos_ids(
     device: torch.device,
     ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
-    """Build 3D RoPE position IDs with shape [batch_size, seq_len, 3]."""
+    """Build legacy 3D RoPE position IDs with shape [batch_size, seq_len, 3].
+
+    The modular Edit surface replaces this helper at import time with the three-axis
+    implementation in modular_nodes.rope_position.
+    """
     tgt_gh, tgt_gw = target_grid
     list_pos = []
 
@@ -473,7 +591,12 @@ def _compute_ref_attention_bias_patchified(
     target_start = txt_len + total_ref_len
 
     for boost, masked_boost, ref_len, spatial_mask, (r_gh, r_gw), mask_mode in zip(
-        resolved_base_boosts, resolved_masked_boosts, ref_token_lens, ref_masks, ref_token_grids, mask_modes
+        resolved_base_boosts,
+        resolved_masked_boosts,
+        ref_token_lens,
+        ref_masks,
+        ref_token_grids,
+        mask_modes,
     ):
         ref_end = ref_start + ref_len
 

@@ -6,7 +6,7 @@ import torch
 
 
 def resolve_rope_axes(position: str) -> Tuple[str, str, str]:
-    """Resolve new 3-axis RoPE controls while preserving legacy single-position values."""
+    """Resolve three-axis RoPE controls while preserving legacy single-position values."""
     legacy = {
         "none": ("inside", "center", "center"),
         "up": ("outside", "center", "up"),
@@ -40,7 +40,15 @@ def build_incontext_3d_rope_pos_ids(
     device: torch.device,
     ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
-    """Build Krea2 3D RoPE position IDs using grid + horizontal + vertical placement."""
+    """Build Krea2 3D RoPE IDs from v1.2-fitted refs plus optional coordinate displacement.
+
+    Reference sizing is not controlled here. Every visual reference is fitted to the target
+    latent first by the canonical Krea2 Edit v1.2 pixel-space geometry. This function only
+    changes the coordinate placement used by RoPE.
+
+    `inside:center:center` intentionally matches the proven RedNode/upstream behavior:
+    stride-1 reference coordinates with integer centered offsets.
+    """
     tgt_gh, tgt_gw = target_grid
     list_pos = []
 
@@ -56,19 +64,22 @@ def build_incontext_3d_rope_pos_ids(
         )
         grid, horizontal, vertical = resolve_rope_axes(position)
 
+        centered_x = float(max(0, (tgt_gw - r_gw) // 2))
+        centered_y = float(max(0, (tgt_gh - r_gh) // 2))
+
         if horizontal == "left":
             x_off = 0.0 if grid == "inside" else -float(r_gw)
         elif horizontal == "right":
-            x_off = float(tgt_gw - r_gw) if grid == "inside" else float(tgt_gw)
+            x_off = float(max(0, tgt_gw - r_gw)) if grid == "inside" else float(tgt_gw)
         else:
-            x_off = (tgt_gw - r_gw) / 2.0
+            x_off = centered_x
 
         if vertical == "up":
             y_off = 0.0 if grid == "inside" else -float(r_gh)
         elif vertical == "down":
-            y_off = float(tgt_gh - r_gh) if grid == "inside" else float(tgt_gh)
+            y_off = float(max(0, tgt_gh - r_gh)) if grid == "inside" else float(tgt_gh)
         else:
-            y_off = (tgt_gh - r_gh) / 2.0
+            y_off = centered_y
 
         grid_y = torch.arange(r_gh, device=device, dtype=torch.float32) + y_off
         grid_x = torch.arange(r_gw, device=device, dtype=torch.float32) + x_off
@@ -86,9 +97,10 @@ def build_incontext_3d_rope_pos_ids(
 
 
 def install_krea2_rope_positioning() -> None:
-    """Install three-axis RoPE positioning and native visual-reference sizing."""
+    """Install only the optional RoPE placement extension.
+
+    Krea2 Edit reference sizing remains owned by the canonical v1.2 fit geometry.
+    """
     from .. import patch as patch_module
-    from .reference_fit import install_krea2_reference_fit
 
     patch_module._build_incontext_3d_rope_pos_ids = build_incontext_3d_rope_pos_ids
-    install_krea2_reference_fit()

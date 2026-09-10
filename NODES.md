@@ -7,21 +7,35 @@ Declares one ordered visual reference for Krea2 Edit.
 | Control | Values | Default | Behavior |
 | --- | --- | --- | --- |
 | `image` | `IMAGE` | — | Visual edit reference. |
-| `boost` | `0.0 .. 10.0` | `1.0` | Per-reference attention boost. |
-| `fit_to_latent` | boolean | `true` | `true` contains the reference inside target geometry; `false` preserves native scale except /16 VAE padding. |
-| `rope_grid` | `inside`, `outside` | `inside` | Place RoPE coordinates inside or outside the target grid. |
-| `rope_horizontal` | `center`, `left`, `right` | `center` | Horizontal RoPE alignment. |
-| `rope_vertical` | `center`, `up`, `down` | `center` | Vertical RoPE alignment. |
+| `boost` | `0.0 .. 10.0` | `1.0` | Positive-pass target-to-reference attention boost. The grounded negative always uses `1.0`. |
+| `rope_grid` | `inside`, `outside` | `inside` | Place the fitted reference RoPE coordinates inside or outside the target grid. |
+| `rope_horizontal` | `center`, `left`, `right` | `center` | Horizontal RoPE alignment/displacement. |
+| `rope_vertical` | `center`, `up`, `down` | `center` | Vertical RoPE alignment/displacement. |
 | `semantic` | boolean | `true` | Also participates in Qwen Vision. |
 | `semantic_role` | text | empty | Optional semantic name for this image. |
 | `instruction` | multiline text | empty | Per-reference Qwen instruction. |
 | `grounding_px` | `0 .. 4096` | `768` | Qwen grounding size. |
+
+### Visual reference geometry
+
+Reference sizing is not configurable on this node.
+
+Every visual reference is always prepared against the final resolved target latent using the Krea2 Identity Edit v1.2 pixel-space `fit` geometry before VAE encoding. This is independent of how the target latent was created:
+
+- Size Resolver -> `fixed`
+- `preset`
+- `from_image`
+- latent content from an image
+
+The target latent is resolved first. Then every Krea2 Edit visual reference is fitted to that target. RoPE controls only change the coordinate placement of that already-fitted reference; they never change its pixel/VAE sizing.
 
 Rules:
 
 - `semantic = false`: `semantic_role`, `instruction`, and `grounding_px` are disabled and ignored.
 - `semantic = true` + empty `semantic_role`: positional Krea2 Edit behavior.
 - `semantic = true` + non-empty `semantic_role`: the role text is attached to the corresponding Qwen image.
+- Configured `boost` applies to the positive conditioning pass only.
+- The grounded negative uses the same visual references with reference boost fixed to `1.0`, matching the v1.2 Identity Edit conditioning recipe.
 
 ## Krea2 CcC Semantic Reference
 
@@ -113,7 +127,18 @@ Optional:
 - `visual_references`
 - `semantic_references`
 
-Final ordering:
+Execution contract:
+
+```text
+1. Resolve target latent geometry.
+2. Fit every visual reference to that target with Krea2 Edit v1.2 pixel-space fit.
+3. VAE-encode fitted visual references.
+4. Apply optional RoPE coordinate displacement.
+5. Use configured reference boosts on positive conditioning.
+6. Use reference boost 1.0 on grounded negative conditioning.
+```
+
+Conditioning ordering remains:
 
 ```text
 visual references -> latent semantic (when enabled) -> semantic-only references -> style references
