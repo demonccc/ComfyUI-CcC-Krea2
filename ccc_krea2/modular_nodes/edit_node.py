@@ -25,8 +25,8 @@ from .rope_position import install_krea2_rope_positioning
 
 
 # Match the proven RedNode/Krea2Moodboard text layout on both CFG branches.
-# Positive: all physical VISION_BLOCKs first, then semantic annotations + user prompt.
-# Negative: same appearance VISION_BLOCKs, no positive annotations.
+# Identity appearance refs are positional: VISION_BLOCK * N + user instruction, with no
+# per-reference label/instruction text injected into the Qwen stream.
 edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
 edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
 install_krea2_rope_positioning()
@@ -226,10 +226,51 @@ def _normalize_pipeline_report(pipeline_info: str, patch_applied: bool) -> str:
         elif line == "Reference Transport: standard ComfyUI reference_latents":
             line = "Reference Transport: conditioning reference_latents (RedNode-compatible)"
         lines.append(line)
-    # Avoid leaving an empty Warnings section when the skipped-patch warning was the only warning.
     if lines and lines[-1] == "Warnings:":
         lines.pop()
     return "\n".join(lines)
+
+
+def _first_conditioning_extras(conditioning) -> dict:
+    if not conditioning or not isinstance(conditioning, (list, tuple)):
+        return {}
+    first = conditioning[0]
+    if not isinstance(first, (list, tuple)) or len(first) < 2 or not isinstance(first[1], dict):
+        return {}
+    return first[1]
+
+
+def _flatten_tensor_values(value):
+    if torch.is_tensor(value):
+        return [value]
+    if isinstance(value, (list, tuple)):
+        out = []
+        for item in value:
+            out.extend(_flatten_tensor_values(item))
+        return out
+    return []
+
+
+def _format_runtime_conditioning(conditioning) -> str:
+    extras = _first_conditioning_extras(conditioning)
+    tensors = _flatten_tensor_values(extras.get("reference_latents"))
+    shapes = [tuple(int(v) for v in tensor.shape) for tensor in tensors]
+    return (
+        f"ref_latents={len(tensors)} shapes={shapes}, "
+        f"reference_fit={extras.get('reference_fit', '<missing>')}, "
+        f"reference_boosts={extras.get('reference_boosts', '<implicit 1.0>')}, "
+        f"rope={extras.get('reference_rope_positions', '<missing>')}"
+    )
+
+
+def _runtime_forward_owner() -> str:
+    try:
+        from comfy.ldm.krea2.model import SingleStreamDiT
+
+        fn = SingleStreamDiT._forward
+        return f"{getattr(fn, '__module__', '<unknown>')}.{getattr(fn, '__qualname__', getattr(fn, '__name__', '<unknown>'))}"
+    except Exception as exc:
+        return f"unavailable ({type(exc).__name__})"
 
 
 class CcCKrea2Edit:
@@ -285,8 +326,6 @@ class CcCKrea2Edit:
         )
         runtime_latent = _runtime_latent(latent)
 
-        # Ask the orchestrator for its standard reference_latents conditioning transport. We then
-        # install the RedNode-compatible Krea2 runtime without capturing any refs in MODEL.
         _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
@@ -332,12 +371,15 @@ class CcCKrea2Edit:
         if visual_entries:
             lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
             lines.append("Reference Transport: CONDITIONING metadata (reference_latents/reference_fit)")
-            lines.append("Runtime Forward: RedNode-equivalent SingleStreamDiT._forward")
-            lines.append("Positive Grounding: contiguous vision blocks before all semantic text")
+            lines.append(f"Runtime Forward Owner: {_runtime_forward_owner()}")
+            lines.append("Positive Grounding: RedNode edit-only parity (VISION_BLOCK * N + user prompt)")
+            lines.append("Visual Reference semantic_role/instruction: metadata-only on Identity grounding path")
             lines.append("Qwen Grounding Resize: RedNode-compatible AREA cap; tokenizer owns native alignment")
             lines.append(f"Positive Reference Boosts: {positive_boosts}")
             lines.append(f"Negative Reference Boosts: {negative_boosts}")
             lines.append("Negative Grounding: same visual refs; semantic aliases/instructions excluded")
+            lines.append(f"Positive Conditioning Runtime: {_format_runtime_conditioning(positive)}")
+            lines.append(f"Negative Conditioning Runtime: {_format_runtime_conditioning(negative)}")
 
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
