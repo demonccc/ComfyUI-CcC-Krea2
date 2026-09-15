@@ -12,7 +12,6 @@ import torch
 import torch.nn.functional as F
 from einops import rearrange
 
-from .modular_nodes.rope_position import build_incontext_3d_rope_pos_ids
 from .patch import install_krea2_reference_conditioning
 
 
@@ -72,6 +71,7 @@ def install_rednode_krea2_forward() -> bool:
         import comfy.ldm.common_dit
         from comfy.ldm.flux.layers import timestep_embedding
         from comfy.ldm.krea2.model import SingleStreamDiT
+        from .modular_nodes.rope_position import build_incontext_3d_rope_pos_ids
     except (ImportError, AttributeError):
         return False
 
