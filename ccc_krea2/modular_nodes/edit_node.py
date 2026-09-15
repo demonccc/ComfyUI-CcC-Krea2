@@ -7,7 +7,8 @@ import torch
 from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
-from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
+from ..patch import attach_reference_runtime_to_conditioning
+from ..rednode_runtime import patch_krea2_model_rednode
 from ..rednode_contract import (
     build_grounded_negative_user_content,
     build_grounded_positive_user_content,
@@ -285,7 +286,7 @@ class CcCKrea2Edit:
         runtime_latent = _runtime_latent(latent)
 
         # Ask the orchestrator for its standard reference_latents conditioning transport. We then
-        # install the RedNode-compatible Krea2 runtime wrapper without capturing any refs in MODEL.
+        # install the RedNode-compatible Krea2 runtime without capturing any refs in MODEL.
         _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
@@ -315,7 +316,7 @@ class CcCKrea2Edit:
             reference_boosts=None,
         )
 
-        patched_model = patch_krea2_model(model, prepared_refs=[]) if apply_krea2_edit_patch else model
+        patched_model = patch_krea2_model_rednode(model) if apply_krea2_edit_patch else model
         pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
 
         semantic_entries = (semantic_references or SemanticReferenceChain()).entries
@@ -331,6 +332,7 @@ class CcCKrea2Edit:
         if visual_entries:
             lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
             lines.append("Reference Transport: CONDITIONING metadata (reference_latents/reference_fit)")
+            lines.append("Runtime Forward: RedNode-equivalent SingleStreamDiT._forward")
             lines.append("Positive Grounding: contiguous vision blocks before all semantic text")
             lines.append("Qwen Grounding Resize: RedNode-compatible AREA cap; tokenizer owns native alignment")
             lines.append(f"Positive Reference Boosts: {positive_boosts}")
