@@ -25,11 +25,15 @@ def build_grounded_positive_user_content(
     resolved_references: List[Dict[str, Any]],
     user_prompt: str = "",
 ) -> str:
-    """Build the edit user turn with all vision blocks contiguous.
+    """Build the Krea2 positive user turn.
 
-    RedNode/Krea2Moodboard feed Qwen as ``VISION_BLOCK * N + instruction``. CcC keeps
-    per-reference semantic roles/instructions, but emits them only *after* every physical
-    vision block so text never splits the multimodal image prefix.
+    Identity/Edit appearance references intentionally match RedNode exactly: their physical
+    vision blocks are contiguous and are followed directly by the user's edit instruction.
+    Per-reference Visual Reference labels/instructions are metadata only on this path; injecting
+    them changes the Qwen sequence from the proven ``VISION_BLOCK * N + instruction`` contract.
+
+    CcC-only semantic/style references may still contribute ordinary annotation text after the
+    complete image prefix because they are extensions rather than Identity Edit appearance refs.
     """
     blocks: List[str] = []
     annotations: List[str] = []
@@ -41,14 +45,18 @@ def build_grounded_positive_user_content(
             continue
 
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
+        is_appearance = bool(getattr(spec, "appearance_reference", True))
         count = _style_block_count(spec) if ref_path == "style" else 1
         blocks.extend([VISION_PAD_TOKEN] * count)
 
+        # Proven Identity Edit / RedNode path: appearance edit refs are positional. Scene is
+        # frame/image 1 and subject is frame/image 2 by workflow order; no label text is injected.
+        if ref_path == "edit" and is_appearance:
+            physical_index += count
+            continue
+
         alias = _alias_for(item, spec)
         instruction = str(getattr(spec, "vision_instruction", "") or "").strip()
-
-        # Preserve CcC semantic controls as ordinary instruction text after the complete
-        # image prefix. Do not inject text between physical image markers.
         if alias or instruction:
             if count == 1:
                 label = f"Image {physical_index}"
