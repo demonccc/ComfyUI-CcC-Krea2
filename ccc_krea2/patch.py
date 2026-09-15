@@ -1,64 +1,23 @@
-"""Canonical ModelPatcher wrapper integration and exact Krea 2 SingleStreamDiT edit forward execution."""
+"""Krea 2 Identity Edit runtime using conditioning-transported reference latents.
+
+The transport and forward semantics intentionally follow the proven RedNode / Krea2Moodboard
+Identity Edit v1.2 contract: reference latents, fit flags and boosts travel with CONDITIONING,
+so positive and negative passes can carry the same references while using different boosts.
+CcC extends only the RoPE placement of already-fitted references.
+"""
 
 import math
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 
-from .references import PreparedReference, _process_latent_in_if_available
 
-
-def install_krea2_reference_boost_conditioning() -> None:
-    """Allow per-conditioning reference boosts, matching the proven Krea2 Identity Edit contract.
-
-    Positive and negative conditioning are evaluated separately by ComfyUI. Transporting boosts
-    through conditioning metadata lets the positive pass use the configured reference fidelity
-    while the grounded negative pass stays at 1.0, as used by the v1.2 Identity Edit workflow.
-    """
-    try:
-        import comfy.conds
-        import comfy.model_base
-    except (ImportError, AttributeError):
-        return
-
-    krea2_cls = getattr(comfy.model_base, "Krea2", None)
-    if krea2_cls is None or getattr(krea2_cls, "_ccc_krea2_reference_boost_patched", False):
-        return
-
-    original_extra_conds = krea2_cls.extra_conds
-
-    def _ccc_krea2_extra_conds(self, **kwargs):
-        out = original_extra_conds(self, **kwargs)
-
-        ref_boosts = kwargs.get("reference_boosts")
-        if ref_boosts is not None:
-            out["ref_boosts"] = comfy.conds.CONDConstant(list(ref_boosts))
-
-        masked_boosts = kwargs.get("reference_masked_boosts")
-        if masked_boosts is not None:
-            out["ccc_ref_masked_boosts"] = comfy.conds.CONDConstant(list(masked_boosts))
-
-        return out
-
-    krea2_cls.extra_conds = _ccc_krea2_extra_conds
-    krea2_cls._ccc_krea2_reference_boost_patched = True
-
-
-def attach_reference_boosts_to_conditioning(
-    conditioning: List[Any],
-    reference_boosts: List[float],
-    reference_masked_boosts: Optional[List[float]] = None,
-) -> List[Any]:
-    """Attach pass-specific reference boost metadata to a conditioning object."""
+def _conditioning_set_values(conditioning: List[Any], values: Dict[str, Any]) -> List[Any]:
+    """Set conditioning metadata with a lightweight fallback for isolated tests."""
     if not conditioning:
         return conditioning
-
-    values = {"reference_boosts": [float(v) for v in reference_boosts]}
-    if reference_masked_boosts is not None:
-        values["reference_masked_boosts"] = [float(v) for v in reference_masked_boosts]
-
     try:
         import node_helpers
 
@@ -75,103 +34,160 @@ def attach_reference_boosts_to_conditioning(
         return updated
 
 
-def _normalize_runtime_boosts(value: Any, count: int, default: float = 1.0) -> List[float]:
-    """Normalize condition-provided boost values to the active visual-reference count."""
+def attach_reference_boosts_to_conditioning(
+    conditioning: List[Any],
+    reference_boosts: List[float],
+    reference_masked_boosts: Optional[List[float]] = None,
+) -> List[Any]:
+    """Attach pass-specific reference boost metadata."""
+    values: Dict[str, Any] = {"reference_boosts": [float(v) for v in reference_boosts]}
+    if reference_masked_boosts is not None:
+        values["reference_masked_boosts"] = [float(v) for v in reference_masked_boosts]
+    return _conditioning_set_values(conditioning, values)
+
+
+def attach_reference_runtime_to_conditioning(
+    conditioning: List[Any],
+    reference_count: int,
+    rope_positions: Optional[List[str]] = None,
+    reference_boosts: Optional[List[float]] = None,
+) -> List[Any]:
+    """Attach RedNode-compatible fit metadata plus the CcC RoPE extension.
+
+    `reference_latents` themselves are attached by the edit orchestrator. This helper adds the
+    remaining per-pass controls without changing the public node surface.
+    """
+    if reference_count <= 0:
+        return conditioning
+    values: Dict[str, Any] = {
+        "reference_fit": [True] * reference_count,
+        "reference_rope_positions": list(rope_positions or ["none"] * reference_count),
+    }
+    if reference_boosts is not None and any(float(v) != 1.0 for v in reference_boosts):
+        values["reference_boosts"] = [float(v) for v in reference_boosts]
+    return _conditioning_set_values(conditioning, values)
+
+
+def install_krea2_reference_conditioning() -> None:
+    """Teach ComfyUI Krea2 to forward reference metadata from CONDITIONING to the DiT wrapper."""
+    try:
+        import comfy.conds
+        import comfy.model_base
+    except (ImportError, AttributeError):
+        return
+
+    krea2_cls = getattr(comfy.model_base, "Krea2", None)
+    if krea2_cls is None or getattr(krea2_cls, "_ccc_krea2_reference_conditioning_patched", False):
+        return
+
+    original_extra_conds = krea2_cls.extra_conds
+    original_extra_shapes = getattr(krea2_cls, "extra_conds_shapes", None)
+
+    def _ccc_krea2_extra_conds(self, **kwargs):
+        out = original_extra_conds(self, **kwargs)
+
+        ref_latents = kwargs.get("reference_latents")
+        if ref_latents is not None:
+            out["ref_latents"] = comfy.conds.CONDList([self.process_latent_in(lat) for lat in ref_latents])
+
+        ref_boosts = kwargs.get("reference_boosts")
+        if ref_boosts is not None:
+            out["ref_boosts"] = comfy.conds.CONDConstant(list(ref_boosts))
+
+        ref_fit = kwargs.get("reference_fit")
+        if ref_fit is not None:
+            out["ref_fit"] = comfy.conds.CONDConstant(list(ref_fit))
+
+        rope_positions = kwargs.get("reference_rope_positions")
+        if rope_positions is not None:
+            out["ccc_ref_rope_positions"] = comfy.conds.CONDConstant(list(rope_positions))
+
+        return out
+
+    krea2_cls.extra_conds = _ccc_krea2_extra_conds
+
+    if original_extra_shapes is not None:
+
+        def _ccc_krea2_extra_conds_shapes(self, **kwargs):
+            out = original_extra_shapes(self, **kwargs)
+            ref_latents = kwargs.get("reference_latents")
+            if ref_latents is not None:
+                out["ref_latents"] = [1, 16, sum(math.prod(lat.size()[2:]) for lat in ref_latents)]
+            return out
+
+        krea2_cls.extra_conds_shapes = _ccc_krea2_extra_conds_shapes
+
+    krea2_cls._ccc_krea2_reference_conditioning_patched = True
+
+
+def _normalize_runtime_list(value: Any, count: int, default: Any) -> List[Any]:
     if count <= 0:
         return []
     if value is None:
-        return [float(default)] * count
-
+        return [default] * count
     if torch.is_tensor(value):
         raw = value.detach().flatten().tolist()
     elif isinstance(value, (list, tuple)):
         raw = list(value)
     else:
         raw = [value]
+    if len(raw) < count:
+        raw = [default] * (count - len(raw)) + raw
+    elif len(raw) > count:
+        raw = raw[-count:]
+    return raw
 
-    resolved = [float(v) for v in raw]
-    if len(resolved) < count:
-        resolved = [float(default)] * (count - len(resolved)) + resolved
-    elif len(resolved) > count:
-        resolved = resolved[-count:]
-    return resolved
+
+def _normalize_runtime_boosts(value: Any, count: int, default: float = 1.0) -> List[float]:
+    """Backward-compatible float specialization used by existing tests/helpers."""
+    return [float(v) for v in _normalize_runtime_list(value, count, default)]
 
 
 def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> bool:
-    """Check if model object has already been patched with the given wrapper key."""
+    """Check whether a model patcher already carries a CcC edit runtime marker/wrapper."""
     if getattr(model, "_ccc_patch_key", None) == patch_key:
         return True
-
     if hasattr(model, "wrappers"):
-        w_dict = getattr(model, "wrappers", {})
-        if isinstance(w_dict, dict):
-            for _, wrappers_list in w_dict.items():
-                if isinstance(wrappers_list, dict) and patch_key in wrappers_list:
+        wrappers = getattr(model, "wrappers", {})
+        if isinstance(wrappers, dict):
+            for value in wrappers.values():
+                if isinstance(value, dict) and patch_key in value:
                     return True
-                if isinstance(wrappers_list, list):
-                    for w in wrappers_list:
-                        if getattr(w, "__name__", "") == patch_key or getattr(w, "wrapper_key", "") == patch_key:
+                if isinstance(value, list):
+                    for wrapper in value:
+                        if getattr(wrapper, "wrapper_key", "") == patch_key:
                             return True
-
     if hasattr(model, "model_options"):
-        opts = getattr(model, "model_options", {})
-        if isinstance(opts, dict):
-            t_opts = opts.get("transformer_options", {})
-            if isinstance(t_opts, dict):
-                wrappers = t_opts.get("wrappers", {})
-                if isinstance(wrappers, dict):
-                    for _, diff_w in wrappers.items():
-                        if isinstance(diff_w, dict) and patch_key in diff_w:
-                            return True
-
+        options = getattr(model, "model_options", {})
+        wrappers = options.get("transformer_options", {}).get("wrappers", {}) if isinstance(options, dict) else {}
+        if isinstance(wrappers, dict):
+            for value in wrappers.values():
+                if isinstance(value, dict) and patch_key in value:
+                    return True
     return False
 
 
 def check_patch_safety(model: Any, target_patch: str) -> None:
-    """Ensure model does not contain conflicting or incompatible patch wrappers."""
-    if target_patch in ("krea2_edit", "ccc_krea2_edit"):
-        if is_model_already_patched(model, "ccc_ostris_edit"):
-            raise ValueError(
-                "[CcC Krea2] Conflict detected: Cannot apply 'krea2_edit' patch to a model already patched with 'ccc_ostris_edit'."
-            )
-    elif target_patch in ("ostris_edit", "ccc_ostris_edit"):
-        if is_model_already_patched(model, "ccc_krea2_edit"):
-            raise ValueError(
-                "[CcC Krea2] Conflict detected: Cannot apply 'ostris_edit' patch to a model already patched with 'ccc_krea2_edit'."
-            )
+    if target_patch in ("krea2_edit", "ccc_krea2_edit") and is_model_already_patched(model, "ccc_ostris_edit"):
+        raise ValueError("[CcC Krea2] Cannot apply Krea2 Edit on a model already patched for Ostris Edit.")
+    if target_patch in ("ostris_edit", "ccc_ostris_edit") and is_model_already_patched(model, "ccc_krea2_edit"):
+        raise ValueError("[CcC Krea2] Cannot apply Ostris Edit on a model already patched for Krea2 Edit.")
 
 
-def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any:
-    """Clone MODEL and register the Krea2 Edit DIFFUSION_MODEL wrapper.
+def patch_krea2_model(model: Any, prepared_refs: Optional[List[Any]] = None) -> Any:
+    """Clone MODEL and register a runtime wrapper that consumes refs from CONDITIONING.
 
-    Reference geometry and latents are captured by the wrapper. Attention boosts are deliberately
-    *not* captured as a single global value: they arrive per conditioning pass so the positive can
-    use the configured boost while the grounded negative remains at 1.0.
+    `prepared_refs` is retained only for call compatibility. References are deliberately not
+    captured in the MODEL anymore; this is the key RedNode-compatible behavior.
     """
     if is_model_already_patched(model, "ccc_krea2_edit"):
         raise RuntimeError(
-            "[CcC Krea2] Input MODEL is already patched by CcC Krea2 Edit. "
-            "Chaining CcC Edit nodes is unsupported because each wrapper captures reference "
-            "latents in a closure. Connect this Edit node to the unpatched upstream MODEL instead."
+            "[CcC Krea2] Input MODEL is already patched by CcC Krea2 Edit. Connect Edit to the unpatched upstream MODEL."
         )
 
-    install_krea2_reference_boost_conditioning()
-
+    install_krea2_reference_conditioning()
     patched_model = model.clone()
     patched_model._ccc_patch_key = "ccc_krea2_edit"
-
-    processed_ref_latents: List[torch.Tensor] = []
-    ref_masks: List[Optional[torch.Tensor]] = []
-    mask_modes: List[str] = []
-    ref_rope_positions: List[str] = []
-
-    for ref in prepared_refs:
-        if ref.vae_latent is not None:
-            proc_lat = _process_latent_in_if_available(patched_model, ref.vae_latent)
-            processed_ref_latents.append(proc_lat)
-            ref_masks.append(ref.spatial_attention_mask)
-            mask_modes.append(ref.mask_mode)
-            ref_rope_positions.append(getattr(ref, "rope_position", "none"))
 
     def krea2_edit_wrapper(
         executor: Any,
@@ -181,57 +197,69 @@ def patch_krea2_model(model: Any, prepared_refs: List[PreparedReference]) -> Any
         *wargs: Any,
         **kwargs: Any,
     ) -> torch.Tensor:
-        """Canonical ComfyUI DIFFUSION_MODEL wrapper signature."""
         dit_model = getattr(executor, "class_obj", None)
 
-        transformer_options = {}
-        if wargs and isinstance(wargs[-1], dict):
-            transformer_options = wargs[-1]
-        elif "transformer_options" in kwargs:
-            transformer_options = kwargs["transformer_options"]
+        # ComfyUI signature drift: older cores call
+        #   (..., attention_mask, transformer_options)
+        # while newer Krea2 cores may call
+        #   (..., attention_mask, ref_latents, transformer_options).
+        # Prefer explicit conditioning kwargs, otherwise recover the positional ref list.
+        ref_latents = kwargs.get("ref_latents")
+        if ref_latents is None:
+            drift = list(wargs)
+            if drift and isinstance(drift[-1], dict):
+                drift.pop()
+            if len(drift) >= 2 and isinstance(drift[1], (list, tuple)):
+                candidate = drift[1]
+                if all(torch.is_tensor(item) for item in candidate):
+                    ref_latents = list(candidate)
+        ref_latents = list(ref_latents or [])
 
-        if not processed_ref_latents or dit_model is None:
+        if dit_model is None or not ref_latents:
             fallback_kwargs = dict(kwargs)
-            fallback_kwargs.pop("ref_boosts", None)
-            fallback_kwargs.pop("ccc_ref_masked_boosts", None)
+            for key in ("ref_latents", "ref_boosts", "ref_fit", "ccc_ref_rope_positions"):
+                fallback_kwargs.pop(key, None)
             return executor(x, timesteps, context, *wargs, **fallback_kwargs)
 
-        count = len(processed_ref_latents)
-        runtime_ref_boosts = _normalize_runtime_boosts(kwargs.get("ref_boosts"), count, default=1.0)
-        runtime_masked_boosts = _normalize_runtime_boosts(
-            kwargs.get("ccc_ref_masked_boosts"), count, default=1.0
-        )
+        transformer_options = kwargs.get("transformer_options")
+        if transformer_options is None and wargs and isinstance(wargs[-1], dict):
+            transformer_options = wargs[-1]
+        if transformer_options is None:
+            transformer_options = {}
+
+        count = len(ref_latents)
+        boosts = [float(v) for v in _normalize_runtime_list(kwargs.get("ref_boosts"), count, 1.0)]
+        fit_flags = [bool(v) for v in _normalize_runtime_list(kwargs.get("ref_fit"), count, False)]
+        rope_positions = [
+            str(v)
+            for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
+        ]
 
         return krea2_dit_incontext_forward(
             dit_model=dit_model,
             x=x,
             timesteps=timesteps,
             context=context,
-            ref_latents=processed_ref_latents,
-            ref_boosts=runtime_ref_boosts,
-            ref_masked_boosts=runtime_masked_boosts,
-            ref_masks=ref_masks,
-            mask_modes=mask_modes,
-            ref_rope_positions=ref_rope_positions,
+            ref_latents=ref_latents,
+            ref_boosts=boosts,
+            ref_fit=fit_flags,
+            ref_rope_positions=rope_positions,
             transformer_options=transformer_options,
         )
 
     _register_wrapper(patched_model, krea2_edit_wrapper)
-
     return patched_model
 
 
 def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
-    """Register wrapper using ComfyUI WrappersMP.DIFFUSION_MODEL ("diffusion_model") with API fallback."""
     registered = False
-
-    wrapper_type = "diffusion_model"
+    wrapper_type: Any = "diffusion_model"
     try:
         import comfy.patcher_extension
 
         wrapper_type = comfy.patcher_extension.WrappersMP.DIFFUSION_MODEL
     except Exception:
-        wrapper_type = "diffusion_model"
+        pass
 
     if hasattr(patched_model, "add_wrapper_with_key"):
         try:
@@ -247,69 +275,57 @@ def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
             pass
 
     if not registered:
-        _fallback_options_register(patched_model, wrapper, wrapper_type)
-
-
-def _fallback_options_register(patched_model: Any, wrapper: Any, wrapper_type: Any = "diffusion_model") -> None:
-    """Fallback options registration using nested dictionary structure."""
-    if not hasattr(patched_model, "model_options"):
-        patched_model.model_options = {}
-
-    options = patched_model.model_options
-
-    t_options = options.setdefault("transformer_options", {})
-    wrappers = t_options.setdefault("wrappers", {})
-
-    w_key = str(wrapper_type)
-    if isinstance(wrappers, dict):
-        diff_wrappers = wrappers.setdefault(w_key, {})
-        if isinstance(diff_wrappers, dict):
-            existing = diff_wrappers.get("ccc_krea2_edit")
-            if existing is None:
-                diff_wrappers["ccc_krea2_edit"] = [wrapper]
-            elif isinstance(existing, list):
-                existing.append(wrapper)
-            else:
-                diff_wrappers["ccc_krea2_edit"] = [existing, wrapper]
-        elif isinstance(diff_wrappers, list):
-            diff_wrappers.append(wrapper)
+        if not hasattr(patched_model, "model_options"):
+            patched_model.model_options = {}
+        wrappers = patched_model.model_options.setdefault("transformer_options", {}).setdefault("wrappers", {})
+        key = str(wrapper_type)
+        value = wrappers.setdefault(key, {})
+        if isinstance(value, dict):
+            value["ccc_krea2_edit"] = [wrapper]
+        elif isinstance(value, list):
+            value.append(wrapper)
 
 
 def _pad_to_patch_size(tensor: torch.Tensor, patch_size: int) -> torch.Tensor:
-    """Pad 4D tensor spatial dimensions to multiples of patch_size using replicate padding."""
     try:
         from comfy.ldm.common_dit import pad_to_patch_size
 
         return pad_to_patch_size(tensor, (patch_size, patch_size), padding_mode="replicate")
     except (ImportError, AttributeError):
-        h, w = tensor.shape[-2], tensor.shape[-1]
-        pad_h = (patch_size - (h % patch_size)) % patch_size
-        pad_w = (patch_size - (w % patch_size)) % patch_size
-        if pad_h > 0 or pad_w > 0:
-            return F.pad(tensor, (0, pad_w, 0, pad_h), mode="replicate")
-        return tensor
+        h, w = tensor.shape[-2:]
+        pad_h = (patch_size - h % patch_size) % patch_size
+        pad_w = (patch_size - w % patch_size) % patch_size
+        return F.pad(tensor, (0, pad_w, 0, pad_h), mode="replicate") if pad_h or pad_w else tensor
 
 
 def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
-    """Repeat or trim tensor along batch dimension to match target_bs."""
     try:
         from comfy.utils import repeat_to_batch_size
 
         return repeat_to_batch_size(tensor, target_bs)
     except (ImportError, AttributeError):
-        curr_b = tensor.shape[0]
-        if curr_b == target_bs:
+        if tensor.shape[0] == target_bs:
             return tensor
-        if curr_b > target_bs:
+        if tensor.shape[0] > target_bs:
             return tensor[:target_bs]
+        return tensor[:1].expand(target_bs, *tensor.shape[1:])
 
-        repeats = (target_bs + curr_b - 1) // curr_b
-        tiled = tensor.repeat(repeats, *([1] * (tensor.ndim - 1)))
-        return tiled[:target_bs]
+
+def _fit_latent(src: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """RedNode legacy fallback: crop to target AR then resize in latent space."""
+    sh, sw = src.shape[-2:]
+    if (sh, sw) == (height, width):
+        return src
+    scale = max(height / sh, width / sw)
+    crop_h = min(sh, int(round(height / scale)))
+    crop_w = min(sw, int(round(width / scale)))
+    y0 = (sh - crop_h) // 2
+    x0 = (sw - crop_w) // 2
+    src = src[..., y0:y0 + crop_h, x0:x0 + crop_w]
+    return F.interpolate(src.float(), size=(height, width), mode="bilinear")
 
 
 def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
-    """Compute sinusoidal timestep embeddings with ComfyUI fallback."""
     try:
         from comfy.ldm.flux.layers import timestep_embedding
 
@@ -317,169 +333,78 @@ def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 100
     except (ImportError, AttributeError):
         half = dim // 2
         freqs = torch.exp(
-            -math.log(max_period)
-            * torch.arange(start=0, end=half, dtype=torch.float32, device=timesteps.device)
-            / half
+            -math.log(max_period) * torch.arange(half, dtype=torch.float32, device=timesteps.device) / half
         )
-        args = timesteps[:, None].float() * freqs[None, :]
-        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-        if dim % 2:
-            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
-        return embedding
+        args = timesteps[:, None].float() * freqs[None]
+        emb = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+        return torch.cat([emb, torch.zeros_like(emb[:, :1])], dim=-1) if dim % 2 else emb
 
 
-def krea2_dit_incontext_forward(
-    dit_model: Any,
-    x: torch.Tensor,
-    timesteps: torch.Tensor,
-    context: torch.Tensor,
-    ref_latents: List[torch.Tensor],
-    ref_boosts: List[float],
-    ref_masks: List[Optional[torch.Tensor]],
-    mask_modes: List[str],
-    transformer_options: Dict[str, Any],
-    ref_masked_boosts: Optional[List[float]] = None,
-    ref_rope_positions: Optional[List[str]] = None,
-) -> torch.Tensor:
-    """Execute Krea 2 SingleStreamDiT edit forward using exact model member API and signatures."""
-    orig_ndim = x.ndim
-    if orig_ndim == 5:
-        b_orig, c_orig, t_orig, h_orig, w_orig = x.shape
-        x_4d = rearrange(x, "b c t h w -> (b t) c h w")
-    else:
-        x_4d = x
-        t_orig = 1
+def _compute_ref_attention_bias_patchified(
+    boosts: List[float],
+    txt_len: int,
+    ref_token_lens: List[int],
+    tgt_len: int,
+    ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
+    ref_token_grids: Optional[List[Tuple[int, int]]] = None,
+    mask_modes: Optional[List[str]] = None,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+    masked_boosts: Optional[List[float]] = None,
+) -> Optional[torch.Tensor]:
+    """Target->reference attention bias with legacy optional mask compatibility.
 
-    bs, c, target_h, target_w = x_4d.shape
+    The split public Edit surface currently supplies unmasked refs, so its runtime path reduces
+    exactly to RedNode's per-reference log(boost) bias. The mask branch is retained for internal
+    compatibility and tests.
+    """
+    if not boosts:
+        return None
+    device = device or torch.device("cpu")
+    dtype = dtype or torch.float32
+    ref_masks = list(ref_masks or [None] * len(boosts))
+    ref_token_grids = list(ref_token_grids or [(1, n) for n in ref_token_lens])
+    mask_modes = list(mask_modes or ["hard"] * len(boosts))
 
-    patch_size = getattr(dit_model, "patch", 2)
-    if not isinstance(patch_size, int):
-        patch_size = getattr(patch_size, "patch_size", 2)
+    offsets = [txt_len]
+    for length in ref_token_lens:
+        offsets.append(offsets[-1] + length)
+    target_start = offsets[-1]
+    seq_len = target_start + tgt_len
+    bias = torch.zeros((1, 1, seq_len, seq_len), device=device, dtype=dtype)
 
-    channels = getattr(dit_model, "channels", c)
+    any_effect = False
+    for index, boost in enumerate(boosts):
+        spatial_mask = ref_masks[index] if index < len(ref_masks) else None
+        ref_start = offsets[index]
+        ref_end = ref_start + ref_token_lens[index]
+        boost_log = math.log(max(float(boost), 1e-4))
 
-    orig_tgt_h, orig_tgt_w = target_h, target_w
+        if spatial_mask is None:
+            if float(boost) != 1.0:
+                bias[:, :, target_start:, ref_start:ref_end] = boost_log
+                any_effect = True
+            continue
 
-    x_padded = _pad_to_patch_size(x_4d, patch_size)
-    padded_h, padded_w = x_padded.shape[-2], x_padded.shape[-1]
+        if boost_log == 0.0:
+            continue
+        gh, gw = ref_token_grids[index]
+        mask = spatial_mask[:1].float()
+        if mask.ndim == 2:
+            mask = mask.unsqueeze(0).unsqueeze(0)
+        elif mask.ndim == 3:
+            mask = mask.unsqueeze(1)
+        mask = F.interpolate(mask, size=(gh, gw), mode="nearest")[0, 0]
+        if mask_modes[index] == "hard":
+            mask = (mask > 0.5).float()
+        else:
+            mask = mask.clamp(0.0, 1.0)
+        flat = mask.reshape(-1).to(device=device, dtype=dtype)
+        if flat.numel() == ref_token_lens[index]:
+            bias[:, :, target_start:, ref_start:ref_end] += boost_log * flat.view(1, 1, 1, -1)
+            any_effect = True
 
-    target_gh = padded_h // patch_size
-    target_gw = padded_w // patch_size
-    tgt_n_toks = target_gh * target_gw
-
-    x_patch = rearrange(
-        x_padded,
-        "b c (h p1) (w p2) -> b (h w) (c p1 p2)",
-        p1=patch_size,
-        p2=patch_size,
-    )
-
-    ref_patches: List[torch.Tensor] = []
-    ref_token_grids: List[Tuple[int, int]] = []
-    ref_token_lens: List[int] = []
-
-    for ref_lat in ref_latents:
-        if ref_lat.ndim == 5:
-            ref_lat = rearrange(ref_lat, "b c t h w -> (b t) c h w")
-
-        ref_lat = ref_lat.to(device=x.device, dtype=x.dtype)
-        ref_lat_b = _repeat_to_batch_size(ref_lat, bs)
-        ref_padded = _pad_to_patch_size(ref_lat_b, patch_size)
-
-        r_ph, r_pw = ref_padded.shape[-2], ref_padded.shape[-1]
-        r_gh = r_ph // patch_size
-        r_gw = r_pw // patch_size
-
-        r_patch = rearrange(
-            ref_padded,
-            "b c (h p1) (w p2) -> b (h w) (c p1 p2)",
-            p1=patch_size,
-            p2=patch_size,
-        )
-        ref_patches.append(r_patch)
-        ref_token_grids.append((r_gh, r_gw))
-        ref_token_lens.append(r_gh * r_gw)
-
-    ctx = dit_model._unpack_context(context)
-    ctx = dit_model.txtfusion(ctx, mask=None, transformer_options=transformer_options)
-    ctx = dit_model.txtmlp(ctx)
-
-    txt_len = ctx.shape[1] if ctx is not None else 0
-
-    target_emb = dit_model.first(x_patch)
-    ref_embs = [dit_model.first(rp) for rp in ref_patches]
-
-    seq_components = []
-    if ctx is not None:
-        seq_components.append(ctx)
-    seq_components.extend(ref_embs)
-    seq_components.append(target_emb)
-
-    full_seq = torch.cat(seq_components, dim=1)
-
-    rope_pos_ids = _build_incontext_3d_rope_pos_ids(
-        batch_size=bs,
-        txt_len=txt_len,
-        ref_token_grids=ref_token_grids,
-        target_grid=(target_gh, target_gw),
-        ref_rope_positions=ref_rope_positions,
-        device=x.device,
-    )
-
-    freqs = dit_model.pe_embedder(rope_pos_ids) if hasattr(dit_model, "pe_embedder") else None
-
-    attn_bias = _compute_ref_attention_bias_patchified(
-        boosts=ref_boosts,
-        masked_boosts=ref_masked_boosts or [1.0] * len(ref_boosts),
-        txt_len=txt_len,
-        ref_token_lens=ref_token_lens,
-        tgt_len=tgt_n_toks,
-        ref_masks=ref_masks,
-        ref_token_grids=ref_token_grids,
-        mask_modes=mask_modes,
-        device=x.device,
-        dtype=x.dtype,
-    )
-
-    tdim = getattr(dit_model, "tdim", 256)
-    t_emb_val = _timestep_embedding(timesteps, tdim).unsqueeze(1).to(x.dtype)
-    t = dit_model.tmlp(t_emb_val)
-    tvec = dit_model.tproj(t)
-
-    h_seq = full_seq
-    blocks = getattr(dit_model, "blocks", [])
-    total_blocks = len(blocks)
-    total_ref_len = sum(ref_token_lens)
-
-    for i, block in enumerate(blocks):
-        t_opts = transformer_options.copy()
-        t_opts["total_blocks"] = total_blocks
-        t_opts["block_type"] = "single"
-        t_opts["img_slice"] = [slice(txt_len + total_ref_len, None)]
-        t_opts["block_index"] = i
-
-        h_seq = block(h_seq, tvec, freqs, attn_bias, transformer_options=t_opts)
-
-    out_seq = dit_model.last(h_seq, t) if hasattr(dit_model, "last") else h_seq
-
-    tgt_tokens = out_seq[:, -tgt_n_toks:, :]
-
-    out_4d = rearrange(
-        tgt_tokens,
-        "b (h w) (c p1 p2) -> b c (h p1) (w p2)",
-        h=target_gh,
-        w=target_gw,
-        p1=patch_size,
-        p2=patch_size,
-        c=channels,
-    )
-
-    out_cropped = out_4d[:, :, :orig_tgt_h, :orig_tgt_w]
-
-    if orig_ndim == 5:
-        return rearrange(out_cropped, "(b t) c h w -> b c t h w", t=t_orig)
-
-    return out_cropped
+    return bias if any_effect else None
 
 
 def _build_incontext_3d_rope_pos_ids(
@@ -490,145 +415,140 @@ def _build_incontext_3d_rope_pos_ids(
     device: torch.device,
     ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
-    """Build legacy 3D RoPE position IDs with shape [batch_size, seq_len, 3].
+    """Default RedNode-compatible centered positions; modular Edit can replace this helper."""
+    tgt_h, tgt_w = target_grid
+    parts = [torch.zeros((txt_len, 3), device=device, dtype=torch.float32)] if txt_len else []
+    for index, (ref_h, ref_w) in enumerate(ref_token_grids):
+        y0 = float(max(0, (tgt_h - ref_h) // 2))
+        x0 = float(max(0, (tgt_w - ref_w) // 2))
+        ys = torch.arange(ref_h, device=device, dtype=torch.float32) + y0
+        xs = torch.arange(ref_w, device=device, dtype=torch.float32) + x0
+        yy, xx = torch.meshgrid(ys, xs, indexing="ij")
+        tt = torch.full_like(yy, float(index + 1))
+        parts.append(torch.stack([tt.flatten(), yy.flatten(), xx.flatten()], dim=-1))
+    ys = torch.arange(tgt_h, device=device, dtype=torch.float32)
+    xs = torch.arange(tgt_w, device=device, dtype=torch.float32)
+    yy, xx = torch.meshgrid(ys, xs, indexing="ij")
+    parts.append(torch.stack([torch.zeros_like(yy).flatten(), yy.flatten(), xx.flatten()], dim=-1))
+    return torch.cat(parts, dim=0).unsqueeze(0).repeat(batch_size, 1, 1)
 
-    The modular Edit surface replaces this helper at import time with the three-axis
-    implementation in modular_nodes.rope_position.
-    """
-    tgt_gh, tgt_gw = target_grid
-    list_pos = []
 
-    if txt_len > 0:
-        txt_pos = torch.zeros((txt_len, 3), device=device, dtype=torch.float32)
-        list_pos.append(txt_pos)
+def krea2_dit_incontext_forward(
+    dit_model: Any,
+    x: torch.Tensor,
+    timesteps: torch.Tensor,
+    context: torch.Tensor,
+    ref_latents: List[torch.Tensor],
+    ref_boosts: Optional[List[float]] = None,
+    transformer_options: Optional[Dict[str, Any]] = None,
+    ref_fit: Optional[List[bool]] = None,
+    ref_rope_positions: Optional[List[str]] = None,
+    **_legacy: Any,
+) -> torch.Tensor:
+    """RedNode-compatible in-context Krea2 forward with optional CcC RoPE displacement."""
+    transformer_options = transformer_options or {}
+    n_refs = len(ref_latents)
+    boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
+    fit_flags = [bool(v) for v in _normalize_runtime_list(ref_fit, n_refs, True)]
+    rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
 
-    for i, (r_gh, r_gw) in enumerate(ref_token_grids):
-        frame_idx = i + 1
-        position = (
-            ref_rope_positions[i]
-            if ref_rope_positions is not None and i < len(ref_rope_positions)
-            else "none"
+    temporal = x.ndim == 5
+    if temporal:
+        batch5, channels5, frames5, height5, width5 = x.shape
+        x = x.reshape(batch5 * frames5, channels5, height5, width5)
+
+    batch, _, original_h, original_w = x.shape
+    patch_size = getattr(dit_model, "patch", 2)
+    if not isinstance(patch_size, int):
+        patch_size = getattr(patch_size, "patch_size", 2)
+
+    x = _pad_to_patch_size(x, patch_size)
+    height, width = x.shape[-2:]
+    target_gh, target_gw = height // patch_size, width // patch_size
+
+    sources = []
+    for index, source in enumerate(ref_latents):
+        src = source.to(device=x.device, dtype=x.dtype)
+        if src.ndim == 5:
+            sb, sc, st, sh, sw = src.shape
+            src = src.reshape(sb * st, sc, sh, sw)
+        src = _repeat_to_batch_size(src, batch)
+        keep_own_grid = fit_flags[index] and src.shape[-2] <= height and src.shape[-1] <= width
+        if src.shape[-2:] != (height, width) and not keep_own_grid:
+            src = _fit_latent(src, height, width).to(x.dtype)
+        sources.append(_pad_to_patch_size(src, patch_size))
+
+    context = dit_model._unpack_context(context)
+    target_tokens = rearrange(
+        x, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=patch_size, pw=patch_size
+    )
+    target_tokens = dit_model.first(target_tokens)
+    source_tokens = [
+        dit_model.first(
+            rearrange(src, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=patch_size, pw=patch_size)
         )
-        y_off = (tgt_gh - r_gh) / 2.0
-        x_off = (tgt_gw - r_gw) / 2.0
-        if position == "up":
-            y_off = -float(r_gh)
-        elif position == "down":
-            y_off = float(tgt_gh)
-        elif position == "left":
-            x_off = -float(r_gw)
-        elif position == "right":
-            x_off = float(tgt_gw)
-        elif position != "none":
-            raise ValueError(
-                f"Invalid reference RoPE position '{position}'. Expected none, up, down, left, or right."
-            )
+        for src in sources
+    ]
 
-        grid_y = torch.arange(r_gh, device=device, dtype=torch.float32) + y_off
-        grid_x = torch.arange(r_gw, device=device, dtype=torch.float32) + x_off
+    t_emb = _timestep_embedding(timesteps, getattr(dit_model, "tdim", 256)).unsqueeze(1).to(target_tokens.dtype)
+    t = dit_model.tmlp(t_emb)
+    tvec = dit_model.tproj(t)
 
-        mesh_y, mesh_x = torch.meshgrid(grid_y, grid_x, indexing="ij")
-        mesh_t = torch.full_like(mesh_y, fill_value=float(frame_idx))
+    context = dit_model.txtfusion(context, mask=None, transformer_options=transformer_options)
+    context = dit_model.txtmlp(context)
 
-        ref_pos = torch.stack([mesh_t.flatten(), mesh_y.flatten(), mesh_x.flatten()], dim=-1)
-        list_pos.append(ref_pos)
+    txt_len = context.shape[1]
+    target_len = target_tokens.shape[1]
+    source_lens = [tokens.shape[1] for tokens in source_tokens]
+    source_len = sum(source_lens)
+    combined = torch.cat([context] + source_tokens + [target_tokens], dim=1)
 
-    tgt_y = torch.arange(tgt_gh, device=device, dtype=torch.float32)
-    tgt_x = torch.arange(tgt_gw, device=device, dtype=torch.float32)
-    mesh_ty, mesh_tx = torch.meshgrid(tgt_y, tgt_x, indexing="ij")
-    mesh_tt = torch.zeros_like(mesh_ty)
+    source_grids = [(src.shape[-2] // patch_size, src.shape[-1] // patch_size) for src in sources]
+    pos = _build_incontext_3d_rope_pos_ids(
+        batch_size=batch,
+        txt_len=txt_len,
+        ref_token_grids=source_grids,
+        target_grid=(target_gh, target_gw),
+        ref_rope_positions=rope_positions,
+        device=combined.device,
+    )
+    freqs = dit_model.pe_embedder(pos)
 
-    tgt_pos = torch.stack([mesh_tt.flatten(), mesh_ty.flatten(), mesh_tx.flatten()], dim=-1)
-    list_pos.append(tgt_pos)
+    attn_bias = _compute_ref_attention_bias_patchified(
+        boosts=boosts,
+        txt_len=txt_len,
+        ref_token_lens=source_lens,
+        tgt_len=target_len,
+        device=combined.device,
+        dtype=combined.dtype,
+    )
 
-    seq_pos = torch.cat(list_pos, dim=0)
-    return seq_pos.unsqueeze(0).repeat(batch_size, 1, 1)
+    total_blocks = len(dit_model.blocks)
+    total_ref_len = source_len
+    for block_index, block in enumerate(dit_model.blocks):
+        # Preserve the current ComfyUI Krea2 transformer metadata contract while keeping the
+        # Identity Edit sequence order [text | refs | target]. This matters for attention patches
+        # that consume img_slice/block_index but does not change RedNode reference semantics.
+        block_options = transformer_options.copy()
+        block_options["total_blocks"] = total_blocks
+        block_options["block_type"] = "single"
+        block_options["img_slice"] = [slice(txt_len + total_ref_len, None)]
+        block_options["block_index"] = block_index
+        combined = block(combined, tvec, freqs, attn_bias, transformer_options=block_options)
 
+    final = dit_model.last(combined, t)
+    output = final[:, txt_len + source_len:txt_len + source_len + target_len]
+    output = rearrange(
+        output,
+        "b (h w) (c ph pw) -> b c (h ph) (w pw)",
+        h=target_gh,
+        w=target_gw,
+        ph=patch_size,
+        pw=patch_size,
+        c=dit_model.channels,
+    )
+    output = output[:, :, :original_h, :original_w]
 
-def _compute_ref_attention_bias_patchified(
-    boosts: List[float],
-    txt_len: int,
-    ref_token_lens: List[int],
-    tgt_len: int,
-    ref_masks: List[Optional[torch.Tensor]],
-    ref_token_grids: List[Tuple[int, int]],
-    mask_modes: List[str],
-    device: torch.device,
-    dtype: torch.dtype,
-    masked_boosts: Optional[List[float]] = None,
-) -> Optional[torch.Tensor]:
-    """Compute additive attention logit bias covering full sequence."""
-    resolved_base_boosts = []
-    resolved_masked_boosts = []
-
-    for i in range(len(boosts)):
-        b = boosts[i]
-        m = ref_masks[i] if i < len(ref_masks) else None
-
-        if masked_boosts is not None and i < len(masked_boosts):
-            resolved_base_boosts.append(b)
-            resolved_masked_boosts.append(masked_boosts[i])
-        else:
-            if m is not None:
-                resolved_base_boosts.append(1.0)
-                resolved_masked_boosts.append(b)
-            else:
-                resolved_base_boosts.append(b)
-                resolved_masked_boosts.append(1.0)
-
-    if not boosts or all(
-        b == 1.0 and mb == 1.0 and m is None
-        for b, mb, m in zip(resolved_base_boosts, resolved_masked_boosts, ref_masks)
-    ):
-        return None
-
-    total_ref_len = sum(ref_token_lens)
-    seq_len = txt_len + total_ref_len + tgt_len
-
-    bias = torch.zeros((1, 1, seq_len, seq_len), device=device, dtype=dtype)
-
-    ref_start = txt_len
-    target_start = txt_len + total_ref_len
-
-    for boost, masked_boost, ref_len, spatial_mask, (r_gh, r_gw), mask_mode in zip(
-        resolved_base_boosts,
-        resolved_masked_boosts,
-        ref_token_lens,
-        ref_masks,
-        ref_token_grids,
-        mask_modes,
-    ):
-        ref_end = ref_start + ref_len
-
-        safe_base_boost = max(1e-4, min(100.0, float(boost)))
-        base_bias = math.log(safe_base_boost)
-
-        safe_masked_boost = max(1e-4, min(100.0, float(masked_boost)))
-        masked_extra_bias = math.log(safe_masked_boost)
-
-        if base_bias != 0.0:
-            bias[0, 0, target_start:, ref_start:ref_end] += base_bias
-
-        if spatial_mask is not None and masked_extra_bias != 0.0:
-            m_bchw = spatial_mask[:1].float()
-            if m_bchw.ndim == 2:
-                m_bchw = m_bchw.unsqueeze(0).unsqueeze(0)
-            elif m_bchw.ndim == 3:
-                m_bchw = m_bchw.unsqueeze(0)
-
-            m_resized = F.interpolate(m_bchw, size=(r_gh, r_gw), mode="nearest")
-            m_2d = m_resized[0, 0]
-
-            if mask_mode == "hard":
-                m_processed = (m_2d > 0.5).float()
-            else:
-                m_processed = m_2d.clamp(0.0, 1.0)
-
-            m_flat = m_processed.reshape(-1).to(device=device, dtype=dtype)
-            if m_flat.numel() == ref_len:
-                selected_bias = masked_extra_bias * m_flat
-                bias[0, 0, target_start:, ref_start:ref_end] += selected_bias.unsqueeze(0)
-
-        ref_start = ref_end
-
-    return torch.nan_to_num(bias, nan=0.0, posinf=100.0, neginf=-100.0)
+    if temporal:
+        output = output.reshape(batch5, frames5, dit_model.channels, original_h, original_w).movedim(1, 2)
+    return output

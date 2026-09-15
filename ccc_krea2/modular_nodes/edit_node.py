@@ -4,16 +4,20 @@ from typing import Any, Optional
 
 import torch
 
+from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
-from ..edit_engine import run_krea2_edit_orchestrator
 from ..grounding import resize_grounding_image
-from ..patch import attach_reference_boosts_to_conditioning
+from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
+from ..rednode_contract import build_grounded_negative_user_content
 from ..reference_specs import ReferenceChain, ReferenceSpec, StyleReferenceSpec
 from ..vision_prep import prepare_image_for_qwen
 from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
 from .rope_position import install_krea2_rope_positioning
 
 
+# Keep the existing orchestrator, but make its negative builder match the proven Identity Edit
+# contract: same Qwen appearance images, no positive aliases/instructions in the negative text.
+edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
 install_krea2_rope_positioning()
 
 
@@ -107,8 +111,8 @@ def _combine_reference_chains(
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=entry.boost,
-                # Identity Edit v1.2 reference geometry is mandatory. Target latent creation
-                # (preset, fixed, Size Resolver, or image content) is independent from this step.
+                # Target geometry may come from preset, fixed dimensions, Size Resolver, or image.
+                # Once resolved, every visual reference uses the mandatory Identity Edit v1.2 fit.
                 visual_reference_fit="fit",
                 rope_position=entry.rope_position,
                 _legacy_role=f"reference_{index}",
@@ -152,6 +156,27 @@ def _combine_reference_chains(
     return chain
 
 
+def _normalize_pipeline_report(pipeline_info: str, patch_applied: bool) -> str:
+    if not patch_applied:
+        return pipeline_info
+    lines = []
+    skipped_warning = (
+        "CcC Krea2 model patch was skipped; reference latents attached to conditioning require compatible runtime support."
+    )
+    for line in pipeline_info.splitlines():
+        if skipped_warning in line:
+            continue
+        if line == "CcC Model Patch: skipped":
+            line = "CcC Model Patch: applied"
+        elif line == "Reference Transport: standard ComfyUI reference_latents":
+            line = "Reference Transport: conditioning reference_latents (RedNode-compatible)"
+        lines.append(line)
+    # Avoid leaving an empty Warnings section when the skipped-patch warning was the only warning.
+    if lines and lines[-1] == "Warnings:":
+        lines.pop()
+    return "\n".join(lines)
+
+
 class CcCKrea2Edit:
     """Krea2 Edit orchestrator consuming a pre-built target latent."""
 
@@ -161,9 +186,9 @@ class CcCKrea2Edit:
     FUNCTION = "process"
     DESCRIPTION = (
         "Krea2 Edit orchestrator. Target latent construction lives in Krea2 CcC Latent. "
-        "Every visual reference is then fitted to that resolved target using the Krea2 Edit v1.2 "
-        "pixel-space geometry before VAE encoding. RoPE positioning can move the fitted reference "
-        "coordinates without changing reference sizing."
+        "Every visual reference is fitted to that resolved target using the Identity Edit v1.2 "
+        "pixel-space geometry. Reference latents and fit metadata travel through CONDITIONING; "
+        "RoPE positioning can move the fitted reference coordinates without changing sizing."
     )
 
     @classmethod
@@ -197,7 +222,6 @@ class CcCKrea2Edit:
         semantic_references=None,
     ):
         visual_entries = (visual_references or VisualReferenceChain()).entries
-
         chain = _combine_reference_chains(
             clip=clip,
             visual_references=visual_references,
@@ -206,7 +230,9 @@ class CcCKrea2Edit:
         )
         runtime_latent = _runtime_latent(latent)
 
-        patched_model, positive, negative, latent_out, pipeline_info = run_krea2_edit_orchestrator(
+        # Ask the orchestrator for its standard reference_latents conditioning transport. We then
+        # install the RedNode-compatible Krea2 runtime wrapper without capturing any refs in MODEL.
+        _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
             vae=vae,
@@ -215,23 +241,31 @@ class CcCKrea2Edit:
             positive_prompt=positive_prompt,
             negative_prompt=negative_prompt,
             reference_method="krea2_edit",
-            apply_model_patch=bool(apply_krea2_edit_patch),
+            apply_model_patch=False,
         )
 
-        # Match the proven Identity Edit v1.2 behavior: the configured reference boost belongs
-        # only to the positive pass. The grounded negative uses the same visual references but
-        # always with neutral attention boost (1.0).
         positive_boosts = [float(entry.boost) for entry in visual_entries]
         negative_boosts = [1.0] * len(positive_boosts)
-        if apply_krea2_edit_patch and any(boost != 1.0 for boost in positive_boosts):
-            positive = attach_reference_boosts_to_conditioning(positive, positive_boosts)
-        # Deliberately do not attach reference_boosts to negative conditioning. The model
-        # wrapper defaults to neutral 1.0 when the conditioning does not provide an override,
-        # matching the proven RedNode / Identity Edit v1.2 negative path.
+        rope_positions = [entry.rope_position for entry in visual_entries]
+
+        positive = attach_reference_runtime_to_conditioning(
+            positive,
+            reference_count=len(visual_entries),
+            rope_positions=rope_positions,
+            reference_boosts=positive_boosts,
+        )
+        negative = attach_reference_runtime_to_conditioning(
+            negative,
+            reference_count=len(visual_entries),
+            rope_positions=rope_positions,
+            reference_boosts=None,
+        )
+
+        patched_model = patch_krea2_model(model, prepared_refs=[]) if apply_krea2_edit_patch else model
+        pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
 
         semantic_entries = (semantic_references or SemanticReferenceChain()).entries
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
-
         lines = [
             "=== Krea2 CcC Edit Report ===",
             "Target Latent: external Krea2 CcC Latent",
@@ -241,11 +275,11 @@ class CcCKrea2Edit:
         ]
 
         if visual_entries:
-            lines.append(
-                "Reference Geometry: mandatory Krea2 Edit v1.2 pixel-space fit to resolved target latent"
-            )
+            lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
+            lines.append("Reference Transport: CONDITIONING metadata (reference_latents/reference_fit)")
             lines.append(f"Positive Reference Boosts: {positive_boosts}")
             lines.append(f"Negative Reference Boosts: {negative_boosts}")
+            lines.append("Negative Grounding: same visual refs; semantic aliases/instructions excluded")
 
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
