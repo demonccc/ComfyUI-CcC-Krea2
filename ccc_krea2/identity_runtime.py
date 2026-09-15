@@ -1,8 +1,8 @@
-"""RedNode-equivalent Krea2 Identity Edit runtime with CcC RoPE placement.
+"""CcC Krea2 Identity Edit runtime with per-reference RoPE placement.
 
-This module intentionally mirrors RedNodeAI/ComfyUI-Krea2Moodboard's patched
-SingleStreamDiT._forward contract. CcC adds only per-reference RoPE placement; target
-geometry, pixel-space reference fit and conditioning transport stay outside this module.
+This module owns the SingleStreamDiT in-context reference forward used by the split Edit
+surface. Target geometry, pixel-space reference fit and conditioning transport stay outside
+this module; CcC adds per-reference RoPE placement at runtime.
 """
 
 import math
@@ -65,8 +65,8 @@ def _align_runtime_list(value: Any, count: int, default: Any):
     return [default] * max(0, count - len(raw)) + raw[-count:]
 
 
-def install_rednode_krea2_forward() -> bool:
-    """Install the RedNode-style SingleStreamDiT forward once per ComfyUI process."""
+def install_identity_krea2_forward() -> bool:
+    """Install the CcC Identity Edit SingleStreamDiT forward once per ComfyUI process."""
     try:
         import comfy.ldm.common_dit
         from comfy.ldm.flux.layers import timestep_embedding
@@ -75,7 +75,7 @@ def install_rednode_krea2_forward() -> bool:
     except (ImportError, AttributeError):
         return False
 
-    if getattr(SingleStreamDiT, "_ccc_rednode_identity_patched", False):
+    if getattr(SingleStreamDiT, "_ccc_identity_runtime_patched", False):
         return True
 
     def _ccc_krea2_forward(
@@ -88,7 +88,7 @@ def install_rednode_krea2_forward() -> bool:
         transformer_options=None,
         **kwargs,
     ):
-        # Match RedNode's ComfyUI signature-drift handling.
+        # Handle ComfyUI signature drift while preserving conditioning-owned references.
         native_ref = None
         drift = list(_drift)
         if drift and isinstance(drift[-1], dict) and transformer_options is None:
@@ -106,9 +106,12 @@ def install_rednode_krea2_forward() -> bool:
         count = len(ref_latents)
         ref_boosts = [float(v) for v in _align_runtime_list(ref_boosts, count, 1.0)]
         ref_fit = [bool(v) for v in _align_runtime_list(ref_fit, count, False)]
-        ref_rope_positions = [str(v) for v in _align_runtime_list(
-            ref_rope_positions, count, "inside:center:center"
-        )]
+        ref_rope_positions = [
+            str(v)
+            for v in _align_runtime_list(
+                ref_rope_positions, count, "inside:center:center"
+            )
+        ]
 
         temporal = x.ndim == 5
         if temporal:
@@ -118,7 +121,6 @@ def install_rednode_krea2_forward() -> bool:
         batch, _, original_h, original_w = x.shape
         patch = self.patch
 
-        # Deliberately use ComfyUI's native padding call exactly like RedNode.
         x = comfy.ldm.common_dit.pad_to_patch_size(x, (patch, patch))
         height, width = x.shape[-2:]
         target_gh, target_gw = height // patch, width // patch
@@ -193,7 +195,7 @@ def install_rednode_krea2_forward() -> bool:
                 combined.dtype,
             )
 
-        # Keep RedNode's block contract exactly: do not synthesize img_slice/block_index metadata.
+        # Keep the native block call contract; CcC only changes reference placement and boosts.
         for block in self.blocks:
             combined = block(
                 combined,
@@ -223,16 +225,16 @@ def install_rednode_krea2_forward() -> bool:
         return output
 
     SingleStreamDiT._forward = _ccc_krea2_forward
-    SingleStreamDiT._ccc_rednode_identity_patched = True
+    SingleStreamDiT._ccc_identity_runtime_patched = True
     return True
 
 
-def patch_krea2_model_rednode(model: Any) -> Any:
-    """Return a model clone using the process-wide RedNode-compatible Krea2 forward."""
+def patch_krea2_identity_model(model: Any) -> Any:
+    """Return a model clone using the CcC Identity Edit runtime."""
     install_krea2_reference_conditioning()
-    if not install_rednode_krea2_forward():
+    if not install_identity_krea2_forward():
         raise RuntimeError(
-            "[CcC Krea2] Could not install the RedNode-compatible Krea2 SingleStreamDiT runtime."
+            "[CcC Krea2] Could not install the Krea2 Identity Edit SingleStreamDiT runtime."
         )
 
     patched = model.clone()

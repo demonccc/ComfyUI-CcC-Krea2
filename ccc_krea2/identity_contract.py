@@ -1,4 +1,4 @@
-"""Small compatibility helpers mirroring the proven RedNode/Krea2Moodboard edit contract."""
+"""Krea2 Identity Edit conditioning contract helpers."""
 
 from typing import Any, Dict, List
 
@@ -27,13 +27,13 @@ def build_grounded_positive_user_content(
 ) -> str:
     """Build the Krea2 positive user turn.
 
-    Identity/Edit appearance references intentionally match RedNode exactly: their physical
-    vision blocks are contiguous and are followed directly by the user's edit instruction.
-    Per-reference Visual Reference labels/instructions are metadata only on this path; injecting
-    them changes the Qwen sequence from the proven ``VISION_BLOCK * N + instruction`` contract.
+    Identity/Edit appearance references are positional: their physical vision blocks are
+    contiguous and are followed directly by the user's edit instruction. Per-reference
+    Visual Reference labels/instructions remain metadata on this path so the Qwen sequence
+    stays ``VISION_BLOCK * N + instruction``.
 
-    CcC-only semantic/style references may still contribute ordinary annotation text after the
-    complete image prefix because they are extensions rather than Identity Edit appearance refs.
+    CcC-only semantic/style references may still contribute ordinary annotation text after
+    the complete image prefix because they are extensions rather than appearance refs.
     """
     blocks: List[str] = []
     annotations: List[str] = []
@@ -49,8 +49,8 @@ def build_grounded_positive_user_content(
         count = _style_block_count(spec) if ref_path == "style" else 1
         blocks.extend([VISION_PAD_TOKEN] * count)
 
-        # Proven Identity Edit / RedNode path: appearance edit refs are positional. Scene is
-        # frame/image 1 and subject is frame/image 2 by workflow order; no label text is injected.
+        # Appearance edit refs are positional. Scene is frame/image 1 and subject is
+        # frame/image 2 by workflow order; no label text is injected.
         if ref_path == "edit" and is_appearance:
             physical_index += count
             continue
@@ -82,9 +82,9 @@ def build_grounded_negative_user_content(
 ) -> str:
     """Build the Identity Edit grounded negative without positive semantic annotations.
 
-    Training unconditional = same appearance images + empty text. A user-supplied negative prompt
-    may still be appended because the public CcC Edit node exposes that field, but semantic roles
-    and per-reference instructions intentionally never enter the negative pass.
+    The unconditional branch uses the same appearance images with empty text. A user-supplied
+    negative prompt may still be appended because the public CcC Edit node exposes that field,
+    but semantic roles and per-reference instructions intentionally never enter this pass.
     """
     blocks = []
     for item in resolved_references:

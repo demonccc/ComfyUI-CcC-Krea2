@@ -3,8 +3,8 @@
 import torch
 
 from ccc_krea2.constants import VISION_PAD_TOKEN
+from ccc_krea2.identity_conditioning import encode_visual_identity_direct
 from ccc_krea2.modular_nodes.edit_reference_types import VisualReferenceEntry
-from ccc_krea2.rednode_identity_path import encode_visual_identity_direct
 
 
 class _DummyClip:
@@ -29,7 +29,7 @@ def _extras(conditioning):
     return conditioning[0][1]
 
 
-def test_direct_identity_path_matches_rednode_visual_contract():
+def test_direct_identity_path_matches_visual_identity_contract():
     clip = _DummyClip()
     vae = _DummyVAE()
     target = {"samples": torch.zeros((1, 16, 22, 22))}  # 176x176 target pixels

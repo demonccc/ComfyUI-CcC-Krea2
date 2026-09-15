@@ -1,16 +1,16 @@
-"""Regression contracts aligned with RedNode / Krea2 Identity Edit v1.2."""
+"""Regression contracts for Krea2 Identity Edit v1.2."""
 
 import torch
 
 from ccc_krea2.constants import VISION_PAD_TOKEN
+from ccc_krea2.identity_contract import (
+    build_grounded_negative_user_content,
+    build_grounded_positive_user_content,
+)
 from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
 from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _prepare_qwen_image
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
 from ccc_krea2.patch import attach_reference_runtime_to_conditioning
-from ccc_krea2.rednode_contract import (
-    build_grounded_negative_user_content,
-    build_grounded_positive_user_content,
-)
 
 
 class _Spec:
@@ -37,7 +37,7 @@ class _SemanticOnlySpec:
     vision_instruction = "Use this image only as semantic target context."
 
 
-def test_grounded_positive_matches_rednode_for_visual_identity_refs_even_with_labels():
+def test_grounded_positive_matches_identity_contract_for_visual_refs_even_with_labels():
     refs = [
         {"spec": _PlainSpec()},
         {"spec": _Spec(), "expanded_aliases": ("subject image",)},
@@ -75,9 +75,9 @@ def test_grounded_negative_can_append_explicit_user_negative_without_reference_a
     assert "subject image" not in text
 
 
-def test_qwen_grounding_matches_rednode_area_cap_without_pre_alignment():
-    # RedNode downsizes the longest side to grounding_px and lets Qwen own its native
-    # patch/merge alignment. 971x2059 at 768 therefore becomes 362x768 here, not 352x768.
+def test_qwen_grounding_uses_area_cap_without_pre_alignment():
+    # Longest-side downscale remains tokenizer-native: 971x2059 at 768 becomes
+    # 362x768 here rather than being pre-aligned to a vision patch multiple.
     image = torch.zeros((1, 2059, 971, 3))
     prepared = _prepare_qwen_image(image=image, clip=None, grounding_px=768)
     assert prepared.original_image.shape == (1, 2059, 971, 3)

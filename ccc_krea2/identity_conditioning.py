@@ -1,8 +1,7 @@
 """Direct Krea2 Identity Edit conditioning path.
 
-This module intentionally bypasses the generic CcC edit orchestrator for visual-only
-Identity Edit workflows. It mirrors RedNodeAI/ComfyUI-Krea2Moodboard's Krea2IdentityEdit
-encode contract while keeping CcC's already-resolved target geometry and RoPE placement.
+This module bypasses the generic CcC edit orchestrator for visual-only Identity Edit
+workflows while keeping CcC target geometry and RoPE placement.
 """
 
 from dataclasses import dataclass
@@ -43,7 +42,7 @@ def _as_single_rgb(image: torch.Tensor) -> torch.Tensor:
 
 
 def _grounding_image(image: torch.Tensor, grounding_px: int) -> torch.Tensor:
-    """Match RedNode Identity Edit grounding: longest-side AREA cap, never upscale."""
+    """Prepare Identity Edit grounding with a longest-side AREA cap and no upscaling."""
     image = _as_single_rgb(image)
     samples = image.movedim(-1, 1)
     height, width = int(samples.shape[2]), int(samples.shape[3])
@@ -123,7 +122,7 @@ def encode_visual_identity_direct(
     positive_prompt: str,
     negative_prompt: str = "",
 ) -> DirectIdentityResult:
-    """Encode visual Identity refs directly using the proven RedNode contract.
+    """Encode visual Identity refs directly with the Krea2 Identity Edit conditioning contract.
 
     Visual-reference order is preserved exactly (scene first, subject second by workflow
     convention). CcC semantic_role/instruction fields remain UI/report metadata and do not
@@ -180,8 +179,8 @@ def encode_visual_identity_direct(
     if any(boost != 1.0 for boost in boosts):
         positive_values["reference_boosts"] = boosts
 
-    # RedNode's grounded negative uses the same VAE refs and fit geometry but no boost
-    # override. The Krea2 runtime therefore resolves every negative ref boost to 1.0.
+    # The grounded negative uses the same VAE refs and fit geometry but no boost override,
+    # so the Krea2 runtime resolves every negative reference boost to 1.0.
     positive = _conditioning_set_values(positive, positive_values, append=True)
     negative = _conditioning_set_values(negative, common, append=True)
 

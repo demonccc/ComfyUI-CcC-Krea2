@@ -7,10 +7,10 @@ import torch
 from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
+from ..identity_conditioning import encode_visual_identity_direct
+from ..identity_contract import build_grounded_negative_user_content, build_grounded_positive_user_content
+from ..identity_runtime import patch_krea2_identity_model
 from ..patch import attach_reference_runtime_to_conditioning
-from ..rednode_contract import build_grounded_negative_user_content, build_grounded_positive_user_content
-from ..rednode_identity_path import encode_visual_identity_direct
-from ..rednode_runtime import patch_krea2_model_rednode
 from ..reference_specs import (
     PreparedVisionImage,
     ReferenceChain,
@@ -23,14 +23,14 @@ from .rope_position import install_krea2_rope_positioning
 
 
 # Generic semantic/style fallback keeps the same text contract. Pure visual Identity
-# workflows bypass edit_engine entirely and use rednode_identity_path instead.
+# workflows bypass edit_engine entirely and use the direct identity conditioning path.
 edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
 edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
 install_krea2_rope_positioning()
 
 
 def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
-    """Prepare Qwen grounding like RedNode before CLIP tokenization."""
+    """Prepare Qwen grounding with a longest-side AREA cap before CLIP tokenization."""
     del clip
     if image.ndim == 3:
         image = image.unsqueeze(0)
@@ -209,7 +209,7 @@ def _normalize_pipeline_report(pipeline_info: str, patch_applied: bool) -> str:
         if line == "CcC Model Patch: skipped":
             line = "CcC Model Patch: applied"
         elif line == "Reference Transport: standard ComfyUI reference_latents":
-            line = "Reference Transport: conditioning reference_latents (RedNode-compatible)"
+            line = "Reference Transport: conditioning-owned reference_latents"
         lines.append(line)
     if lines and lines[-1] == "Warnings:":
         lines.pop()
@@ -266,8 +266,8 @@ def _runtime_patch_markers() -> str:
         from comfy.ldm.krea2.model import SingleStreamDiT
 
         return (
-            f"rednode={bool(getattr(SingleStreamDiT, '_krea2_identity_patched', False))}, "
-            f"ccc={bool(getattr(SingleStreamDiT, '_ccc_rednode_identity_patched', False))}"
+            f"external_identity={bool(getattr(SingleStreamDiT, '_krea2_identity_patched', False))}, "
+            f"ccc_identity={bool(getattr(SingleStreamDiT, '_ccc_identity_runtime_patched', False))}"
         )
     except Exception as exc:
         return f"unavailable ({type(exc).__name__})"
@@ -283,7 +283,7 @@ class CcCKrea2Edit:
     DESCRIPTION = (
         "Krea2 Edit orchestrator. Target latent construction lives in Krea2 CcC Latent. "
         "Every visual reference is fitted to that resolved target using the Identity Edit v1.2 "
-        "pixel-space geometry. Pure visual Identity workflows use a direct RedNode-compatible "
+        "pixel-space geometry. Pure visual Identity workflows use a direct Identity Edit "
         "conditioning path; semantic/style extensions use the generic orchestrator."
     )
 
@@ -326,7 +326,7 @@ class CcCKrea2Edit:
         negative_boosts = [1.0] * len(positive_boosts)
         rope_positions = [entry.rope_position for entry in visual_entries]
 
-        # Pure visual Identity workflows get the direct proven encode path. No generic slots,
+        # Pure visual Identity workflows get the direct encode path. No generic slots,
         # span extraction, style post-processing, prompt augmentation, or PreparedReference layer.
         direct_identity = bool(visual_entries) and not semantic_entries and not latent_semantic.get("enabled")
         direct_result = None
@@ -346,7 +346,7 @@ class CcCKrea2Edit:
             pipeline_info = (
                 "=== CcC Krea2 Edit Pipeline Report ===\n"
                 "Reference Contract: krea2_edit\n"
-                "Conditioning Path: direct RedNode Identity encode\n"
+                "Conditioning Path: direct Identity Edit encode\n"
                 "Generic Edit Engine: bypassed\n"
                 f"Target Pixel Geometry: {runtime_latent['samples'].shape[-1] * 8} x "
                 f"{runtime_latent['samples'].shape[-2] * 8}\n"
@@ -386,7 +386,7 @@ class CcCKrea2Edit:
             )
             pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
 
-        patched_model = patch_krea2_model_rednode(model) if apply_krea2_edit_patch else model
+        patched_model = patch_krea2_identity_model(model) if apply_krea2_edit_patch else model
 
         lines = [
             "=== Krea2 CcC Edit Report ===",
@@ -394,7 +394,7 @@ class CcCKrea2Edit:
             f"Visual References: {len(visual_entries)}",
             f"Semantic References: {len(semantic_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
-            f"Conditioning Path: {'direct RedNode Identity encode' if direct_identity else 'generic semantic/style orchestrator'}",
+            f"Conditioning Path: {'direct Identity Edit encode' if direct_identity else 'generic semantic/style orchestrator'}",
         ]
 
         if visual_entries:
@@ -404,7 +404,7 @@ class CcCKrea2Edit:
             lines.append(f"Runtime Patch Markers: {_runtime_patch_markers()}")
             lines.append("Positive Grounding: VISION_BLOCK * N + user prompt")
             lines.append("Visual Reference semantic_role/instruction: metadata-only on Identity grounding path")
-            lines.append("Qwen Grounding Resize: RedNode AREA longest-side cap")
+            lines.append("Qwen Grounding Resize: AREA longest-side cap")
             lines.append(f"Positive Reference Boosts: {positive_boosts}")
             lines.append(f"Negative Reference Boosts: {negative_boosts}")
             lines.append("Negative Grounding: same visual Qwen images; no positive semantic annotations")

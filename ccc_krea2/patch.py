@@ -1,9 +1,8 @@
 """Krea 2 Identity Edit runtime using conditioning-transported reference latents.
 
-The transport and forward semantics intentionally follow the proven RedNode / Krea2Moodboard
-Identity Edit v1.2 contract: reference latents, fit flags and boosts travel with CONDITIONING,
-so positive and negative passes can carry the same references while using different boosts.
-CcC extends only the RoPE placement of already-fitted references.
+Reference latents, fit flags and boosts travel with CONDITIONING so positive and negative
+passes can carry the same references while using different boosts. CcC extends this with
+per-reference RoPE placement for already-fitted references.
 """
 
 import math
@@ -52,7 +51,7 @@ def attach_reference_runtime_to_conditioning(
     rope_positions: Optional[List[str]] = None,
     reference_boosts: Optional[List[float]] = None,
 ) -> List[Any]:
-    """Attach RedNode-compatible fit metadata plus the CcC RoPE extension.
+    """Attach Identity Edit fit metadata plus the CcC RoPE extension.
 
     `reference_latents` themselves are attached by the edit orchestrator. This helper adds the
     remaining per-pass controls without changing the public node surface.
@@ -178,7 +177,7 @@ def patch_krea2_model(model: Any, prepared_refs: Optional[List[Any]] = None) -> 
     """Clone MODEL and register a runtime wrapper that consumes refs from CONDITIONING.
 
     `prepared_refs` is retained only for call compatibility. References are deliberately not
-    captured in the MODEL anymore; this is the key RedNode-compatible behavior.
+    captured in the MODEL anymore; conditioning owns the per-pass reference state.
     """
     if is_model_already_patched(model, "ccc_krea2_edit"):
         raise RuntimeError(
@@ -312,7 +311,7 @@ def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
 
 
 def _fit_latent(src: torch.Tensor, height: int, width: int) -> torch.Tensor:
-    """RedNode legacy fallback: crop to target AR then resize in latent space."""
+    """Legacy fallback: crop to target AR then resize in latent space."""
     sh, sw = src.shape[-2:]
     if (sh, sw) == (height, width):
         return src
@@ -355,8 +354,8 @@ def _compute_ref_attention_bias_patchified(
     """Target->reference attention bias with legacy optional mask compatibility.
 
     The split public Edit surface currently supplies unmasked refs, so its runtime path reduces
-    exactly to RedNode's per-reference log(boost) bias. The mask branch is retained for internal
-    compatibility and tests.
+    to a per-reference log(boost) bias. The mask branch is retained for internal compatibility
+    and tests.
     """
     if not boosts:
         return None
@@ -415,7 +414,7 @@ def _build_incontext_3d_rope_pos_ids(
     device: torch.device,
     ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
-    """Default RedNode-compatible centered positions; modular Edit can replace this helper."""
+    """Default Identity Edit centered positions; modular Edit can replace this helper."""
     tgt_h, tgt_w = target_grid
     parts = [torch.zeros((txt_len, 3), device=device, dtype=torch.float32)] if txt_len else []
     for index, (ref_h, ref_w) in enumerate(ref_token_grids):
@@ -445,7 +444,7 @@ def krea2_dit_incontext_forward(
     ref_rope_positions: Optional[List[str]] = None,
     **_legacy: Any,
 ) -> torch.Tensor:
-    """RedNode-compatible in-context Krea2 forward with optional CcC RoPE displacement."""
+    """In-context Krea2 forward with optional CcC RoPE displacement."""
     transformer_options = transformer_options or {}
     n_refs = len(ref_latents)
     boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
@@ -528,7 +527,7 @@ def krea2_dit_incontext_forward(
     for block_index, block in enumerate(dit_model.blocks):
         # Preserve the current ComfyUI Krea2 transformer metadata contract while keeping the
         # Identity Edit sequence order [text | refs | target]. This matters for attention patches
-        # that consume img_slice/block_index but does not change RedNode reference semantics.
+        # that consume img_slice/block_index without changing reference semantics.
         block_options = transformer_options.copy()
         block_options["total_blocks"] = total_blocks
         block_options["block_type"] = "single"
