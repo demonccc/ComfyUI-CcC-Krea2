@@ -8,30 +8,84 @@ from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
 from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
-from ..rednode_contract import build_grounded_negative_user_content
-from ..reference_specs import ReferenceChain, ReferenceSpec, StyleReferenceSpec
-from ..vision_prep import prepare_image_for_qwen
+from ..rednode_contract import (
+    build_grounded_negative_user_content,
+    build_grounded_positive_user_content,
+)
+from ..reference_specs import (
+    PreparedVisionImage,
+    ReferenceChain,
+    ReferenceSpec,
+    StyleReferenceSpec,
+    VisionPrepSpec,
+)
 from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
 from .rope_position import install_krea2_rope_positioning
 
 
-# Keep the existing orchestrator, but make its negative builder match the proven Identity Edit
-# contract: same Qwen appearance images, no positive aliases/instructions in the negative text.
+# Match the proven RedNode/Krea2Moodboard text layout on both CFG branches.
+# Positive: all physical VISION_BLOCKs first, then semantic annotations + user prompt.
+# Negative: same appearance VISION_BLOCKs, no positive annotations.
+edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
 edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
 install_krea2_rope_positioning()
 
 
 def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
+    """Prepare Qwen grounding exactly like RedNode before CLIP tokenization.
+
+    RedNode only caps the longest side with AREA downsampling. It does not pre-align the
+    image to Qwen's patch/merge factor; the Qwen tokenizer/processor owns that final native
+    geometry step. Keeping that boundary avoids an extra resize before semantic encoding.
+    """
+    del clip  # Qwen-native geometry is intentionally left to clip.tokenize().
+
+    if image.ndim == 3:
+        image = image.unsqueeze(0)
+    original = image
+
     if grounding_px == 0:
         vision_input = image
+        resize_applied = False
     else:
         vision_input = resize_grounding_image(
             image=image,
             resize_mode="downscale_only",
             grounding_px=grounding_px,
             grounding_preset="custom",
+            resize_method="area",
         )
-    return prepare_image_for_qwen(image=vision_input, clip=clip, original_image=image)
+        resize_applied = vision_input.shape[1:3] != image.shape[1:3]
+
+    vision_input = vision_input[..., :3].clamp(0.0, 1.0)
+    src_h, src_w = int(original.shape[1]), int(original.shape[2])
+    prep_h, prep_w = int(vision_input.shape[1]), int(vision_input.shape[2])
+
+    prep_spec = VisionPrepSpec(
+        mode="native",
+        semantic_min_mp=0.0,
+        semantic_max_mp=0.0,
+        semantic_fixed_mp=0.0,
+        downscale_method_requested="area",
+        upscale_method_requested="none",
+        encoder_signature="Qwen tokenizer-native",
+        resolved_alignment=None,
+        resolved_native_limits=None,
+    )
+    debug_metadata = {
+        "src_hw": (src_h, src_w),
+        "prep_hw": (prep_h, prep_w),
+        "target_hw": (prep_h, prep_w),
+        "direction": "downscale" if resize_applied else "none",
+        "resolved_method": "area" if resize_applied else "none",
+        "additional_adjustment": "owned by Qwen tokenizer",
+    }
+    return PreparedVisionImage(
+        original_image=original,
+        vision_image=vision_input,
+        prep_spec=prep_spec,
+        debug_metadata=debug_metadata,
+    )
 
 
 def _append_semantic(
@@ -277,6 +331,8 @@ class CcCKrea2Edit:
         if visual_entries:
             lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
             lines.append("Reference Transport: CONDITIONING metadata (reference_latents/reference_fit)")
+            lines.append("Positive Grounding: contiguous vision blocks before all semantic text")
+            lines.append("Qwen Grounding Resize: RedNode-compatible AREA cap; tokenizer owns native alignment")
             lines.append(f"Positive Reference Boosts: {positive_boosts}")
             lines.append(f"Negative Reference Boosts: {negative_boosts}")
             lines.append("Negative Grounding: same visual refs; semantic aliases/instructions excluded")
