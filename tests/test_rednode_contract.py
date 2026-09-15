@@ -29,24 +29,37 @@ class _PlainSpec:
     vision_instruction = ""
 
 
-def test_grounded_positive_matches_rednode_when_no_annotations_are_requested():
-    refs = [{"spec": _PlainSpec()}, {"spec": _PlainSpec()}]
-    text = build_grounded_positive_user_content(refs, "Change the pose.")
-    assert text == VISION_PAD_TOKEN * 2 + "Change the pose."
+class _SemanticOnlySpec:
+    include_in_vision = True
+    reference_path = "edit"
+    appearance_reference = False
+    alias = "target image"
+    vision_instruction = "Use this image only as semantic target context."
 
 
-def test_grounded_positive_keeps_all_vision_blocks_contiguous_before_annotations():
+def test_grounded_positive_matches_rednode_for_visual_identity_refs_even_with_labels():
     refs = [
         {"spec": _PlainSpec()},
         {"spec": _Spec(), "expanded_aliases": ("subject image",)},
     ]
     text = build_grounded_positive_user_content(refs, "Replace the woman.")
+    assert text == VISION_PAD_TOKEN * 2 + "Replace the woman."
+    assert "subject image" not in text
+    assert "face and body" not in text
+
+
+def test_ccc_semantic_only_extension_may_add_text_after_complete_vision_prefix():
+    refs = [
+        {"spec": _PlainSpec()},
+        {"spec": _SemanticOnlySpec(), "expanded_aliases": ("target image",)},
+    ]
+    text = build_grounded_positive_user_content(refs, "Change the pose.")
     prefix = VISION_PAD_TOKEN * 2
     assert text.startswith(prefix)
     assert text.count(VISION_PAD_TOKEN) == 2
-    assert text.find("subject image") >= len(prefix)
-    assert text.find("face and body") >= len(prefix)
-    assert text.find("Replace the woman.") >= len(prefix)
+    assert text.find("target image") >= len(prefix)
+    assert text.find("semantic target context") >= len(prefix)
+    assert text.find("Change the pose.") >= len(prefix)
 
 
 def test_grounded_negative_keeps_image_marker_but_drops_positive_annotations():
