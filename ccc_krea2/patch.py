@@ -67,6 +67,29 @@ def attach_reference_runtime_to_conditioning(
     return _conditioning_set_values(conditioning, values)
 
 
+def _prepare_reference_latent_for_model(model: Any, latent: torch.Tensor) -> torch.Tensor:
+    """Normalize an image reference to Krea2/Wan's 5D latent contract before process_latent_in.
+
+    VAE image encoders commonly return B,C,H,W. Krea2 uses a Wan latent format whose channel
+    normalization tensors are B,C,T,H,W. Passing a 4D image latent directly into that
+    normalization can broadcast the channel axis into a bogus temporal dimension. Image
+    references therefore get an explicit singleton T axis before model latent scaling.
+    Existing 5D references are preserved unchanged.
+    """
+    if not torch.is_tensor(latent):
+        raise TypeError(
+            f"[CcC Krea2] Reference latent must be a torch.Tensor, got {type(latent).__name__}."
+        )
+    if latent.ndim == 4:
+        latent = latent.unsqueeze(2)
+    elif latent.ndim != 5:
+        raise ValueError(
+            "[CcC Krea2] Reference latent must be B,C,H,W or B,C,T,H,W; "
+            f"received shape {tuple(latent.shape)}."
+        )
+    return model.process_latent_in(latent)
+
+
 def install_krea2_reference_conditioning() -> None:
     """Teach ComfyUI Krea2 to forward reference metadata from CONDITIONING to the DiT wrapper."""
     try:
@@ -87,7 +110,9 @@ def install_krea2_reference_conditioning() -> None:
 
         ref_latents = kwargs.get("reference_latents")
         if ref_latents is not None:
-            out["ref_latents"] = comfy.conds.CONDList([self.process_latent_in(lat) for lat in ref_latents])
+            out["ref_latents"] = comfy.conds.CONDList(
+                [_prepare_reference_latent_for_model(self, lat) for lat in ref_latents]
+            )
 
         ref_boosts = kwargs.get("reference_boosts")
         if ref_boosts is not None:
