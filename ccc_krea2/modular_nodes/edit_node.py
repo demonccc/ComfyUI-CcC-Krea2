@@ -8,11 +8,9 @@ from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
 from ..patch import attach_reference_runtime_to_conditioning
+from ..rednode_contract import build_grounded_negative_user_content, build_grounded_positive_user_content
+from ..rednode_identity_path import encode_visual_identity_direct
 from ..rednode_runtime import patch_krea2_model_rednode
-from ..rednode_contract import (
-    build_grounded_negative_user_content,
-    build_grounded_positive_user_content,
-)
 from ..reference_specs import (
     PreparedVisionImage,
     ReferenceChain,
@@ -24,23 +22,16 @@ from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
 from .rope_position import install_krea2_rope_positioning
 
 
-# Match the proven RedNode/Krea2Moodboard text layout on both CFG branches.
-# Identity appearance refs are positional: VISION_BLOCK * N + user instruction, with no
-# per-reference label/instruction text injected into the Qwen stream.
+# Generic semantic/style fallback keeps the same text contract. Pure visual Identity
+# workflows bypass edit_engine entirely and use rednode_identity_path instead.
 edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
 edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
 install_krea2_rope_positioning()
 
 
 def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
-    """Prepare Qwen grounding exactly like RedNode before CLIP tokenization.
-
-    RedNode only caps the longest side with AREA downsampling. It does not pre-align the
-    image to Qwen's patch/merge factor; the Qwen tokenizer/processor owns that final native
-    geometry step. Keeping that boundary avoids an extra resize before semantic encoding.
-    """
-    del clip  # Qwen-native geometry is intentionally left to clip.tokenize().
-
+    """Prepare Qwen grounding like RedNode before CLIP tokenization."""
+    del clip
     if image.ndim == 3:
         image = image.unsqueeze(0)
     original = image
@@ -62,30 +53,28 @@ def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
     src_h, src_w = int(original.shape[1]), int(original.shape[2])
     prep_h, prep_w = int(vision_input.shape[1]), int(vision_input.shape[2])
 
-    prep_spec = VisionPrepSpec(
-        mode="native",
-        semantic_min_mp=0.0,
-        semantic_max_mp=0.0,
-        semantic_fixed_mp=0.0,
-        downscale_method_requested="area",
-        upscale_method_requested="none",
-        encoder_signature="Qwen tokenizer-native",
-        resolved_alignment=None,
-        resolved_native_limits=None,
-    )
-    debug_metadata = {
-        "src_hw": (src_h, src_w),
-        "prep_hw": (prep_h, prep_w),
-        "target_hw": (prep_h, prep_w),
-        "direction": "downscale" if resize_applied else "none",
-        "resolved_method": "area" if resize_applied else "none",
-        "additional_adjustment": "owned by Qwen tokenizer",
-    }
     return PreparedVisionImage(
         original_image=original,
         vision_image=vision_input,
-        prep_spec=prep_spec,
-        debug_metadata=debug_metadata,
+        prep_spec=VisionPrepSpec(
+            mode="native",
+            semantic_min_mp=0.0,
+            semantic_max_mp=0.0,
+            semantic_fixed_mp=0.0,
+            downscale_method_requested="area",
+            upscale_method_requested="none",
+            encoder_signature="Qwen tokenizer-native",
+            resolved_alignment=None,
+            resolved_native_limits=None,
+        ),
+        debug_metadata={
+            "src_hw": (src_h, src_w),
+            "prep_hw": (prep_h, prep_w),
+            "target_hw": (prep_h, prep_w),
+            "direction": "downscale" if resize_applied else "none",
+            "resolved_method": "area" if resize_applied else "none",
+            "additional_adjustment": "owned by Qwen tokenizer",
+        },
     )
 
 
@@ -101,7 +90,6 @@ def _append_semantic(
     alias: str = "",
 ) -> ReferenceChain:
     prep = _prepare_qwen_image(image=image, clip=clip, grounding_px=grounding_px)
-
     if mode == "semantic_only":
         spec = ReferenceSpec(
             reference_path="edit",
@@ -125,12 +113,10 @@ def _append_semantic(
             indirect_style_transfer=(mode == "style_indirect"),
             _legacy_role="style",
         )
-
     return chain.append(spec)
 
 
 def _runtime_latent(latent: dict) -> dict:
-    """Restore the exact target-latent contract used before the Latent/Edit split."""
     runtime = {
         "samples": latent["samples"],
         "batch_index": latent.get("batch_index"),
@@ -149,6 +135,7 @@ def _combine_reference_chains(
     semantic_references: Optional[SemanticReferenceChain],
     latent: dict,
 ) -> ReferenceChain:
+    """Build the generic chain used only when semantic/style extensions are active."""
     chain = ReferenceChain()
 
     for index, entry in enumerate((visual_references or VisualReferenceChain()).entries, start=1):
@@ -166,8 +153,6 @@ def _combine_reference_chains(
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=entry.boost,
-                # Target geometry may come from preset, fixed dimensions, Size Resolver, or image.
-                # Once resolved, every visual reference uses the mandatory Identity Edit v1.2 fit.
                 visual_reference_fit="fit",
                 rope_position=entry.rope_position,
                 _legacy_role=f"reference_{index}",
@@ -268,7 +253,22 @@ def _runtime_forward_owner() -> str:
         from comfy.ldm.krea2.model import SingleStreamDiT
 
         fn = SingleStreamDiT._forward
-        return f"{getattr(fn, '__module__', '<unknown>')}.{getattr(fn, '__qualname__', getattr(fn, '__name__', '<unknown>'))}"
+        return (
+            f"{getattr(fn, '__module__', '<unknown>')}."
+            f"{getattr(fn, '__qualname__', getattr(fn, '__name__', '<unknown>'))}"
+        )
+    except Exception as exc:
+        return f"unavailable ({type(exc).__name__})"
+
+
+def _runtime_patch_markers() -> str:
+    try:
+        from comfy.ldm.krea2.model import SingleStreamDiT
+
+        return (
+            f"rednode={bool(getattr(SingleStreamDiT, '_krea2_identity_patched', False))}, "
+            f"ccc={bool(getattr(SingleStreamDiT, '_ccc_rednode_identity_patched', False))}"
+        )
     except Exception as exc:
         return f"unavailable ({type(exc).__name__})"
 
@@ -283,8 +283,8 @@ class CcCKrea2Edit:
     DESCRIPTION = (
         "Krea2 Edit orchestrator. Target latent construction lives in Krea2 CcC Latent. "
         "Every visual reference is fitted to that resolved target using the Identity Edit v1.2 "
-        "pixel-space geometry. Reference latents and fit metadata travel through CONDITIONING; "
-        "RoPE positioning can move the fitted reference coordinates without changing sizing."
+        "pixel-space geometry. Pure visual Identity workflows use a direct RedNode-compatible "
+        "conditioning path; semantic/style extensions use the generic orchestrator."
     )
 
     @classmethod
@@ -318,75 +318,117 @@ class CcCKrea2Edit:
         semantic_references=None,
     ):
         visual_entries = (visual_references or VisualReferenceChain()).entries
-        chain = _combine_reference_chains(
-            clip=clip,
-            visual_references=visual_references,
-            semantic_references=semantic_references,
-            latent=latent,
-        )
+        semantic_entries = (semantic_references or SemanticReferenceChain()).entries
+        latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
         runtime_latent = _runtime_latent(latent)
-
-        _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
-            model=model,
-            clip=clip,
-            vae=vae,
-            references=chain,
-            target_latent=runtime_latent,
-            positive_prompt=positive_prompt,
-            negative_prompt=negative_prompt,
-            reference_method="krea2_edit",
-            apply_model_patch=False,
-        )
 
         positive_boosts = [float(entry.boost) for entry in visual_entries]
         negative_boosts = [1.0] * len(positive_boosts)
         rope_positions = [entry.rope_position for entry in visual_entries]
 
-        positive = attach_reference_runtime_to_conditioning(
-            positive,
-            reference_count=len(visual_entries),
-            rope_positions=rope_positions,
-            reference_boosts=positive_boosts,
-        )
-        negative = attach_reference_runtime_to_conditioning(
-            negative,
-            reference_count=len(visual_entries),
-            rope_positions=rope_positions,
-            reference_boosts=None,
-        )
+        # Pure visual Identity workflows get the direct proven encode path. No generic slots,
+        # span extraction, style post-processing, prompt augmentation, or PreparedReference layer.
+        direct_identity = bool(visual_entries) and not semantic_entries and not latent_semantic.get("enabled")
+        direct_result = None
+
+        if direct_identity:
+            direct_result = encode_visual_identity_direct(
+                clip=clip,
+                vae=vae,
+                visual_entries=visual_entries,
+                target_latent=runtime_latent,
+                positive_prompt=positive_prompt,
+                negative_prompt=negative_prompt,
+            )
+            positive = direct_result.positive
+            negative = direct_result.negative
+            latent_out = runtime_latent
+            pipeline_info = (
+                "=== CcC Krea2 Edit Pipeline Report ===\n"
+                "Reference Contract: krea2_edit\n"
+                "Conditioning Path: direct RedNode Identity encode\n"
+                "Generic Edit Engine: bypassed\n"
+                f"Target Pixel Geometry: {runtime_latent['samples'].shape[-1] * 8} x "
+                f"{runtime_latent['samples'].shape[-2] * 8}\n"
+                f"Target Latent Geometry: {runtime_latent['samples'].shape[-1]} x "
+                f"{runtime_latent['samples'].shape[-2]}"
+            )
+        else:
+            chain = _combine_reference_chains(
+                clip=clip,
+                visual_references=visual_references,
+                semantic_references=semantic_references,
+                latent=latent,
+            )
+            _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
+                model=model,
+                clip=clip,
+                vae=vae,
+                references=chain,
+                target_latent=runtime_latent,
+                positive_prompt=positive_prompt,
+                negative_prompt=negative_prompt,
+                reference_method="krea2_edit",
+                apply_model_patch=False,
+            )
+
+            positive = attach_reference_runtime_to_conditioning(
+                positive,
+                reference_count=len(visual_entries),
+                rope_positions=rope_positions,
+                reference_boosts=positive_boosts,
+            )
+            negative = attach_reference_runtime_to_conditioning(
+                negative,
+                reference_count=len(visual_entries),
+                rope_positions=rope_positions,
+                reference_boosts=None,
+            )
+            pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
 
         patched_model = patch_krea2_model_rednode(model) if apply_krea2_edit_patch else model
-        pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
 
-        semantic_entries = (semantic_references or SemanticReferenceChain()).entries
-        latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
         lines = [
             "=== Krea2 CcC Edit Report ===",
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
             f"Semantic References: {len(semantic_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
+            f"Conditioning Path: {'direct RedNode Identity encode' if direct_identity else 'generic semantic/style orchestrator'}",
         ]
 
         if visual_entries:
             lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
             lines.append("Reference Transport: CONDITIONING metadata (reference_latents/reference_fit)")
             lines.append(f"Runtime Forward Owner: {_runtime_forward_owner()}")
-            lines.append("Positive Grounding: RedNode edit-only parity (VISION_BLOCK * N + user prompt)")
+            lines.append(f"Runtime Patch Markers: {_runtime_patch_markers()}")
+            lines.append("Positive Grounding: VISION_BLOCK * N + user prompt")
             lines.append("Visual Reference semantic_role/instruction: metadata-only on Identity grounding path")
-            lines.append("Qwen Grounding Resize: RedNode-compatible AREA cap; tokenizer owns native alignment")
+            lines.append("Qwen Grounding Resize: RedNode AREA longest-side cap")
             lines.append(f"Positive Reference Boosts: {positive_boosts}")
             lines.append(f"Negative Reference Boosts: {negative_boosts}")
-            lines.append("Negative Grounding: same visual refs; semantic aliases/instructions excluded")
+            lines.append("Negative Grounding: same visual Qwen images; no positive semantic annotations")
             lines.append(f"Positive Conditioning Runtime: {_format_runtime_conditioning(positive)}")
             lines.append(f"Negative Conditioning Runtime: {_format_runtime_conditioning(negative)}")
 
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
-            lines.append(
+            base = (
                 f"Visual Reference {index}: boost={entry.boost}, fit=krea2_v1.2, "
                 f"rope={entry.rope_position}, semantic={entry.semantic}, semantic_role={role}"
             )
+            if direct_result is not None and index <= len(direct_result.geometries):
+                geom = direct_result.geometries[index - 1]
+                base += (
+                    f", source={geom.source_size[0]}x{geom.source_size[1]}, "
+                    f"vae={geom.vae_input_pixel_size[0]}x{geom.vae_input_pixel_size[1]}, "
+                    f"latent={geom.vae_latent_grid_size[0]}x{geom.vae_latent_grid_size[1]}"
+                )
+            lines.append(base)
+
+        if direct_result is not None:
+            lines.append(f"Direct Qwen Image Sizes: {list(direct_result.qwen_sizes)}")
+            lines.append(f"Direct Reference Latent Shapes: {list(direct_result.reference_latent_shapes)}")
 
         latent_info = latent.get("ccc_krea2_latent_info")
         if latent_info:
