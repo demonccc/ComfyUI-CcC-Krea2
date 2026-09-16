@@ -1,8 +1,9 @@
 """Krea2 Edit pixel-space geometry.
 
-The `fit` path intentionally matches RedNode / Identity Edit v1.2: references are resampled in
-pixel space to the resolved target-grid density before VAE encoding, and genuine aspect-ratio
-mismatches keep the complete source image (no hidden crop).
+The ``fit`` path follows the Identity Edit v1.2 training geometry: references are
+resampled in pixel space to the resolved target-grid density before VAE encoding.
+For genuine aspect-ratio mismatches, the source is center-cropped just enough for
+the /16-snapped fitted size to remain an exact stride-1 mapping in RoPE space.
 """
 
 import math
@@ -102,11 +103,16 @@ def resolve_krea2edit_geometry(
         vae_w = tgt_w
         vae_h = tgt_h
     elif resolved == "fit":
-        # Exact RedNode v1.2 mismatch behavior: preserve the COMPLETE source image and only
-        # resample it to a /16-snapped grid inside the target. Do not back-compute a crop from
-        # the snapped dimensions; that tiny crop was a CcC divergence from upstream.
+        # Training-aligned v1.2 mismatch behavior. The fitted dimensions are floor-snapped
+        # to /16, then the source is cropped minimally so resizing lands on that grid at
+        # the original uniform scale. This avoids the anisotropic squeeze introduced when
+        # a floor-snapped size is reached by resizing the complete source image.
         vae_h = min(_floor16(src_h * scale), target_cap_h)
         vae_w = min(_floor16(src_w * scale), target_cap_w)
+        crop_h = min(src_h, max(1, int(round(vae_h / scale))))
+        crop_w = min(src_w, max(1, int(round(vae_w / scale))))
+        top = (src_h - crop_h) // 2
+        left = (src_w - crop_w) // 2
     elif resolved == "contain":
         vae_h = min(_floor16(round(src_h * scale)), target_cap_h)
         vae_w = min(_floor16(round(src_w * scale)), target_cap_w)

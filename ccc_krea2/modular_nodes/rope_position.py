@@ -40,14 +40,15 @@ def build_incontext_3d_rope_pos_ids(
     device: torch.device,
     ref_rope_positions: Optional[List[str]] = None,
 ) -> torch.Tensor:
-    """Build Krea2 3D RoPE IDs from v1.2-fitted refs plus optional coordinate displacement.
+    """Build Krea2 3D RoPE IDs from fitted refs plus optional coordinate displacement.
 
     Reference sizing is not controlled here. Every visual reference is fitted to the target
-    latent first by the canonical Krea2 Edit v1.2 pixel-space geometry. This function only
-    changes the coordinate placement used by RoPE.
+    latent first by the Identity Edit pixel-space geometry. This function only changes the
+    coordinate placement used by RoPE.
 
-    `inside:center:center` intentionally matches the proven RedNode/upstream behavior:
-    stride-1 reference coordinates with integer centered offsets.
+    ``inside:center:center`` uses stride-1 coordinates with a fractional center. Half-token
+    offsets are valid RoPE coordinates and avoid the one-half-token bias produced by integer
+    floor placement when the target/reference grid gap is odd.
     """
     tgt_gh, tgt_gw = target_grid
     list_pos = []
@@ -64,8 +65,8 @@ def build_incontext_3d_rope_pos_ids(
         )
         grid, horizontal, vertical = resolve_rope_axes(position)
 
-        centered_x = float(max(0, (tgt_gw - r_gw) // 2))
-        centered_y = float(max(0, (tgt_gh - r_gh) // 2))
+        centered_x = max(0.0, (float(tgt_gw) - float(r_gw)) / 2.0)
+        centered_y = max(0.0, (float(tgt_gh) - float(r_gh)) / 2.0)
 
         if horizontal == "left":
             x_off = 0.0 if grid == "inside" else -float(r_gw)
@@ -97,10 +98,7 @@ def build_incontext_3d_rope_pos_ids(
 
 
 def install_krea2_rope_positioning() -> None:
-    """Install only the optional RoPE placement extension.
-
-    Krea2 Edit reference sizing remains owned by the canonical v1.2 fit geometry.
-    """
+    """Install only the optional RoPE placement extension for legacy wrapper paths."""
     from .. import patch as patch_module
 
     patch_module._build_incontext_3d_rope_pos_ids = build_incontext_3d_rope_pos_ids
