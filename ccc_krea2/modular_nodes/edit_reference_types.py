@@ -12,6 +12,7 @@ class VisualReferenceEntry:
 
     image: torch.Tensor
     boost: float = 1.0
+    fit_mode: str = "fit"
     rope_grid: str = "inside"
     rope_horizontal: str = "center"
     rope_vertical: str = "center"
@@ -24,6 +25,11 @@ class VisualReferenceEntry:
     def rope_position(self) -> str:
         """Compact transport representation consumed by the Krea2 patch."""
         return f"{self.rope_grid}:{self.rope_horizontal}:{self.rope_vertical}"
+
+    @property
+    def resolved_fit_mode(self) -> str:
+        """Map the public fit label to the geometry engine value."""
+        return "crop" if self.fit_mode.startswith("crop") else "fit"
 
 
 @dataclass(frozen=True)

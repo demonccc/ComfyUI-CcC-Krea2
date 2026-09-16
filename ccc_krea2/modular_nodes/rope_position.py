@@ -43,12 +43,11 @@ def build_incontext_3d_rope_pos_ids(
     """Build Krea2 3D RoPE IDs from fitted refs plus optional coordinate displacement.
 
     Reference sizing is not controlled here. Every visual reference is fitted to the target
-    latent first by the Identity Edit pixel-space geometry. This function only changes the
-    coordinate placement used by RoPE.
+    latent first. This function only changes the coordinate placement used by RoPE.
 
-    ``inside:center:center`` uses stride-1 coordinates with a fractional center. Half-token
-    offsets are valid RoPE coordinates and avoid the one-half-token bias produced by integer
-    floor placement when the target/reference grid gap is odd.
+    ``inside:center:center`` deliberately uses the integer floor center used by the established
+    Krea2 Identity Edit runtime. CcC outside/left/right/up/down placements remain extensions on
+    top of that baseline.
     """
     tgt_gh, tgt_gw = target_grid
     list_pos = []
@@ -65,8 +64,8 @@ def build_incontext_3d_rope_pos_ids(
         )
         grid, horizontal, vertical = resolve_rope_axes(position)
 
-        centered_x = max(0.0, (float(tgt_gw) - float(r_gw)) / 2.0)
-        centered_y = max(0.0, (float(tgt_gh) - float(r_gh)) / 2.0)
+        centered_x = float(max(0, (tgt_gw - r_gw) // 2))
+        centered_y = float(max(0, (tgt_gh - r_gh) // 2))
 
         if horizontal == "left":
             x_off = 0.0 if grid == "inside" else -float(r_gw)

@@ -8,6 +8,7 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
+FIT_MODES = ("fit", "crop (legacy)")
 ROPE_GRIDS = ("inside", "outside")
 ROPE_HORIZONTAL = ("center", "left", "right")
 ROPE_VERTICAL = ("center", "up", "down")
@@ -22,9 +23,8 @@ class CcCKrea2VisualReference:
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one visual Krea2 Edit reference. Chaining order is the physical Krea2 reference order. "
-        "The reference image is always fitted to the resolved target latent using the Krea2 Edit v1.2 "
-        "pixel-space fit geometry before VAE encoding. RoPE grid/horizontal/vertical only controls where "
-        "the fitted reference coordinates are placed relative to the target grid."
+        "Fit keeps v1.2 fit-inside geometry; crop (legacy) center-crops to the target aspect ratio and "
+        "fills the complete resolved target grid before VAE encoding. RoPE controls only coordinate placement."
     )
 
     @classmethod
@@ -33,6 +33,17 @@ class CcCKrea2VisualReference:
             "required": {
                 "image": ("IMAGE",),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
+                "fit_mode": (
+                    FIT_MODES,
+                    {
+                        "default": "fit",
+                        "tooltip": (
+                            "fit preserves the full source at target-grid density and can leave large spatial margins "
+                            "for very different aspect ratios. crop (legacy) center-crops to the target AR and encodes "
+                            "a full-target-grid reference, matching the established full-grid identity baseline."
+                        ),
+                    },
+                ),
                 "rope_grid": (ROPE_GRIDS, {"default": "inside"}),
                 "rope_horizontal": (ROPE_HORIZONTAL, {"default": "center"}),
                 "rope_vertical": (ROPE_VERTICAL, {"default": "center"}),
@@ -42,12 +53,22 @@ class CcCKrea2VisualReference:
                     {
                         "default": "",
                         "tooltip": (
-                            "Optional Qwen semantic name for this image, for example 'scene image' or "
-                            "'subject image'. Empty keeps positional Krea2 Edit behavior."
+                            "Metadata label for reports and higher-level routing. Identity appearance references stay "
+                            "positional in the Qwen stream; this label is not injected into Identity grounding text."
                         ),
                     },
                 ),
-                "instruction": ("STRING", {"multiline": True, "default": ""}),
+                "instruction": (
+                    "STRING",
+                    {
+                        "multiline": True,
+                        "default": "",
+                        "tooltip": (
+                            "Metadata instruction for higher-level routing. It is not injected into the positional "
+                            "Identity grounding stream; use Semantic Reference for explicit Qwen-only instructions."
+                        ),
+                    },
+                ),
                 "grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 16}),
             },
             "optional": {
@@ -59,6 +80,7 @@ class CcCKrea2VisualReference:
         self,
         image: torch.Tensor,
         boost: float = 1.0,
+        fit_mode: str = "fit",
         rope_grid: str = "inside",
         rope_horizontal: str = "center",
         rope_vertical: str = "center",
@@ -74,6 +96,7 @@ class CcCKrea2VisualReference:
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
+            fit_mode=fit_mode,
             rope_grid=rope_grid,
             rope_horizontal=rope_horizontal,
             rope_vertical=rope_vertical,

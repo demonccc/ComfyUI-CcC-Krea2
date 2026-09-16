@@ -7,7 +7,11 @@ import torch
 from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
-from ..orchestrator_runtime import patch_krea2_orchestrated_model
+from ..identity_contract import (
+    build_grounded_negative_user_content,
+    build_grounded_positive_user_content,
+)
+from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
 from ..reference_specs import (
     PreparedVisionImage,
     ReferenceChain,
@@ -19,10 +23,11 @@ from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
 from .rope_position import install_krea2_rope_positioning
 
 
-# Keep the split public node surface, but restore the original orchestrator transport:
-# prepared appearance references are captured by the MODEL wrapper instead of bypassing
-# the orchestrator or moving appearance state into CONDITIONING.
-edit_engine_runtime.patch_krea2_model = patch_krea2_orchestrated_model
+# Identity appearance references are positional in the proven Krea2 grounding contract:
+# VISION_BLOCK * N + instruction. Semantic/style-only CcC extensions may still add their
+# annotations after the complete visual prefix.
+edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
+edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
 install_krea2_rope_positioning()
 
 
@@ -132,7 +137,7 @@ def _combine_reference_chains(
     semantic_references: Optional[SemanticReferenceChain],
     latent: dict,
 ) -> ReferenceChain:
-    """Translate the split public nodes back into the original orchestrator ReferenceChain."""
+    """Translate the split public nodes into the common orchestrator ReferenceChain."""
     chain = ReferenceChain()
 
     for index, entry in enumerate((visual_references or VisualReferenceChain()).entries, start=1):
@@ -145,12 +150,14 @@ def _combine_reference_chains(
             ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
+                # Kept as metadata for reports/routing. Identity grounding builders deliberately
+                # do not inject appearance-reference labels or instructions into Qwen text.
                 alias=entry.semantic_role if entry.semantic else "",
                 vision_instruction=entry.instruction if entry.semantic else "",
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=float(entry.boost),
-                visual_reference_fit="fit",
+                visual_reference_fit=entry.resolved_fit_mode,
                 rope_position=entry.rope_position,
                 _legacy_role=f"reference_{index}",
             )
@@ -195,13 +202,46 @@ def _combine_reference_chains(
     return chain
 
 
-def _format_model_runtime(model) -> str:
-    return (
-        f"refs={getattr(model, '_ccc_orchestrated_reference_count', 0)} "
-        f"shapes={getattr(model, '_ccc_orchestrated_reference_shapes', [])}, "
-        f"boosts={getattr(model, '_ccc_orchestrated_reference_boosts', [])}, "
-        f"rope={getattr(model, '_ccc_orchestrated_reference_rope', [])}"
+def _conditioning_extras(conditioning):
+    if not conditioning:
+        return {}
+    first = conditioning[0]
+    if isinstance(first, (list, tuple)) and len(first) >= 2 and isinstance(first[1], dict):
+        return first[1]
+    return {}
+
+
+def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
+    extras = _conditioning_extras(conditioning)
+    refs = list(extras.get("reference_latents") or [])
+    shapes = [tuple(int(v) for v in ref.shape) for ref in refs if torch.is_tensor(ref)]
+    fit = list(extras.get("reference_fit") or [])
+    rope = list(extras.get("reference_rope_positions") or [])
+    boosts = extras.get("reference_boosts")
+    if boosts is None:
+        boosts = [1.0] * reference_count
+    else:
+        boosts = [float(v) for v in boosts]
+    return f"refs={len(refs)} shapes={shapes}, fit={fit}, boosts={boosts}, rope={rope}"
+
+
+def _rewrite_pipeline_report_for_conditioning_runtime(report: str, patched: bool) -> str:
+    if not patched:
+        return report
+    lines = []
+    skip_warning = (
+        "CcC Krea2 model patch was skipped; reference latents attached to conditioning require compatible runtime support."
     )
+    for line in report.splitlines():
+        if skip_warning in line:
+            continue
+        if line == "CcC Model Patch: skipped":
+            lines.append("CcC Model Patch: applied")
+        elif line == "Reference Transport: standard ComfyUI reference_latents":
+            lines.append("Reference Transport: CONDITIONING metadata (refs/fit/boost/RoPE)")
+        else:
+            lines.append(line)
+    return "\n".join(lines)
 
 
 class CcCKrea2Edit:
@@ -212,9 +252,8 @@ class CcCKrea2Edit:
     RETURN_NAMES = ("patched_model", "positive", "negative", "latent", "edit_info")
     FUNCTION = "process"
     DESCRIPTION = (
-        "Krea2 Edit orchestrator. The public Latent and Reference nodes stay modular, while "
-        "execution uses the original CcC orchestrator contract: Qwen conditioning, reference "
-        "preparation and the MODEL appearance wrapper are resolved together."
+        "Krea2 Edit orchestrator. CcC resolves target geometry and reference preparation while "
+        "appearance refs, fit state, per-pass boosts and RoPE placement travel with CONDITIONING."
     )
 
     @classmethod
@@ -259,18 +298,50 @@ class CcCKrea2Edit:
             latent=latent,
         )
 
-        patched_model, positive, negative, latent_out, pipeline_info = (
-            edit_engine_runtime.run_krea2_edit_orchestrator(
-                model=model,
-                clip=clip,
-                vae=vae,
-                references=chain,
-                target_latent=runtime_latent,
-                positive_prompt=positive_prompt,
-                negative_prompt=negative_prompt,
-                reference_method="krea2_edit",
-                apply_model_patch=bool(apply_krea2_edit_patch),
+        # Run preparation with model patching disabled so the orchestrator attaches the raw
+        # reference latents to both conditionings. We then add per-pass runtime metadata and
+        # install the scoped CcC MODEL wrapper. This mirrors the established Identity Edit
+        # contract: same refs/geometry on positive+negative, positive boosts only.
+        _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
+            model=model,
+            clip=clip,
+            vae=vae,
+            references=chain,
+            target_latent=runtime_latent,
+            positive_prompt=positive_prompt,
+            negative_prompt=negative_prompt,
+            reference_method="krea2_edit",
+            apply_model_patch=False,
+        )
+
+        reference_count = len(visual_entries)
+        rope_positions = [entry.rope_position for entry in visual_entries]
+        positive_boosts = [float(entry.boost) for entry in visual_entries]
+
+        if reference_count:
+            positive = attach_reference_runtime_to_conditioning(
+                positive,
+                reference_count=reference_count,
+                rope_positions=rope_positions,
+                reference_boosts=positive_boosts,
             )
+            negative = attach_reference_runtime_to_conditioning(
+                negative,
+                reference_count=reference_count,
+                rope_positions=rope_positions,
+                reference_boosts=None,
+            )
+
+        if apply_krea2_edit_patch and reference_count:
+            patched_model = patch_krea2_model(model=model)
+            runtime_patched = True
+        else:
+            patched_model = model
+            runtime_patched = False
+
+        pipeline_info = _rewrite_pipeline_report_for_conditioning_runtime(
+            pipeline_info,
+            patched=runtime_patched,
         )
 
         lines = [
@@ -279,22 +350,28 @@ class CcCKrea2Edit:
             f"Visual References: {len(visual_entries)}",
             f"Semantic References: {len(semantic_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
-            "Conditioning Path: orchestrated Krea2 Edit",
+            "Conditioning Path: orchestrated Krea2 Edit preparation",
             "Generic Edit Engine: active",
             (
-                "Appearance Transport: MODEL wrapper closure"
-                if apply_krea2_edit_patch
-                else "Appearance Transport: external runtime / conditioning fallback"
+                "Appearance Transport: CONDITIONING metadata"
+                if reference_count
+                else "Appearance Transport: none"
             ),
+            "Identity Qwen Contract: positional visual blocks; Visual Reference labels/instructions are metadata-only",
         ]
 
-        if visual_entries and apply_krea2_edit_patch:
-            lines.append(f"Model Appearance Runtime: {_format_model_runtime(patched_model)}")
+        if reference_count:
+            lines.append(
+                f"Positive Appearance Runtime: {_format_conditioning_runtime(positive, reference_count)}"
+            )
+            lines.append(
+                f"Negative Appearance Runtime: {_format_conditioning_runtime(negative, reference_count)}"
+            )
 
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
             lines.append(
-                f"Visual Reference {index}: boost={entry.boost}, fit=krea2_v1.2, "
+                f"Visual Reference {index}: boost={entry.boost}, fit={entry.fit_mode}, "
                 f"rope={entry.rope_position}, semantic={entry.semantic}, semantic_role={role}"
             )
 
