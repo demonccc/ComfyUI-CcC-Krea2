@@ -32,6 +32,7 @@ def test_scene_subject_workflow_uses_split_nodes():
 
     scene = next(node for node in visual_nodes if node.get("title") == "Scene Visual Reference")
     subject = next(node for node in visual_nodes if node.get("title") == "Subject Visual Reference")
+    edit = edit_nodes[0]
 
     assert scene["widgets_values"][:5] == [1.0, "inside", "center", "center", True]
     assert subject["widgets_values"][:5] == [4.0, "inside", "center", "center", True]
@@ -39,6 +40,13 @@ def test_scene_subject_workflow_uses_split_nodes():
     assert len(subject["widgets_values"]) == 9
     assert scene["widgets_values"][-1] == "fit"
     assert subject["widgets_values"][-1] == "fit"
+
+    # Krea2 Edit exposes only positive prompt + patch toggle. The negative text branch is
+    # intentionally fixed to an empty string inside the node implementation.
+    assert edit["widgets_values"] == [
+        "Replace the person in the scene image with the person from the subject image.",
+        True,
+    ]
 
     previous = next(inp for inp in subject["inputs"] if inp["name"] == "previous_references")
     assert previous["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"
