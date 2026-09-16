@@ -38,7 +38,7 @@ def test_scene_subject_workflow_uses_split_nodes():
     assert len(scene["widgets_values"]) == 9
     assert len(subject["widgets_values"]) == 9
     assert scene["widgets_values"][-1] == "fit"
-    assert subject["widgets_values"][-1] == "crop (legacy)"
+    assert subject["widgets_values"][-1] == "fit"
 
     previous = next(inp for inp in subject["inputs"] if inp["name"] == "previous_references")
     assert previous["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"
