@@ -23,8 +23,9 @@ class CcCKrea2VisualReference:
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one visual Krea2 Edit reference. Chaining order is the physical Krea2 reference order. "
-        "Fit keeps v1.2 fit-inside geometry; crop (legacy) center-crops to the target aspect ratio and "
-        "fills the complete resolved target grid before VAE encoding. RoPE controls only coordinate placement."
+        "Fit mirrors the proven Krea2Moodboard fit-inside geometry and preserves the full source for genuine "
+        "aspect-ratio mismatches; crop (legacy) center-crops to the target aspect ratio and fills the complete "
+        "resolved target grid before VAE encoding. RoPE controls only coordinate placement."
     )
 
     @classmethod
@@ -67,9 +68,9 @@ class CcCKrea2VisualReference:
                     {
                         "default": "fit",
                         "tooltip": (
-                            "fit preserves the full source at target-grid density and can leave large spatial margins "
-                            "for very different aspect ratios. crop (legacy) center-crops to the target AR and encodes "
-                            "a full-target-grid reference, matching the established full-grid identity baseline."
+                            "fit mirrors Krea2Moodboard: near-matched sources fill the target, while genuine AR "
+                            "mismatches keep the complete source on a centered fit-inside reference grid. "
+                            "crop (legacy) center-crops to target AR and encodes a full-target-grid reference."
                         ),
                     },
                 ),
