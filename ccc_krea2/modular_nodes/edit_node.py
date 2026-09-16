@@ -7,10 +7,7 @@ import torch
 from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
-from ..identity_conditioning import encode_visual_identity_direct
-from ..identity_contract import build_grounded_negative_user_content, build_grounded_positive_user_content
-from ..identity_runtime import patch_krea2_identity_model
-from ..patch import attach_reference_runtime_to_conditioning
+from ..orchestrator_runtime import patch_krea2_orchestrated_model
 from ..reference_specs import (
     PreparedVisionImage,
     ReferenceChain,
@@ -22,15 +19,15 @@ from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
 from .rope_position import install_krea2_rope_positioning
 
 
-# Generic semantic/style fallback keeps the same text contract. Pure visual Identity
-# workflows bypass edit_engine entirely and use the direct identity conditioning path.
-edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
-edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
+# Keep the split public node surface, but restore the original orchestrator transport:
+# prepared appearance references are captured by the MODEL wrapper instead of bypassing
+# the orchestrator or moving appearance state into CONDITIONING.
+edit_engine_runtime.patch_krea2_model = patch_krea2_orchestrated_model
 install_krea2_rope_positioning()
 
 
 def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
-    """Prepare Qwen grounding with a longest-side AREA cap before CLIP tokenization."""
+    """Prepare the semantic copy sent to Qwen while preserving the original image for VAE fit."""
     del clip
     if image.ndim == 3:
         image = image.unsqueeze(0)
@@ -135,7 +132,7 @@ def _combine_reference_chains(
     semantic_references: Optional[SemanticReferenceChain],
     latent: dict,
 ) -> ReferenceChain:
-    """Build the generic chain used only when semantic/style extensions are active."""
+    """Translate the split public nodes back into the original orchestrator ReferenceChain."""
     chain = ReferenceChain()
 
     for index, entry in enumerate((visual_references or VisualReferenceChain()).entries, start=1):
@@ -152,7 +149,7 @@ def _combine_reference_chains(
                 vision_instruction=entry.instruction if entry.semantic else "",
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
-                attention_boost=entry.boost,
+                attention_boost=float(entry.boost),
                 visual_reference_fit="fit",
                 rope_position=entry.rope_position,
                 _legacy_role=f"reference_{index}",
@@ -190,111 +187,34 @@ def _combine_reference_chains(
         else:
             pending_styles.append(payload)
 
+    # Style references remain last because a single logical style reference can expand
+    # into multiple physical Qwen images.
     for payload in pending_styles:
         chain = _append_semantic(chain=chain, **payload)
 
     return chain
 
 
-def _normalize_pipeline_report(pipeline_info: str, patch_applied: bool) -> str:
-    if not patch_applied:
-        return pipeline_info
-    lines = []
-    skipped_warning = (
-        "CcC Krea2 model patch was skipped; reference latents attached to conditioning require compatible runtime support."
-    )
-    for line in pipeline_info.splitlines():
-        if skipped_warning in line:
-            continue
-        if line == "CcC Model Patch: skipped":
-            line = "CcC Model Patch: applied"
-        elif line == "Reference Transport: standard ComfyUI reference_latents":
-            line = "Reference Transport: conditioning-owned reference_latents"
-        lines.append(line)
-    if lines and lines[-1] == "Warnings:":
-        lines.pop()
-    return "\n".join(lines)
-
-
-def _first_conditioning_extras(conditioning) -> dict:
-    if not conditioning or not isinstance(conditioning, (list, tuple)):
-        return {}
-    first = conditioning[0]
-    if not isinstance(first, (list, tuple)) or len(first) < 2 or not isinstance(first[1], dict):
-        return {}
-    return first[1]
-
-
-def _flatten_tensor_values(value):
-    if torch.is_tensor(value):
-        return [value]
-    if isinstance(value, (list, tuple)):
-        out = []
-        for item in value:
-            out.extend(_flatten_tensor_values(item))
-        return out
-    return []
-
-
-def _format_runtime_conditioning(conditioning) -> str:
-    extras = _first_conditioning_extras(conditioning)
-    tensors = _flatten_tensor_values(extras.get("reference_latents"))
-    shapes = [tuple(int(v) for v in tensor.shape) for tensor in tensors]
+def _format_model_runtime(model) -> str:
     return (
-        f"ref_latents={len(tensors)} shapes={shapes}, "
-        f"reference_fit={extras.get('reference_fit', '<missing>')}, "
-        f"reference_boosts={extras.get('reference_boosts', '<missing>')}, "
-        f"rope={extras.get('reference_rope_positions', '<missing>')}"
+        f"refs={getattr(model, '_ccc_orchestrated_reference_count', 0)} "
+        f"shapes={getattr(model, '_ccc_orchestrated_reference_shapes', [])}, "
+        f"boosts={getattr(model, '_ccc_orchestrated_reference_boosts', [])}, "
+        f"rope={getattr(model, '_ccc_orchestrated_reference_rope', [])}"
     )
-
-
-def _format_model_reference_runtime(model) -> str:
-    return (
-        f"refs={getattr(model, '_ccc_identity_reference_count', 0)} "
-        f"shapes={getattr(model, '_ccc_identity_reference_shapes', [])}, "
-        f"boosts={getattr(model, '_ccc_identity_reference_boosts', [])}, "
-        f"fit={getattr(model, '_ccc_identity_reference_fit', [])}, "
-        f"rope={getattr(model, '_ccc_identity_reference_rope', [])}"
-    )
-
-
-def _runtime_forward_owner() -> str:
-    try:
-        from comfy.ldm.krea2.model import SingleStreamDiT
-
-        fn = SingleStreamDiT._forward
-        return (
-            f"{getattr(fn, '__module__', '<unknown>')}."
-            f"{getattr(fn, '__qualname__', getattr(fn, '__name__', '<unknown>'))}"
-        )
-    except Exception as exc:
-        return f"unavailable ({type(exc).__name__})"
-
-
-def _runtime_patch_markers() -> str:
-    try:
-        from comfy.ldm.krea2.model import SingleStreamDiT
-
-        return (
-            f"external_identity={bool(getattr(SingleStreamDiT, '_krea2_identity_patched', False))}, "
-            f"ccc_identity={bool(getattr(SingleStreamDiT, '_ccc_identity_runtime_patched', False))}"
-        )
-    except Exception as exc:
-        return f"unavailable ({type(exc).__name__})"
 
 
 class CcCKrea2Edit:
-    """Krea2 Edit orchestrator consuming a pre-built target latent."""
+    """Krea2 Edit orchestrator consuming the split CcC Latent/Reference node outputs."""
 
     CATEGORY = NODE_CATEGORY
     RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING")
     RETURN_NAMES = ("patched_model", "positive", "negative", "latent", "edit_info")
     FUNCTION = "process"
     DESCRIPTION = (
-        "Krea2 Edit orchestrator. Target latent construction lives in Krea2 CcC Latent. "
-        "Every visual reference is fitted to that resolved target using the Identity Edit v1.2 "
-        "pixel-space geometry. Pure visual Identity workflows use a direct Identity Edit "
-        "conditioning path; semantic/style extensions use the generic orchestrator."
+        "Krea2 Edit orchestrator. The public Latent and Reference nodes stay modular, while "
+        "execution uses the original CcC orchestrator contract: Qwen conditioning, reference "
+        "preparation and the MODEL appearance wrapper are resolved together."
     )
 
     @classmethod
@@ -332,54 +252,15 @@ class CcCKrea2Edit:
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
         runtime_latent = _runtime_latent(latent)
 
-        positive_boosts = [float(entry.boost) for entry in visual_entries]
-        rope_positions = [entry.rope_position for entry in visual_entries]
+        chain = _combine_reference_chains(
+            clip=clip,
+            visual_references=visual_references,
+            semantic_references=semantic_references,
+            latent=latent,
+        )
 
-        direct_identity = bool(visual_entries) and not semantic_entries and not latent_semantic.get("enabled")
-        direct_result = None
-
-        if direct_identity:
-            direct_result = encode_visual_identity_direct(
-                clip=clip,
-                vae=vae,
-                visual_entries=visual_entries,
-                target_latent=runtime_latent,
-                positive_prompt=positive_prompt,
-                negative_prompt=negative_prompt,
-            )
-            positive = direct_result.positive
-            negative = direct_result.negative
-            latent_out = runtime_latent
-            pipeline_info = (
-                "=== CcC Krea2 Edit Pipeline Report ===\n"
-                "Reference Contract: krea2_edit\n"
-                "Conditioning Path: direct Identity Edit encode\n"
-                "Generic Edit Engine: bypassed\n"
-                "Appearance Transport: isolated MODEL wrapper\n"
-                f"Target Pixel Geometry: {runtime_latent['samples'].shape[-1] * 8} x "
-                f"{runtime_latent['samples'].shape[-2] * 8}\n"
-                f"Target Latent Geometry: {runtime_latent['samples'].shape[-1]} x "
-                f"{runtime_latent['samples'].shape[-2]}"
-            )
-            patched_model = (
-                patch_krea2_identity_model(
-                    model,
-                    reference_latents=direct_result.reference_latents,
-                    reference_boosts=direct_result.reference_boosts,
-                    reference_fit=[True] * len(direct_result.reference_latents),
-                    reference_rope_positions=direct_result.reference_rope_positions,
-                )
-                if apply_krea2_edit_patch
-                else model
-            )
-        else:
-            chain = _combine_reference_chains(
-                clip=clip,
-                visual_references=visual_references,
-                semantic_references=semantic_references,
-                latent=latent,
-            )
-            _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
+        patched_model, positive, negative, latent_out, pipeline_info = (
+            edit_engine_runtime.run_krea2_edit_orchestrator(
                 model=model,
                 clip=clip,
                 vae=vae,
@@ -388,23 +269,9 @@ class CcCKrea2Edit:
                 positive_prompt=positive_prompt,
                 negative_prompt=negative_prompt,
                 reference_method="krea2_edit",
-                apply_model_patch=False,
+                apply_model_patch=bool(apply_krea2_edit_patch),
             )
-
-            positive = attach_reference_runtime_to_conditioning(
-                positive,
-                reference_count=len(visual_entries),
-                rope_positions=rope_positions,
-                reference_boosts=positive_boosts,
-            )
-            negative = attach_reference_runtime_to_conditioning(
-                negative,
-                reference_count=len(visual_entries),
-                rope_positions=rope_positions,
-                reference_boosts=None,
-            )
-            pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
-            patched_model = patch_krea2_identity_model(model) if apply_krea2_edit_patch else model
+        )
 
         lines = [
             "=== Krea2 CcC Edit Report ===",
@@ -412,52 +279,24 @@ class CcCKrea2Edit:
             f"Visual References: {len(visual_entries)}",
             f"Semantic References: {len(semantic_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
-            f"Conditioning Path: {'direct Identity Edit encode' if direct_identity else 'generic semantic/style orchestrator'}",
+            "Conditioning Path: orchestrated Krea2 Edit",
+            "Generic Edit Engine: active",
+            (
+                "Appearance Transport: MODEL wrapper closure"
+                if apply_krea2_edit_patch
+                else "Appearance Transport: external runtime / conditioning fallback"
+            ),
         ]
 
-        if visual_entries:
-            lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
-            if direct_identity:
-                lines.append("Reference Transport: isolated MODEL wrapper (not CONDITIONING)")
-                lines.append(f"Model Appearance Runtime: {_format_model_reference_runtime(patched_model)}")
-            else:
-                lines.append("Reference Transport: CONDITIONING metadata (generic extension path)")
-                lines.append(f"Positive Conditioning Runtime: {_format_runtime_conditioning(positive)}")
-                lines.append(f"Negative Conditioning Runtime: {_format_runtime_conditioning(negative)}")
-            lines.append(f"Global Forward Owner: {_runtime_forward_owner()}")
-            lines.append(f"Global Patch Markers: {_runtime_patch_markers()}")
-            lines.append("Positive Grounding: VISION_BLOCK * N + user prompt")
-            lines.append("Visual Reference semantic_role/instruction: metadata-only on Identity grounding path")
-            lines.append("Qwen Grounding Resize: AREA longest-side cap")
-            lines.append(f"Model-level Reference Boosts: {positive_boosts}")
-            lines.append("Negative Grounding: same visual Qwen images; appearance refs/boosts remain model-level")
-            if direct_identity:
-                target_mp = (runtime_latent["samples"].shape[-1] * 8 * runtime_latent["samples"].shape[-2] * 8) / 1_000_000.0
-                if target_mp > 1.5:
-                    lines.append(
-                        f"Resolution Advisory: target={target_mp:.3f} MP; the Identity Edit reference workflow "
-                        "defaults to about 1 MP. Use 1024x1024 as the parity baseline before scaling up."
-                    )
+        if visual_entries and apply_krea2_edit_patch:
+            lines.append(f"Model Appearance Runtime: {_format_model_runtime(patched_model)}")
 
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
-            base = (
+            lines.append(
                 f"Visual Reference {index}: boost={entry.boost}, fit=krea2_v1.2, "
                 f"rope={entry.rope_position}, semantic={entry.semantic}, semantic_role={role}"
             )
-            if direct_result is not None and index <= len(direct_result.geometries):
-                geom = direct_result.geometries[index - 1]
-                base += (
-                    f", source={geom.source_size[0]}x{geom.source_size[1]}, "
-                    f"crop={geom.crop_rectangle}, "
-                    f"vae={geom.vae_input_pixel_size[0]}x{geom.vae_input_pixel_size[1]}, "
-                    f"latent={geom.vae_latent_grid_size[0]}x{geom.vae_latent_grid_size[1]}"
-                )
-            lines.append(base)
-
-        if direct_result is not None:
-            lines.append(f"Direct Qwen Image Sizes: {list(direct_result.qwen_sizes)}")
-            lines.append(f"Raw VAE Reference Shapes: {list(direct_result.reference_latent_shapes)}")
 
         latent_info = latent.get("ccc_krea2_latent_info")
         if latent_info:
