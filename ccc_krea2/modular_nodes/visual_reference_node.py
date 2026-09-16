@@ -33,17 +33,6 @@ class CcCKrea2VisualReference:
             "required": {
                 "image": ("IMAGE",),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
-                "fit_mode": (
-                    FIT_MODES,
-                    {
-                        "default": "fit",
-                        "tooltip": (
-                            "fit preserves the full source at target-grid density and can leave large spatial margins "
-                            "for very different aspect ratios. crop (legacy) center-crops to the target AR and encodes "
-                            "a full-target-grid reference, matching the established full-grid identity baseline."
-                        ),
-                    },
-                ),
                 "rope_grid": (ROPE_GRIDS, {"default": "inside"}),
                 "rope_horizontal": (ROPE_HORIZONTAL, {"default": "center"}),
                 "rope_vertical": (ROPE_VERTICAL, {"default": "center"}),
@@ -73,6 +62,17 @@ class CcCKrea2VisualReference:
             },
             "optional": {
                 "previous_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
+                "fit_mode": (
+                    FIT_MODES,
+                    {
+                        "default": "fit",
+                        "tooltip": (
+                            "fit preserves the full source at target-grid density and can leave large spatial margins "
+                            "for very different aspect ratios. crop (legacy) center-crops to the target AR and encodes "
+                            "a full-target-grid reference, matching the established full-grid identity baseline."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -80,7 +80,6 @@ class CcCKrea2VisualReference:
         self,
         image: torch.Tensor,
         boost: float = 1.0,
-        fit_mode: str = "fit",
         rope_grid: str = "inside",
         rope_horizontal: str = "center",
         rope_vertical: str = "center",
@@ -89,6 +88,7 @@ class CcCKrea2VisualReference:
         instruction: str = "",
         grounding_px: int = 768,
         previous_references: Optional[VisualReferenceChain] = None,
+        fit_mode: str = "fit",
     ) -> Tuple[VisualReferenceChain]:
         chain = previous_references if previous_references is not None else VisualReferenceChain()
 
