@@ -1,9 +1,10 @@
 """Krea2 Edit pixel-space geometry.
 
-The ``fit`` path follows the Identity Edit v1.2 training geometry: references are
-resampled in pixel space to the resolved target-grid density before VAE encoding.
-For genuine aspect-ratio mismatches, the source is center-cropped just enough for
-the /16-snapped fitted size to remain an exact stride-1 mapping in RoPE space.
+The ``fit`` path follows the proven Krea2Moodboard / Identity Edit v1.2 geometry:
+references are resampled in pixel space before VAE encoding. Near-matched aspect ratios
+fill the target via a minimal center-crop; genuine aspect-ratio mismatches preserve the
+complete source image and resize it to a /16-snapped fit-inside grid. ``crop`` remains the
+explicit legacy full-grid center-crop mode.
 """
 
 import math
@@ -56,7 +57,7 @@ def resolve_krea2edit_geometry(
     tgt_w: int,
     fit_mode: str = "auto",
 ) -> ResolvedGeometry:
-    """Resolve reference geometry while preserving the Identity Edit v1.2 fit contract."""
+    """Resolve reference geometry while preserving the Krea2Moodboard fit contract."""
     requested = fit_mode
     if fit_mode == "exact":
         fit_mode = "auto"
@@ -103,16 +104,11 @@ def resolve_krea2edit_geometry(
         vae_w = tgt_w
         vae_h = tgt_h
     elif resolved == "fit":
-        # Training-aligned v1.2 mismatch behavior. The fitted dimensions are floor-snapped
-        # to /16, then the source is cropped minimally so resizing lands on that grid at
-        # the original uniform scale. This avoids the anisotropic squeeze introduced when
-        # a floor-snapped size is reached by resizing the complete source image.
+        # Match Krea2Moodboard exactly for genuine AR mismatches: preserve the complete
+        # source image and resize it uniformly to a /16-snapped fit-inside grid. The
+        # narrower reference grid is then centered inside the target by the runtime RoPE.
         vae_h = min(_floor16(src_h * scale), target_cap_h)
         vae_w = min(_floor16(src_w * scale), target_cap_w)
-        crop_h = min(src_h, max(1, int(round(vae_h / scale))))
-        crop_w = min(src_w, max(1, int(round(vae_w / scale))))
-        top = (src_h - crop_h) // 2
-        left = (src_w - crop_w) // 2
     elif resolved == "contain":
         vae_h = min(_floor16(round(src_h * scale)), target_cap_h)
         vae_w = min(_floor16(round(src_w * scale)), target_cap_w)
