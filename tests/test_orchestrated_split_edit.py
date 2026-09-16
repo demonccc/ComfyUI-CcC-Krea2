@@ -22,6 +22,18 @@ def test_split_edit_uses_positional_identity_qwen_builders():
     assert edit_node.edit_engine_runtime.build_krea2_negative_user_content is build_grounded_negative_user_content
 
 
+def test_split_edit_negative_prompt_is_fixed_empty_and_not_user_editable():
+    required = edit_node.CcCKrea2Edit.INPUT_TYPES()["required"]
+    signature = inspect.signature(edit_node.CcCKrea2Edit.process)
+
+    assert edit_node.KREA2_EDIT_NEGATIVE_PROMPT == ""
+    assert "negative_prompt" not in required
+    assert "negative_prompt" not in signature.parameters
+
+    source = inspect.getsource(edit_node.CcCKrea2Edit.process)
+    assert "negative_prompt=KREA2_EDIT_NEGATIVE_PROMPT" in source
+
+
 def test_reference_fit_mode_exposes_full_target_crop_baseline():
     fit = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), fit_mode="fit")
     crop = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), fit_mode="crop (legacy)")
