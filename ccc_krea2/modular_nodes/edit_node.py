@@ -23,6 +23,12 @@ from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
 from .rope_position import install_krea2_rope_positioning
 
 
+# Krea2 Edit uses a grounded unconditional branch rather than a classic SD-style
+# negative prompt. Keep the negative text empty by contract; visual references remain
+# attached to both branches and negative reference boosts stay neutral at 1.0.
+KREA2_EDIT_NEGATIVE_PROMPT = ""
+
+
 # Identity appearance references are positional in the proven Krea2 grounding contract:
 # VISION_BLOCK * N + instruction. Semantic/style-only CcC extensions may still add their
 # annotations after the complete visual prefix.
@@ -289,6 +295,7 @@ class CcCKrea2Edit:
     DESCRIPTION = (
         "Krea2 Edit orchestrator. CcC resolves target geometry and reference preparation while "
         "appearance refs, fit state, per-pass boosts and RoPE placement travel with CONDITIONING. "
+        "The grounded negative branch always uses an empty text prompt and neutral reference boosts. "
         "For standard centered references, an installed Krea2Moodboard Identity runtime is reused directly."
     )
 
@@ -301,7 +308,6 @@ class CcCKrea2Edit:
                 "vae": ("VAE",),
                 "latent": ("LATENT",),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
-                "negative_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
             },
             "optional": {
@@ -317,7 +323,6 @@ class CcCKrea2Edit:
         vae,
         latent,
         positive_prompt="",
-        negative_prompt="",
         apply_krea2_edit_patch=True,
         visual_references=None,
         semantic_references=None,
@@ -345,7 +350,7 @@ class CcCKrea2Edit:
             references=chain,
             target_latent=runtime_latent,
             positive_prompt=positive_prompt,
-            negative_prompt=negative_prompt,
+            negative_prompt=KREA2_EDIT_NEGATIVE_PROMPT,
             reference_method="krea2_edit",
             apply_model_patch=False,
         )
@@ -406,6 +411,7 @@ class CcCKrea2Edit:
                 else "Appearance Transport: none"
             ),
             "Identity Qwen Contract: positional visual blocks; Visual Reference labels/instructions are metadata-only",
+            "Negative Prompt: fixed empty string",
             (
                 "Identity Runtime: external Krea2Moodboard forward"
                 if runtime_mode == "external_moodboard"
