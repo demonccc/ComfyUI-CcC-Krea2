@@ -22,17 +22,17 @@ class _DummyClip:
 
 class _DummyVAE:
     def encode(self, image):
-        return torch.zeros((1, 16, image.shape[1] // 8, image.shape[2] // 8))
+        return torch.zeros((1, 16, 1, image.shape[1] // 8, image.shape[2] // 8))
 
 
 def _extras(conditioning):
     return conditioning[0][1]
 
 
-def test_direct_identity_path_matches_visual_identity_contract():
+def test_direct_identity_keeps_appearance_out_of_conditioning():
     clip = _DummyClip()
     vae = _DummyVAE()
-    target = {"samples": torch.zeros((1, 16, 22, 22))}  # 176x176 target pixels
+    target = {"samples": torch.zeros((1, 16, 1, 22, 22))}  # 176x176 target pixels
 
     scene = VisualReferenceEntry(
         image=torch.zeros((1, 180, 120, 3)),
@@ -74,22 +74,23 @@ def test_direct_identity_path_matches_visual_identity_contract():
     assert len(clip.calls[0][1]) == 2
     assert len(clip.calls[1][1]) == 2
 
-    pos = _extras(result.positive)
-    neg = _extras(result.negative)
-    assert len(pos["reference_latents"]) == 2
-    assert len(neg["reference_latents"]) == 2
-    assert pos["reference_fit"] == [True, True]
-    assert neg["reference_fit"] == [True, True]
-    assert pos["reference_boosts"] == [1.0, 4.0]
-    assert "reference_boosts" not in neg
-    assert pos["reference_rope_positions"] == [
+    # Appearance state is owned by the MODEL wrapper, not positive/negative conditioning.
+    assert "reference_latents" not in _extras(result.positive)
+    assert "reference_latents" not in _extras(result.negative)
+    assert "reference_boosts" not in _extras(result.positive)
+    assert "reference_boosts" not in _extras(result.negative)
+
+    assert len(result.reference_latents) == 2
+    assert result.reference_boosts == (1.0, 4.0)
+    assert result.reference_rope_positions == (
         "inside:center:center",
         "inside:center:center",
-    ]
-    assert neg["reference_rope_positions"] == pos["reference_rope_positions"]
+    )
 
     # Source order is preserved and each ref keeps the v1.2 fit-inside grid.
     assert result.geometries[0].source_size == (120, 180)
     assert result.geometries[1].source_size == (97, 205)
     assert result.reference_latent_shapes[0][1] == 16
     assert result.reference_latent_shapes[1][1] == 16
+    assert result.reference_latent_shapes[0][2] == 1
+    assert result.reference_latent_shapes[1][2] == 1

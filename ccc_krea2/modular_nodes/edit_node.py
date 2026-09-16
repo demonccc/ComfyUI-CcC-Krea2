@@ -243,8 +243,18 @@ def _format_runtime_conditioning(conditioning) -> str:
     return (
         f"ref_latents={len(tensors)} shapes={shapes}, "
         f"reference_fit={extras.get('reference_fit', '<missing>')}, "
-        f"reference_boosts={extras.get('reference_boosts', '<implicit 1.0>')}, "
+        f"reference_boosts={extras.get('reference_boosts', '<missing>')}, "
         f"rope={extras.get('reference_rope_positions', '<missing>')}"
+    )
+
+
+def _format_model_reference_runtime(model) -> str:
+    return (
+        f"refs={getattr(model, '_ccc_identity_reference_count', 0)} "
+        f"shapes={getattr(model, '_ccc_identity_reference_shapes', [])}, "
+        f"boosts={getattr(model, '_ccc_identity_reference_boosts', [])}, "
+        f"fit={getattr(model, '_ccc_identity_reference_fit', [])}, "
+        f"rope={getattr(model, '_ccc_identity_reference_rope', [])}"
     )
 
 
@@ -323,11 +333,8 @@ class CcCKrea2Edit:
         runtime_latent = _runtime_latent(latent)
 
         positive_boosts = [float(entry.boost) for entry in visual_entries]
-        negative_boosts = [1.0] * len(positive_boosts)
         rope_positions = [entry.rope_position for entry in visual_entries]
 
-        # Pure visual Identity workflows get the direct encode path. No generic slots,
-        # span extraction, style post-processing, prompt augmentation, or PreparedReference layer.
         direct_identity = bool(visual_entries) and not semantic_entries and not latent_semantic.get("enabled")
         direct_result = None
 
@@ -348,10 +355,22 @@ class CcCKrea2Edit:
                 "Reference Contract: krea2_edit\n"
                 "Conditioning Path: direct Identity Edit encode\n"
                 "Generic Edit Engine: bypassed\n"
+                "Appearance Transport: isolated MODEL wrapper\n"
                 f"Target Pixel Geometry: {runtime_latent['samples'].shape[-1] * 8} x "
                 f"{runtime_latent['samples'].shape[-2] * 8}\n"
                 f"Target Latent Geometry: {runtime_latent['samples'].shape[-1]} x "
                 f"{runtime_latent['samples'].shape[-2]}"
+            )
+            patched_model = (
+                patch_krea2_identity_model(
+                    model,
+                    reference_latents=direct_result.reference_latents,
+                    reference_boosts=direct_result.reference_boosts,
+                    reference_fit=[True] * len(direct_result.reference_latents),
+                    reference_rope_positions=direct_result.reference_rope_positions,
+                )
+                if apply_krea2_edit_patch
+                else model
             )
         else:
             chain = _combine_reference_chains(
@@ -385,8 +404,7 @@ class CcCKrea2Edit:
                 reference_boosts=None,
             )
             pipeline_info = _normalize_pipeline_report(pipeline_info, bool(apply_krea2_edit_patch))
-
-        patched_model = patch_krea2_identity_model(model) if apply_krea2_edit_patch else model
+            patched_model = patch_krea2_identity_model(model) if apply_krea2_edit_patch else model
 
         lines = [
             "=== Krea2 CcC Edit Report ===",
@@ -399,17 +417,27 @@ class CcCKrea2Edit:
 
         if visual_entries:
             lines.append("Reference Geometry: mandatory Identity Edit v1.2 pixel-space fit to resolved target latent")
-            lines.append("Reference Transport: CONDITIONING metadata (reference_latents/reference_fit)")
-            lines.append(f"Runtime Forward Owner: {_runtime_forward_owner()}")
-            lines.append(f"Runtime Patch Markers: {_runtime_patch_markers()}")
+            if direct_identity:
+                lines.append("Reference Transport: isolated MODEL wrapper (not CONDITIONING)")
+                lines.append(f"Model Appearance Runtime: {_format_model_reference_runtime(patched_model)}")
+            else:
+                lines.append("Reference Transport: CONDITIONING metadata (generic extension path)")
+                lines.append(f"Positive Conditioning Runtime: {_format_runtime_conditioning(positive)}")
+                lines.append(f"Negative Conditioning Runtime: {_format_runtime_conditioning(negative)}")
+            lines.append(f"Global Forward Owner: {_runtime_forward_owner()}")
+            lines.append(f"Global Patch Markers: {_runtime_patch_markers()}")
             lines.append("Positive Grounding: VISION_BLOCK * N + user prompt")
             lines.append("Visual Reference semantic_role/instruction: metadata-only on Identity grounding path")
             lines.append("Qwen Grounding Resize: AREA longest-side cap")
-            lines.append(f"Positive Reference Boosts: {positive_boosts}")
-            lines.append(f"Negative Reference Boosts: {negative_boosts}")
-            lines.append("Negative Grounding: same visual Qwen images; no positive semantic annotations")
-            lines.append(f"Positive Conditioning Runtime: {_format_runtime_conditioning(positive)}")
-            lines.append(f"Negative Conditioning Runtime: {_format_runtime_conditioning(negative)}")
+            lines.append(f"Model-level Reference Boosts: {positive_boosts}")
+            lines.append("Negative Grounding: same visual Qwen images; appearance refs/boosts remain model-level")
+            if direct_identity:
+                target_mp = (runtime_latent["samples"].shape[-1] * 8 * runtime_latent["samples"].shape[-2] * 8) / 1_000_000.0
+                if target_mp > 1.5:
+                    lines.append(
+                        f"Resolution Advisory: target={target_mp:.3f} MP; the Identity Edit reference workflow "
+                        "defaults to about 1 MP. Use 1024x1024 as the parity baseline before scaling up."
+                    )
 
         for index, entry in enumerate(visual_entries, start=1):
             role = entry.semantic_role if entry.semantic_role else "<positional>"
@@ -421,6 +449,7 @@ class CcCKrea2Edit:
                 geom = direct_result.geometries[index - 1]
                 base += (
                     f", source={geom.source_size[0]}x{geom.source_size[1]}, "
+                    f"crop={geom.crop_rectangle}, "
                     f"vae={geom.vae_input_pixel_size[0]}x{geom.vae_input_pixel_size[1]}, "
                     f"latent={geom.vae_latent_grid_size[0]}x{geom.vae_latent_grid_size[1]}"
                 )
@@ -428,7 +457,7 @@ class CcCKrea2Edit:
 
         if direct_result is not None:
             lines.append(f"Direct Qwen Image Sizes: {list(direct_result.qwen_sizes)}")
-            lines.append(f"Direct Reference Latent Shapes: {list(direct_result.reference_latent_shapes)}")
+            lines.append(f"Raw VAE Reference Shapes: {list(direct_result.reference_latent_shapes)}")
 
         latent_info = latent.get("ccc_krea2_latent_info")
         if latent_info:

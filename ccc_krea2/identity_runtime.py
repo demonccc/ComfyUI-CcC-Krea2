@@ -1,13 +1,13 @@
-"""CcC Krea2 Identity Edit runtime with per-reference RoPE placement.
+"""CcC Krea 2 Identity Edit runtime with per-reference RoPE placement.
 
-CcC injects the Identity Edit path through a per-MODEL diffusion wrapper so it can
-coexist with other Krea2 custom nodes that may patch SingleStreamDiT globally.
-Target geometry, pixel-space reference fit, and conditioning transport stay outside
-this module; this runtime consumes the prepared references and applies CcC RoPE placement.
+Visual-only Identity Edit stores prepared appearance references in a per-MODEL diffusion
+wrapper. This mirrors the source-patch architecture: Qwen conditioning carries semantics,
+while the MODEL wrapper owns clean VAE source latents, fidelity boosts and spatial placement.
+No global SingleStreamDiT monkey-patch is installed by CcC.
 """
 
 import math
-from typing import Any, List
+from typing import Any, List, Optional, Sequence
 
 import torch
 import torch.nn.functional as F
@@ -66,27 +66,24 @@ def _align_runtime_list(value: Any, count: int, default: Any):
     return [default] * max(0, count - len(raw)) + raw[-count:]
 
 
-def _extract_runtime_refs(wargs, kwargs):
-    """Recover conditioning-owned refs across ComfyUI Krea2 signature variants."""
-    ref_latents = kwargs.get("ref_latents")
+def _extract_transformer_options(wargs, kwargs):
     transformer_options = kwargs.get("transformer_options")
-
-    positional = list(wargs)
     if transformer_options is None:
-        for item in reversed(positional):
+        for item in reversed(wargs):
             if isinstance(item, dict):
                 transformer_options = item
                 break
-    if transformer_options is None:
-        transformer_options = {}
+    return transformer_options or {}
 
+
+def _extract_conditioning_refs(wargs, kwargs):
+    ref_latents = kwargs.get("ref_latents")
     if ref_latents is None:
-        for item in positional:
+        for item in wargs:
             if isinstance(item, (list, tuple)) and item and all(torch.is_tensor(v) for v in item):
                 ref_latents = list(item)
                 break
-
-    return list(ref_latents or []), transformer_options
+    return list(ref_latents or [])
 
 
 def _identity_edit_forward(
@@ -100,7 +97,7 @@ def _identity_edit_forward(
     ref_rope_positions: List[str],
     transformer_options: dict,
 ) -> torch.Tensor:
-    """Run the Krea2 in-context reference sequence [text | refs | target]."""
+    """Run the training-style Krea2 sequence [text | refs | target]."""
     try:
         import comfy.ldm.common_dit
         from comfy.ldm.flux.layers import timestep_embedding
@@ -113,9 +110,7 @@ def _identity_edit_forward(
     ref_fit = [bool(v) for v in _align_runtime_list(ref_fit, count, False)]
     ref_rope_positions = [
         str(v)
-        for v in _align_runtime_list(
-            ref_rope_positions, count, "inside:center:center"
-        )
+        for v in _align_runtime_list(ref_rope_positions, count, "inside:center:center")
     ]
 
     temporal = x.ndim == 5
@@ -143,7 +138,6 @@ def _identity_edit_forward(
         if src.shape[0] != batch:
             src = src[:1].expand(batch, *src.shape[1:])
 
-        # Pixel-fit-prepared refs keep their own stride-1 grid inside the target.
         native = ref_fit[index] and src.shape[-2] <= height and src.shape[-1] <= width
         if src.shape[-2:] != (height, width) and not native:
             src = _fit_latent(src, height, width).to(x.dtype)
@@ -261,47 +255,88 @@ def _register_model_wrapper(model: Any, wrapper: Any) -> None:
 
 
 def install_identity_krea2_forward() -> bool:
-    """Compatibility shim: Identity Edit is now injected per MODEL, not globally."""
+    """Compatibility shim: CcC no longer patches SingleStreamDiT globally."""
     return True
 
 
-def patch_krea2_identity_model(model: Any) -> Any:
-    """Return a model clone with a CcC-only per-model Identity Edit wrapper."""
-    install_krea2_reference_conditioning()
+def _process_model_latents(model: Any, refs: Sequence[torch.Tensor]) -> List[torch.Tensor]:
+    """Scale raw VAE refs exactly once using the same BaseModel latent transform as the target."""
+    base_model = getattr(model, "model", None)
+    if base_model is None or not hasattr(base_model, "process_latent_in"):
+        raise RuntimeError("[CcC Krea2] Connected MODEL does not expose process_latent_in().")
+    return [base_model.process_latent_in(ref) for ref in refs]
+
+
+def patch_krea2_identity_model(
+    model: Any,
+    reference_latents: Optional[Sequence[torch.Tensor]] = None,
+    reference_boosts: Optional[Sequence[float]] = None,
+    reference_fit: Optional[Sequence[bool]] = None,
+    reference_rope_positions: Optional[Sequence[str]] = None,
+) -> Any:
+    """Return a model clone with an isolated Identity Edit appearance wrapper.
+
+    When ``reference_latents`` are provided, they are captured by the MODEL wrapper and are
+    never transported through CONDITIONING. This is the preferred visual-only path and keeps
+    third-party ``Krea2.extra_conds`` patches out of appearance transport. With no captured
+    refs, the compatibility path can still consume conditioning-owned refs.
+    """
+    captured_refs = list(reference_latents or [])
+    if captured_refs:
+        runtime_refs = _process_model_latents(model, captured_refs)
+    else:
+        install_krea2_reference_conditioning()
+        runtime_refs = []
+
     patched = model.clone()
     patched._ccc_patch_key = "ccc_krea2_edit"
+    patched._ccc_identity_reference_count = len(runtime_refs)
+    patched._ccc_identity_reference_shapes = [tuple(int(v) for v in ref.shape) for ref in runtime_refs]
+
+    captured_boosts = [float(v) for v in _align_runtime_list(reference_boosts, len(runtime_refs), 1.0)]
+    captured_fit = [bool(v) for v in _align_runtime_list(reference_fit, len(runtime_refs), True)]
+    captured_rope = [
+        str(v)
+        for v in _align_runtime_list(
+            reference_rope_positions, len(runtime_refs), "inside:center:center"
+        )
+    ]
+    patched._ccc_identity_reference_boosts = list(captured_boosts)
+    patched._ccc_identity_reference_fit = list(captured_fit)
+    patched._ccc_identity_reference_rope = list(captured_rope)
 
     def wrapper(executor, x, timesteps, context, *wargs, **kwargs):
-        ref_latents, transformer_options = _extract_runtime_refs(wargs, kwargs)
-        if not ref_latents:
-            return executor(x, timesteps, context, *wargs, **kwargs)
+        transformer_options = _extract_transformer_options(wargs, kwargs)
+
+        if runtime_refs:
+            refs = runtime_refs
+            boosts = captured_boosts
+            fit_flags = captured_fit
+            rope_positions = captured_rope
+        else:
+            refs = _extract_conditioning_refs(wargs, kwargs)
+            if not refs:
+                return executor(x, timesteps, context, *wargs, **kwargs)
+            count = len(refs)
+            boosts = [float(v) for v in _align_runtime_list(kwargs.get("ref_boosts"), count, 1.0)]
+            fit_flags = [bool(v) for v in _align_runtime_list(kwargs.get("ref_fit"), count, False)]
+            rope_positions = [
+                str(v)
+                for v in _align_runtime_list(
+                    kwargs.get("ccc_ref_rope_positions"), count, "inside:center:center"
+                )
+            ]
 
         diffusion_model = getattr(executor, "class_obj", None)
         if diffusion_model is None:
             raise RuntimeError("[CcC Krea2] Could not resolve the Krea2 diffusion model from the wrapper executor.")
-
-        count = len(ref_latents)
-        boosts = [
-            float(v)
-            for v in _align_runtime_list(kwargs.get("ref_boosts"), count, 1.0)
-        ]
-        fit_flags = [
-            bool(v)
-            for v in _align_runtime_list(kwargs.get("ref_fit"), count, False)
-        ]
-        rope_positions = [
-            str(v)
-            for v in _align_runtime_list(
-                kwargs.get("ccc_ref_rope_positions"), count, "inside:center:center"
-            )
-        ]
 
         return _identity_edit_forward(
             model=diffusion_model,
             x=x,
             timesteps=timesteps,
             context=context,
-            ref_latents=ref_latents,
+            ref_latents=refs,
             ref_boosts=boosts,
             ref_fit=fit_flags,
             ref_rope_positions=rope_positions,

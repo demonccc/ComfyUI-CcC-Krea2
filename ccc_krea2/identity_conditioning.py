@@ -1,7 +1,9 @@
-"""Direct Krea2 Identity Edit conditioning path.
+"""Direct Krea 2 Identity Edit conditioning for visual-only workflows.
 
-This module bypasses the generic CcC edit orchestrator for visual-only Identity Edit
-workflows while keeping CcC target geometry and RoPE placement.
+Qwen owns semantic grounding. Appearance references are prepared here in pixel space
+and handed to the per-MODEL Identity runtime instead of being transported through
+CONDITIONING. This keeps the appearance path isolated from third-party global Krea2
+conditioning patches while preserving CcC target geometry and RoPE controls.
 """
 
 from dataclasses import dataclass
@@ -17,8 +19,9 @@ try:
     from comfy.text_encoders.krea2 import KREA2_TEMPLATE
 except ImportError:
     KREA2_TEMPLATE = (
-        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-        "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
+        "<|im_start|>system\nDescribe the image by detailing the color, shape, size, "
+        "texture, quantity, text, spatial relationships of the objects and background:"
+        "<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
     )
 
 
@@ -28,7 +31,10 @@ class DirectIdentityResult:
     negative: Any
     geometries: Tuple[ResolvedGeometry, ...]
     qwen_sizes: Tuple[Tuple[int, int], ...]
+    reference_latents: Tuple[torch.Tensor, ...]
     reference_latent_shapes: Tuple[Tuple[int, ...], ...]
+    reference_boosts: Tuple[float, ...]
+    reference_rope_positions: Tuple[str, ...]
     positive_text: str
     negative_text: str
 
@@ -42,7 +48,7 @@ def _as_single_rgb(image: torch.Tensor) -> torch.Tensor:
 
 
 def _grounding_image(image: torch.Tensor, grounding_px: int) -> torch.Tensor:
-    """Prepare Identity Edit grounding with a longest-side AREA cap and no upscaling."""
+    """Match Krea2 Edit grounded encoding: AREA longest-side cap, never upscale."""
     image = _as_single_rgb(image)
     samples = image.movedim(-1, 1)
     height, width = int(samples.shape[2]), int(samples.shape[3])
@@ -73,27 +79,6 @@ def _normalize_vae_latent(encoded: Any) -> torch.Tensor:
     raise TypeError(f"[CcC Krea2] Unsupported VAE encode result: {type(encoded).__name__}")
 
 
-def _conditioning_set_values(conditioning: Any, values: dict, append: bool = True) -> Any:
-    try:
-        import node_helpers
-
-        return node_helpers.conditioning_set_values(conditioning, values, append=append)
-    except (ImportError, AttributeError):
-        updated = []
-        for item in conditioning:
-            if not isinstance(item, (list, tuple)) or len(item) < 2:
-                updated.append(item)
-                continue
-            tensor, extras = item[0], dict(item[1]) if isinstance(item[1], dict) else {}
-            for key, value in values.items():
-                if append and key in extras and isinstance(extras[key], (list, tuple)) and isinstance(value, (list, tuple)):
-                    extras[key] = list(extras[key]) + list(value)
-                else:
-                    extras[key] = value
-            updated.append([tensor, extras])
-        return updated
-
-
 def _encode_qwen(clip: Any, text: str, images: List[torch.Tensor]) -> Any:
     try:
         if images:
@@ -122,12 +107,11 @@ def encode_visual_identity_direct(
     positive_prompt: str,
     negative_prompt: str = "",
 ) -> DirectIdentityResult:
-    """Encode visual Identity refs directly with the Krea2 Identity Edit conditioning contract.
+    """Prepare visual refs and grounded Qwen conditioning without appearance metadata.
 
-    Visual-reference order is preserved exactly (scene first, subject second by workflow
-    convention). CcC semantic_role/instruction fields remain UI/report metadata and do not
-    alter the Identity Qwen stream. References with ``semantic=False`` still participate in
-    the VAE in-context path but are deliberately omitted from Qwen grounding.
+    Reference order is preserved exactly. For two-reference Identity Edit that means scene
+    first and subject second. ``semantic=False`` removes that reference only from Qwen; it
+    remains present in the VAE appearance path.
     """
     if vae is None:
         raise ValueError("[CcC Krea2] Visual Identity references require a VAE.")
@@ -167,29 +151,21 @@ def encode_visual_identity_direct(
     positive_text = vision_prefix + (positive_prompt or "")
     negative_text = vision_prefix + (negative_prompt or "")
 
+    # Appearance references deliberately do NOT travel in conditioning on this path.
+    # The model wrapper owns them, matching the source-patch architecture and avoiding
+    # interference from other packages that globally extend Krea2.extra_conds.
     positive = _encode_qwen(clip, positive_text, qwen_images)
     negative = _encode_qwen(clip, negative_text, qwen_images)
-
-    common = {
-        "reference_latents": ref_latents,
-        "reference_fit": [True] * len(ref_latents),
-        "reference_rope_positions": rope_positions,
-    }
-    positive_values = dict(common)
-    if any(boost != 1.0 for boost in boosts):
-        positive_values["reference_boosts"] = boosts
-
-    # The grounded negative uses the same VAE refs and fit geometry but no boost override,
-    # so the Krea2 runtime resolves every negative reference boost to 1.0.
-    positive = _conditioning_set_values(positive, positive_values, append=True)
-    negative = _conditioning_set_values(negative, common, append=True)
 
     return DirectIdentityResult(
         positive=positive,
         negative=negative,
         geometries=tuple(geometries),
         qwen_sizes=tuple((int(img.shape[2]), int(img.shape[1])) for img in qwen_images),
+        reference_latents=tuple(ref_latents),
         reference_latent_shapes=tuple(tuple(int(v) for v in latent.shape) for latent in ref_latents),
+        reference_boosts=tuple(boosts),
+        reference_rope_positions=tuple(rope_positions),
         positive_text=positive_text,
         negative_text=negative_text,
     )
