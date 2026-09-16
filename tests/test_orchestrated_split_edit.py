@@ -60,10 +60,30 @@ def test_positive_and_negative_runtime_boosts_are_independent():
     assert "reference_boosts" not in _extras(negative)
 
 
-def test_split_edit_prepares_with_conditioning_transport_then_patches_model():
+def test_standard_center_rope_is_moodboard_compatible():
+    centered = [
+        VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3))),
+        VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3))),
+    ]
+    assert edit_node._uses_only_standard_center_rope(centered) is True
+
+    displaced = [
+        VisualReferenceEntry(
+            image=torch.zeros((1, 64, 32, 3)),
+            rope_grid="outside",
+            rope_horizontal="right",
+            rope_vertical="center",
+        )
+    ]
+    assert edit_node._uses_only_standard_center_rope(displaced) is False
+
+
+def test_split_edit_prepares_conditioning_and_can_delegate_to_moodboard_runtime():
     source = inspect.getsource(edit_node.CcCKrea2Edit.process)
     assert "run_krea2_edit_orchestrator" in source
     assert "apply_model_patch=False" in source
     assert "attach_reference_runtime_to_conditioning" in source
+    assert "_external_moodboard_runtime_active" in source
+    assert 'runtime_mode = "external_moodboard"' in source
     assert "patch_krea2_model" in source
     assert "patch_krea2_orchestrated_model" not in source
