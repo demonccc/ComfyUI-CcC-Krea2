@@ -8,34 +8,33 @@ Declares one ordered visual reference for Krea2 Edit.
 | --- | --- | --- | --- |
 | `image` | `IMAGE` | — | Visual edit reference. |
 | `boost` | `0.0 .. 10.0` | `1.0` | Positive-pass target-to-reference attention boost. The grounded negative always uses `1.0`. |
-| `rope_grid` | `inside`, `outside` | `inside` | Place the fitted reference RoPE coordinates inside or outside the target grid. |
-| `rope_horizontal` | `center`, `left`, `right` | `center` | Horizontal RoPE alignment/displacement. |
-| `rope_vertical` | `center`, `up`, `down` | `center` | Vertical RoPE alignment/displacement. |
-| `semantic` | boolean | `true` | Also participates in Qwen Vision. |
-| `semantic_role` | text | empty | Optional semantic name for this image. |
-| `instruction` | multiline text | empty | Per-reference Qwen instruction. |
-| `grounding_px` | `0 .. 4096` | `768` | Qwen grounding size. |
+| `reference_fit` | `crop`, `resize`, `native` | `native` | Pixel-space behavior before VAE encoding. |
+| `placement_grid` | `inside`, `outside` | `inside` | RoPE placement grid for `resize` and `native`. Crop always forces `inside`. |
+| `grid_horizontal_position` | `center`, `left`, `right` | `center` | Horizontal grid placement. In crop mode this chooses where the crop window lands on the source. |
+| `grid_vertical_position` | `center`, `up`, `down` | `center` | Vertical grid placement. In crop mode this chooses where the crop window lands on the source. |
+| `resize_method` | `lanczos`, `bicubic`, `bilinear`, `area` | `lanczos` | Interpolation used only when `reference_fit = resize`. |
+| `semantic` | boolean | `true` | Also send this visual reference to Qwen. |
+| `semantic_resize` | boolean | `true` | Enable Qwen-only downscale when the image exceeds `semantic_grounding_px`. Never upscales. |
+| `semantic_grounding_px` | `16 .. 4096` | `768` | Maximum longest edge for the Qwen copy when `semantic_resize` is enabled. |
+| `semantic_resize_method` | `lanczos`, `bicubic`, `bilinear`, `area` | `lanczos` | Qwen-only downscale interpolation. |
+| `prompt_annotation` | multiline text | empty | Optional text appended as `Image N: <annotation>` after the complete vision prefix. |
 
 ### Visual reference geometry
 
-Reference sizing is not configurable on this node.
+The three public modes are deliberately explicit:
 
-Every visual reference is always prepared against the final resolved target latent using the Krea2 Identity Edit v1.2 pixel-space `fit` geometry before VAE encoding. This is independent of how the target latent was created:
+- `crop`: the resolved target grid is used as an **inside crop window** over the source image. The horizontal/vertical controls decide which source region survives. No intentional resize is performed. `placement_grid` is forced to `inside`.
+- `resize`: always resizes, whether the source is smaller or larger. Aspect ratio is preserved and the source longest edge is mapped to the target-grid longest edge using `resize_method`.
+- `native`: no intentional crop or resize. Only minimum VAE alignment is applied when required.
 
-- Size Resolver -> `fixed`
-- `preset`
-- `from_image`
-- latent content from an image
+Qwen preparation is independent from VAE geometry:
 
-The target latent is resolved first. Then every Krea2 Edit visual reference is fitted to that target. RoPE controls only change the coordinate placement of that already-fitted reference; they never change its pixel/VAE sizing.
+- `semantic = false`: the reference is VAE/DiT only.
+- `semantic = true, semantic_resize = false`: Qwen receives native source pixels.
+- `semantic = true, semantic_resize = true`: Qwen receives a downscaled copy only when the source exceeds `semantic_grounding_px`; smaller sources are unchanged.
+- `prompt_annotation` is optional. Without it, visual references remain purely positional. With it, CcC adds `Image N: ...` text while preserving physical reference order.
 
-Rules:
-
-- `semantic = false`: `semantic_role`, `instruction`, and `grounding_px` are disabled and ignored.
-- `semantic = true` + empty `semantic_role`: positional Krea2 Edit behavior.
-- `semantic = true` + non-empty `semantic_role`: the role text is attached to the corresponding Qwen image.
-- Configured `boost` applies to the positive conditioning pass only.
-- The grounded negative uses the same visual references with reference boost fixed to `1.0`, matching the v1.2 Identity Edit conditioning recipe.
+Configured `boost` applies to the positive conditioning pass only. The grounded negative uses the same visual references with reference boost fixed to `1.0`.
 
 ## Krea2 CcC Semantic Reference
 
