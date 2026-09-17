@@ -34,12 +34,14 @@ def test_scene_subject_workflow_uses_split_nodes():
     subject = next(node for node in visual_nodes if node.get("title") == "Subject Visual Reference")
     edit = edit_nodes[0]
 
-    assert scene["widgets_values"][:5] == [1.0, "inside", "center", "center", True]
-    assert subject["widgets_values"][:5] == [4.0, "inside", "center", "center", True]
-    assert len(scene["widgets_values"]) == 9
-    assert len(subject["widgets_values"]) == 9
-    assert scene["widgets_values"][-1] == "fit"
-    assert subject["widgets_values"][-1] == "fit"
+    assert scene["widgets_values"][:6] == [1.0, "resize", "inside", "center", "center", "lanczos"]
+    assert subject["widgets_values"][:6] == [4.0, "resize", "inside", "center", "center", "lanczos"]
+    assert len(scene["widgets_values"]) == 11
+    assert len(subject["widgets_values"]) == 11
+    assert scene["widgets_values"][6:10] == [True, True, 768, "lanczos"]
+    assert subject["widgets_values"][6:10] == [True, True, 768, "lanczos"]
+    assert "scene image" in scene["widgets_values"][10]
+    assert "subject image" in subject["widgets_values"][10]
 
     # Krea2 Edit exposes only positive prompt + patch toggle. The negative text branch is
     # intentionally fixed to an empty string inside the node implementation.
