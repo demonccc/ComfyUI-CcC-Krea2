@@ -25,15 +25,12 @@ def build_grounded_positive_user_content(
     resolved_references: List[Dict[str, Any]],
     user_prompt: str = "",
 ) -> str:
-    """Build the Krea2 positive user turn with explicit appearance-role binding.
+    """Build the Krea2 positive user turn.
 
-    The physical vision prefix stays contiguous and preserves the trained reference order,
-    but appearance references are explicitly named immediately after that prefix. This restores
-    the original CcC contract where Qwen knew which physical image was the scene, subject, outfit,
-    or other declared role instead of relying on position alone.
-
-    CcC-only semantic/style references can contribute their ordinary annotations in the same
-    annotation section. The raw user edit instruction always remains last.
+    Physical vision blocks stay contiguous and preserve Krea2 reference order. Appearance
+    references are positional by default; when a Visual Reference carries prompt_annotation,
+    it is appended as Image N: <annotation> after the complete vision prefix. Semantic/style
+    references keep their own optional annotations. The raw user edit instruction remains last.
     """
     blocks: List[str] = []
     annotations: List[str] = []
@@ -54,13 +51,11 @@ def build_grounded_positive_user_content(
 
         if ref_path == "edit" and is_appearance:
             label = f"Image {physical_index}"
-            if alias:
-                annotations.append(f"{label} is the {alias}.")
             if instruction:
-                if alias:
-                    annotations.append(f"{label} ({alias}): {instruction}")
-                else:
-                    annotations.append(f"{label}: {instruction}")
+                annotations.append(f"{label}: {instruction}")
+            elif alias:
+                # Compatibility for older role-based reference nodes.
+                annotations.append(f"{label}: {alias}")
             physical_index += count
             continue
 
