@@ -34,11 +34,13 @@ def test_split_edit_negative_prompt_is_fixed_empty_and_not_user_editable():
     assert "negative_prompt=KREA2_EDIT_NEGATIVE_PROMPT" in source
 
 
-def test_reference_fit_mode_exposes_full_target_crop_baseline():
-    fit = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), fit_mode="fit")
-    crop = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), fit_mode="crop (legacy)")
+def test_reference_fit_modes_expose_simple_public_contract():
+    native = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="native")
+    resize = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="resize")
+    crop = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="crop")
 
-    assert fit.resolved_fit_mode == "fit"
+    assert native.resolved_fit_mode == "native"
+    assert resize.resolved_fit_mode == "resize"
     assert crop.resolved_fit_mode == "crop"
 
 
@@ -82,9 +84,9 @@ def test_standard_center_rope_is_moodboard_compatible():
     displaced = [
         VisualReferenceEntry(
             image=torch.zeros((1, 64, 32, 3)),
-            rope_grid="outside",
-            rope_horizontal="right",
-            rope_vertical="center",
+            placement_grid="outside",
+            grid_horizontal_position="right",
+            grid_vertical_position="center",
         )
     ]
     assert edit_node._uses_only_standard_center_rope(displaced) is False
