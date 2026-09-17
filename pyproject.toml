@@ -36,6 +36,10 @@ PublisherId = "CcC"
 DisplayName = "CcC Krea2"
 Icon = "🎨"
 
+[tool.setuptools.packages.find]
+include = ["ccc_krea2*"]
+exclude = ["tests*", "web*", "workflows*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
