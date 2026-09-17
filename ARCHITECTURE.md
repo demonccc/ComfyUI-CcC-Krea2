@@ -16,65 +16,65 @@ VAE / dimensions / content -> Krea2 CcC Latent ---+
 
 ## Target Geometry vs Reference Geometry
 
-Target latent construction and Krea2 Edit reference preparation are intentionally separate.
+Target latent construction and visual-reference preparation remain separate.
 
-The target latent can be created from:
+The target latent can be created from `from_image`, fixed width/height, Size Resolver output, or a preset. Once aligned, that target geometry becomes the grid used by Visual Reference.
 
-```text
-from_image
-fixed width/height
-Size Resolver -> fixed width/height
-preset resolution + aspect ratio
-```
-
-It can also be empty or contain VAE-encoded image content, and that content can optionally participate semantically.
-
-Once the target latent has been resolved and aligned to /16, its final geometry becomes the reference geometry contract for Krea2 Edit.
-
-Every visual reference then follows:
+Each visual reference has two independent paths:
 
 ```text
 raw reference image
         |
-        +-> Qwen semantic grounding path (when enabled)
+        +-> optional Qwen path
+        |      semantic
+        |      semantic_resize
+        |      semantic_grounding_px
+        |      semantic_resize_method
+        |      prompt_annotation
         |
-        +-> Krea2 Edit v1.2 pixel-space fit against resolved target
-                |
-                -> VAE encode
-                |
-                -> reference latent
-                |
-                -> optional RoPE coordinate placement/displacement
+        +-> VAE / DiT appearance path
+               reference_fit = crop | resize | native
+               placement_grid
+               grid_horizontal_position
+               grid_vertical_position
+               resize_method
+               boost
 ```
 
-The visual-reference node does not expose a reference sizing mode. Krea2 Identity Edit v1.2 `fit` is mandatory for visual edit references.
+### Visual-reference fit
 
-## Visual References
+`crop` treats the target grid as a crop window **inside the source image**. Horizontal and vertical grid position determine where that window lands. For example, `left + down` retains the lower-left source region. Crop always forces `inside`; outside placement does not apply.
 
-Visual Reference nodes are ordered and append-only. The current two-reference workflow uses:
+`resize` always resizes, whether the source starts smaller or larger. Aspect ratio is preserved and the source longest edge is mapped to the target-grid longest edge. The interpolation method is selectable.
+
+`native` performs no intentional crop or resize and only applies the minimum technical VAE alignment required.
+
+### Qwen visual grounding
+
+`semantic` only decides whether an appearance reference is also visible to Qwen.
+
+`semantic_resize = false` sends the Qwen copy at native resolution.
+
+`semantic_resize = true` enables a maximum longest-edge cap through `semantic_grounding_px`. It is downscale-only: sources below the cap are unchanged. `semantic_resize_method` selects the interpolation method.
+
+`prompt_annotation` is optional. Physical vision blocks remain ordered. When present, CcC appends:
 
 ```text
-scene -> subject
+Image N: <prompt_annotation>
 ```
 
-The standard RoPE placement is `inside:center:center`, matching the proven centered stride-1 behavior after v1.2 fitting.
+after the complete vision prefix. Empty annotations preserve the positional upstream-style contract.
 
-CcC adds experimental RoPE freedom without changing reference sizing:
+### RoPE and boost
 
-- grid: `inside` / `outside`
-- horizontal: `center` / `left` / `right`
-- vertical: `center` / `up` / `down`
+For `resize` and `native`, `placement_grid` can be `inside` or `outside`; horizontal and vertical controls select the coordinate placement. Crop always uses `inside` because the grid is acting as the crop window itself.
 
-This can move reference coordinates outside the target grid for experiments while preserving the same v1.2-fitted VAE reference.
-
-Reference attention boost is pass-specific:
+Reference attention boost remains pass-specific:
 
 ```text
 positive -> configured per-reference boost
 negative -> 1.0 for every reference
 ```
-
-The negative remains grounded with the same Qwen images; only its reference attention boost is neutral, matching the proven Krea2 Identity Edit recipe.
 
 ## Size Resolver
 
