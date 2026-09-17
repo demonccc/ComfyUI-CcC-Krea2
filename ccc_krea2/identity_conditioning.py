@@ -10,9 +10,10 @@ from dataclasses import dataclass
 from typing import Any, List, Sequence, Tuple
 
 import torch
-import torch.nn.functional as F
+
 
 from .constants import VISION_PAD_TOKEN
+from .grounding import resize_grounding_image
 from .krea2edit_geometry import ResolvedGeometry, process_image_and_mask_geometry, resolve_krea2edit_geometry
 
 try:
@@ -47,24 +48,23 @@ def _as_single_rgb(image: torch.Tensor) -> torch.Tensor:
     return image[:1, :, :, :3]
 
 
-def _grounding_image(image: torch.Tensor, grounding_px: int) -> torch.Tensor:
-    """Match Krea2 Edit grounded encoding: AREA longest-side cap, never upscale."""
+def _grounding_image(
+    image: torch.Tensor,
+    semantic_resize: bool,
+    grounding_px: int,
+    resize_method: str,
+) -> torch.Tensor:
+    """Prepare the Qwen copy: optional downscale-only cap, never upscale."""
     image = _as_single_rgb(image)
-    samples = image.movedim(-1, 1)
-    height, width = int(samples.shape[2]), int(samples.shape[3])
-
-    if grounding_px and max(height, width) > int(grounding_px):
-        scale_by = float(grounding_px) / float(max(height, width))
-        out_w = max(1, round(width * scale_by))
-        out_h = max(1, round(height * scale_by))
-        try:
-            import comfy.utils
-
-            samples = comfy.utils.common_upscale(samples, out_w, out_h, "area", "disabled")
-        except (ImportError, AttributeError):
-            samples = F.interpolate(samples.float(), size=(out_h, out_w), mode="area")
-
-    return samples.movedim(1, -1)[:, :, :, :3]
+    if not semantic_resize:
+        return image
+    return resize_grounding_image(
+        image=image,
+        resize_mode="downscale_only",
+        grounding_px=int(grounding_px),
+        grounding_preset="custom",
+        resize_method=resize_method,
+    )[:, :, :, :3]
 
 
 def _normalize_vae_latent(encoded: Any) -> torch.Tensor:
@@ -131,12 +131,20 @@ def encode_visual_identity_direct(
     for entry in visual_entries:
         raw = _as_single_rgb(entry.image)
         src_h, src_w = int(raw.shape[1]), int(raw.shape[2])
+        rope_parts = str(entry.rope_position).split(":")
+        if len(rope_parts) == 3:
+            _, grid_horizontal, grid_vertical = rope_parts
+        else:
+            grid_horizontal, grid_vertical = "center", "center"
         geom = resolve_krea2edit_geometry(
             src_h=src_h,
             src_w=src_w,
             tgt_h=target_h,
             tgt_w=target_w,
-            fit_mode="fit",
+            fit_mode=entry.resolved_fit_mode,
+            grid_horizontal_position=grid_horizontal,
+            grid_vertical_position=grid_vertical,
+            resize_method=entry.resize_method,
         )
         fitted, _ = process_image_and_mask_geometry(raw, None, geom)
         ref_latents.append(_normalize_vae_latent(vae.encode(fitted)))
@@ -145,10 +153,26 @@ def encode_visual_identity_direct(
         boosts.append(float(entry.boost))
 
         if bool(entry.semantic):
-            qwen_images.append(_grounding_image(raw, int(entry.grounding_px)))
+            qwen_images.append(
+                _grounding_image(
+                    raw,
+                    bool(entry.semantic_resize),
+                    int(entry.semantic_grounding_px),
+                    str(entry.semantic_resize_method),
+                )
+            )
 
     vision_prefix = VISION_PAD_TOKEN * len(qwen_images)
-    positive_text = vision_prefix + (positive_prompt or "")
+    annotations = []
+    qwen_index = 1
+    for entry in visual_entries:
+        if bool(entry.semantic):
+            annotation = str(getattr(entry, "prompt_annotation", "") or "").strip()
+            if annotation:
+                annotations.append(f"Image {qwen_index}: {annotation}")
+            qwen_index += 1
+    suffix = "\n".join(annotations + ([positive_prompt] if positive_prompt else []))
+    positive_text = vision_prefix + suffix
     negative_text = vision_prefix + (negative_prompt or "")
 
     # Appearance references deliberately do NOT travel in conditioning on this path.
