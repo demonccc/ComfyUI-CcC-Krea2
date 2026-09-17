@@ -37,15 +37,16 @@ class _SemanticOnlySpec:
     vision_instruction = "Use this image only as semantic target context."
 
 
-def test_grounded_positive_matches_identity_contract_for_visual_refs_even_with_labels():
+def test_grounded_positive_supports_optional_visual_prompt_annotation():
     refs = [
         {"spec": _PlainSpec()},
         {"spec": _Spec(), "expanded_aliases": ("subject image",)},
     ]
     text = build_grounded_positive_user_content(refs, "Replace the woman.")
-    assert text == VISION_PAD_TOKEN * 2 + "Replace the woman."
-    assert "subject image" not in text
-    assert "face and body" not in text
+    prefix = VISION_PAD_TOKEN * 2
+    assert text.startswith(prefix)
+    assert "Image 2: Use only the subject face and body." in text
+    assert text.endswith("Replace the woman.")
 
 
 def test_ccc_semantic_only_extension_may_add_text_after_complete_vision_prefix():
@@ -75,14 +76,14 @@ def test_grounded_negative_can_append_explicit_user_negative_without_reference_a
     assert "subject image" not in text
 
 
-def test_qwen_grounding_uses_area_cap_without_pre_alignment():
+def test_qwen_grounding_uses_lanczos_cap_without_pre_alignment():
     # Longest-side downscale remains tokenizer-native: 971x2059 at 768 becomes
     # 362x768 here rather than being pre-aligned to a vision patch multiple.
     image = torch.zeros((1, 2059, 971, 3))
     prepared = _prepare_qwen_image(image=image, clip=None, grounding_px=768)
     assert prepared.original_image.shape == (1, 2059, 971, 3)
     assert prepared.vision_image.shape == (1, 768, 362, 3)
-    assert prepared.debug_metadata["resolved_method"] == "area"
+    assert prepared.debug_metadata["resolved_method"] == "lanczos"
     assert prepared.debug_metadata["additional_adjustment"] == "owned by Qwen tokenizer"
 
 
@@ -129,18 +130,21 @@ def test_conditioning_runtime_keeps_positive_boost_and_negative_neutral():
     assert "reference_boosts" not in negative[0][1]
 
 
-def test_public_edit_and_visual_reference_surfaces_remain_unchanged():
+def test_public_edit_and_visual_reference_surfaces_match_refactored_contract():
     visual_required = CcCKrea2VisualReference.INPUT_TYPES()["required"]
     assert list(visual_required) == [
         "image",
         "boost",
-        "rope_grid",
-        "rope_horizontal",
-        "rope_vertical",
+        "reference_fit",
+        "placement_grid",
+        "grid_horizontal_position",
+        "grid_vertical_position",
+        "resize_method",
         "semantic",
-        "semantic_role",
-        "instruction",
-        "grounding_px",
+        "semantic_resize",
+        "semantic_grounding_px",
+        "semantic_resize_method",
+        "prompt_annotation",
     ]
 
     edit_inputs = CcCKrea2Edit.INPUT_TYPES()
@@ -150,7 +154,6 @@ def test_public_edit_and_visual_reference_surfaces_remain_unchanged():
         "vae",
         "latent",
         "positive_prompt",
-        "negative_prompt",
         "apply_krea2_edit_patch",
     ]
     assert list(edit_inputs["optional"]) == ["visual_references", "semantic_references"]
