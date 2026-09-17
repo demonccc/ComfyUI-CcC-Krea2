@@ -7,24 +7,51 @@ app.registerExtension({
 
         if (node.comfyClass === "CcCKrea2VisualReference") {
             const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
+            const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
+            const fitWidget = node.widgets?.find((w) => w.name === "reference_fit");
+
+            const setDisabled = (name, disabled) => {
+                const widget = node.widgets?.find((w) => w.name === name);
+                if (widget) widget.disabled = disabled;
+            };
 
             const updateSemanticState = () => {
                 const enabled = semanticWidget?.value === true;
-                for (const name of ["semantic_role", "instruction", "grounding_px"]) {
-                    const widget = node.widgets?.find((w) => w.name === name);
-                    if (widget) widget.disabled = !enabled;
+                const resizeEnabled = enabled && semanticResizeWidget?.value === true;
+                setDisabled("semantic_resize", !enabled);
+                setDisabled("semantic_grounding_px", !resizeEnabled);
+                setDisabled("semantic_resize_method", !resizeEnabled);
+                setDisabled("prompt_annotation", !enabled);
+            };
+
+            const updateFitState = () => {
+                const mode = fitWidget?.value ?? "native";
+                const crop = mode === "crop";
+                setDisabled("placement_grid", crop);
+                setDisabled("resize_method", mode !== "resize");
+                if (crop) {
+                    const placement = node.widgets?.find((w) => w.name === "placement_grid");
+                    if (placement) placement.value = "inside";
                 }
             };
 
-            if (semanticWidget) {
-                const originalCallback = semanticWidget.callback;
-                semanticWidget.callback = function () {
+            for (const [widget, callback] of [
+                [semanticWidget, updateSemanticState],
+                [semanticResizeWidget, updateSemanticState],
+                [fitWidget, updateFitState],
+            ]) {
+                if (!widget) continue;
+                const originalCallback = widget.callback;
+                widget.callback = function () {
                     if (originalCallback) originalCallback.apply(this, arguments);
-                    updateSemanticState();
+                    callback();
                 };
             }
 
-            setTimeout(updateSemanticState, 20);
+            setTimeout(() => {
+                updateSemanticState();
+                updateFitState();
+            }, 20);
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
