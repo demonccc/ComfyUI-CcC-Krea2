@@ -48,6 +48,7 @@ class ReferenceSpec:
     masked_attention_boost: float = 1.0
     attention_mask: Optional[torch.Tensor] = None
     visual_reference_fit: str = "auto"
+    visual_resize_method: str = "bicubic"
     rope_position: str = "none"  # "none", "up", "down", "left", "right"
 
     # Style-path parameters
