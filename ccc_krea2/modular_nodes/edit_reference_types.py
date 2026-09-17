@@ -12,24 +12,27 @@ class VisualReferenceEntry:
 
     image: torch.Tensor
     boost: float = 1.0
-    fit_mode: str = "fit"
-    rope_grid: str = "inside"
-    rope_horizontal: str = "center"
-    rope_vertical: str = "center"
+    reference_fit: str = "native"
+    placement_grid: str = "inside"
+    grid_horizontal_position: str = "center"
+    grid_vertical_position: str = "center"
+    resize_method: str = "lanczos"
     semantic: bool = True
-    semantic_role: str = ""
-    instruction: str = ""
-    grounding_px: int = 768
+    semantic_resize: bool = True
+    semantic_grounding_px: int = 768
+    semantic_resize_method: str = "lanczos"
+    prompt_annotation: str = ""
 
     @property
     def rope_position(self) -> str:
         """Compact transport representation consumed by the Krea2 patch."""
-        return f"{self.rope_grid}:{self.rope_horizontal}:{self.rope_vertical}"
+        grid = "inside" if self.reference_fit == "crop" else self.placement_grid
+        return f"{grid}:{self.grid_horizontal_position}:{self.grid_vertical_position}"
 
     @property
     def resolved_fit_mode(self) -> str:
-        """Map the public fit label to the geometry engine value."""
-        return "crop" if self.fit_mode.startswith("crop") else "fit"
+        """Return the public geometry mode consumed by the edit engine."""
+        return self.reference_fit
 
 
 @dataclass(frozen=True)
