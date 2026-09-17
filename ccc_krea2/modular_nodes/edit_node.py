@@ -37,25 +37,31 @@ edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_
 install_krea2_rope_positioning()
 
 
-def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
-    """Prepare the semantic copy sent to Qwen while preserving the original image for VAE fit."""
+def _prepare_qwen_image(
+    image: torch.Tensor,
+    clip: Any,
+    grounding_px: int,
+    semantic_resize: bool = True,
+    resize_method: str = "lanczos",
+):
+    """Prepare the Qwen copy while preserving the untouched original image for VAE use."""
     del clip
     if image.ndim == 3:
         image = image.unsqueeze(0)
     original = image
 
-    if grounding_px == 0:
-        vision_input = image
-        resize_applied = False
-    else:
+    if semantic_resize:
         vision_input = resize_grounding_image(
             image=image,
             resize_mode="downscale_only",
             grounding_px=grounding_px,
             grounding_preset="custom",
-            resize_method="area",
+            resize_method=resize_method,
         )
         resize_applied = vision_input.shape[1:3] != image.shape[1:3]
+    else:
+        vision_input = image
+        resize_applied = False
 
     vision_input = vision_input[..., :3].clamp(0.0, 1.0)
     src_h, src_w = int(original.shape[1]), int(original.shape[2])
@@ -69,7 +75,7 @@ def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
             semantic_min_mp=0.0,
             semantic_max_mp=0.0,
             semantic_fixed_mp=0.0,
-            downscale_method_requested="area",
+            downscale_method_requested=resize_method if semantic_resize else "none",
             upscale_method_requested="none",
             encoder_signature="Qwen tokenizer-native",
             resolved_alignment=None,
@@ -80,7 +86,7 @@ def _prepare_qwen_image(image: torch.Tensor, clip: Any, grounding_px: int):
             "prep_hw": (prep_h, prep_w),
             "target_hw": (prep_h, prep_w),
             "direction": "downscale" if resize_applied else "none",
-            "resolved_method": "area" if resize_applied else "none",
+            "resolved_method": resize_method if resize_applied else "none",
             "additional_adjustment": "owned by Qwen tokenizer",
         },
     )
@@ -97,7 +103,13 @@ def _append_semantic(
     fidelity: float = 1.0,
     alias: str = "",
 ) -> ReferenceChain:
-    prep = _prepare_qwen_image(image=image, clip=clip, grounding_px=grounding_px)
+    prep = _prepare_qwen_image(
+        image=image,
+        clip=clip,
+        grounding_px=grounding_px,
+        semantic_resize=True,
+        resize_method="lanczos",
+    )
     if mode == "semantic_only":
         spec = ReferenceSpec(
             reference_path="edit",
@@ -150,20 +162,21 @@ def _combine_reference_chains(
         prep = _prepare_qwen_image(
             image=entry.image,
             clip=clip,
-            grounding_px=entry.grounding_px if entry.semantic else 0,
+            grounding_px=entry.semantic_grounding_px,
+            semantic_resize=entry.semantic_resize if entry.semantic else False,
+            resize_method=entry.semantic_resize_method,
         )
         chain = chain.append(
             ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
-                # Kept as metadata for reports/routing. Identity grounding builders deliberately
-                # do not inject appearance-reference labels or instructions into Qwen text.
-                alias=entry.semantic_role if entry.semantic else "",
-                vision_instruction=entry.instruction if entry.semantic else "",
+                alias="",
+                vision_instruction=entry.prompt_annotation if entry.semantic else "",
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=float(entry.boost),
                 visual_reference_fit=entry.resolved_fit_mode,
+                visual_resize_method=entry.resize_method,
                 rope_position=entry.rope_position,
                 _legacy_role=f"reference_{index}",
             )
@@ -410,7 +423,7 @@ class CcCKrea2Edit:
                 if reference_count
                 else "Appearance Transport: none"
             ),
-            "Identity Qwen Contract: positional visual blocks; Visual Reference labels/instructions are metadata-only",
+            "Identity Qwen Contract: positional visual blocks with optional Image N prompt annotations",
             "Negative Prompt: fixed empty string",
             (
                 "Identity Runtime: external Krea2Moodboard forward"
@@ -435,10 +448,12 @@ class CcCKrea2Edit:
             )
 
         for index, entry in enumerate(visual_entries, start=1):
-            role = entry.semantic_role if entry.semantic_role else "<positional>"
+            annotation = entry.prompt_annotation if entry.prompt_annotation else "<none>"
             lines.append(
-                f"Visual Reference {index}: boost={entry.boost}, fit={entry.fit_mode}, "
-                f"rope={entry.rope_position}, semantic={entry.semantic}, semantic_role={role}"
+                f"Visual Reference {index}: boost={entry.boost}, fit={entry.reference_fit}, "
+                f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
+                f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
+                f"semantic_resize_method={entry.semantic_resize_method}, prompt_annotation={annotation}"
             )
 
         latent_info = latent.get("ccc_krea2_latent_info")
