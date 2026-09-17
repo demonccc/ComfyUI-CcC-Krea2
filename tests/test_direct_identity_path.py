@@ -37,18 +37,22 @@ def test_direct_identity_keeps_appearance_out_of_conditioning():
     scene = VisualReferenceEntry(
         image=torch.zeros((1, 180, 120, 3)),
         boost=1.0,
+        reference_fit="resize",
         semantic=True,
-        semantic_role="scene image",
-        instruction="This text must stay out of the Identity Qwen stream.",
-        grounding_px=128,
+        semantic_resize=True,
+        semantic_grounding_px=128,
+        semantic_resize_method="lanczos",
+        prompt_annotation="It is the scene image.",
     )
     subject = VisualReferenceEntry(
         image=torch.zeros((1, 205, 97, 3)),
         boost=4.0,
+        reference_fit="resize",
         semantic=True,
-        semantic_role="subject image",
-        instruction="This text must also stay out of the Identity Qwen stream.",
-        grounding_px=128,
+        semantic_resize=True,
+        semantic_grounding_px=128,
+        semantic_resize_method="lanczos",
+        prompt_annotation="It is the subject image.",
     )
 
     result = encode_visual_identity_direct(
@@ -60,13 +64,17 @@ def test_direct_identity_keeps_appearance_out_of_conditioning():
         negative_prompt="",
     )
 
-    expected_positive = VISION_PAD_TOKEN * 2 + "Replace the woman."
+    expected_positive = (
+        VISION_PAD_TOKEN * 2
+        + "Image 1: It is the scene image.\n"
+        + "Image 2: It is the subject image.\n"
+        + "Replace the woman."
+    )
     expected_negative = VISION_PAD_TOKEN * 2
     assert result.positive_text == expected_positive
     assert result.negative_text == expected_negative
-    assert "scene image" not in result.positive_text
-    assert "subject image" not in result.positive_text
-    assert "This text" not in result.positive_text
+    assert "scene image" in result.positive_text
+    assert "subject image" in result.positive_text
 
     assert len(clip.calls) == 2
     assert clip.calls[0][0] == expected_positive
@@ -87,7 +95,7 @@ def test_direct_identity_keeps_appearance_out_of_conditioning():
         "inside:center:center",
     )
 
-    # Source order is preserved and each ref keeps the v1.2 fit-inside grid.
+    # Source order is preserved and each ref uses the selected public resize mode.
     assert result.geometries[0].source_size == (120, 180)
     assert result.geometries[1].source_size == (97, 205)
     assert result.reference_latent_shapes[0][1] == 16
