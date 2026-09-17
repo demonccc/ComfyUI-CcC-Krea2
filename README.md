@@ -16,13 +16,19 @@ The Edit surface is split into focused nodes:
 
 Use one node per visual Krea2 Edit reference and chain them in physical reference order.
 
-Reference sizing is deliberately not a user control: every visual reference is always fitted to the already-resolved target latent with the Krea2 Identity Edit v1.2 pixel-space `fit` geometry before VAE encoding.
+The VAE pixel path has three explicit modes:
 
-RoPE positioning is independent from that fit and is split into grid (`inside` / `outside`), horizontal (`center` / `left` / `right`) and vertical (`center` / `up` / `down`) controls. This keeps the proven edit geometry while allowing CcC experiments that move the reference coordinates outside the target grid.
+- `crop`: use the target grid as an inside crop window over the source. `grid_horizontal_position` and `grid_vertical_position` select the retained source region. Outside placement is disabled for crop.
+- `resize`: always resize up or down while preserving aspect ratio; the source longest edge is mapped to the target-grid longest edge. Interpolation is selectable.
+- `native`: preserve source size and pixels, with only minimum VAE alignment when required.
 
-`semantic_role` is optional. With `semantic = true` and an empty role, Qwen keeps positional Krea2 Edit behavior. With a value, that text identifies the corresponding image semantically.
+RoPE placement remains explicit through `placement_grid` (`inside` / `outside`), horizontal (`center` / `left` / `right`) and vertical (`center` / `up` / `down`) controls.
 
-`boost` applies to the positive pass. The grounded negative uses the same reference images with boost fixed to `1.0`, matching the v1.2 Identity Edit recipe.
+Qwen is independent from the VAE path. `semantic` decides whether the same image is also sent to Qwen. When `semantic_resize` is enabled, the Qwen copy is downscaled only if it exceeds `semantic_grounding_px`; smaller images are never upscaled. `semantic_resize_method` selects the downscale method.
+
+`prompt_annotation` is optional and is appended as `Image N: <annotation>`. This allows lightweight guidance such as `Image 1: It is the scene image, only pay attention to the buildings.` without forcing a fixed scene/subject role model.
+
+`boost` applies to the positive pass. The grounded negative uses the same reference images with boost fixed to `1.0`.
 
 ### Size Resolver
 
