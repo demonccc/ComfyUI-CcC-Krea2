@@ -8,10 +8,11 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
-FIT_MODES = ("fit", "crop (legacy)")
-ROPE_GRIDS = ("inside", "outside")
-ROPE_HORIZONTAL = ("center", "left", "right")
-ROPE_VERTICAL = ("center", "up", "down")
+REFERENCE_FIT = ("crop", "resize", "native")
+PLACEMENT_GRIDS = ("inside", "outside")
+GRID_HORIZONTAL = ("center", "left", "right")
+GRID_VERTICAL = ("center", "up", "down")
+RESIZE_METHODS = ("lanczos", "bicubic", "bilinear", "area")
 
 
 class CcCKrea2VisualReference:
@@ -22,12 +23,11 @@ class CcCKrea2VisualReference:
     RETURN_NAMES = ("visual_references",)
     FUNCTION = "process"
     DESCRIPTION = (
-        "Adds one visual Krea2 Edit reference. Chaining order is the physical Krea2 reference order. "
-        "When semantic grounding is enabled, the role label and instruction explicitly bind that physical image "
-        "to its Qwen role in the positive edit prompt. Fit mirrors the proven Krea2Moodboard fit-inside geometry "
-        "and preserves the full source for genuine aspect-ratio mismatches; crop (legacy) center-crops to the "
-        "target aspect ratio and fills the complete resolved target grid before VAE encoding. RoPE controls only "
-        "coordinate placement."
+        "Adds one ordered Krea2 Edit appearance reference. reference_fit controls only the pixel path sent to VAE: "
+        "crop uses the target grid as an inside crop window positioned by the grid controls, resize always scales "
+        "proportionally to the target grid longest edge, and native preserves source size except for minimum VAE "
+        "alignment. semantic controls whether the same image is also shown to Qwen. prompt_annotation optionally "
+        "adds 'Image N: ...' text after the vision prefix."
     )
 
     @classmethod
@@ -36,46 +36,59 @@ class CcCKrea2VisualReference:
             "required": {
                 "image": ("IMAGE",),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
-                "rope_grid": (ROPE_GRIDS, {"default": "inside"}),
-                "rope_horizontal": (ROPE_HORIZONTAL, {"default": "center"}),
-                "rope_vertical": (ROPE_VERTICAL, {"default": "center"}),
-                "semantic": ("BOOLEAN", {"default": True}),
-                "semantic_role": (
-                    "STRING",
+                "reference_fit": (REFERENCE_FIT, {"default": "native"}),
+                "placement_grid": (
+                    PLACEMENT_GRIDS,
                     {
-                        "default": "",
-                        "tooltip": (
-                            "Explicit Qwen role label for this physical appearance reference when semantic grounding "
-                            "is enabled, for example 'scene image' or 'subject image'."
-                        ),
+                        "default": "inside",
+                        "tooltip": "RoPE placement grid. crop always forces inside.",
                     },
                 ),
-                "instruction": (
+                "grid_horizontal_position": (GRID_HORIZONTAL, {"default": "center"}),
+                "grid_vertical_position": (GRID_VERTICAL, {"default": "center"}),
+                "resize_method": (
+                    RESIZE_METHODS,
+                    {
+                        "default": "lanczos",
+                        "tooltip": "Interpolation used only when reference_fit is resize.",
+                    },
+                ),
+                "semantic": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, this appearance reference is also sent to Qwen.",
+                    },
+                ),
+                "semantic_resize": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, Qwen input is downscaled only when it exceeds semantic_grounding_px. Never upscales.",
+                    },
+                ),
+                "semantic_grounding_px": (
+                    "INT",
+                    {"default": 768, "min": 16, "max": 4096, "step": 16},
+                ),
+                "semantic_resize_method": (
+                    RESIZE_METHODS,
+                    {
+                        "default": "lanczos",
+                        "tooltip": "Interpolation used only for semantic downscaling.",
+                    },
+                ),
+                "prompt_annotation": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "",
-                        "tooltip": (
-                            "Positive-Qwen instruction describing what this reference contributes. It is bound to "
-                            "this physical image together with semantic_role. The grounded negative remains image-only."
-                        ),
+                        "tooltip": "Optional text appended as 'Image N: <annotation>' for this Qwen image.",
                     },
                 ),
-                "grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 16}),
             },
             "optional": {
                 "previous_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
-                "fit_mode": (
-                    FIT_MODES,
-                    {
-                        "default": "fit",
-                        "tooltip": (
-                            "fit mirrors Krea2Moodboard: near-matched sources fill the target, while genuine AR "
-                            "mismatches keep the complete source on a centered fit-inside reference grid. "
-                            "crop (legacy) center-crops to target AR and encodes a full-target-grid reference."
-                        ),
-                    },
-                ),
             },
         }
 
@@ -83,15 +96,17 @@ class CcCKrea2VisualReference:
         self,
         image: torch.Tensor,
         boost: float = 1.0,
-        rope_grid: str = "inside",
-        rope_horizontal: str = "center",
-        rope_vertical: str = "center",
+        reference_fit: str = "native",
+        placement_grid: str = "inside",
+        grid_horizontal_position: str = "center",
+        grid_vertical_position: str = "center",
+        resize_method: str = "lanczos",
         semantic: bool = True,
-        semantic_role: str = "",
-        instruction: str = "",
-        grounding_px: int = 768,
+        semantic_resize: bool = True,
+        semantic_grounding_px: int = 768,
+        semantic_resize_method: str = "lanczos",
+        prompt_annotation: str = "",
         previous_references: Optional[VisualReferenceChain] = None,
-        fit_mode: str = "fit",
     ) -> Tuple[VisualReferenceChain]:
         chain = previous_references if previous_references is not None else VisualReferenceChain()
 
@@ -99,13 +114,15 @@ class CcCKrea2VisualReference:
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
-            fit_mode=fit_mode,
-            rope_grid=rope_grid,
-            rope_horizontal=rope_horizontal,
-            rope_vertical=rope_vertical,
+            reference_fit=reference_fit,
+            placement_grid="inside" if reference_fit == "crop" else placement_grid,
+            grid_horizontal_position=grid_horizontal_position,
+            grid_vertical_position=grid_vertical_position,
+            resize_method=resize_method,
             semantic=semantic_enabled,
-            semantic_role=semantic_role.strip() if semantic_enabled else "",
-            instruction=instruction.strip() if semantic_enabled else "",
-            grounding_px=int(grounding_px),
+            semantic_resize=bool(semantic_resize) if semantic_enabled else False,
+            semantic_grounding_px=int(semantic_grounding_px),
+            semantic_resize_method=semantic_resize_method,
+            prompt_annotation=prompt_annotation.strip() if semantic_enabled else "",
         )
         return (chain.append(entry),)
