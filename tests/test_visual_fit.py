@@ -42,6 +42,55 @@ def test_visual_fit_fit_mode():
     assert out_img.shape[2] == fw
 
 
+def test_public_crop_uses_positioned_inside_grid_window():
+    img = torch.rand(1, 900, 1200, 3)
+    out_img, _, meta = resolve_visual_reference_fit(
+        img,
+        target_h=512,
+        target_w=640,
+        mode="crop",
+        grid_horizontal_position="left",
+        grid_vertical_position="down",
+    )
+    assert meta["mode_resolved"] == "crop_window"
+    assert meta["crop_rectangle"] == (0, 388, 640, 512)
+    assert out_img.shape == (1, 512, 640, 3)
+    assert meta["interpolation_method"] == "none"
+
+
+def test_public_resize_always_scales_up_or_down_with_selected_method():
+    small = torch.rand(1, 256, 128, 3)
+    out_small, _, meta_small = resolve_visual_reference_fit(
+        small,
+        target_h=1024,
+        target_w=1024,
+        mode="resize",
+        resize_method="lanczos",
+    )
+    assert meta_small["mode_resolved"] == "resize"
+    assert out_small.shape == (1, 1024, 512, 3)
+    assert meta_small["interpolation_method"] == "lanczos"
+
+    large = torch.rand(1, 2048, 1024, 3)
+    out_large, _, meta_large = resolve_visual_reference_fit(
+        large,
+        target_h=1024,
+        target_w=1024,
+        mode="resize",
+        resize_method="bicubic",
+    )
+    assert out_large.shape == (1, 1024, 512, 3)
+    assert meta_large["interpolation_method"] == "bicubic"
+
+
+def test_public_native_preserves_pixels_except_vae_alignment():
+    img = torch.rand(1, 701, 603, 3)
+    out_img, _, meta = resolve_visual_reference_fit(img, target_h=512, target_w=512, mode="native")
+    assert meta["mode_resolved"] == "native"
+    assert out_img.shape == (1, 704, 608, 3)
+    assert meta["interpolation_method"] == "pad"
+
+
 def test_contain_no_upscale_preserves_native_pixels_and_pads_for_alignment():
     img = torch.rand(1, 701, 603, 3)
     out_img, _, meta = resolve_visual_reference_fit(
