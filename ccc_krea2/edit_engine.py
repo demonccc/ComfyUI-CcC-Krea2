@@ -197,8 +197,21 @@ def run_krea2_edit_orchestrator(
                     )
                 else:  # krea2_edit
                     fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
+                    rope_position = str(getattr(spec, "rope_position", "inside:center:center") or "inside:center:center")
+                    rope_parts = rope_position.split(":")
+                    if len(rope_parts) == 3:
+                        _, grid_horizontal, grid_vertical = rope_parts
+                    else:
+                        grid_horizontal, grid_vertical = "center", "center"
                     geom = resolve_krea2edit_geometry(
-                        src_h=src_h, src_w=src_w, tgt_h=target_h, tgt_w=target_w, fit_mode=fit_mode
+                        src_h=src_h,
+                        src_w=src_w,
+                        tgt_h=target_h,
+                        tgt_w=target_w,
+                        fit_mode=fit_mode,
+                        grid_horizontal_position=grid_horizontal,
+                        grid_vertical_position=grid_vertical,
+                        resize_method=getattr(spec, "visual_resize_method", "bicubic"),
                     )
 
                     fit_img, fit_mask = process_image_and_mask_geometry(
