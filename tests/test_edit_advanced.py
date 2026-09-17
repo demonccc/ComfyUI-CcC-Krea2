@@ -12,7 +12,7 @@ from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReferenc
 from ccc_krea2.patch import attach_reference_boosts_to_conditioning, _normalize_runtime_boosts
 
 
-def test_visual_reference_exposes_three_axis_rope_controls_without_reference_sizing_toggle():
+def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
     inputs = CcCKrea2VisualReference.INPUT_TYPES()
     required = inputs["required"]
     optional = inputs["optional"]
@@ -20,55 +20,75 @@ def test_visual_reference_exposes_three_axis_rope_controls_without_reference_siz
     assert list(required) == [
         "image",
         "boost",
-        "rope_grid",
-        "rope_horizontal",
-        "rope_vertical",
+        "reference_fit",
+        "placement_grid",
+        "grid_horizontal_position",
+        "grid_vertical_position",
+        "resize_method",
         "semantic",
-        "semantic_role",
-        "instruction",
-        "grounding_px",
+        "semantic_resize",
+        "semantic_grounding_px",
+        "semantic_resize_method",
+        "prompt_annotation",
     ]
     assert list(optional) == ["previous_references"]
-    assert "fit_to_latent" not in required
-    assert required["rope_grid"][0] == ("inside", "outside")
-    assert required["rope_horizontal"][0] == ("center", "left", "right")
-    assert required["rope_vertical"][0] == ("center", "up", "down")
+    assert required["reference_fit"][0] == ("crop", "resize", "native")
+    assert required["placement_grid"][0] == ("inside", "outside")
+    assert required["grid_horizontal_position"][0] == ("center", "left", "right")
+    assert required["grid_vertical_position"][0] == ("center", "up", "down")
+    assert required["resize_method"][0] == ("lanczos", "bicubic", "bilinear", "area")
 
 
-def test_visual_reference_semantic_role_is_ignored_when_semantic_is_disabled():
+def test_visual_reference_semantic_fields_are_ignored_when_semantic_is_disabled():
     image = torch.zeros((1, 64, 64, 3))
     (chain,) = CcCKrea2VisualReference().process(
         image=image,
         semantic=False,
-        semantic_role="subject image",
-        instruction="Use subject identity",
+        semantic_resize=True,
+        prompt_annotation="It is the subject image.",
     )
     entry = chain.entries[0]
     assert entry.semantic is False
-    assert entry.semantic_role == ""
-    assert entry.instruction == ""
+    assert entry.semantic_resize is False
+    assert entry.prompt_annotation == ""
 
 
-def test_visual_reference_chain_preserves_order_boost_and_rope_axes():
+def test_visual_reference_chain_preserves_order_boost_and_grid_axes():
     scene = torch.zeros((1, 64, 96, 3))
     subject = torch.zeros((1, 96, 64, 3))
     node = CcCKrea2VisualReference()
 
-    (scene_chain,) = node.process(image=scene, semantic_role="scene image")
+    (scene_chain,) = node.process(image=scene, prompt_annotation="It is the scene image.")
     (chain,) = node.process(
         image=subject,
         boost=4.0,
-        rope_grid="inside",
-        rope_horizontal="left",
-        rope_vertical="up",
-        semantic_role="subject image",
+        reference_fit="native",
+        placement_grid="inside",
+        grid_horizontal_position="left",
+        grid_vertical_position="up",
+        prompt_annotation="It is the subject image.",
         previous_references=scene_chain,
     )
 
     assert len(chain.entries) == 2
     assert chain.entries[1].boost == 4.0
-    assert not hasattr(chain.entries[1], "fit_to_latent")
     assert chain.entries[1].rope_position == "inside:left:up"
+    assert chain.entries[1].prompt_annotation == "It is the subject image."
+
+
+def test_visual_reference_crop_forces_inside_grid():
+    image = torch.zeros((1, 96, 96, 3))
+    (chain,) = CcCKrea2VisualReference().process(
+        image=image,
+        reference_fit="crop",
+        placement_grid="outside",
+        grid_horizontal_position="right",
+        grid_vertical_position="down",
+    )
+    entry = chain.entries[0]
+    assert entry.placement_grid == "inside"
+    assert entry.rope_position == "inside:right:down"
+
 
 
 def test_krea2_v12_fit_regression_for_1719x1164_reference_against_992_square_target():
