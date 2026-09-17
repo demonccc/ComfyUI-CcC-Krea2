@@ -1,10 +1,13 @@
 """Krea2 Edit pixel-space geometry.
 
-The ``fit`` path follows the proven Krea2Moodboard / Identity Edit v1.2 geometry:
-references are resampled in pixel space before VAE encoding. Near-matched aspect ratios
-fill the target via a minimal center-crop; genuine aspect-ratio mismatches preserve the
-complete source image and resize it to a /16-snapped fit-inside grid. ``crop`` remains the
-explicit legacy full-grid center-crop mode.
+Public CcC modes are intentionally simple:
+- crop: use the target grid as an inside crop window over the source; horizontal/vertical
+  grid position selects which source region survives. No intentional resize is performed.
+- resize: always scale proportionally (up or down) so the source longest edge matches the
+  target-grid longest edge, using the selected interpolation method.
+- native: preserve source pixels and only pad to minimum VAE alignment when required.
+
+Legacy fit/auto modes remain available internally for compatibility with older workflows/tests.
 """
 
 import math
@@ -38,6 +41,20 @@ def _floor16(value: float) -> int:
     return max(16, int(value) // 16 * 16)
 
 
+def _round16(value: float) -> int:
+    return max(16, int(round(float(value) / 16.0)) * 16)
+
+
+def _positioned_crop_offset(available: int, position: str) -> int:
+    if available <= 0:
+        return 0
+    if position in ("left", "up"):
+        return 0
+    if position in ("right", "down"):
+        return available
+    return available // 2
+
+
 def _crop_to_target_ar(src_h: int, src_w: int, tgt_h: int, tgt_w: int) -> Tuple[int, int, int, int]:
     src_ar = src_w / float(src_h)
     tgt_ar = tgt_w / float(tgt_h)
@@ -56,6 +73,9 @@ def resolve_krea2edit_geometry(
     tgt_h: int,
     tgt_w: int,
     fit_mode: str = "auto",
+    grid_horizontal_position: Optional[str] = None,
+    grid_vertical_position: Optional[str] = None,
+    resize_method: str = "bicubic",
 ) -> ResolvedGeometry:
     """Resolve reference geometry while preserving the Krea2Moodboard fit contract."""
     requested = fit_mode
@@ -84,7 +104,11 @@ def resolve_krea2edit_geometry(
             resolved = "fit"
     elif fit_mode == "fit":
         resolved = "exact" if (src_w, src_h) == (tgt_w, tgt_h) else ("crop_and_resize" if near_match else "fit")
-    elif fit_mode in ("crop", "contain", "native", "contain_no_upscale", "fit_no_upscale"):
+    elif fit_mode == "crop":
+        resolved = "crop_window" if grid_horizontal_position is not None or grid_vertical_position is not None else "crop"
+    elif fit_mode == "resize":
+        resolved = "resize"
+    elif fit_mode in ("contain", "native", "contain_no_upscale", "fit_no_upscale"):
         resolved = "contain_no_upscale" if fit_mode in ("contain_no_upscale", "fit_no_upscale") else fit_mode
     else:
         resolved = fit_mode
@@ -93,16 +117,37 @@ def resolve_krea2edit_geometry(
     top = 0
     crop_w = src_w
     crop_h = src_h
-    interpolation = "bicubic"
+    interpolation = resize_method
 
     if resolved == "exact":
         vae_w = tgt_w
         vae_h = tgt_h
         interpolation = "none" if (src_w, src_h) == (vae_w, vae_h) else "bicubic"
+    elif resolved == "crop_window":
+        # The target grid acts as a window inside the source. Position selects which
+        # source region is kept. Crop mode never uses outside placement and does not
+        # intentionally rescale pixels.
+        crop_w = _floor16(min(src_w, tgt_w))
+        crop_h = _floor16(min(src_h, tgt_h))
+        left = _positioned_crop_offset(src_w - crop_w, grid_horizontal_position or "center")
+        top = _positioned_crop_offset(src_h - crop_h, grid_vertical_position or "center")
+        vae_w = crop_w
+        vae_h = crop_h
+        interpolation = "none"
     elif resolved in ("crop", "crop_and_resize"):
+        # Legacy compatibility path.
         left, top, crop_w, crop_h = _crop_to_target_ar(src_h, src_w, tgt_h, tgt_w)
         vae_w = tgt_w
         vae_h = tgt_h
+    elif resolved == "resize":
+        # Always resize, preserving aspect ratio. The source longest edge is mapped to
+        # the target grid longest edge, regardless of whether that means up/down scaling.
+        target_longest = max(tgt_h, tgt_w)
+        source_longest = max(src_h, src_w)
+        resize_scale = target_longest / float(source_longest)
+        vae_h = _round16(src_h * resize_scale)
+        vae_w = _round16(src_w * resize_scale)
+        interpolation = resize_method
     elif resolved == "fit":
         # Match Krea2Moodboard exactly for genuine AR mismatches: preserve the complete
         # source image and resize it uniformly to a /16-snapped fit-inside grid. The
@@ -208,6 +253,9 @@ def resolve_visual_reference_fit(
     target_w: int,
     mode: str = "auto",
     mask: Optional[torch.Tensor] = None,
+    grid_horizontal_position: Optional[str] = None,
+    grid_vertical_position: Optional[str] = None,
+    resize_method: str = "bicubic",
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Dict[str, Any]]:
     if image.ndim == 3:
         image = image.unsqueeze(0)
@@ -217,6 +265,9 @@ def resolve_visual_reference_fit(
         tgt_h=target_h,
         tgt_w=target_w,
         fit_mode=mode,
+        grid_horizontal_position=grid_horizontal_position,
+        grid_vertical_position=grid_vertical_position,
+        resize_method=resize_method,
     )
     fit_img, fit_mask = process_image_and_mask_geometry(image, mask, geom)
     return fit_img, fit_mask, {
