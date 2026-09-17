@@ -23,9 +23,11 @@ class CcCKrea2VisualReference:
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one visual Krea2 Edit reference. Chaining order is the physical Krea2 reference order. "
-        "Fit mirrors the proven Krea2Moodboard fit-inside geometry and preserves the full source for genuine "
-        "aspect-ratio mismatches; crop (legacy) center-crops to the target aspect ratio and fills the complete "
-        "resolved target grid before VAE encoding. RoPE controls only coordinate placement."
+        "When semantic grounding is enabled, the role label and instruction explicitly bind that physical image "
+        "to its Qwen role in the positive edit prompt. Fit mirrors the proven Krea2Moodboard fit-inside geometry "
+        "and preserves the full source for genuine aspect-ratio mismatches; crop (legacy) center-crops to the "
+        "target aspect ratio and fills the complete resolved target grid before VAE encoding. RoPE controls only "
+        "coordinate placement."
     )
 
     @classmethod
@@ -43,8 +45,8 @@ class CcCKrea2VisualReference:
                     {
                         "default": "",
                         "tooltip": (
-                            "Metadata label for reports and higher-level routing. Identity appearance references stay "
-                            "positional in the Qwen stream; this label is not injected into Identity grounding text."
+                            "Explicit Qwen role label for this physical appearance reference when semantic grounding "
+                            "is enabled, for example 'scene image' or 'subject image'."
                         ),
                     },
                 ),
@@ -54,8 +56,8 @@ class CcCKrea2VisualReference:
                         "multiline": True,
                         "default": "",
                         "tooltip": (
-                            "Metadata instruction for higher-level routing. It is not injected into the positional "
-                            "Identity grounding stream; use Semantic Reference for explicit Qwen-only instructions."
+                            "Positive-Qwen instruction describing what this reference contributes. It is bound to "
+                            "this physical image together with semantic_role. The grounded negative remains image-only."
                         ),
                     },
                 ),
