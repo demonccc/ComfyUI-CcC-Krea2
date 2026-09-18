@@ -1,4 +1,4 @@
-"""Reference-cache contracts for CcC Krea2."""
+"""Reference-cache contracts for Krea2 CcC Edit."""
 
 from types import SimpleNamespace
 
