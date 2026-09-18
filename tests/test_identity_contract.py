@@ -1,4 +1,4 @@
-"""Regression contracts for the CcC Krea2 edit path."""
+"""Regression contracts for the Krea2 CcC Edit path."""
 
 import torch
 
