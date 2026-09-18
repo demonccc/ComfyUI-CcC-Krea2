@@ -1,4 +1,4 @@
-"""Tests for the current CcC reference chain and slot resolution."""
+"""Tests for the current Krea2 CcC Edit reference chain and slot resolution."""
 
 import pytest
 import torch
