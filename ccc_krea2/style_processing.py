@@ -18,6 +18,7 @@ class StyleSpanOperation:
     row_end: int
     style_fidelity: float
     indirect_style_transfer: bool
+    extract: str = "style"
 
 
 VALID_STYLE_PROCESSING_MODES = ("full", "2x2", "4x4")
@@ -75,11 +76,13 @@ def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tens
 def apply_statistical_style_fidelity(
     cond_tensor: torch.Tensor, spans_info: List[Union[StyleSpanOperation, Tuple[Tuple[int, int], float, bool]]]
 ) -> Tuple[torch.Tensor, bool, List[int]]:
-    """Apply Krea2 Moodboard statistical style fidelity and multi-span indirect row removal.
+    """Apply Krea2 Moodboard span processing and multi-span indirect row removal.
 
-    Fidelity Transform: output = fidelity * orig + (1.0 - fidelity) * target
-    Target: per-reference stats (mean, mean + std, mean - std) cycled across span visual rows.
-    Indirect: removes all designated indirect style vision rows in ONE operation using a single keep mask.
+    Fidelity/strength transform: output = fidelity * orig + (1.0 - fidelity) * target.
+    extract=style uses per-reference statistics (mean, mean + std, mean - std)
+    cycled across the visual rows. extract=subject uses Moodboard whitening
+    (span - mean) / std, removing style statistics while preserving token
+    structure/content/composition. Indirect removes designated vision rows after Qwen.
 
     Returns:
         (transformed_tensor, indirect_applied, removed_indices)
@@ -124,9 +127,20 @@ def apply_statistical_style_fidelity(
             span = z[:, start:end]  # (B, rows, 12, fused//12)
             mu = span.mean(dim=1, keepdim=True)
             sigma = span.std(dim=1, keepdim=True) + 1e-6
-            stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)  # (B, 3, 12, fused//12)
-            idx = torch.arange(end - start, device=span.device) % 3
-            target = stats[:, idx]
+
+            if op.extract == "subject":
+                # Exact Krea2Moodboard subject extraction: remove per-reference
+                # style statistics while retaining the spatial/content token structure.
+                target = (span - mu) / sigma
+            elif op.extract == "style":
+                stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)  # (B, 3, 12, fused//12)
+                idx = torch.arange(end - start, device=span.device) % 3
+                target = stats[:, idx]
+            else:
+                raise ValueError(
+                    f"Invalid Moodboard extract mode '{op.extract}'. Supported modes: 'style', 'subject'."
+                )
+
             z[:, start:end] = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
 
         if op.indirect_style_transfer:
