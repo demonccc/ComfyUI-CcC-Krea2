@@ -1,4 +1,4 @@
-"""Public CcC Krea2 reference-cache nodes."""
+"""Public Krea2 CcC Edit reference-cache nodes."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ class CcCKrea2ReferenceCacheCreate:
                 "semantic_resize": ("BOOLEAN", {"default": True}),
                 "semantic_grounding_px": (
                     "INT",
-                    {"default": 768, "min": 16, "max": 4096, "step": 16},
+                    {"default": 768, "min": 32, "max": 4096, "step": 32},
                 ),
                 "semantic_resize_method": (RESIZE_METHODS, {"default": "lanczos"}),
             }
@@ -96,7 +96,7 @@ class CcCKrea2ReferenceCacheSave:
     RETURN_NAMES = ("filename",)
     FUNCTION = "save"
     OUTPUT_NODE = True
-    DESCRIPTION = "Saves a CcC Krea2 reference cache as a portable safetensors file."
+    DESCRIPTION = "Saves a Krea2 CcC Edit reference cache as a portable safetensors file."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -142,13 +142,13 @@ class CcCKrea2ReferenceCacheSave:
 
 
 class CcCKrea2ReferenceCacheLoad:
-    """Load a portable CcC Krea2 reference cache."""
+    """Load a portable Krea2 CcC Edit reference cache."""
 
     CATEGORY = NODE_CATEGORY
     RETURN_TYPES = ("KREA2_REFERENCE_CACHE", "STRING")
     RETURN_NAMES = ("cache", "cache_info")
     FUNCTION = "load"
-    DESCRIPTION = "Loads a CcC Krea2 reference cache from models/krea2_ccc_cache."
+    DESCRIPTION = "Loads a Krea2 CcC Edit reference cache from models/krea2_ccc_cache."
 
     @classmethod
     def INPUT_TYPES(cls):
