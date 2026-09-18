@@ -85,7 +85,6 @@ def test_negative_conditioning_image_streams():
         target_latent=target_latent,
         positive_prompt="test",
         negative_prompt="blurry",
-        reference_method="krea2_edit",
     )
 
     # tokenize_calls[0] is positive, tokenize_calls[1] is negative
@@ -100,43 +99,3 @@ def test_negative_conditioning_image_streams():
     # Negative images: ONLY the 1 appearance ref
     assert len(neg_call["images"]) == 1
 
-
-def test_ostris_negative_stream_has_zero_images():
-    """Verify that Ostris negative Qwen stream has NO vision markers and NO images."""
-    model = DummyModel()
-    clip = DummyClip()
-    vae = DummyVAE()
-    target_latent = {"samples": torch.zeros((1, 16, 1, 32, 32))}
-
-    img = torch.rand(1, 256, 256, 3)
-    prep = prepare_vision_image(image=img, clip=clip, mode="native")
-
-    app_spec = ReferenceSpec(
-        reference_path="edit",
-        prepared_image=prep,
-        alias="subject",
-        appearance_reference=True,
-    )
-
-    chain = ReferenceChain((app_spec,))
-
-    run_krea2_edit_orchestrator(
-        model=model,
-        clip=clip,
-        vae=vae,
-        references=chain,
-        target_latent=target_latent,
-        positive_prompt="test",
-        negative_prompt="blurry",
-        reference_method="ostris_edit",
-    )
-
-    assert len(clip.tokenize_calls) == 2
-    pos_call = clip.tokenize_calls[0]
-    neg_call = clip.tokenize_calls[1]
-
-    assert len(pos_call["images"]) == 1
-
-    # Negative images must be zero for ostris edit
-    assert len(neg_call["images"]) == 0
-    assert "<|vision_start|>" not in neg_call["prompt"]
