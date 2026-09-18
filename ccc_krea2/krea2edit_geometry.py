@@ -1,13 +1,9 @@
-"""Krea2 Edit pixel-space geometry.
+"""Pixel-space geometry for CcC Krea2 visual references.
 
-Public CcC modes are intentionally simple:
-- crop: use the target grid as an inside crop window over the source; horizontal/vertical
-  grid position selects which source region survives. No intentional resize is performed.
-- resize: always scale proportionally (up or down) so the source longest edge matches the
-  target-grid longest edge, using the selected interpolation method.
+Public modes:
+- crop: use the target grid as an inside crop window over the source.
+- resize: scale proportionally to the target-grid longest edge.
 - native: preserve source pixels and only pad to minimum VAE alignment when required.
-
-Legacy fit/auto modes remain available internally for compatibility with older workflows/tests.
 """
 
 import math
@@ -77,7 +73,7 @@ def resolve_krea2edit_geometry(
     grid_vertical_position: Optional[str] = None,
     resize_method: str = "bicubic",
 ) -> ResolvedGeometry:
-    """Resolve reference geometry while preserving the Krea2Moodboard fit contract."""
+    """Resolve visual-reference geometry for the CcC Krea2 edit pipeline."""
     requested = fit_mode
     if fit_mode == "exact":
         fit_mode = "auto"
@@ -135,7 +131,7 @@ def resolve_krea2edit_geometry(
         vae_h = crop_h
         interpolation = "none"
     elif resolved in ("crop", "crop_and_resize"):
-        # Legacy compatibility path.
+        # Internal fit/crop path.
         left, top, crop_w, crop_h = _crop_to_target_ar(src_h, src_w, tgt_h, tgt_w)
         vae_w = tgt_w
         vae_h = tgt_h
@@ -149,7 +145,7 @@ def resolve_krea2edit_geometry(
         vae_w = _round16(src_w * resize_scale)
         interpolation = resize_method
     elif resolved == "fit":
-        # Match Krea2Moodboard exactly for genuine AR mismatches: preserve the complete
+        # For genuine aspect-ratio mismatches, preserve the complete
         # source image and resize it uniformly to a /16-snapped fit-inside grid. The
         # narrower reference grid is then centered inside the target by the runtime RoPE.
         vae_h = min(_floor16(src_h * scale), target_cap_h)
