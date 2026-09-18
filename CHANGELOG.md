@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Portable visual-reference caches using safetensors.
+- Cached raw VAE appearance latents for repeated target-specific edits.
+- Cached Qwen3-VL visual features (merged, grid and DeepStack) while preserving prompt-dependent language conditioning.
+- Cached Visual Reference node that mixes with normal ordered references.
+
 ### Changed
 
 - Consolidated Krea2 Edit around one CcC runtime.
