@@ -1,4 +1,4 @@
-"""Portable reference caches for CcC Krea2.
+"""Portable reference caches for Krea2 CcC Edit.
 
 A cache stores prompt-independent work only:
 - the raw VAE appearance latent for one target geometry;
@@ -46,11 +46,11 @@ class QwenVisualCache:
 
     def __post_init__(self) -> None:
         if not torch.is_tensor(self.merged) or self.merged.ndim != 2:
-            raise ValueError("[CcC Krea2] Qwen cache merged tensor must be 2D.")
+            raise ValueError("[Krea2 CcC Edit] Qwen cache merged tensor must be 2D.")
         if not torch.is_tensor(self.grid) or self.grid.ndim != 2 or self.grid.shape[-1] != 3:
-            raise ValueError("[CcC Krea2] Qwen cache grid must have shape N x 3.")
+            raise ValueError("[Krea2 CcC Edit] Qwen cache grid must have shape N x 3.")
         if not self.deepstack or not all(torch.is_tensor(t) and t.ndim == 2 for t in self.deepstack):
-            raise ValueError("[CcC Krea2] Qwen cache requires DeepStack tensors.")
+            raise ValueError("[Krea2 CcC Edit] Qwen cache requires DeepStack tensors.")
         object.__setattr__(self, "merged", self.merged.detach().cpu().contiguous().clone())
         object.__setattr__(self, "grid", self.grid.detach().cpu().contiguous().clone())
         object.__setattr__(
@@ -62,7 +62,7 @@ class QwenVisualCache:
 
 @dataclass(frozen=True)
 class CcCKrea2ReferenceCache:
-    """Portable cached representation of one CcC visual reference."""
+    """Portable cached representation of one Krea2 CcC Visual Reference."""
 
     appearance_latent: torch.Tensor
     geometry: ResolvedGeometry
@@ -71,7 +71,7 @@ class CcCKrea2ReferenceCache:
 
     def __post_init__(self) -> None:
         if not torch.is_tensor(self.appearance_latent) or self.appearance_latent.ndim not in (4, 5):
-            raise ValueError("[CcC Krea2] Cached appearance latent must be a 4D or 5D tensor.")
+            raise ValueError("[Krea2 CcC Edit] Cached appearance latent must be a 4D or 5D tensor.")
         object.__setattr__(
             self,
             "appearance_latent",
@@ -97,7 +97,7 @@ def _qwen_transformer(clip: Any) -> Any:
     transformer = getattr(encoder, "transformer", None)
     if transformer is None or not callable(getattr(transformer, "preprocess_embed", None)):
         raise ValueError(
-            "[CcC Krea2] Reference cache requires the Krea2 Qwen3-VL 4B encoder "
+            "[Krea2 CcC Edit] Reference cache requires the Krea2 Qwen3-VL 4B encoder "
             "with preprocess_embed support."
         )
     return transformer
@@ -158,7 +158,7 @@ def build_qwen_visual_cache(
         )
 
     if not isinstance(extra, dict) or "grid" not in extra or "deepstack" not in extra:
-        raise ValueError("[CcC Krea2] Qwen vision preprocessing did not return grid and DeepStack.")
+        raise ValueError("[Krea2 CcC Edit] Qwen vision preprocessing did not return grid and DeepStack.")
     deepstack = tuple(extra["deepstack"])
     return QwenVisualCache(
         merged=merged,
@@ -190,7 +190,7 @@ def use_cached_qwen_images(clip: Any, physical_images):
             current_model_type = str(getattr(transformer, "model_type", "qwen3vl_4b"))
             if cache.model_type != current_model_type:
                 raise ValueError(
-                    "[CcC Krea2] Cached Qwen model type does not match the loaded encoder: "
+                    "[Krea2 CcC Edit] Cached Qwen model type does not match the loaded encoder: "
                     f"{cache.model_type} != {current_model_type}."
                 )
             return cache.merged.to(device=device, copy=True), {
@@ -229,12 +229,12 @@ def create_reference_cache(
     if image.ndim == 3:
         image = image.unsqueeze(0)
     if image.ndim != 4 or image.shape[0] != 1:
-        raise ValueError("[CcC Krea2] Reference cache creation requires exactly one IMAGE.")
+        raise ValueError("[Krea2 CcC Edit] Reference cache creation requires exactly one IMAGE.")
     samples = target_latent.get("samples") if isinstance(target_latent, dict) else None
     if not torch.is_tensor(samples) or samples.ndim not in (4, 5):
-        raise ValueError("[CcC Krea2] Reference cache requires a valid target LATENT.")
+        raise ValueError("[Krea2 CcC Edit] Reference cache requires a valid target LATENT.")
     if vae is None or not callable(getattr(vae, "encode", None)):
-        raise ValueError("[CcC Krea2] Reference cache requires a Krea2-compatible VAE.")
+        raise ValueError("[Krea2 CcC Edit] Reference cache requires a Krea2-compatible VAE.")
 
     target_h = int(samples.shape[-2]) * 8
     target_w = int(samples.shape[-1]) * 8
@@ -259,7 +259,7 @@ def create_reference_cache(
     else:
         appearance = encoded
     if not torch.is_tensor(appearance):
-        raise ValueError("[CcC Krea2] VAE did not return a tensor reference latent.")
+        raise ValueError("[Krea2 CcC Edit] VAE did not return a tensor reference latent.")
 
     qwen = build_qwen_visual_cache(
         clip=clip,
@@ -298,7 +298,7 @@ def validate_cache_target(cache: CcCKrea2ReferenceCache, target_w: int, target_h
 
     if cache.target_size != (int(target_w), int(target_h)):
         raise ValueError(
-            "[CcC Krea2] Cached appearance geometry does not match the current target. "
+            "[Krea2 CcC Edit] Cached appearance geometry does not match the current target. "
             f"Cache: {cache.target_size[0]}x{cache.target_size[1]}, "
             f"target: {target_w}x{target_h}. Create another cache for this target geometry."
         )
@@ -362,7 +362,7 @@ def save_reference_cache(cache: CcCKrea2ReferenceCache, path: Path) -> None:
 
 
 def load_reference_cache(path: Path) -> CcCKrea2ReferenceCache:
-    """Load and validate a portable CcC reference cache."""
+    """Load and validate a portable Krea2 CcC Edit reference cache."""
 
     from safetensors import safe_open
     from safetensors.torch import load_file
@@ -372,11 +372,11 @@ def load_reference_cache(path: Path) -> CcCKrea2ReferenceCache:
         metadata = handle.metadata() or {}
     raw = metadata.get("ccc_krea2_cache")
     if not raw:
-        raise ValueError("[CcC Krea2] File is not a CcC reference cache.")
+        raise ValueError("[Krea2 CcC Edit] File is not a Krea2 CcC Edit reference cache.")
     payload = json.loads(raw)
     cache_meta = payload.get("cache", {})
     if cache_meta.get("format") != CACHE_FORMAT:
-        raise ValueError("[CcC Krea2] Unsupported reference cache format.")
+        raise ValueError("[Krea2 CcC Edit] Unsupported reference cache format.")
 
     qwen_meta = payload["qwen"]
     count = int(qwen_meta["deepstack_count"])
@@ -418,10 +418,10 @@ def resolve_cache_path(filename: str) -> Path:
     root = default_cache_directory().resolve()
     relative = Path(filename)
     if relative.is_absolute() or ".." in relative.parts:
-        raise ValueError("[CcC Krea2] Cache filename must be a safe relative path.")
+        raise ValueError("[Krea2 CcC Edit] Cache filename must be a safe relative path.")
     path = (root / relative).resolve()
     if root not in path.parents and path != root:
-        raise ValueError("[CcC Krea2] Cache path escapes the cache directory.")
+        raise ValueError("[Krea2 CcC Edit] Cache path escapes the cache directory.")
     if path.suffix.lower() != ".safetensors":
         path = path.with_suffix(".safetensors")
     return path
@@ -431,7 +431,7 @@ def format_reference_cache_info(cache: CcCKrea2ReferenceCache) -> str:
     geometry = cache.geometry
     return "\n".join(
         [
-            "CcC Krea2 Reference Cache",
+            "Krea2 CcC Edit Reference Cache",
             f"Source: {cache.metadata['source_width']} x {cache.metadata['source_height']}",
             f"Target: {cache.metadata['target_width']} x {cache.metadata['target_height']}",
             f"Appearance latent: {tuple(cache.appearance_latent.shape)} {cache.appearance_latent.dtype}",
