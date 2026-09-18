@@ -2,11 +2,11 @@
 
 ## Single Edit Runtime
 
-CcC Krea2 has one edit execution path.
+Krea2 CcC Edit has one edit execution path.
 
 ```text
 IMAGE -> Visual Reference ----+
-IMAGE -> Visual Reference ----+--> Edit --> CcC runtime --> Krea2
+IMAGE -> Visual Reference ----+--> Edit --> Krea2 CcC Edit runtime --> Krea2
 IMAGE -> Semantic Reference --+      ^
                                      |
 Size Resolver -> Latent -------------+
@@ -36,6 +36,12 @@ source image
 
 The Qwen image does not need to match target pixel geometry. The appearance image does use target geometry rules before VAE encoding.
 
+### Semantic grounding cadence
+
+Krea2 CcC Visual Reference exposes `semantic_grounding_px` as an integer with step 32. Krea2 CcC Semantic Reference and the semantic path in Krea2 CcC Latent use the same 32-pixel cadence. This matches Qwen3-VL's effective spatial alignment: 16-pixel vision patches with merge size 2.
+
+Values outside that cadence are not intrinsically invalid. For example, 380 px can still be processed, but Qwen aligns its effective visual grid to multiples of 32, so 384 px is the clearer equivalent for controlled experiments.
+
 ## Conditioning and runtime transport
 
 Appearance reference latents are attached to CONDITIONING together with per-reference runtime metadata:
@@ -45,7 +51,7 @@ Appearance reference latents are attached to CONDITIONING together with per-refe
 - neutral negative boost
 - RoPE placement
 
-The CcC runtime consumes that metadata and executes one in-context sequence:
+The Krea2 CcC Edit runtime consumes that metadata and executes one in-context sequence:
 
 ```text
 [text | reference 1 | reference 2 | ... | target]
@@ -89,7 +95,7 @@ Latent owns:
 
 ## Ownership
 
-The current public edit architecture is implemented by CcC modules only. External projects that influenced individual ideas or techniques are acknowledged separately in [NOTICE](NOTICE).
+The current public edit architecture is implemented by Krea2 CcC Edit modules only. External projects that influenced individual ideas or techniques are acknowledged separately in [NOTICE](NOTICE).
 
 ## Reference cache
 
@@ -104,9 +110,9 @@ source image
                                                                  |
 runtime                                                          |
    prompt --> Qwen language path <--- cached Qwen visual --------+
-   target --> CcC Krea2 runtime <--- cached appearance latent ---+
+   target --> Krea2 CcC Edit runtime <--- cached appearance latent ---+
 ```
 
 The final Qwen conditioning is always recomputed because it depends on the current prompt.
 
-The appearance latent is validated against the target geometry used to create it. Cached and uncached references converge on the same CONDITIONING/reference-latent transport and the same CcC edit runtime.
+The appearance latent is validated against the target geometry used to create it. Cached and uncached references converge on the same CONDITIONING/reference-latent transport and the same Krea2 CcC Edit runtime.
