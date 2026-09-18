@@ -1,4 +1,4 @@
-# Krea2 CcC Nodes
+# Krea2 CcC Edit Nodes
 
 ## Krea2 CcC Visual Reference
 
@@ -15,7 +15,7 @@ Declares one ordered appearance reference.
 | `resize_method` | lanczos, bicubic, bilinear, area | lanczos | Interpolation for resize mode. |
 | `semantic` | boolean | true | Also show the source image to Qwen. |
 | `semantic_resize` | boolean | true | Enable Qwen-only downscale when above the configured cap. |
-| `semantic_grounding_px` | 16 .. 4096 | 768 | Maximum Qwen longest edge when semantic resize is enabled. |
+| `semantic_grounding_px` | 32 .. 4096, step 32 | 768 | Maximum Qwen longest edge when semantic resize is enabled. |
 | `semantic_resize_method` | lanczos, bicubic, bilinear, area | lanczos | Qwen downscale interpolation. |
 | `prompt_annotation` | text | empty | Optional `Image N: ...` Qwen annotation. |
 
@@ -26,6 +26,10 @@ Declares one ordered appearance reference.
 - `native`: preserve source pixels except for minimum VAE alignment.
 
 Qwen preparation is independent from VAE geometry.
+
+`semantic_grounding_px` uses a step of 32 because Qwen3-VL effectively aligns visual processing to a 32-pixel spatial cadence (16-pixel vision patches with merge size 2). Values such as 380 are not invalid, but they are aligned internally to the same kind of grid, so using 384 makes the effective resolution explicit and experiments easier to compare.
+
+The same step-32 convention is used by `grounding_px` in **Krea2 CcC Semantic Reference** and `latent_grounding_px` in **Krea2 CcC Latent**.
 
 ## Krea2 CcC Semantic Reference
 
@@ -102,7 +106,7 @@ Execution:
 3. Resolve visual pixel geometry.
 4. VAE-encode appearance references.
 5. Attach reference latents and runtime metadata to CONDITIONING.
-6. Apply the single CcC Krea2 model patch.
+6. Apply the single Krea2 CcC Edit model patch.
 7. Execute [text | refs | target].
 ```
 
