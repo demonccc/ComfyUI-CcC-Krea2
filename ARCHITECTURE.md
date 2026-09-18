@@ -36,6 +36,12 @@ source image
 
 The Qwen image does not need to match target pixel geometry. The appearance image does use target geometry rules before VAE encoding.
 
+### Target megapixel policy
+
+Krea2 CcC Latent exposes convenience presets through 3.0 MP, but Krea2 CcC Edit does not treat 3.0 MP as a global model limit. Fixed dimensions and image-derived dimensions may resolve above that value when the user explicitly requests them.
+
+Megapixel limits that come from a specific LoRA, adapter or checkpoint must be treated as model-specific guidance, not enforced as a generic Krea2 CcC Edit restriction.
+
 ### Semantic grounding cadence
 
 Krea2 CcC Visual Reference exposes `semantic_grounding_px` as an integer with step 32. Krea2 CcC Semantic Reference and the semantic path in Krea2 CcC Latent use the same 32-pixel cadence. This matches Qwen3-VL's effective spatial alignment: 16-pixel vision patches with merge size 2.
