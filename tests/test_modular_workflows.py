@@ -15,7 +15,7 @@ def test_split_edit_nodes_are_registered_and_valid():
         assert hasattr(cls, "INPUT_TYPES")
         assert hasattr(cls, "RETURN_TYPES")
         assert hasattr(cls, "FUNCTION")
-        assert cls.CATEGORY == "CcC/Krea2"
+        assert cls.CATEGORY == "Krea2 CcC Edit"
 
 
 def test_reference_size_resolver_and_latent_socket_types_are_distinct():
