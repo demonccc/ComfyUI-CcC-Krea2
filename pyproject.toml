@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ComfyUI-CcC-Krea2"
 version = "0.1.0"
-description = "ComfyUI custom nodes for advanced Krea 2 reference-guided editing, including subject, outfit, scene and localized inpainting workflows."
+description = "ComfyUI custom nodes for Krea 2 reference-guided editing, reusable reference caches, LoRA utilities, and text-to-image workflows."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -19,7 +19,8 @@ classifiers = [
 ]
 dependencies = [
     "pillow>=9.5.0",
-    "einops>=0.7.0"
+    "einops>=0.7.0",
+    "safetensors>=0.4.0"
 ]
 
 [project.optional-dependencies]
