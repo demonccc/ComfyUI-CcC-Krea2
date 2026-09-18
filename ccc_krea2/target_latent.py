@@ -9,7 +9,7 @@ from .reference_specs import PreparedVisionImage, ReferenceChain
 from .geometry import resize_tensor
 
 
-EASY_GEOMETRY_HARD_CAP_MEGAPIXELS = 3.0
+EASY_GEOMETRY_PRESET_CEILING_MEGAPIXELS = 3.0
 EASY_ASPECT_RATIOS = ("auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
 
 
@@ -26,7 +26,7 @@ class TargetVisionContext:
 
 @dataclass(frozen=True)
 class SubjectAwareSceneGeometry:
-    """Scene-led target geometry that preserves Subject pixels until the hard cap requires fitting."""
+    """Scene-led target geometry that preserves Subject pixels until the geometry ceiling requires fitting."""
 
     target_height: int
     target_width: int
@@ -45,7 +45,7 @@ class SubjectAwareSceneGeometry:
 
 @dataclass(frozen=True)
 class CanvasAspectGeometry:
-    """Smallest selected-aspect canvas that contains its anchor until the hard cap is reached."""
+    """Smallest selected-aspect canvas that contains its anchor until the geometry ceiling is reached."""
 
     aspect_ratio: str
     target_height: int
@@ -98,9 +98,9 @@ def _scene_dimensions_at_pixel_budget(
 def calculate_subject_aware_scene_geometry(
     scene_image: torch.Tensor,
     subject_image: torch.Tensor,
-    max_megapixels: float = EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
+    max_megapixels: float = EASY_GEOMETRY_PRESET_CEILING_MEGAPIXELS,
 ) -> SubjectAwareSceneGeometry:
-    """Calculate Scene geometry while avoiding Subject downscale unless the hard cap makes it unavoidable."""
+    """Calculate Scene geometry while avoiding Subject downscale unless the geometry ceiling makes it unavoidable."""
     scene_height, scene_width = get_image_dims(scene_image)
     subject_height, subject_width = get_image_dims(subject_image)
     aligned_subject_width = max(16, int(math.ceil(subject_width / 16.0)) * 16)
@@ -164,7 +164,7 @@ def calculate_subject_aware_scene_geometry(
 def calculate_canvas_aspect_geometry(
     anchor_image: torch.Tensor,
     aspect_ratio: str,
-    max_megapixels: float = EASY_GEOMETRY_HARD_CAP_MEGAPIXELS,
+    max_megapixels: float = EASY_GEOMETRY_PRESET_CEILING_MEGAPIXELS,
 ) -> CanvasAspectGeometry:
     """Build a /16 canvas of the requested aspect that contains the anchor without resize when possible."""
     if aspect_ratio not in EASY_ASPECT_RATIOS:
