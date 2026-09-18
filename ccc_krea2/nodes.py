@@ -1,4 +1,4 @@
-"""ComfyUI Custom Node mappings for the CcC Krea2 suite."""
+"""ComfyUI custom node mappings for Krea2 CcC Edit."""
 
 from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
 from .t2i import CcCKrea2TextToImage
