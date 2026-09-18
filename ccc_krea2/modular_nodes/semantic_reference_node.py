@@ -19,7 +19,7 @@ class CcCKrea2SemanticReference:
     RETURN_TYPES = ("KREA2_SEMANTIC_REFERENCE_CHAIN",)
     RETURN_NAMES = ("semantic_references",)
     FUNCTION = "process"
-    DESCRIPTION = "Adds one Qwen-only semantic/style reference. semantic_only uses Krea2Moodboard subject extraction without adding a VAE/LoRA reference."
+    DESCRIPTION = "Adds one Qwen-only semantic/style reference. semantic_only extracts subject/content information without adding a VAE/LoRA reference."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -48,7 +48,7 @@ class CcCKrea2SemanticReference:
         previous_references: Optional[SemanticReferenceChain] = None,
     ) -> Tuple[SemanticReferenceChain]:
         chain = previous_references if previous_references is not None else SemanticReferenceChain()
-        # semantic_only mirrors Krea2Moodboard subject extraction. It must use the
+        # semantic_only extracts subject/content information. It must use the
         # full image so pose/composition/background remain available to Qwen.
         effective_processing = "full" if mode == "semantic_only" else processing
         entry = SemanticReferenceEntry(
