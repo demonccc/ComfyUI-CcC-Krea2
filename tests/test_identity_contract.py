@@ -8,8 +8,10 @@ from ccc_krea2.identity_contract import (
     build_grounded_positive_user_content,
 )
 from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
-from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _prepare_qwen_image
+from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _append_semantic, _prepare_qwen_image
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
+from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
+from ccc_krea2.reference_specs import ReferenceChain
 from ccc_krea2.patch import attach_reference_runtime_to_conditioning
 
 
@@ -128,6 +130,48 @@ def test_conditioning_runtime_keeps_positive_boost_and_negative_neutral():
     assert positive[0][1]["reference_rope_positions"] == ["inside:center:center"]
     assert negative[0][1]["reference_fit"] == [True]
     assert "reference_boosts" not in negative[0][1]
+
+
+def test_semantic_only_uses_moodboard_subject_extraction_without_appearance_latent():
+    image = torch.zeros((1, 512, 384, 3))
+    chain = _append_semantic(
+        chain=ReferenceChain(),
+        image=image,
+        clip=None,
+        instruction="Keep the complete scene semantics.",
+        grounding_px=768,
+        mode="semantic_only",
+        processing="2x2",
+        fidelity=0.5,
+    )
+
+    spec = chain[0]
+    assert spec.appearance_reference is False
+    assert spec.include_in_vision is True
+    assert spec.semantic_extract == "subject"
+    assert spec.semantic_strength == 0.5
+    assert "pose" in spec.vision_instruction
+    assert "surrounding people" in spec.vision_instruction
+    assert "background" in spec.vision_instruction
+    assert "Keep the complete scene semantics." in spec.vision_instruction
+
+
+def test_semantic_reference_forces_full_image_for_semantic_only():
+    node = CcCKrea2SemanticReference()
+    image = torch.zeros((1, 256, 256, 3))
+    (chain,) = node.process(
+        image=image,
+        mode="semantic_only",
+        instruction="",
+        grounding_px=768,
+        processing="4x4",
+        fidelity=0.5,
+    )
+    assert chain.entries[0].processing == "full"
+
+    required = CcCKrea2SemanticReference.INPUT_TYPES()["required"]
+    assert required["processing"][1]["default"] == "full"
+    assert required["fidelity"][1]["default"] == 0.5
 
 
 def test_public_edit_and_visual_reference_surfaces_match_refactored_contract():
