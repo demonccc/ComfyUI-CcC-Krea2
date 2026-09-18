@@ -108,7 +108,7 @@ def test_krea2_v12_fit_regression_for_1719x1164_reference_against_992_square_tar
     assert geom.whether_interpolation_occurred is True
 
 
-def test_rope_center_uses_current_integer_center_after_fit():
+def test_rope_center_preserves_fractional_center_after_fit():
     # VAE latent grids 124x82 (ref) and 124x124 (target) become DiT patch grids
     # 62x41 and 62x62 with Krea2 patch size 2.
     pos = build_incontext_3d_rope_pos_ids(
@@ -121,7 +121,7 @@ def test_rope_center_uses_current_integer_center_after_fit():
     )
 
     ref = pos[0, : 41 * 62]
-    assert ref[:, 1].min().item() == 10.0
+    assert ref[:, 1].min().item() == 10.5
     assert ref[:, 2].min().item() == 0.0
 
 
