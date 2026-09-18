@@ -51,6 +51,10 @@ class ReferenceSpec:
     visual_resize_method: str = "bicubic"
     rope_position: str = "none"  # "none", "up", "down", "left", "right"
 
+    # Qwen-only semantic extraction (Krea2Moodboard subject mechanics)
+    semantic_extract: str = "none"  # "none" or "subject"
+    semantic_strength: float = 1.0
+
     # Style-path parameters
     style_fidelity: float = 0.5
     style_processing: str = "2x2"  # "full", "2x2", "4x4"
