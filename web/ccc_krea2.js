@@ -54,6 +54,29 @@ app.registerExtension({
             }, 20);
         }
 
+        if (node.comfyClass === "CcCKrea2SemanticReference") {
+            const modeWidget = node.widgets?.find((w) => w.name === "mode");
+            const processingWidget = node.widgets?.find((w) => w.name === "processing");
+
+            const updateSemanticReferenceState = () => {
+                const semanticOnly = (modeWidget?.value ?? "semantic_only") === "semantic_only";
+                if (processingWidget) {
+                    processingWidget.disabled = semanticOnly;
+                    if (semanticOnly) processingWidget.value = "full";
+                }
+            };
+
+            if (modeWidget) {
+                const originalCallback = modeWidget.callback;
+                modeWidget.callback = function () {
+                    if (originalCallback) originalCallback.apply(this, arguments);
+                    updateSemanticReferenceState();
+                };
+            }
+
+            setTimeout(updateSemanticReferenceState, 20);
+        }
+
         if (node.comfyClass === "CcCKrea2Latent") {
             const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
             const contentWidget = node.widgets?.find((w) => w.name === "content");
