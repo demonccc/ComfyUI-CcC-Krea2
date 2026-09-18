@@ -1,4 +1,4 @@
-"""Core orchestrator engine for CcC Krea2 Edit."""
+"""Core orchestrator engine for Krea2 CcC Edit."""
 
 import torch
 from typing import Tuple, Dict, Any, Optional, List
@@ -63,7 +63,7 @@ def run_krea2_edit_orchestrator(
     for i in range(len(resolved_refs) - 1):
         if resolved_refs[i]["resolved_slot"] >= resolved_refs[i + 1]["resolved_slot"]:
             raise ValueError(
-                f"[CcC Krea2] Resolved references out of slot order: slot {resolved_refs[i]['resolved_slot']} "
+                f"[Krea2 CcC Edit] Resolved references out of slot order: slot {resolved_refs[i]['resolved_slot']} "
                 f"comes before slot {resolved_refs[i + 1]['resolved_slot']}."
             )
 
@@ -96,10 +96,10 @@ def run_krea2_edit_orchestrator(
             if is_appearance:
                 if cached_latent is not None:
                     if cached_geom is None:
-                        raise ValueError("[CcC Krea2] Cached appearance reference is missing geometry metadata.")
+                        raise ValueError("[Krea2 CcC Edit] Cached appearance reference is missing geometry metadata.")
                     if tuple(cached_geom.target_grid_size) != (lw, lh):
                         raise ValueError(
-                            "[CcC Krea2] Cached appearance geometry does not match the current target. "
+                            "[Krea2 CcC Edit] Cached appearance geometry does not match the current target. "
                             f"Cache latent grid: {cached_geom.target_grid_size[0]}x{cached_geom.target_grid_size[1]}, "
                             f"target latent grid: {lw}x{lh}."
                         )
@@ -108,7 +108,7 @@ def run_krea2_edit_orchestrator(
                     geom = cached_geom
                 else:
                     if spec.prepared_image is None:
-                        raise ValueError("[CcC Krea2] Visual reference is missing both image and cached appearance latent.")
+                        raise ValueError("[Krea2 CcC Edit] Visual reference is missing both image and cached appearance latent.")
                     src_img = spec.prepared_image.original_image
                     src_h, src_w = src_img.shape[1], src_img.shape[2]
                     fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
@@ -174,7 +174,7 @@ def run_krea2_edit_orchestrator(
                 vis_img = CachedQwenImage(cached_qwen)
             else:
                 if spec.prepared_image is None:
-                    raise ValueError("[CcC Krea2] Qwen reference is missing both image and cached visual features.")
+                    raise ValueError("[Krea2 CcC Edit] Qwen reference is missing both image and cached visual features.")
                 vis_img = spec.prepared_image.vision_image
 
             pos_idx = len(pos_qwen_images) + 1
@@ -239,7 +239,7 @@ def run_krea2_edit_orchestrator(
                 {"role": "style", "slot": slot, "spans": phys_range, "spec": spec, "ref_item": ref_item}
             )
 
-    # Format user content using the CcC grounded prompt contract.
+    # Format user content using the Krea2 CcC Edit grounded prompt contract.
     user_content = build_krea2_user_content(resolved_references=resolved_refs, user_prompt=pos_base)
     neg_user_content = build_krea2_negative_user_content(
         resolved_references=resolved_refs, user_negative_prompt=neg_base
@@ -276,8 +276,8 @@ def run_krea2_edit_orchestrator(
 
     # Step 7: Build edit_info report
     info_lines = [
-        "=== CcC Krea2 Edit Pipeline Report ===",
-        "Reference Contract: CcC Krea2 Edit",
+        "=== Krea2 CcC Edit Pipeline Report ===",
+        "Reference Contract: Krea2 CcC Edit",
         "Reference Transport: CONDITIONING reference_latents",
     ]
 
