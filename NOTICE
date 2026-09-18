@@ -1,7 +1,10 @@
 CcC Krea2 (ComfyUI-CcC-Krea2)
 Copyright (C) 2026 CcC Krea2 Contributors
 
-This project incorporates architectural concepts, reference implementations, and design patterns from the following open-source projects:
+CcC Krea2 is its own active implementation, but its development benefited from ideas,
+research, reference implementations, experiments, and design patterns published by the
+following open-source projects. These acknowledgements are intentionally kept here to
+credit the work that informed the project:
 
 1. ComfyUI by the ComfyUI project (comfyanonymous)
    https://github.com/comfyanonymous/ComfyUI
@@ -25,8 +28,11 @@ This project incorporates architectural concepts, reference implementations, and
 
 5. ai-toolkit by Ostris
    https://github.com/ostris/ai-toolkit
-   (Ostris edit backend architecture, timestep 0 reference token modulation, Picture N prompt structure)
+   Research/reference influence included edit-conditioning experiments, timestep-zero reference concepts, and image-number prompt structures.
    Licensed under the MIT License.
 
 This package is licensed under the GNU General Public License v3.0 (GPL-3.0).
 Model weights (Krea 2 checkpoints, Qwen3-VL text encoder, VAE, edit LoRAs) are separate works with their own respective licenses and are not distributed as part of this software package.
+
+
+The names above identify sources of inspiration, research, or licensed reference work. They do not describe alternate runtime backends in the current CcC architecture.
