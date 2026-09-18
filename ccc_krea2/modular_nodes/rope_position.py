@@ -63,8 +63,8 @@ def build_incontext_3d_rope_pos_ids(
         )
         grid, horizontal, vertical = resolve_rope_axes(position)
 
-        centered_x = float(max(0, (tgt_gw - r_gw) // 2))
-        centered_y = float(max(0, (tgt_gh - r_gh) // 2))
+        centered_x = max(0.0, (tgt_gw - r_gw) / 2.0)
+        centered_y = max(0.0, (tgt_gh - r_gh) / 2.0)
 
         if horizontal == "left":
             x_off = 0.0 if grid == "inside" else -float(r_gw)
