@@ -36,7 +36,7 @@ def get_style_processing_image_count(mode: str) -> int:
 
 
 def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tensor]:
-    """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using the CcC tile order."""
+    """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using the Krea2 CcC Semantic Reference tile order."""
     if mode not in VALID_STYLE_PROCESSING_MODES:
         raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
 
@@ -62,7 +62,7 @@ def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tens
             crop = image[:, y0:y1, x0:x1, :]
             crops.append(crop)
 
-    # Reorder tiles using the CcC semantic/style tile order
+    # Reorder tiles using the Krea2 CcC Semantic Reference tile order
     if mode == "2x2":
         shuffled = [crops[i] for i in SHUFFLE_2X2]
     elif mode == "4x4":
