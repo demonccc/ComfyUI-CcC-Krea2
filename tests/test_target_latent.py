@@ -376,9 +376,9 @@ def test_subject_aware_geometry_resizes_scene_to_hard_cap_before_fit_check():
         scene_image=_shape_only_image(2400, 1600),
         subject_image=_shape_only_image(1000, 1000),
     )
-    assert (plan.target_width, plan.target_height) == (1936, 1280)
+    assert (plan.target_width, plan.target_height) == (2112, 1408)
     assert plan.scene_was_downscaled is True
-    assert plan.max_megapixels == 2.5
+    assert plan.max_megapixels == 3.0
     assert plan.subject_requires_downscale is False
 
 
@@ -387,7 +387,7 @@ def test_subject_aware_geometry_uses_full_hard_cap_when_expansion_from_small_sce
         scene_image=_shape_only_image(1200, 800),
         subject_image=_shape_only_image(1400, 1600),
     )
-    assert (plan.target_width, plan.target_height) == (1936, 1280)
+    assert (plan.target_width, plan.target_height) == (2128, 1408)
     assert plan.scene_was_downscaled is False
     assert plan.latent_was_expanded is True
     assert plan.latent_was_capped is True
@@ -399,7 +399,7 @@ def test_subject_aware_geometry_downscales_subject_only_when_hard_cap_canvas_can
         scene_image=_shape_only_image(2400, 1600),
         subject_image=_shape_only_image(1400, 1600),
     )
-    assert (plan.target_width, plan.target_height) == (1936, 1280)
+    assert (plan.target_width, plan.target_height) == (2112, 1408)
     assert plan.scene_was_downscaled is True
     assert plan.latent_was_expanded is False
     assert plan.latent_was_capped is True
@@ -441,6 +441,6 @@ def test_canvas_aspect_only_downscales_anchor_after_hard_cap():
         anchor_image=_shape_only_image(2000, 1600),
         aspect_ratio="1:1",
     )
-    assert (plan.target_width, plan.target_height) == (1568, 1568)
+    assert (plan.target_width, plan.target_height) == (1728, 1728)
     assert plan.latent_was_capped is True
     assert plan.anchor_requires_downscale is True
