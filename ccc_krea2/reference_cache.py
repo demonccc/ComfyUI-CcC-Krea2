@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from types import MappingProxyType
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Mapping, Tuple
 
 import torch
 
