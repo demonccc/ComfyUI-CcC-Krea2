@@ -15,7 +15,7 @@ def _resolve_size(long_edge_image: torch.Tensor, aspect_ratio_image: torch.Tenso
     long_edge = max(size_w, size_h)
     ratio = aspect_w / float(aspect_h)
     if ratio <= 0:
-        raise ValueError("[CcC Krea2] Aspect ratio reference must have valid dimensions.")
+        raise ValueError("[Krea2 CcC Edit] Aspect ratio reference must have valid dimensions.")
 
     if ratio >= 1.0:
         width = long_edge
