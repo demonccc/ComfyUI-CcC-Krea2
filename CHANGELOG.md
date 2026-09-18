@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- `Semantic Reference / semantic_only` now uses Krea2Moodboard-style `subject` extraction on the Qwen vision span, full-image processing, a content/composition directive, and no VAE/LoRA reference latent. Default semantic fidelity/strength is `0.5`.
 - Removed Easy Edit and the previous simple/Advanced Edit public surfaces.
 - Split Edit responsibilities into Visual Reference, Semantic Reference, Size Resolver, Latent, and Edit nodes.
 - Visual Reference exposes independent RoPE grid/horizontal/vertical controls.
