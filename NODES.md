@@ -45,6 +45,8 @@ Semantic references do not create VAE reference latents.
 
 `semantic_only` uses the full image and applies semantic extraction only to that image's Qwen span. `fidelity` controls how strongly the transformed span differs from the raw Qwen representation.
 
+`grounding_px` is an integer with step 32 and defaults to 768. The step follows Qwen3-VL's effective 32-pixel visual grid cadence.
+
 ## Krea2 CcC Size Resolver
 
 Inputs:
@@ -81,6 +83,8 @@ Image fit:
 - `stretch`
 
 Final dimensions are aligned to multiples of 16.
+
+When latent semantic guidance is enabled, `latent_grounding_px` is an integer with step 32 and defaults to 768, matching the same Qwen3-VL visual-grid cadence used by Krea2 CcC Visual Reference and Krea2 CcC Semantic Reference.
 
 ## Krea2 CcC Edit
 
@@ -122,7 +126,7 @@ Negative text is fixed empty by the edit contract. Appearance images remain avai
 
 Precomputes one visual reference.
 
-Inputs include the source image, Krea2 CLIP, VAE, target latent, appearance geometry controls, and semantic grounding controls.
+Inputs include the source image, Krea2 CLIP, VAE, target latent, appearance geometry controls, and semantic grounding controls. `semantic_grounding_px` uses the same integer step-32 convention as Krea2 CcC Visual Reference.
 
 Outputs:
 
