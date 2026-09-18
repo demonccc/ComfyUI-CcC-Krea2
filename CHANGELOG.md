@@ -11,7 +11,9 @@
 
 ### Changed
 
-- Consolidated Krea2 Edit around one CcC runtime.
+- Standardized semantic grounding controls on a 32-pixel cadence to match Qwen3-VL visual grid alignment.
+
+- Consolidated Krea2 CcC Edit around one Krea2 CcC Edit runtime.
 - Removed runtime delegation to other installed custom nodes.
 - Removed alternate edit backends and compatibility-only execution paths.
 - Removed obsolete Subject, Scene, Outfit, Style and generic Reference public-node implementations that were no longer registered.
@@ -25,4 +27,4 @@
 - Semantic-only references remain Qwen-only and do not add VAE reference latents.
 - Size Resolver outputs only width and height.
 - Latent owns final target dimensions, /16 alignment and optional target content.
-- Documentation now describes only the current CcC architecture. Attribution and project influences remain in NOTICE.
+- Documentation now describes only the current Krea2 CcC Edit architecture. Attribution and project influences remain in NOTICE.
