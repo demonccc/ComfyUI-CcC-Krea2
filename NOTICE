@@ -31,6 +31,12 @@ credit the work that informed the project:
    Research/reference influence included edit-conditioning experiments, timestep-zero reference concepts, and image-number prompt structures.
    Licensed under the MIT License.
 
+6. ComfyUI-Krea2IdentityMod by ArtemKo7v
+   https://github.com/ArtemKo7v/ComfyUI-Krea2IdentityMod
+   Reference-cache inspiration included portable raw VAE appearance latents and the
+   Qwen3-VL prompt-independent visual cache boundary (merged, grid, DeepStack).
+   Licensed under the Apache License, Version 2.0 (Apache-2.0).
+
 This package is licensed under the GNU General Public License v3.0 (GPL-3.0).
 Model weights (Krea 2 checkpoints, Qwen3-VL text encoder, VAE, edit LoRAs) are separate works with their own respective licenses and are not distributed as part of this software package.
 
