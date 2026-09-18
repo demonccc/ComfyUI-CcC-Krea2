@@ -1,4 +1,4 @@
-"""Typed data structures for Qwen Vision preparation and CcC Krea2 references."""
+"""Typed data structures for Qwen Vision preparation and Krea2 CcC Edit references."""
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple
@@ -33,7 +33,7 @@ class PreparedVisionImage:
 
 @dataclass(frozen=True)
 class ReferenceSpec:
-    """Declarative reference used by the CcC Krea2 edit pipeline."""
+    """Declarative reference used by the Krea2 CcC Edit pipeline."""
 
     reference_path: str = "edit"
     prepared_image: Optional[PreparedVisionImage] = None
