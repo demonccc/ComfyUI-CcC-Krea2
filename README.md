@@ -102,6 +102,33 @@ references
 
 Reference ordering is preserved physically.
 
+## Reference Cache
+
+CcC can precompute and persist one visual reference as a portable `.safetensors` cache.
+
+The cache contains two prompt-independent payloads:
+
+- the raw VAE appearance latent for the target geometry used during cache creation;
+- Qwen3-VL visual features: `merged`, `grid`, and all DeepStack tensors.
+
+The prompt-dependent Qwen language path is never cached. A new prompt still produces new conditioning while reusing the cached visual features.
+
+Public cache nodes:
+
+- **Krea2 CcC Reference Cache Create**
+- **Krea2 CcC Reference Cache Save**
+- **Krea2 CcC Reference Cache Load**
+- **Krea2 CcC Cached Visual Reference**
+
+Cached and normal visual references can be mixed in the same ordered reference chain. Runtime controls such as boost, RoPE placement, semantic enablement, and prompt annotation remain adjustable after loading the cache.
+
+Appearance cache geometry is target-specific. If the output geometry changes, create another appearance cache for that target. The Qwen payload itself is prompt-independent.
+
+The cache design was informed by **ComfyUI-Krea2IdentityMod** by ArtemKo7v:
+https://github.com/ArtemKo7v/ComfyUI-Krea2IdentityMod
+
+In particular, that project demonstrated the usefulness of persisting raw appearance latents and identified the Qwen3-VL visual cache boundary that requires `merged + grid + deepstack`, rather than caching final prompt-conditioned conditioning.
+
 ## Test Workflow
 
 The repository contains one current edit workflow:

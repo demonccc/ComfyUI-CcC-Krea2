@@ -1,7 +1,7 @@
 """Typed declarative inputs for the split Krea2 Edit nodes."""
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 import torch
 
@@ -10,7 +10,8 @@ import torch
 class VisualReferenceEntry:
     """One visual edit reference before Qwen/VAE preparation."""
 
-    image: torch.Tensor
+    image: Optional[torch.Tensor] = None
+    cache: Optional[Any] = None
     boost: float = 1.0
     reference_fit: str = "native"
     placement_grid: str = "inside"

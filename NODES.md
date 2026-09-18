@@ -113,3 +113,39 @@ Negative text is fixed empty by the edit contract. Appearance images remain avai
 - `CcC Krea2 - LoRA Prompt Settings`
 - `CcC Krea2 - LoRA Stack`
 - `CcC Krea2 - Text to Image`
+
+## Krea2 CcC Reference Cache Create
+
+Precomputes one visual reference.
+
+Inputs include the source image, Krea2 CLIP, VAE, target latent, appearance geometry controls, and semantic grounding controls.
+
+Outputs:
+
+- `cache`
+- `cache_info`
+
+The cache stores the raw VAE appearance latent plus Qwen visual features. It does not store final prompt-dependent conditioning.
+
+## Krea2 CcC Reference Cache Save / Load
+
+Save writes portable `.safetensors` files under:
+
+```text
+ComfyUI/models/krea2_ccc_cache/
+```
+
+Load restores the cached tensors and metadata.
+
+## Krea2 CcC Cached Visual Reference
+
+Adds a loaded or newly created cache to the normal visual-reference chain.
+
+Runtime controls remain editable:
+
+- `boost`
+- RoPE placement
+- semantic enable/disable
+- `prompt_annotation`
+
+No VAE encode or Qwen Vision execution is required for a cached reference.

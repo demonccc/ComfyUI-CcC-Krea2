@@ -90,3 +90,23 @@ Latent owns:
 ## Ownership
 
 The current public edit architecture is implemented by CcC modules only. External projects that influenced individual ideas or techniques are acknowledged separately in [NOTICE](NOTICE).
+
+## Reference cache
+
+Reference caching is an optimization layer, not a second runtime.
+
+```text
+source image
+   |
+   +--> appearance preparation --> VAE --> appearance_latent ----+
+   |                                                             |
+   +--> Qwen visual path --> merged + grid + deepstack ----------+--> cache.safetensors
+                                                                 |
+runtime                                                          |
+   prompt --> Qwen language path <--- cached Qwen visual --------+
+   target --> CcC Krea2 runtime <--- cached appearance latent ---+
+```
+
+The final Qwen conditioning is always recomputed because it depends on the current prompt.
+
+The appearance latent is validated against the target geometry used to create it. Cached and uncached references converge on the same CONDITIONING/reference-latent transport and the same CcC edit runtime.

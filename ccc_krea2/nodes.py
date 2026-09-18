@@ -7,6 +7,12 @@ from .modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
 from .modular_nodes.latent_node import CcCKrea2Latent
 from .modular_nodes.edit_node import CcCKrea2Edit
+from .modular_nodes.cache_nodes import (
+    CcCKrea2ReferenceCacheCreate,
+    CcCKrea2ReferenceCacheSave,
+    CcCKrea2ReferenceCacheLoad,
+    CcCKrea2CachedVisualReference,
+)
 
 
 NODE_CLASS_MAPPINGS = {
@@ -15,6 +21,10 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2SizeResolver": CcCKrea2SizeResolver,
     "CcCKrea2Latent": CcCKrea2Latent,
     "CcCKrea2Edit": CcCKrea2Edit,
+    "CcCKrea2ReferenceCacheCreate": CcCKrea2ReferenceCacheCreate,
+    "CcCKrea2ReferenceCacheSave": CcCKrea2ReferenceCacheSave,
+    "CcCKrea2ReferenceCacheLoad": CcCKrea2ReferenceCacheLoad,
+    "CcCKrea2CachedVisualReference": CcCKrea2CachedVisualReference,
     "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
     "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
     "CcCKrea2TextToImage": CcCKrea2TextToImage,
@@ -27,6 +37,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2SizeResolver": "Krea2 CcC Size Resolver",
     "CcCKrea2Latent": "Krea2 CcC Latent",
     "CcCKrea2Edit": "Krea2 CcC Edit",
+    "CcCKrea2ReferenceCacheCreate": "Krea2 CcC Reference Cache Create",
+    "CcCKrea2ReferenceCacheSave": "Krea2 CcC Reference Cache Save",
+    "CcCKrea2ReferenceCacheLoad": "Krea2 CcC Reference Cache Load",
+    "CcCKrea2CachedVisualReference": "Krea2 CcC Cached Visual Reference",
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
     "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
