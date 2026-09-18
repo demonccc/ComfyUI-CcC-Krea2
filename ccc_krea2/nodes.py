@@ -7,6 +7,7 @@ from .modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
 from .modular_nodes.latent_node import CcCKrea2Latent
 from .modular_nodes.edit_node import CcCKrea2Edit
+from .modular_nodes.character_sheet_node import CcCKrea2CharacterSheet
 from .modular_nodes.cache_nodes import (
     CcCKrea2ReferenceCacheCreate,
     CcCKrea2ReferenceCacheSave,
@@ -21,6 +22,7 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2SizeResolver": CcCKrea2SizeResolver,
     "CcCKrea2Latent": CcCKrea2Latent,
     "CcCKrea2Edit": CcCKrea2Edit,
+    "CcCKrea2CharacterSheet": CcCKrea2CharacterSheet,
     "CcCKrea2ReferenceCacheCreate": CcCKrea2ReferenceCacheCreate,
     "CcCKrea2ReferenceCacheSave": CcCKrea2ReferenceCacheSave,
     "CcCKrea2ReferenceCacheLoad": CcCKrea2ReferenceCacheLoad,
@@ -37,6 +39,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2SizeResolver": "Krea2 CcC Size Resolver",
     "CcCKrea2Latent": "Krea2 CcC Latent",
     "CcCKrea2Edit": "Krea2 CcC Edit",
+    "CcCKrea2CharacterSheet": "Krea2 CcC Character Sheet",
     "CcCKrea2ReferenceCacheCreate": "Krea2 CcC Reference Cache Create",
     "CcCKrea2ReferenceCacheSave": "Krea2 CcC Reference Cache Save",
     "CcCKrea2ReferenceCacheLoad": "Krea2 CcC Reference Cache Load",
