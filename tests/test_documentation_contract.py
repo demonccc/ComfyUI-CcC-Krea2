@@ -1,4 +1,4 @@
-"""Documentation contract for the current CcC Krea2 architecture."""
+"""Documentation contract for the current Krea2 CcC Edit architecture."""
 
 from pathlib import Path
 
@@ -12,13 +12,16 @@ def test_readme_documents_current_split_edit_and_single_runtime():
     assert "Krea2 CcC Visual Reference" in readme
     assert "Krea2 CcC Semantic Reference" in readme
     assert "Krea2 CcC Edit" in readme
-    assert "one CcC edit runtime" in readme
+    assert "one Krea2 CcC Edit runtime" in readme
     assert "workflows/01_scene_subject.json" in readme
 
 
 def test_nodes_doc_matches_current_visual_and_semantic_controls():
     nodes = _read("NODES.md")
     assert "semantic_grounding_px" in nodes
+    assert "step 32" in nodes
+    assert "380" in nodes
+    assert "384" in nodes
     assert "prompt_annotation" in nodes
     assert "semantic_only" in nodes
     assert "Krea2 CcC Semantic Reference" in nodes
