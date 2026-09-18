@@ -1,4 +1,4 @@
-"""CcC Krea2 LoRA Stack and LoRA Prompt Settings custom nodes."""
+"""CcC Krea2 - LoRA Stack and CcC Krea2 - LoRA Prompt Settings nodes."""
 
 import logging
 from typing import Tuple, Optional, Any, List
