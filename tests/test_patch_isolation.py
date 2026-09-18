@@ -16,8 +16,7 @@ class DummyModel:
 def test_patch_isolation():
     original = DummyModel()
 
-    # Apply canonical patch call: patch_krea2_model(model, prepared_refs)
-    patched = patch_krea2_model(original, prepared_refs=[])
+    patched = patch_krea2_model(original)
 
     # Verify original is completely unpatched and pristine
     assert "transformer_options" not in original.model_options
