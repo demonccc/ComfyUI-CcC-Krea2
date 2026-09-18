@@ -11,6 +11,8 @@
 
 ### Changed
 
+- Extended Krea2 CcC Latent presets and generic geometry helpers to 3.0 MP without imposing a LoRA-specific hard limit on the node.
+
 - Standardized semantic grounding controls on a 32-pixel cadence to match Qwen3-VL visual grid alignment.
 
 - Consolidated Krea2 CcC Edit around one Krea2 CcC Edit runtime.
