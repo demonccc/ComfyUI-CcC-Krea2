@@ -6,10 +6,11 @@ from pathlib import Path
 def test_visual_reference_semantic_widgets_are_conditionally_disabled():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
     assert 'node.comfyClass === "CcCKrea2VisualReference"' in js
-    assert '["semantic_role", "instruction", "grounding_px"]' in js
-    assert "widget.disabled = !enabled" in js
-    assert "CcCKrea2EasyEdit" not in js
-    assert "CcCKrea2EditAdvanced" not in js
+    assert 'w.name === "semantic"' in js
+    assert 'setDisabled("semantic_resize", !enabled)' in js
+    assert 'setDisabled("semantic_grounding_px", !resizeEnabled)' in js
+    assert 'setDisabled("semantic_resize_method", !resizeEnabled)' in js
+    assert 'setDisabled("prompt_annotation", !enabled)' in js
 
 
 def test_js_syntax_validation():
