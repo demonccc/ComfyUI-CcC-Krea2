@@ -36,7 +36,7 @@ def get_style_processing_image_count(mode: str) -> int:
 
 
 def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tensor]:
-    """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using upstream Moodboard shuffled orders."""
+    """Slice an input image tensor into full image, 2x2 crops, or 4x4 tiles using the CcC tile order."""
     if mode not in VALID_STYLE_PROCESSING_MODES:
         raise ValueError(f"Invalid style_processing mode '{mode}'. Supported modes: 'full', '2x2', '4x4'.")
 
@@ -62,7 +62,7 @@ def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tens
             crop = image[:, y0:y1, x0:x1, :]
             crops.append(crop)
 
-    # Reorder according to upstream Moodboard shuffle arrays
+    # Reorder tiles using the CcC semantic/style tile order
     if mode == "2x2":
         shuffled = [crops[i] for i in SHUFFLE_2X2]
     elif mode == "4x4":
@@ -76,13 +76,13 @@ def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tens
 def apply_statistical_style_fidelity(
     cond_tensor: torch.Tensor, spans_info: List[Union[StyleSpanOperation, Tuple[Tuple[int, int], float, bool]]]
 ) -> Tuple[torch.Tensor, bool, List[int]]:
-    """Apply Krea2 Moodboard span processing and multi-span indirect row removal.
+    """Apply semantic/style span processing and optional indirect row removal.
 
     Fidelity/strength transform: output = fidelity * orig + (1.0 - fidelity) * target.
     extract=style uses per-reference statistics (mean, mean + std, mean - std)
-    cycled across the visual rows. extract=subject uses Moodboard whitening
-    (span - mean) / std, removing style statistics while preserving token
-    structure/content/composition. Indirect removes designated vision rows after Qwen.
+    cycled across visual rows. extract=subject whitens the reference span
+    to reduce style statistics while preserving token structure/content/composition.
+    Indirect processing removes designated vision rows after Qwen.
 
     Returns:
         (transformed_tensor, indirect_applied, removed_indices)
@@ -129,7 +129,7 @@ def apply_statistical_style_fidelity(
             sigma = span.std(dim=1, keepdim=True) + 1e-6
 
             if op.extract == "subject":
-                # Exact Krea2Moodboard subject extraction: remove per-reference
+                # Subject extraction removes per-reference
                 # style statistics while retaining the spatial/content token structure.
                 target = (span - mu) / sigma
             elif op.extract == "style":
@@ -138,7 +138,7 @@ def apply_statistical_style_fidelity(
                 target = stats[:, idx]
             else:
                 raise ValueError(
-                    f"Invalid Moodboard extract mode '{op.extract}'. Supported modes: 'style', 'subject'."
+                    f"Invalid semantic extract mode '{op.extract}'. Supported modes: 'style', 'subject'."
                 )
 
             z[:, start:end] = op.style_fidelity * span + (1.0 - op.style_fidelity) * target

@@ -95,7 +95,7 @@ def build_krea2_negative_user_content(
     """Build canonical Qwen user content for negative prompt using ONLY non-Style appearance edit references.
 
     Includes only references where reference_path != 'style' and appearance_reference is True.
-    Matches exact count and order of neg_qwen_images for krea2_edit/native backends.
+    Matches the exact count and order of negative Qwen appearance images.
     """
     blocks = []
     for item in resolved_references:
@@ -230,7 +230,7 @@ def build_annotated_user_prompt(
 
 
 def build_role_instructions(role_order: List[ReferenceRole]) -> str:
-    """Legacy helper building Qwen3-VL system prompt role instructions from active image order."""
+    """Build Qwen3-VL role instructions from active image order."""
     if not role_order:
         return ""
 
@@ -543,7 +543,7 @@ def encode_krea2_qwen_context(
                         f"exceeds encoded conditioning sequence length ({pos_rows_before})."
                     )
 
-    # Apply Krea2Moodboard-compatible post-Qwen processing to positive vision spans.
+    # Apply CcC semantic/style post-processing to positive Qwen vision spans.
     # Style refs use style extraction; semantic_only refs use subject extraction so
     # content/composition survive without becoming an additional VAE/LoRA reference.
     if is_positive and conditioning and physical_image_map:
@@ -642,7 +642,7 @@ def encode_krea2_conditioning(
     grounding_images: List[Any],
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
 ) -> Tuple[List[Any], List[Any]]:
-    """Legacy helper encoding Qwen3-VL text and vision tokens for Positive and Negative conditionings."""
+    """Encode Qwen3-VL text and vision tokens for positive and negative conditioning."""
     if clip is None:
         raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
 

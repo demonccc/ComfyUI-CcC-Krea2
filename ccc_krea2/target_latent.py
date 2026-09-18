@@ -560,7 +560,6 @@ def build_target_latent(
     if target_width is not None and target_height is not None:
         target_w = max(128, int(target_width) // 16 * 16)
         target_h = max(128, int(target_height) // 16 * 16)
-        active_mp = (target_w * target_h) / 1_000_000.0
         geom_src = f"{geom_src}_explicit_target"
 
     latent_h = target_h // 8

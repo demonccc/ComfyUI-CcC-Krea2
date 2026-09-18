@@ -1,4 +1,4 @@
-"""Regression contracts for Krea2 Identity Edit v1.2."""
+"""Regression contracts for the CcC Krea2 edit path."""
 
 import torch
 
@@ -132,7 +132,7 @@ def test_conditioning_runtime_keeps_positive_boost_and_negative_neutral():
     assert "reference_boosts" not in negative[0][1]
 
 
-def test_semantic_only_uses_moodboard_subject_extraction_without_appearance_latent():
+def test_semantic_only_uses_subject_extraction_without_appearance_latent():
     image = torch.zeros((1, 512, 384, 3))
     chain = _append_semantic(
         chain=ReferenceChain(),

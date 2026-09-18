@@ -1,10 +1,10 @@
 # ComfyUI-CcC-Krea2
 
-CcC nodes for Krea 2 generation and editing in ComfyUI.
+CcC nodes for Krea 2 generation and reference-guided editing in ComfyUI.
 
 ## Current Edit Architecture
 
-The Edit surface is split into focused nodes:
+The edit pipeline is intentionally split into a small set of focused nodes:
 
 - **Krea2 CcC Visual Reference**
 - **Krea2 CcC Semantic Reference**
@@ -12,96 +12,101 @@ The Edit surface is split into focused nodes:
 - **Krea2 CcC Latent**
 - **Krea2 CcC Edit**
 
+There is one CcC edit runtime. Visual references, semantic references, target latent construction, conditioning and model patching all converge on that runtime.
+
+```text
+Visual Reference ----+
+Visual Reference ----+--> Krea2 CcC Edit --> MODEL / CONDITIONING / LATENT
+Semantic Reference --+          ^
+                                |
+Size Resolver --> Latent -------+
+```
+
 ### Visual Reference
 
-Use one node per visual Krea2 Edit reference and chain them in physical reference order.
+Use one node per ordered appearance reference.
 
-The VAE pixel path has three explicit modes:
+The VAE path exposes three modes:
 
-- `crop`: use the target grid as an inside crop window over the source. `grid_horizontal_position` and `grid_vertical_position` select the retained source region. Outside placement is disabled for crop.
-- `resize`: always resize up or down while preserving aspect ratio; the source longest edge is mapped to the target-grid longest edge. Interpolation is selectable.
-- `native`: preserve source size and pixels, with only minimum VAE alignment when required.
+- `crop`: the target grid acts as an inside crop window over the source.
+- `resize`: resize proportionally so the source longest edge matches the target-grid longest edge.
+- `native`: preserve source pixels, applying only minimum VAE alignment when required.
 
-RoPE placement remains explicit through `placement_grid` (`inside` / `outside`), horizontal (`center` / `left` / `right`) and vertical (`center` / `up` / `down`) controls.
+RoPE placement is controlled independently through `placement_grid`, horizontal position and vertical position.
 
-Qwen is independent from the VAE path. `semantic` decides whether the same image is also sent to Qwen. When `semantic_resize` is enabled, the Qwen copy is downscaled only if it exceeds `semantic_grounding_px`; smaller images are never upscaled. `semantic_resize_method` selects the downscale method.
+The Qwen path is independent from VAE geometry. `semantic` controls whether the same source image is also shown to Qwen. When `semantic_resize` is enabled, the Qwen copy is downscaled only when it exceeds `semantic_grounding_px`; smaller images are not upscaled.
 
-`prompt_annotation` is optional and is appended as `Image N: <annotation>`. This allows lightweight guidance such as `Image 1: It is the scene image, only pay attention to the buildings.` without forcing a fixed scene/subject role model.
+`prompt_annotation` optionally adds `Image N: <annotation>` after the physical vision prefix.
 
-`boost` applies to the positive pass. The grounded negative uses the same reference images with boost fixed to `1.0`.
+`boost` applies to the positive pass. The grounded negative uses the same appearance references with neutral boost `1.0`.
 
 ### Semantic Reference
 
-`Krea2 CcC Semantic Reference` is Qwen-only and does not add another Identity Edit VAE/LoRA reference.
+Semantic Reference is Qwen-only. It does not create a visual/VAE reference latent.
 
-For `mode = semantic_only`, CcC now mirrors the Krea2Moodboard `extract=subject` path: the complete image is encoded by Qwen, its exact vision span is identified, and Moodboard subject whitening is applied to that span before the positive conditioning reaches Krea 2. This keeps content/composition structure available while leaving identity to the normal Visual References.
+Modes:
 
-Semantic-only always uses the full image. The built-in directive asks Qwen to preserve pose, action, outfit, people, interactions, objects, background, framing and composition while ignoring the semantic reference subject's identity. `fidelity` acts like Moodboard strength: `1.0` keeps raw vision rows and lower values apply stronger subject/content extraction; the default is `0.5`.
+- `semantic_only`
+- `style_direct`
+- `style_indirect`
+
+`semantic_only` uses the complete image and transforms only its Qwen vision span. This keeps pose, action, people, clothing, objects, background, framing and composition available without adding another appearance reference.
 
 ### Size Resolver
 
-`Krea2 CcC Size Resolver` combines two images without carrying image content forward:
+Size Resolver combines:
 
-- `long_edge_image` contributes only its longest edge in pixels.
-- `aspect_ratio_image` contributes only its width-to-height proportions.
-- outputs are only `width` and `height`.
+- the longest edge from `long_edge_image`
+- the aspect ratio from `aspect_ratio_image`
 
-The resolver does not align to /16. `Krea2 CcC Latent` owns final VAE alignment.
+and outputs only `width` and `height`.
 
 ### Latent
 
-`Krea2 CcC Latent` separates **dimensions** from **content**.
+Latent owns final target geometry and VAE alignment.
 
-Dimensions can be:
+Dimensions:
 
-- `from_image`: use only the connected image dimensions.
-- `fixed`: use `width` and `height`, which can be linked from Size Resolver.
-- `preset`: calculate from a fixed megapixel resolution (`0.5 MP` through `2.5 MP`) and aspect ratio.
+- `from_image`
+- `fixed`
+- `preset`
 
-Content can be:
+Content:
 
 - `empty`
 - `from_image`
 
-Image content fit modes are:
+Content fit modes:
 
-- `long_edge`: match image long edge to latent long edge, preserve aspect ratio, center, and allow overflow/cropping on the other axis.
-- `native`: keep image pixel size, center it, and allow padding or overflow.
-- `stretch`: resize directly to the latent width and height.
+- `long_edge`
+- `native`
+- `stretch`
 
-`resize_method` is used by `long_edge` and `stretch`; `native` performs no resize.
-
-Final latent pixel dimensions are aligned to multiples of 16. There is no automatic megapixel hard cap.
-
-The important boundary is:
-
-```text
-build target latent however needed
-        ->
-resolve final target geometry
-        ->
-fit every Krea2 Edit visual reference to that target with v1.2 fit
-        ->
-optionally move only its RoPE coordinates
-```
+Final target dimensions are aligned to multiples of 16.
 
 ### Edit
 
-`Krea2 CcC Edit` consumes the pre-built latent, visual references, and semantic references, then builds conditioning and applies the optional Krea2 Edit patch.
+Edit consumes the prepared latent plus visual and semantic reference chains.
 
-Reference ordering remains:
+The current execution path is:
 
 ```text
-visual references -> latent semantic (when enabled) -> semantic-only references -> style references
+references
+  -> Qwen preparation
+  -> visual pixel geometry
+  -> VAE reference latents
+  -> CONDITIONING metadata
+  -> CcC Krea2 runtime
+  -> [text | refs | target]
 ```
+
+Reference ordering is preserved physically.
 
 ## Test Workflow
 
-The repository intentionally contains one edit workflow:
+The repository contains one current edit workflow:
 
 [`workflows/01_scene_subject.json`](workflows/01_scene_subject.json)
-
-It uses Subject as the long-edge reference and Scene as the aspect-ratio reference. Size Resolver outputs feed Latent `width` and `height` in `fixed` dimensions mode. Both visual references are then fitted to the resolved latent with Krea2 Identity Edit v1.2 geometry.
 
 ## Other Public Nodes
 
@@ -109,4 +114,8 @@ It uses Subject as the long-edge reference and Scene as the aspect-ratio referen
 - `CcC Krea2 - LoRA Stack`
 - `CcC Krea2 - Text to Image`
 
-See [NODES.md](NODES.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [CHANGELOG.md](CHANGELOG.md).
+See [NODES.md](NODES.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Acknowledgements
+
+CcC Krea2 was informed by work from the ComfyUI and Krea 2 community. The projects, commits, ideas and licenses that influenced the implementation are documented in [NOTICE](NOTICE). Those references are kept for attribution and gratitude; the active runtime and public architecture described above are the CcC implementation.

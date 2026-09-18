@@ -6,16 +6,16 @@ import torch
 
 
 def resolve_rope_axes(position: str) -> Tuple[str, str, str]:
-    """Resolve three-axis RoPE controls while preserving legacy single-position values."""
-    legacy = {
+    """Resolve the compact three-axis RoPE placement value."""
+    aliases = {
         "none": ("inside", "center", "center"),
         "up": ("outside", "center", "up"),
         "down": ("outside", "center", "down"),
         "left": ("outside", "left", "center"),
         "right": ("outside", "right", "center"),
     }
-    if position in legacy:
-        return legacy[position]
+    if position in aliases:
+        return aliases[position]
 
     parts = position.split(":")
     if len(parts) != 3:
@@ -45,9 +45,8 @@ def build_incontext_3d_rope_pos_ids(
     Reference sizing is not controlled here. Every visual reference is fitted to the target
     latent first. This function only changes the coordinate placement used by RoPE.
 
-    ``inside:center:center`` deliberately uses the integer floor center used by the established
-    Krea2 Identity Edit runtime. CcC outside/left/right/up/down placements remain extensions on
-    top of that baseline.
+    ``inside:center:center`` uses the current CcC centered placement. Outside/left/right/up/down
+    placements use the same coordinate builder.
     """
     tgt_gh, tgt_gw = target_grid
     list_pos = []
@@ -97,7 +96,7 @@ def build_incontext_3d_rope_pos_ids(
 
 
 def install_krea2_rope_positioning() -> None:
-    """Install only the optional RoPE placement extension for legacy wrapper paths."""
+    """Install the CcC RoPE placement builder in the edit runtime."""
     from .. import patch as patch_module
 
     patch_module._build_incontext_3d_rope_pos_ids = build_incontext_3d_rope_pos_ids

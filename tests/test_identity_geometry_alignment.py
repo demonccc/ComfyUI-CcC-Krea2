@@ -35,7 +35,7 @@ def test_current_portrait_subject_fit_preserves_complete_source_inside_target():
     assert geom.target_grid_size == (172, 258)
 
 
-def test_centered_rope_uses_moodboard_integer_center_offset():
+def test_centered_rope_uses_current_integer_center_offset():
     pos = build_incontext_3d_rope_pos_ids(
         batch_size=1,
         txt_len=0,
@@ -45,7 +45,7 @@ def test_centered_rope_uses_moodboard_integer_center_offset():
         ref_rope_positions=["inside:center:center"],
     )
 
-    # Krea2Moodboard centers with integer floor division: (88-41)//2 = 23.
+    # Current CcC behavior uses integer floor division: (88-41)//2 = 23.
     assert float(pos[0, 0, 0]) == 1.0
     assert float(pos[0, 0, 1]) == 0.0
     assert float(pos[0, 0, 2]) == 23.0
