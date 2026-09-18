@@ -1,4 +1,4 @@
-"""Native Text-to-Image helper node for CcC Krea2 suite."""
+"""Native Text-to-Image helper node for Krea2 CcC Edit."""
 
 import math
 from typing import Tuple, Dict, Any, Optional
