@@ -46,14 +46,14 @@ def _resolve_dimensions(
 ) -> Tuple[int, int, str]:
     if dimensions == "from_image":
         if dimensions_image is None:
-            raise ValueError("[CcC Krea2] dimensions='from_image' requires dimensions_image.")
+            raise ValueError("[Krea2 CcC Edit] dimensions='from_image' requires dimensions_image.")
         src_h, src_w = get_image_dims(dimensions_image)
         target_w, target_h = _align_geometry(src_w, src_h)
         return target_w, target_h, f"image dimensions {src_w} x {src_h}"
 
     if dimensions == "fixed":
         if int(width) <= 0 or int(height) <= 0:
-            raise ValueError("[CcC Krea2] fixed width and height must be greater than zero.")
+            raise ValueError("[Krea2 CcC Edit] fixed width and height must be greater than zero.")
         target_w, target_h = _align_geometry(int(width), int(height))
         return target_w, target_h, f"fixed {int(width)} x {int(height)}"
 
@@ -62,7 +62,7 @@ def _resolve_dimensions(
         return target_w, target_h, f"preset {resolution} @ {aspect_ratio}"
 
     raise ValueError(
-        f"[CcC Krea2] Invalid dimensions mode '{dimensions}'. "
+        f"[Krea2 CcC Edit] Invalid dimensions mode '{dimensions}'. "
         f"Expected from_image, fixed, or preset."
     )
 
@@ -106,7 +106,7 @@ def _center_place(
         fitted = image
     else:
         raise ValueError(
-            f"[CcC Krea2] Invalid image_fit '{image_fit}'. "
+            f"[Krea2 CcC Edit] Invalid image_fit '{image_fit}'. "
             f"Expected long_edge, native, or stretch."
         )
 
@@ -160,9 +160,9 @@ def _build_target_latent(
         placement: Dict[str, Any] = {"mode": "empty"}
     elif content == "from_image":
         if content_image is None:
-            raise ValueError("[CcC Krea2] content='from_image' requires content_image.")
+            raise ValueError("[Krea2 CcC Edit] content='from_image' requires content_image.")
         if vae is None:
-            raise ValueError("[CcC Krea2] VAE is required for image content.")
+            raise ValueError("[Krea2 CcC Edit] VAE is required for image content.")
         canvas, placement = _center_place(
             image=content_image,
             target_w=target_w,
@@ -173,7 +173,7 @@ def _build_target_latent(
         samples = normalize_vae_output(vae.encode(canvas), batch_size=batch_size)
     else:
         raise ValueError(
-            f"[CcC Krea2] Invalid content mode '{content}'. Expected empty or from_image."
+            f"[Krea2 CcC Edit] Invalid content mode '{content}'. Expected empty or from_image."
         )
 
     return {
@@ -264,7 +264,7 @@ class CcCKrea2Latent:
 
         if latent_semantic and (content != "from_image" or content_image is None):
             raise ValueError(
-                "[CcC Krea2] latent_semantic requires content='from_image' and content_image."
+                "[Krea2 CcC Edit] latent_semantic requires content='from_image' and content_image."
             )
 
         latent, placement = _build_target_latent(
