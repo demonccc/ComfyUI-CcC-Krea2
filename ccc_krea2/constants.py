@@ -1,9 +1,9 @@
-"""Constants and default configurations for CcC Krea2."""
+"""Constants and default configurations for Krea2 CcC Edit."""
 
 import enum
 
-NODE_CATEGORY = "CcC/Krea2"
-LOGGER_PREFIX = "[CcC Krea2]"
+NODE_CATEGORY = "Krea2 CcC Edit"
+LOGGER_PREFIX = "[Krea2 CcC Edit]"
 
 
 class ReferenceRole(str, enum.Enum):
