@@ -36,8 +36,8 @@ SEMANTIC_SUBJECT_DIRECTIVE = (
 )
 
 
-# Identity appearance references are positional in the proven Krea2 grounding contract:
-# VISION_BLOCK * N + instruction. Semantic/style-only CcC extensions may still add their
+# Visual references are positional in the Krea2 grounding contract:
+# VISION_BLOCK * N + instruction. Semantic/style-only references may append
 # annotations after the complete visual prefix.
 edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
 edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
@@ -133,7 +133,6 @@ def _append_semantic(
             include_in_vision=True,
             semantic_extract="subject",
             semantic_strength=float(fidelity),
-            _legacy_role=alias or "semantic",
         )
     else:
         spec = StyleReferenceSpec(
@@ -146,7 +145,6 @@ def _append_semantic(
             style_processing=processing,
             style_fidelity=fidelity,
             indirect_style_transfer=(mode == "style_indirect"),
-            _legacy_role="style",
         )
     return chain.append(spec)
 
@@ -193,7 +191,6 @@ def _combine_reference_chains(
                 visual_reference_fit=entry.resolved_fit_mode,
                 visual_resize_method=entry.resize_method,
                 rope_position=entry.rope_position,
-                _legacy_role=f"reference_{index}",
             )
         )
 
@@ -259,60 +256,6 @@ def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     return f"refs={len(refs)} shapes={shapes}, fit={fit}, boosts={boosts}, rope={rope}"
 
 
-def _external_moodboard_runtime_active() -> bool:
-    """Return True when Krea2Moodboard already owns the proven Identity/Edit DiT forward."""
-    try:
-        from comfy.ldm.krea2.model import SingleStreamDiT
-    except (ImportError, AttributeError):
-        return False
-    return bool(getattr(SingleStreamDiT, "_krea2_identity_patched", False))
-
-
-def _external_moodboard_runtime_owner() -> str:
-    try:
-        from comfy.ldm.krea2.model import SingleStreamDiT
-    except (ImportError, AttributeError):
-        return "unavailable"
-    forward = getattr(SingleStreamDiT, "_forward", None)
-    if forward is None:
-        return "unknown"
-    return f"{getattr(forward, '__module__', '<unknown>')}.{getattr(forward, '__qualname__', getattr(forward, '__name__', '<unknown>'))}"
-
-
-def _uses_only_standard_center_rope(visual_entries) -> bool:
-    """Moodboard natively implements the centered in-target reference placement."""
-    return all(
-        getattr(entry, "rope_position", "none") in ("none", "inside:center:center")
-        for entry in visual_entries
-    )
-
-
-def _rewrite_pipeline_report_for_conditioning_runtime(report: str, runtime_mode: str) -> str:
-    if runtime_mode == "none":
-        return report
-
-    lines = []
-    skip_warning = (
-        "CcC Krea2 model patch was skipped; reference latents attached to conditioning require compatible runtime support."
-    )
-    for line in report.splitlines():
-        if skip_warning in line:
-            continue
-        if line == "CcC Model Patch: skipped":
-            if runtime_mode == "external_moodboard":
-                lines.append("CcC Model Patch: not needed (external Krea2Moodboard runtime reused)")
-            else:
-                lines.append("CcC Model Patch: applied")
-        elif line == "Reference Transport: standard ComfyUI reference_latents":
-            if runtime_mode == "external_moodboard":
-                lines.append("Reference Transport: CONDITIONING metadata -> Krea2Moodboard runtime")
-            else:
-                lines.append("Reference Transport: CONDITIONING metadata (refs/fit/boost/RoPE)")
-        else:
-            lines.append(line)
-    return "\n".join(lines)
-
-
 class CcCKrea2Edit:
     """Krea2 Edit orchestrator consuming the split CcC Latent/Reference node outputs."""
 
@@ -324,7 +267,7 @@ class CcCKrea2Edit:
         "Krea2 Edit orchestrator. CcC resolves target geometry and reference preparation while "
         "appearance refs, fit state, per-pass boosts and RoPE placement travel with CONDITIONING. "
         "The grounded negative branch always uses an empty text prompt and neutral reference boosts. "
-        "For standard centered references, an installed Krea2Moodboard Identity runtime is reused directly."
+        "CcC Krea2 owns a single edit runtime for all visual references."
     )
 
     @classmethod
@@ -367,10 +310,7 @@ class CcCKrea2Edit:
             latent=latent,
         )
 
-        # Preparation stays in CcC: target geometry, Qwen images, VAE refs and per-pass metadata.
-        # Runtime selection is intentionally separate. The centered baseline delegates to the
-        # already-installed Krea2Moodboard Identity forward when available because that is the
-        # proven behavior this custom node extends rather than replaces.
+        # CcC prepares geometry, Qwen images and VAE reference latents.
         _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
@@ -379,8 +319,6 @@ class CcCKrea2Edit:
             target_latent=runtime_latent,
             positive_prompt=positive_prompt,
             negative_prompt=KREA2_EDIT_NEGATIVE_PROMPT,
-            reference_method="krea2_edit",
-            apply_model_patch=False,
         )
 
         reference_count = len(visual_entries)
@@ -401,29 +339,12 @@ class CcCKrea2Edit:
                 reference_boosts=None,
             )
 
-        external_moodboard = _external_moodboard_runtime_active()
-        standard_center = _uses_only_standard_center_rope(visual_entries)
-        runtime_mode = "none"
-
         if apply_krea2_edit_patch and reference_count:
-            if external_moodboard and standard_center:
-                # Do NOT install a CcC diffusion wrapper here. CONDITIONING already contains
-                # the exact refs/fit/boost contract consumed by Krea2Moodboard, so leaving MODEL
-                # untouched lets its proven SingleStreamDiT._forward execute byte-for-byte.
-                patched_model = model
-                runtime_mode = "external_moodboard"
-            else:
-                # CcC only owns the forward when Moodboard is unavailable or a non-standard
-                # RoPE placement (outside/left/right/up/down) requires our extension.
-                patched_model = patch_krea2_model(model=model)
-                runtime_mode = "ccc_extended"
+            patched_model = patch_krea2_model(model=model)
+            runtime_mode = "ccc"
         else:
             patched_model = model
-
-        pipeline_info = _rewrite_pipeline_report_for_conditioning_runtime(
-            pipeline_info,
-            runtime_mode=runtime_mode,
-        )
+            runtime_mode = "none"
 
         lines = [
             "=== Krea2 CcC Edit Report ===",
@@ -432,26 +353,19 @@ class CcCKrea2Edit:
             f"Semantic References: {len(semantic_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
-            "Generic Edit Engine: active",
             (
                 "Appearance Transport: CONDITIONING metadata"
                 if reference_count
                 else "Appearance Transport: none"
             ),
-            "Identity Qwen Contract: positional visual blocks with optional Image N prompt annotations",
+            "Qwen Contract: positional visual blocks with optional Image N prompt annotations",
             "Negative Prompt: fixed empty string",
             (
-                "Identity Runtime: external Krea2Moodboard forward"
-                if runtime_mode == "external_moodboard"
-                else (
-                    "Identity Runtime: CcC extended forward"
-                    if runtime_mode == "ccc_extended"
-                    else "Identity Runtime: no CcC runtime patch requested"
-                )
+                "Edit Runtime: CcC Krea2"
+                if runtime_mode == "ccc"
+                else "Edit Runtime: patch disabled"
             ),
-            f"External Moodboard Runtime Detected: {'yes' if external_moodboard else 'no'}",
-            f"Runtime Forward Owner: {_external_moodboard_runtime_owner()}",
-            f"CcC Forward Override: {'yes' if runtime_mode == 'ccc_extended' else 'no'}",
+            f"CcC Forward Override: {'yes' if runtime_mode == 'ccc' else 'no'}",
         ]
 
         if reference_count:
