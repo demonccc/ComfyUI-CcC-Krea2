@@ -65,6 +65,21 @@ Image N: <prompt_annotation>
 
 after the complete vision prefix. Empty annotations preserve the positional upstream-style contract.
 
+### Qwen-only Semantic Reference
+
+`semantic_only` is deliberately separate from the Identity Edit appearance path.
+
+```text
+semantic image
+    -> Qwen3-VL with visual refs + prompt
+    -> identify semantic vision span
+    -> Krea2Moodboard subject transform on that span
+       (span - mean) / std, blended by fidelity
+    -> final positive conditioning
+```
+
+The semantic image is never VAE-encoded and never added to `reference_latents`, so the Identity Edit LoRA still receives only the configured Visual References. Semantic-only processing always uses the full image to preserve pose, people, outfit, interactions, background and composition. `fidelity=1.0` keeps the raw Qwen span; lower values move toward Moodboard subject/content extraction.
+
 ### RoPE and boost
 
 For `resize` and `native`, `placement_grid` can be `inside` or `outside`; horizontal and vertical controls select the coordinate placement. Crop always uses `inside` because the grid is acting as the crop window itself.
