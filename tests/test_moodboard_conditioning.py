@@ -166,6 +166,33 @@ def test_style_fidelity_identity_and_statistical_target():
     assert torch.allclose(cond[:, 6:], res_tgt[:, 6:])
 
 
+def test_subject_extraction_matches_krea2_moodboard_whitening():
+    cond = torch.arange(1 * 8 * 24, dtype=torch.float32).reshape(1, 8, 24)
+    op = StyleSpanOperation(
+        logical_reference_id="semantic",
+        logical_vision_slot=1,
+        physical_qwen_index=1,
+        row_start=2,
+        row_end=6,
+        style_fidelity=0.0,
+        indirect_style_transfer=False,
+        extract="subject",
+    )
+
+    result, indirect_applied, removed_indices = apply_statistical_style_fidelity(cond, [op])
+
+    span = cond[:, 2:6].reshape(1, 4, 12, 2)
+    mu = span.mean(dim=1, keepdim=True)
+    sigma = span.std(dim=1, keepdim=True) + 1e-6
+    expected = ((span - mu) / sigma).reshape(1, 4, 24)
+
+    assert torch.allclose(result[:, 2:6], expected)
+    assert torch.allclose(result[:, :2], cond[:, :2])
+    assert torch.allclose(result[:, 6:], cond[:, 6:])
+    assert indirect_applied is False
+    assert removed_indices == []
+
+
 def test_slice_style_image_modes():
     img = torch.rand(1, 512, 512, 3)
     full_crops = slice_style_image(img, mode="full")
