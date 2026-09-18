@@ -1,4 +1,4 @@
-"""Custom socket types, immutable value objects, and prompt augmentation helpers for CcC Krea2."""
+"""Custom socket types, immutable value objects, and prompt augmentation helpers for Krea2 CcC Edit."""
 
 from dataclasses import dataclass
 from typing import Tuple, Optional, List
