@@ -241,7 +241,7 @@ def test_latent_surface_separates_dimensions_and_content():
         "batch_size",
     ]
     assert required["dimensions"][0] == ("from_image", "fixed", "preset")
-    assert required["resolution"][0] == ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP")
+    assert required["resolution"][0] == ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP", "3.0 MP")
     assert required["aspect_ratio"][0] == ("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
     assert required["content"][0] == ("empty", "from_image")
     assert required["image_fit"][0] == ("long_edge", "native", "stretch")
