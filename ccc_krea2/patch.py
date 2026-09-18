@@ -404,8 +404,8 @@ def _build_incontext_3d_rope_pos_ids(
     tgt_h, tgt_w = target_grid
     parts = [torch.zeros((txt_len, 3), device=device, dtype=torch.float32)] if txt_len else []
     for index, (ref_h, ref_w) in enumerate(ref_token_grids):
-        y0 = float(max(0, (tgt_h - ref_h) // 2))
-        x0 = float(max(0, (tgt_w - ref_w) // 2))
+        y0 = max(0.0, (tgt_h - ref_h) / 2.0)
+        x0 = max(0.0, (tgt_w - ref_w) / 2.0)
         ys = torch.arange(ref_h, device=device, dtype=torch.float32) + y0
         xs = torch.arange(ref_w, device=device, dtype=torch.float32) + x0
         yy, xx = torch.meshgrid(ys, xs, indexing="ij")
