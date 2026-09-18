@@ -29,8 +29,8 @@ class CcCKrea2SemanticReference:
                 "mode": (SEMANTIC_MODES, {"default": "semantic_only"}),
                 "instruction": ("STRING", {"multiline": True, "default": ""}),
                 "grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 16}),
-                "processing": (STYLE_PROCESSING, {"default": "2x2"}),
-                "fidelity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "processing": (STYLE_PROCESSING, {"default": "full"}),
+                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
             },
             "optional": {
                 "previous_references": ("KREA2_SEMANTIC_REFERENCE_CHAIN",),
@@ -43,17 +43,20 @@ class CcCKrea2SemanticReference:
         mode: str = "semantic_only",
         instruction: str = "",
         grounding_px: int = 768,
-        processing: str = "2x2",
-        fidelity: float = 1.0,
+        processing: str = "full",
+        fidelity: float = 0.5,
         previous_references: Optional[SemanticReferenceChain] = None,
     ) -> Tuple[SemanticReferenceChain]:
         chain = previous_references if previous_references is not None else SemanticReferenceChain()
+        # semantic_only mirrors Krea2Moodboard subject extraction. It must use the
+        # full image so pose/composition/background remain available to Qwen.
+        effective_processing = "full" if mode == "semantic_only" else processing
         entry = SemanticReferenceEntry(
             image=image,
             mode=mode,
             instruction=instruction.strip(),
             grounding_px=int(grounding_px),
-            processing=processing,
+            processing=effective_processing,
             fidelity=float(fidelity),
         )
         return (chain.append(entry),)
