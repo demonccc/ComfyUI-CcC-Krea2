@@ -28,9 +28,9 @@ class CcCKrea2SemanticReference:
                 "image": ("IMAGE",),
                 "mode": (SEMANTIC_MODES, {"default": "semantic_only"}),
                 "instruction": ("STRING", {"multiline": True, "default": ""}),
-                "grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 16}),
+                "grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 32}),
                 "processing": (STYLE_PROCESSING, {"default": "full", "tooltip": "semantic_only always uses full image; crop/tile processing is for style modes."}),
-                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Krea Mood strength. 1.0 keeps raw Qwen vision rows; lower values apply stronger subject/content extraction."}),
+                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Semantic extraction strength. 1.0 keeps raw Qwen vision rows; lower values apply stronger subject/content extraction."}),
             },
             "optional": {
                 "previous_references": ("KREA2_SEMANTIC_REFERENCE_CHAIN",),
