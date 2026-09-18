@@ -71,6 +71,8 @@ Dimension modes:
 - `fixed`
 - `preset`
 
+Preset resolutions include 0.5, 1.0, 1.5, 2.0, 2.5 and 3.0 MP. The 3.0 MP entry is a convenience preset, not a hard limit: `fixed` and `from_image` remain free to resolve larger geometries when explicitly requested.
+
 Content modes:
 
 - `empty`
@@ -82,7 +84,7 @@ Image fit:
 - `native`
 - `stretch`
 
-Final dimensions are aligned to multiples of 16.
+Final dimensions are aligned to multiples of 16. Krea2 CcC Edit does not impose LoRA-specific megapixel limits; any narrower recommendation belongs to the particular model or adapter being used.
 
 When latent semantic guidance is enabled, `latent_grounding_px` is an integer with step 32 and defaults to 768, matching the same Qwen3-VL visual-grid cadence used by Krea2 CcC Visual Reference and Krea2 CcC Semantic Reference.
 
