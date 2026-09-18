@@ -543,25 +543,42 @@ def encode_krea2_qwen_context(
                         f"exceeds encoded conditioning sequence length ({pos_rows_before})."
                     )
 
-    # Apply Moodboard style processing for positive conditioning
+    # Apply Krea2Moodboard-compatible post-Qwen processing to positive vision spans.
+    # Style refs use style extraction; semantic_only refs use subject extraction so
+    # content/composition survive without becoming an additional VAE/LoRA reference.
     if is_positive and conditioning and physical_image_map:
         spans_info: List[StyleSpanOperation] = []
         for idx, item in enumerate(physical_image_map):
+            if idx >= len(vision_row_spans):
+                continue
+
+            spec = item.get("spec")
             role_val = item.get("role", "") or item.get("logical_role", "")
-            if str(role_val).lower() == "style" and idx < len(vision_row_spans):
-                spec = item.get("spec")
+            extract = None
+            fidelity = 1.0
+            indirect = False
+
+            if str(role_val).lower() == "style":
+                extract = "style"
                 fidelity = getattr(spec, "style_fidelity", 1.0)
                 indirect = getattr(spec, "indirect_style_transfer", False)
+            elif getattr(spec, "semantic_extract", "none") == "subject":
+                extract = "subject"
+                fidelity = getattr(spec, "semantic_strength", 1.0)
+                indirect = False
+
+            if extract is not None:
                 s_start, s_end = vision_row_spans[idx]
                 spans_info.append(
                     StyleSpanOperation(
-                        logical_reference_id=item.get("logical_reference_id", "style"),
+                        logical_reference_id=item.get("logical_reference_id", extract),
                         logical_vision_slot=item.get("logical_vision_slot", idx + 1),
                         physical_qwen_index=item.get("physical_qwen_image_index", idx + 1),
                         row_start=s_start,
                         row_end=s_end,
                         style_fidelity=fidelity,
                         indirect_style_transfer=indirect,
+                        extract=extract,
                     )
                 )
 
