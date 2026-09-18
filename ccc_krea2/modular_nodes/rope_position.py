@@ -45,7 +45,7 @@ def build_incontext_3d_rope_pos_ids(
     Reference sizing is not controlled here. Every visual reference is fitted to the target
     latent first. This function only changes the coordinate placement used by RoPE.
 
-    ``inside:center:center`` uses the current CcC centered placement. Outside/left/right/up/down
+    ``inside:center:center`` uses the current Krea2 CcC Edit centered placement. Outside/left/right/up/down
     placements use the same coordinate builder.
     """
     tgt_gh, tgt_gw = target_grid
@@ -96,7 +96,7 @@ def build_incontext_3d_rope_pos_ids(
 
 
 def install_krea2_rope_positioning() -> None:
-    """Install the CcC RoPE placement builder in the edit runtime."""
+    """Install the Krea2 CcC Edit RoPE placement builder in the edit runtime."""
     from .. import patch as patch_module
 
     patch_module._build_incontext_3d_rope_pos_ids = build_incontext_3d_rope_pos_ids
