@@ -49,8 +49,9 @@ def _body_column_layout(
     if inner <= 0:
         raise ValueError("Character Sheet outer_margin leaves no usable canvas.")
 
-    left_w, body_w = _split_extent(inner, 3, padding)[0] * 2 + padding, _split_extent(inner, 3, padding)[2]
-    # Recompute the body x from the actual widths so odd-pixel resolutions remain exact.
+    thirds = _split_extent(inner, 3, padding)
+    left_w = thirds[0] + padding + thirds[1]
+    body_w = thirds[2]
     body_x = outer_margin + left_w + padding
 
     rects: Dict[str, Tuple[int, int, int, int]] = {}
