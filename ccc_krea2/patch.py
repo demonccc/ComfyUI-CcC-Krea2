@@ -1,4 +1,4 @@
-"""CcC Krea2 edit runtime using conditioning-transported reference latents.
+"""Krea2 CcC Edit runtime using conditioning-transported reference latents.
 
 Reference latents, fit flags, boosts and RoPE placement travel with CONDITIONING.
 """
@@ -60,13 +60,13 @@ def _prepare_reference_latent_for_model(model: Any, latent: torch.Tensor) -> tor
     """
     if not torch.is_tensor(latent):
         raise TypeError(
-            f"[CcC Krea2] Reference latent must be a torch.Tensor, got {type(latent).__name__}."
+            f"[Krea2 CcC Edit] Reference latent must be a torch.Tensor, got {type(latent).__name__}."
         )
     if latent.ndim == 4:
         latent = latent.unsqueeze(2)
     elif latent.ndim != 5:
         raise ValueError(
-            "[CcC Krea2] Reference latent must be B,C,H,W or B,C,T,H,W; "
+            "[Krea2 CcC Edit] Reference latent must be B,C,H,W or B,C,T,H,W; "
             f"received shape {tuple(latent.shape)}."
         )
     return model.process_latent_in(latent)
@@ -145,7 +145,7 @@ def _normalize_runtime_list(value: Any, count: int, default: Any) -> List[Any]:
 
 
 def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> bool:
-    """Check whether a model patcher already carries a CcC edit runtime marker/wrapper."""
+    """Check whether a model patcher already carries a Krea2 CcC Edit runtime marker/wrapper."""
     if getattr(model, "_ccc_patch_key", None) == patch_key:
         return True
     if hasattr(model, "wrappers"):
@@ -169,10 +169,10 @@ def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> b
 
 
 def patch_krea2_model(model: Any) -> Any:
-    """Clone MODEL and register the CcC runtime wrapper that consumes references from CONDITIONING."""
+    """Clone MODEL and register the Krea2 CcC Edit runtime wrapper that consumes references from CONDITIONING."""
     if is_model_already_patched(model, "ccc_krea2_edit"):
         raise RuntimeError(
-            "[CcC Krea2] Input MODEL is already patched by CcC Krea2 Edit. Connect Edit to the unpatched upstream MODEL."
+            "[Krea2 CcC Edit] Input MODEL is already patched by Krea2 CcC Edit. Connect Edit to the unpatched upstream MODEL."
         )
 
     install_krea2_reference_conditioning()
@@ -429,7 +429,7 @@ def krea2_dit_incontext_forward(
     ref_fit: Optional[List[bool]] = None,
     ref_rope_positions: Optional[List[str]] = None
 ) -> torch.Tensor:
-    """In-context Krea2 forward with optional CcC RoPE displacement."""
+    """In-context Krea2 forward with optional Krea2 CcC Edit RoPE displacement."""
     transformer_options = transformer_options or {}
     n_refs = len(ref_latents)
     boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
