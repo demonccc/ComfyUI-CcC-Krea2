@@ -1,4 +1,4 @@
-"""Pixel-space geometry for CcC Krea2 visual references.
+"""Pixel-space geometry for Krea2 CcC Visual Reference.
 
 Public modes:
 - crop: use the target grid as an inside crop window over the source.
@@ -73,7 +73,7 @@ def resolve_krea2edit_geometry(
     grid_vertical_position: Optional[str] = None,
     resize_method: str = "bicubic",
 ) -> ResolvedGeometry:
-    """Resolve visual-reference geometry for the CcC Krea2 edit pipeline."""
+    """Resolve visual-reference geometry for the Krea2 CcC Edit pipeline."""
     requested = fit_mode
     if fit_mode == "exact":
         fit_mode = "auto"
