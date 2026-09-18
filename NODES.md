@@ -38,7 +38,21 @@ Configured `boost` applies to the positive conditioning pass only. The grounded 
 
 ## Krea2 CcC Semantic Reference
 
-Declares one Qwen-only semantic/style reference. Modes remain `semantic_only`, `style_direct`, and `style_indirect`.
+Declares one Qwen-only semantic/style reference. It never adds a VAE reference latent and therefore does not consume an Identity Edit LoRA reference slot.
+
+Modes remain `semantic_only`, `style_direct`, and `style_indirect`.
+
+`semantic_only` now follows the Krea2Moodboard **subject extraction** mechanics:
+
+- Qwen sees the complete semantic image together with the edit references and prompt.
+- The semantic image uses `full` processing; crop/tile modes are intentionally disabled so pose, people, outfit, background, interactions and composition remain available.
+- After Qwen encoding, only the semantic image span is transformed with Moodboard subject whitening: `(span - mean) / std`.
+- The semantic image is still **not** VAE-encoded and is not added to `reference_latents`.
+- A built-in content/composition directive tells Qwen to use pose, action, clothing, people, interactions, objects, background, framing and composition while leaving target identity to the edit identity references.
+- `fidelity` follows Moodboard strength semantics: `1.0` keeps the raw Qwen vision rows; lower values blend progressively toward the subject/content extraction. Default is `0.5`.
+- `instruction` is optional extra guidance and is appended to the built-in semantic directive.
+
+`style_direct` and `style_indirect` keep the existing Moodboard-style style extraction behavior.
 
 ## Krea2 CcC Size Resolver
 
