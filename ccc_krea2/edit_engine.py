@@ -593,6 +593,8 @@ def run_krea2_edit_orchestrator(
                 f"  Actual Conditioning Row Span: {span_str}",
                 f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
                 f"  Vision Instruction Active: {'yes' if sem.get('has_instruction') else 'no'}",
+                f"  Semantic Extract: {getattr(sp, 'semantic_extract', 'none')}",
+                f"  Semantic Strength: {float(getattr(sp, 'semantic_strength', 1.0)):.2f}",
                 "  Appearance Reference: no",
                 "  VAE Reference Frame: none",
                 "  Negative Conditioning Included: no",
