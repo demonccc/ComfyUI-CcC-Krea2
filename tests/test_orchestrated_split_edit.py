@@ -1,4 +1,4 @@
-"""Regression coverage for split Edit parity with the Krea2 Identity conditioning contract."""
+"""Regression coverage for the split CcC Krea2 Edit contract."""
 
 import inspect
 
@@ -17,7 +17,7 @@ def _extras(conditioning):
     return conditioning[0][1]
 
 
-def test_split_edit_uses_positional_identity_qwen_builders():
+def test_split_edit_uses_positional_qwen_builders():
     assert edit_node.edit_engine_runtime.build_krea2_user_content is build_grounded_positive_user_content
     assert edit_node.edit_engine_runtime.build_krea2_negative_user_content is build_grounded_negative_user_content
 
@@ -74,30 +74,10 @@ def test_positive_and_negative_runtime_boosts_are_independent():
     assert "reference_boosts" not in _extras(negative)
 
 
-def test_standard_center_rope_is_moodboard_compatible():
-    centered = [
-        VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3))),
-        VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3))),
-    ]
-    assert edit_node._uses_only_standard_center_rope(centered) is True
-
-    displaced = [
-        VisualReferenceEntry(
-            image=torch.zeros((1, 64, 32, 3)),
-            placement_grid="outside",
-            grid_horizontal_position="right",
-            grid_vertical_position="center",
-        )
-    ]
-    assert edit_node._uses_only_standard_center_rope(displaced) is False
-
-
-def test_split_edit_prepares_conditioning_and_can_delegate_to_moodboard_runtime():
+def test_split_edit_uses_single_ccc_runtime():
     source = inspect.getsource(edit_node.CcCKrea2Edit.process)
     assert "run_krea2_edit_orchestrator" in source
-    assert "apply_model_patch=False" in source
     assert "attach_reference_runtime_to_conditioning" in source
-    assert "_external_moodboard_runtime_active" in source
-    assert 'runtime_mode = "external_moodboard"' in source
     assert "patch_krea2_model" in source
-    assert "patch_krea2_orchestrated_model" not in source
+    assert 'runtime_mode = "ccc"' in source
+    assert "_external_" not in source
