@@ -9,7 +9,7 @@ from ccc_krea2.modular_nodes.rope_position import build_incontext_3d_rope_pos_id
 from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from ccc_krea2.modular_nodes.size_resolver_node import CcCKrea2SizeResolver, _resolve_size
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
-from ccc_krea2.patch import attach_reference_boosts_to_conditioning, _normalize_runtime_boosts
+from ccc_krea2.patch import attach_reference_runtime_to_conditioning
 
 
 def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
@@ -108,7 +108,7 @@ def test_krea2_v12_fit_regression_for_1719x1164_reference_against_992_square_tar
     assert geom.whether_interpolation_occurred is True
 
 
-def test_rope_center_matches_rednode_integer_center_after_v12_fit():
+def test_rope_center_uses_current_integer_center_after_fit():
     # VAE latent grids 124x82 (ref) and 124x124 (target) become DiT patch grids
     # 62x41 and 62x62 with Krea2 patch size 2.
     pos = build_incontext_3d_rope_pos_ids(
@@ -144,20 +144,22 @@ def test_rope_axes_preserve_optional_outside_displacement():
 
 
 def test_positive_reference_boost_metadata_is_explicit_and_negative_defaults_to_neutral():
-    positive_conditioning = [[torch.zeros((1, 4, 8)), {}]]
-    negative_conditioning = [[torch.zeros((1, 4, 8)), {}]]
-
-    positive = attach_reference_boosts_to_conditioning(positive_conditioning, [4.0])
+    base = [[torch.zeros((1, 4, 8)), {}]]
+    positive = attach_reference_runtime_to_conditioning(
+        base,
+        reference_count=1,
+        rope_positions=["inside:center:center"],
+        reference_boosts=[4.0],
+    )
+    negative = attach_reference_runtime_to_conditioning(
+        base,
+        reference_count=1,
+        rope_positions=["inside:center:center"],
+        reference_boosts=None,
+    )
 
     assert positive[0][1]["reference_boosts"] == [4.0]
-    assert "reference_boosts" not in negative_conditioning[0][1]
-    assert _normalize_runtime_boosts(None, 1) == [1.0]
-
-
-def test_runtime_reference_boosts_default_to_neutral_and_align_to_reference_count():
-    assert _normalize_runtime_boosts(None, 2) == [1.0, 1.0]
-    assert _normalize_runtime_boosts([4.0], 2) == [1.0, 4.0]
-    assert _normalize_runtime_boosts([2.0, 3.0, 4.0], 2) == [3.0, 4.0]
+    assert "reference_boosts" not in negative[0][1]
 
 
 def test_semantic_reference_exposes_advanced_semantic_controls():
