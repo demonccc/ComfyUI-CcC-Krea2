@@ -1,4 +1,4 @@
-"""Regression coverage for the split CcC Krea2 Edit contract."""
+"""Regression coverage for the split Krea2 CcC Edit contract."""
 
 import inspect
 
