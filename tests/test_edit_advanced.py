@@ -37,6 +37,8 @@ def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
     assert required["grid_horizontal_position"][0] == ("center", "left", "right")
     assert required["grid_vertical_position"][0] == ("center", "up", "down")
     assert required["resize_method"][0] == ("lanczos", "bicubic", "bilinear", "area")
+    assert required["semantic_grounding_px"][1]["step"] == 32
+    assert required["semantic_grounding_px"][1]["min"] == 32
 
 
 def test_visual_reference_semantic_fields_are_ignored_when_semantic_is_disabled():
@@ -166,6 +168,7 @@ def test_semantic_reference_exposes_advanced_semantic_controls():
     required = CcCKrea2SemanticReference.INPUT_TYPES()["required"]
     assert required["mode"][0] == ("semantic_only", "style_direct", "style_indirect")
     assert required["processing"][0] == ("full", "2x2", "4x4")
+    assert required["grounding_px"][1]["step"] == 32
 
 
 def test_size_resolver_outputs_only_width_and_height_from_two_images():
@@ -242,6 +245,7 @@ def test_latent_surface_separates_dimensions_and_content():
     assert required["aspect_ratio"][0] == ("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
     assert required["content"][0] == ("empty", "from_image")
     assert required["image_fit"][0] == ("long_edge", "native", "stretch")
+    assert required["latent_grounding_px"][1]["step"] == 32
     assert list(optional) == ["dimensions_image", "content_image"]
 
 
