@@ -28,6 +28,13 @@ from .rope_position import install_krea2_rope_positioning
 # attached to both branches and negative reference boosts stay neutral at 1.0.
 KREA2_EDIT_NEGATIVE_PROMPT = ""
 
+SEMANTIC_SUBJECT_DIRECTIVE = (
+    "Use this reference image as a content and composition guide. Preserve its pose, action, "
+    "clothing, surrounding people, interactions, objects, background, environment, framing, "
+    "and spatial composition. Do not use the reference subject's identity as the target identity; "
+    "identity is controlled by the edit identity references."
+)
+
 
 # Identity appearance references are positional in the proven Krea2 grounding contract:
 # VISION_BLOCK * N + instruction. Semantic/style-only CcC extensions may still add their
@@ -111,13 +118,21 @@ def _append_semantic(
         resize_method="lanczos",
     )
     if mode == "semantic_only":
+        user_instruction = instruction.strip()
+        semantic_instruction = (
+            f"{SEMANTIC_SUBJECT_DIRECTIVE} {user_instruction}".strip()
+            if user_instruction
+            else SEMANTIC_SUBJECT_DIRECTIVE
+        )
         spec = ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
             alias=alias,
-            vision_instruction=instruction.strip(),
+            vision_instruction=semantic_instruction,
             appearance_reference=False,
             include_in_vision=True,
+            semantic_extract="subject",
+            semantic_strength=float(fidelity),
             _legacy_role=alias or "semantic",
         )
     else:
