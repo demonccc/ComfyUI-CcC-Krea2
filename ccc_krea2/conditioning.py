@@ -548,7 +548,7 @@ def encode_krea2_qwen_context(
                         f"exceeds encoded conditioning sequence length ({pos_rows_before})."
                     )
 
-    # Apply CcC semantic/style post-processing to positive Qwen vision spans.
+    # Apply Krea2 CcC Semantic Reference processing to positive Qwen vision spans.
     # Style refs use style extraction; semantic_only refs use subject extraction so
     # content/composition survive without becoming an additional VAE/LoRA reference.
     if is_positive and conditioning and physical_image_map:
