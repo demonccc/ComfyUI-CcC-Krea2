@@ -1,4 +1,4 @@
-"""Unit tests for Target Latent node and resolution logic."""
+"""Unit tests for target latent helpers and resolution logic."""
 
 import torch
 import pytest
@@ -11,7 +11,6 @@ from ccc_krea2.target_latent import (
     normalize_vae_output,
     resolve_target_geometry,
 )
-from ccc_krea2.modular_nodes.target_latent_node import CcCKrea2TargetLatent
 
 
 def test_target_geometry_fixed():
@@ -86,19 +85,6 @@ def test_target_latent_scene_content_missing_raises():
         create_target_latent(vae=MagicMock(), target_latent_content="scene", scene_image=None)
 
 
-def test_target_latent_node_execution():
-    node = CcCKrea2TargetLatent()
-    lat_dict, info = node.process(
-        vae=None,
-        target_content="empty",
-        geometry_mode="fixed",
-        target_megapixels=2.0,
-        fixed_megapixels=1.0,
-        aspect_ratio="1:1",
-    )
-    assert lat_dict["samples"].shape[1] == 16
-    assert "Geometry Strategy: fixed" in info
-
 
 def test_normalize_vae_output_accepts_native_5d():
     latent = torch.zeros((1, 16, 1, 144, 216))
@@ -162,7 +148,7 @@ def test_normalize_vae_output_invalid_dimensions_raises():
         normalize_vae_output(tensor_6d, batch_size=1)
 
 
-def test_target_latent_legacy_translation_precedence():
+def test_target_latent_content_precedence():
     img_subj = torch.rand(1, 500, 300, 3)
     img_scene = torch.rand(1, 800, 600, 3)
     subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
@@ -182,7 +168,7 @@ def test_target_latent_legacy_translation_precedence():
     assert lat_dict["target_vision_context"].target_image is scene_prep
 
 
-def test_target_latent_legacy_geometry_favor_subject():
+def test_target_latent_geometry_favor_subject():
     img_subj = torch.rand(1, 400, 300, 3)  # 3:4
     img_scene = torch.rand(1, 300, 400, 3)  # 4:3
     subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
@@ -202,7 +188,7 @@ def test_target_latent_legacy_geometry_favor_subject():
     assert "Content Source Size: 300 x 400" in info
 
 
-def test_target_latent_legacy_geometry_favor_scene():
+def test_target_latent_geometry_favor_scene():
     img_subj = torch.rand(1, 400, 300, 3)  # 3:4
     img_scene = torch.rand(1, 300, 400, 3)  # 4:3
     subj_prep = prepare_vision_image(image=img_subj, clip=None, mode="native")
