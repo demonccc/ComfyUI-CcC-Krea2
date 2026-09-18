@@ -19,7 +19,7 @@ class CcCKrea2SemanticReference:
     RETURN_TYPES = ("KREA2_SEMANTIC_REFERENCE_CHAIN",)
     RETURN_NAMES = ("semantic_references",)
     FUNCTION = "process"
-    DESCRIPTION = "Adds one semantic/style reference using the controls previously exposed by Edit Advanced."
+    DESCRIPTION = "Adds one Qwen-only semantic/style reference. semantic_only uses Krea2Moodboard subject extraction without adding a VAE/LoRA reference."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -29,8 +29,8 @@ class CcCKrea2SemanticReference:
                 "mode": (SEMANTIC_MODES, {"default": "semantic_only"}),
                 "instruction": ("STRING", {"multiline": True, "default": ""}),
                 "grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 16}),
-                "processing": (STYLE_PROCESSING, {"default": "full"}),
-                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "processing": (STYLE_PROCESSING, {"default": "full", "tooltip": "semantic_only always uses full image; crop/tile processing is for style modes."}),
+                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Krea Mood strength. 1.0 keeps raw Qwen vision rows; lower values apply stronger subject/content extraction."}),
             },
             "optional": {
                 "previous_references": ("KREA2_SEMANTIC_REFERENCE_CHAIN",),
