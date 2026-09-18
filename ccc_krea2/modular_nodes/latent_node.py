@@ -12,7 +12,7 @@ from ..target_latent import TargetVisionContext, get_image_dims, normalize_vae_o
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
 CONTENT_MODES = ("empty", "from_image")
-RESOLUTIONS = ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP")
+RESOLUTIONS = ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP", "3.0 MP")
 ASPECT_RATIOS = ("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
 IMAGE_FIT_MODES = ("long_edge", "native", "stretch")
 RESIZE_METHODS = ("auto", "nearest-exact", "bilinear", "bicubic", "area", "lanczos")
