@@ -69,7 +69,7 @@ class CcCKrea2VisualReference:
                 ),
                 "semantic_grounding_px": (
                     "INT",
-                    {"default": 768, "min": 16, "max": 4096, "step": 16},
+                    {"default": 768, "min": 32, "max": 4096, "step": 32},
                 ),
                 "semantic_resize_method": (
                     RESIZE_METHODS,
