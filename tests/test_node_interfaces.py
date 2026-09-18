@@ -26,12 +26,7 @@ def test_split_edit_display_names():
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Edit"] == "Krea2 CcC Edit"
 
 
-def test_easy_and_advanced_edit_nodes_are_not_registered():
-    for removed in (
-        "CcCKrea2EasyEdit",
-        "CcCKrea2EasyEditOstris",
-        "CcCKrea2EditAdvanced",
-        "CcCKrea2Geometry",
-    ):
-        assert removed not in NODE_CLASS_MAPPINGS
-        assert removed not in NODE_DISPLAY_NAME_MAPPINGS
+def test_only_current_edit_nodes_are_registered():
+    assert "CcCKrea2Edit" in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2VisualReference" in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2SemanticReference" in NODE_CLASS_MAPPINGS
