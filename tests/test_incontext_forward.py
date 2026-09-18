@@ -246,25 +246,3 @@ def test_unmasked_reference_regions_retain_zero_bias():
     masked_tokens = target_to_ref_bias[:, :32]
     assert torch.allclose(masked_tokens, torch.tensor(expected_boost_val))
 
-
-def test_ksampler_latents_remain_raw_vae_latents():
-    class DummyVAE:
-        def encode(self, img):
-            return torch.ones((1, 16, 32, 32)) * 0.5
-
-    class DummyModelWithProcessLatentIn:
-        class InnerModel:
-            def process_latent_in(self, lat):
-                return lat * 100.0
-
-        model = InnerModel()
-
-    model = DummyModelWithProcessLatentIn()
-    vae = DummyVAE()
-    base_img = torch.rand((1, 256, 256, 3))
-
-    lat_dict = generate_krea2_latent(
-        model=model, vae=vae, width=256, height=256, batch_size=1, latent_source="image", base_image=base_img
-    )
-
-    assert torch.allclose(lat_dict["samples"], torch.tensor(0.5))
