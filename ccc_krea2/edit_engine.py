@@ -13,6 +13,7 @@ from .conditioning import (
     attach_reference_latents_to_conditioning,
 )
 from .target_latent import should_include_target_in_vision, TargetVisionContext
+from .reference_cache import CachedQwenImage
 
 
 def run_krea2_edit_orchestrator(
@@ -88,40 +89,59 @@ def run_krea2_edit_orchestrator(
         is_appearance = getattr(spec, "appearance_reference", True)
 
         if ref_path == "edit":
-            src_img = spec.prepared_image.original_image
-            src_h, src_w = src_img.shape[1], src_img.shape[2]
+            cached_latent = getattr(spec, "cached_appearance_latent", None)
+            cached_geom = getattr(spec, "cached_geometry", None)
+            cached_qwen = getattr(spec, "cached_qwen_visual", None)
 
             if is_appearance:
-                fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
-                rope_position = str(getattr(spec, "rope_position", "inside:center:center") or "inside:center:center")
-                rope_parts = rope_position.split(":")
-                if len(rope_parts) == 3:
-                    _, grid_horizontal, grid_vertical = rope_parts
+                if cached_latent is not None:
+                    if cached_geom is None:
+                        raise ValueError("[CcC Krea2] Cached appearance reference is missing geometry metadata.")
+                    if tuple(cached_geom.target_grid_size) != (lw, lh):
+                        raise ValueError(
+                            "[CcC Krea2] Cached appearance geometry does not match the current target. "
+                            f"Cache latent grid: {cached_geom.target_grid_size[0]}x{cached_geom.target_grid_size[1]}, "
+                            f"target latent grid: {lw}x{lh}."
+                        )
+                    lat_tokens = cached_latent
+                    fit_mask = None
+                    geom = cached_geom
                 else:
-                    grid_horizontal, grid_vertical = "center", "center"
-                geom = resolve_krea2edit_geometry(
-                    src_h=src_h,
-                    src_w=src_w,
-                    tgt_h=target_h,
-                    tgt_w=target_w,
-                    fit_mode=fit_mode,
-                    grid_horizontal_position=grid_horizontal,
-                    grid_vertical_position=grid_vertical,
-                    resize_method=getattr(spec, "visual_resize_method", "bicubic"),
-                )
-
-                fit_img, fit_mask = process_image_and_mask_geometry(
-                    image=src_img, mask=getattr(spec, "attention_mask", None), geom=geom
-                )
-
-                encoded = vae.encode(fit_img) if vae is not None else None
-                lat_tokens = None
-                if encoded is not None:
-                    lat_tokens = (
-                        encoded["samples"]
-                        if isinstance(encoded, dict)
-                        else (encoded.sample() if hasattr(encoded, "sample") else encoded)
+                    if spec.prepared_image is None:
+                        raise ValueError("[CcC Krea2] Visual reference is missing both image and cached appearance latent.")
+                    src_img = spec.prepared_image.original_image
+                    src_h, src_w = src_img.shape[1], src_img.shape[2]
+                    fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
+                    rope_position = str(
+                        getattr(spec, "rope_position", "inside:center:center") or "inside:center:center"
                     )
+                    rope_parts = rope_position.split(":")
+                    if len(rope_parts) == 3:
+                        _, grid_horizontal, grid_vertical = rope_parts
+                    else:
+                        grid_horizontal, grid_vertical = "center", "center"
+                    geom = resolve_krea2edit_geometry(
+                        src_h=src_h,
+                        src_w=src_w,
+                        tgt_h=target_h,
+                        tgt_w=target_w,
+                        fit_mode=fit_mode,
+                        grid_horizontal_position=grid_horizontal,
+                        grid_vertical_position=grid_vertical,
+                        resize_method=getattr(spec, "visual_resize_method", "bicubic"),
+                    )
+
+                    fit_img, fit_mask = process_image_and_mask_geometry(
+                        image=src_img, mask=getattr(spec, "attention_mask", None), geom=geom
+                    )
+                    encoded = vae.encode(fit_img) if vae is not None else None
+                    lat_tokens = None
+                    if encoded is not None:
+                        lat_tokens = (
+                            encoded["samples"]
+                            if isinstance(encoded, dict)
+                            else (encoded.sample() if hasattr(encoded, "sample") else encoded)
+                        )
 
                 vae_ref_specs.append(
                     {
@@ -132,6 +152,7 @@ def run_krea2_edit_orchestrator(
                         "geom": geom,
                         "spec": spec,
                         "ref_item": ref_item,
+                        "cached": cached_latent is not None,
                     }
                 )
 
@@ -149,9 +170,14 @@ def run_krea2_edit_orchestrator(
             if not getattr(spec, "include_in_vision", True):
                 continue
 
-            # Vision image enters positive Qwen list
+            if cached_qwen is not None:
+                vis_img = CachedQwenImage(cached_qwen)
+            else:
+                if spec.prepared_image is None:
+                    raise ValueError("[CcC Krea2] Qwen reference is missing both image and cached visual features.")
+                vis_img = spec.prepared_image.vision_image
+
             pos_idx = len(pos_qwen_images) + 1
-            vis_img = spec.prepared_image.vision_image
             pos_qwen_images.append(vis_img)
             pos_qwen_image_map.append(
                 {
@@ -168,10 +194,9 @@ def run_krea2_edit_orchestrator(
                 }
             )
 
-            # Negative Qwen uses the same appearance references with empty text.
             if is_appearance:
                 neg_idx = len(neg_qwen_images) + 1
-                neg_qwen_images.append(spec.prepared_image.vision_image)
+                neg_qwen_images.append(vis_img)
                 neg_qwen_image_map.append(
                     {
                         "role": ref_role,
@@ -182,7 +207,7 @@ def run_krea2_edit_orchestrator(
                         "physical_qwen_image_index": neg_idx,
                         "style_group_id": None,
                         "crop_tile_index": None,
-                        "image": spec.prepared_image.vision_image,
+                        "image": vis_img,
                         "spec": spec,
                     }
                 )
@@ -329,6 +354,7 @@ def run_krea2_edit_orchestrator(
             [
                 f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
                 f"  Has Attention Mask: {'yes' if ref.get('mask') is not None else 'no'}",
+                f"  Reference Cache: {'yes' if ref.get('cached') else 'no'}",
             ]
         )
         info_lines.append("")
