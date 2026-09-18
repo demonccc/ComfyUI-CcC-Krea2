@@ -4,8 +4,6 @@ import math
 import torch
 import torch.nn as nn
 from ccc_krea2.patch import patch_krea2_model, krea2_dit_incontext_forward, _compute_ref_attention_bias_patchified
-from ccc_krea2.references import PreparedReference, ReferenceRole
-from ccc_krea2.latents import generate_krea2_latent
 
 
 class MockRealKrea2Block(nn.Module):
@@ -111,17 +109,7 @@ class MockModelWithWrappersMP:
 
 def test_wrappersmp_registration_uses_diffusion_model_key():
     model = MockModelWithWrappersMP()
-    prep_ref = PreparedReference(
-        role=ReferenceRole.SUBJECT,
-        grounding_image=torch.rand((1, 768, 768, 3)),
-        vae_latent=torch.rand((1, 16, 16, 16)),
-        spatial_attention_mask=None,
-        boost=2.5,
-        spatial_hw=(1024, 1024),
-        lat_hw=(16, 16),
-    )
-
-    patched = patch_krea2_model(model, [prep_ref])
+    patched = patch_krea2_model(model)
     assert len(patched.registered_calls) == 1
 
     wrapper_type, key, wrapper = patched.registered_calls[0]
@@ -146,8 +134,6 @@ def test_real_krea2_member_execution_order_and_signatures():
         context=context,
         ref_latents=[ref_lat],
         ref_boosts=[2.5],
-        ref_masks=[None],
-        mask_modes=["hard"],
         transformer_options=opts,
     )
 
@@ -197,8 +183,6 @@ def test_5d_temporal_inputs_preserve_all_frames():
         context=context,
         ref_latents=[ref_lat_5d],
         ref_boosts=[1.0],
-        ref_masks=[None],
-        mask_modes=["hard"],
         transformer_options={},
     )
 
@@ -220,8 +204,6 @@ def test_reference_device_and_dtype_alignment():
         context=context,
         ref_latents=[ref_lat],
         ref_boosts=[2.5],
-        ref_masks=[None],
-        mask_modes=["hard"],
         transformer_options={},
     )
 
@@ -246,7 +228,6 @@ def test_unmasked_reference_regions_retain_zero_bias():
         tgt_len=tgt_len,
         ref_masks=[spatial_mask],
         ref_token_grids=[(8, 8)],
-        mask_modes=["hard"],
         device=device,
         dtype=dtype,
     )
