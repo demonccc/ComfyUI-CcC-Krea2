@@ -144,5 +144,7 @@ The repository contains one current edit workflow:
 See [NODES.md](NODES.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Acknowledgements
+The example Turbo sampling baseline (8 steps, CFG 1.0, Euler + beta) was informed by the public Krea-2-Turbo_I2I workflow by minipasila. CcC keeps its existing AuraFlow shift setting rather than copying that workflow's shift value.
+
 
 CcC Krea2 was informed by work from the ComfyUI and Krea 2 community. The projects, commits, ideas and licenses that influenced the implementation are documented in [NOTICE](NOTICE). Those references are kept for attribution and gratitude; the active runtime and public architecture described above are the CcC implementation.
