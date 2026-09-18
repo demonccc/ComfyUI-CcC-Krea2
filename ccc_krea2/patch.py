@@ -1,8 +1,6 @@
-"""Krea 2 Identity Edit runtime using conditioning-transported reference latents.
+"""CcC Krea2 edit runtime using conditioning-transported reference latents.
 
-Reference latents, fit flags and boosts travel with CONDITIONING so positive and negative
-passes can carry the same references while using different boosts. CcC extends this with
-per-reference RoPE placement for already-fitted references.
+Reference latents, fit flags, boosts and RoPE placement travel with CONDITIONING.
 """
 
 import math
@@ -33,29 +31,13 @@ def _conditioning_set_values(conditioning: List[Any], values: Dict[str, Any]) ->
         return updated
 
 
-def attach_reference_boosts_to_conditioning(
-    conditioning: List[Any],
-    reference_boosts: List[float],
-    reference_masked_boosts: Optional[List[float]] = None,
-) -> List[Any]:
-    """Attach pass-specific reference boost metadata."""
-    values: Dict[str, Any] = {"reference_boosts": [float(v) for v in reference_boosts]}
-    if reference_masked_boosts is not None:
-        values["reference_masked_boosts"] = [float(v) for v in reference_masked_boosts]
-    return _conditioning_set_values(conditioning, values)
-
-
 def attach_reference_runtime_to_conditioning(
     conditioning: List[Any],
     reference_count: int,
     rope_positions: Optional[List[str]] = None,
     reference_boosts: Optional[List[float]] = None,
 ) -> List[Any]:
-    """Attach Identity Edit fit metadata plus the CcC RoPE extension.
-
-    `reference_latents` themselves are attached by the edit orchestrator. This helper adds the
-    remaining per-pass controls without changing the public node surface.
-    """
+    """Attach fit, RoPE and pass-specific boost metadata for visual references."""
     if reference_count <= 0:
         return conditioning
     values: Dict[str, Any] = {
@@ -162,11 +144,6 @@ def _normalize_runtime_list(value: Any, count: int, default: Any) -> List[Any]:
     return raw
 
 
-def _normalize_runtime_boosts(value: Any, count: int, default: float = 1.0) -> List[float]:
-    """Backward-compatible float specialization used by existing tests/helpers."""
-    return [float(v) for v in _normalize_runtime_list(value, count, default)]
-
-
 def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> bool:
     """Check whether a model patcher already carries a CcC edit runtime marker/wrapper."""
     if getattr(model, "_ccc_patch_key", None) == patch_key:
@@ -191,19 +168,8 @@ def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> b
     return False
 
 
-def check_patch_safety(model: Any, target_patch: str) -> None:
-    if target_patch in ("krea2_edit", "ccc_krea2_edit") and is_model_already_patched(model, "ccc_ostris_edit"):
-        raise ValueError("[CcC Krea2] Cannot apply Krea2 Edit on a model already patched for Ostris Edit.")
-    if target_patch in ("ostris_edit", "ccc_ostris_edit") and is_model_already_patched(model, "ccc_krea2_edit"):
-        raise ValueError("[CcC Krea2] Cannot apply Ostris Edit on a model already patched for Krea2 Edit.")
-
-
-def patch_krea2_model(model: Any, prepared_refs: Optional[List[Any]] = None) -> Any:
-    """Clone MODEL and register a runtime wrapper that consumes refs from CONDITIONING.
-
-    `prepared_refs` is retained only for call compatibility. References are deliberately not
-    captured in the MODEL anymore; conditioning owns the per-pass reference state.
-    """
+def patch_krea2_model(model: Any) -> Any:
+    """Clone MODEL and register the CcC runtime wrapper that consumes references from CONDITIONING."""
     if is_model_already_patched(model, "ccc_krea2_edit"):
         raise RuntimeError(
             "[CcC Krea2] Input MODEL is already patched by CcC Krea2 Edit. Connect Edit to the unpatched upstream MODEL."
@@ -336,7 +302,7 @@ def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
 
 
 def _fit_latent(src: torch.Tensor, height: int, width: int) -> torch.Tensor:
-    """Legacy fallback: crop to target AR then resize in latent space."""
+    """Crop to target aspect ratio then resize in latent space when a reference cannot keep its own grid."""
     sh, sw = src.shape[-2:]
     if (sh, sw) == (height, width):
         return src
@@ -376,12 +342,7 @@ def _compute_ref_attention_bias_patchified(
     dtype: Optional[torch.dtype] = None,
     masked_boosts: Optional[List[float]] = None,
 ) -> Optional[torch.Tensor]:
-    """Target->reference attention bias with legacy optional mask compatibility.
-
-    The split public Edit surface currently supplies unmasked refs, so its runtime path reduces
-    to a per-reference log(boost) bias. The mask branch is retained for internal compatibility
-    and tests.
-    """
+    """Build target-to-reference attention bias from per-reference boost values."""
     if not boosts:
         return None
     device = device or torch.device("cpu")
@@ -466,8 +427,7 @@ def krea2_dit_incontext_forward(
     ref_boosts: Optional[List[float]] = None,
     transformer_options: Optional[Dict[str, Any]] = None,
     ref_fit: Optional[List[bool]] = None,
-    ref_rope_positions: Optional[List[str]] = None,
-    **_legacy: Any,
+    ref_rope_positions: Optional[List[str]] = None
 ) -> torch.Tensor:
     """In-context Krea2 forward with optional CcC RoPE displacement."""
     transformer_options = transformer_options or {}
