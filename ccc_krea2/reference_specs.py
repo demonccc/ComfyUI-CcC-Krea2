@@ -1,15 +1,16 @@
-"""Typed data structures for Qwen Vision preparation, reference specifications, and reference chains."""
+"""Typed data structures for Qwen Vision preparation and CcC Krea2 references."""
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple
+
 import torch
 
 
 @dataclass(frozen=True)
 class VisionPrepSpec:
-    """Specification describing how a vision image derivative was prepared for Qwen Vision."""
+    """Describe how a Qwen Vision image derivative was prepared."""
 
-    mode: str  # "native", "adaptive", "fixed"
+    mode: str
     semantic_min_mp: float
     semantic_max_mp: float
     semantic_fixed_mp: float
@@ -22,7 +23,7 @@ class VisionPrepSpec:
 
 @dataclass(frozen=True)
 class PreparedVisionImage:
-    """Wrapper storing untouched original image and derived Qwen Vision image."""
+    """Store the untouched source image and the derived Qwen Vision image."""
 
     original_image: torch.Tensor
     vision_image: torch.Tensor
@@ -32,9 +33,9 @@ class PreparedVisionImage:
 
 @dataclass(frozen=True)
 class ReferenceSpec:
-    """Generic declarative specification for an edit or style reference image."""
+    """Declarative reference used by the CcC Krea2 edit pipeline."""
 
-    reference_path: str = "edit"  # "edit" or "style"
+    reference_path: str = "edit"
     prepared_image: Optional[PreparedVisionImage] = None
     requested_vision_slot: Optional[int] = None
     alias: str = ""
@@ -42,114 +43,40 @@ class ReferenceSpec:
     vision_instruction: str = ""
     include_in_vision: bool = True
 
-    # Edit-path parameters
+    # Visual/edit path
     appearance_reference: bool = True
     attention_boost: float = 1.0
     masked_attention_boost: float = 1.0
     attention_mask: Optional[torch.Tensor] = None
-    visual_reference_fit: str = "auto"
-    visual_resize_method: str = "bicubic"
-    rope_position: str = "none"  # "none", "up", "down", "left", "right"
+    visual_reference_fit: str = "native"
+    visual_resize_method: str = "lanczos"
+    rope_position: str = "inside:center:center"
 
-    # Qwen-only semantic extraction (Krea2Moodboard subject mechanics)
-    semantic_extract: str = "none"  # "none" or "subject"
+    # Qwen-only semantic processing
+    semantic_extract: str = "none"
     semantic_strength: float = 1.0
 
-    # Style-path parameters
+    # Style path
     style_fidelity: float = 0.5
-    style_processing: str = "2x2"  # "full", "2x2", "4x4"
+    style_processing: str = "2x2"
     indirect_style_transfer: bool = True
-    style_directive: bool = True
-
-    # Legacy & directive anchor fields for backward compatibility
-    role: str = ""
-    aliases_template: str = ""
-    extra_vision_directive: str = ""
-    visual_fit_mode: str = ""
-    pose_anchor: float = 0.0
-    outfit_anchor: float = 0.0
-    masked_identity_anchor: float = 0.0
-    scene_anchor: float = 0.0
-    masked_region_anchor: float = 0.0
-
-    # Internal legacy role storage
-    _legacy_role: str = ""
-
-    def __post_init__(self):
-        if self.role and not self._legacy_role:
-            object.__setattr__(self, "_legacy_role", self.role)
-        if self._legacy_role and (not self.reference_path or self.reference_path == "edit"):
-            ref_p = "style" if self._legacy_role.lower() == "style" else "edit"
-            object.__setattr__(self, "reference_path", ref_p)
-        if not self.role:
-            object.__setattr__(self, "role", self._legacy_role if self._legacy_role else self.reference_path)
-        if self.aliases_template and not self.alias:
-            object.__setattr__(self, "alias", self.aliases_template)
-        if self.extra_vision_directive and not self.vision_instruction:
-            object.__setattr__(self, "vision_instruction", self.extra_vision_directive)
-        if self.visual_fit_mode and self.visual_reference_fit == "auto":
-            object.__setattr__(self, "visual_reference_fit", self.visual_fit_mode)
 
     @property
-    def get_role(self) -> str:
-        if self._legacy_role:
-            return self._legacy_role
-        if self.role:
-            return self.role
+    def role(self) -> str:
         return self.reference_path
-
-
-# Compatibility base class and role specs for existing workflows and tests
-BaseReferenceSpec = ReferenceSpec
-
-
-@dataclass(frozen=True)
-class SubjectReferenceSpec(ReferenceSpec):
-    """Deprecated compatibility wrapper for Subject reference."""
-
-    def __post_init__(self):
-        super().__post_init__()
-        object.__setattr__(self, "reference_path", "edit")
-        if not self._legacy_role:
-            object.__setattr__(self, "_legacy_role", "subject")
-
-
-@dataclass(frozen=True)
-class SceneReferenceSpec(ReferenceSpec):
-    """Deprecated compatibility wrapper for Scene reference."""
-
-    def __post_init__(self):
-        super().__post_init__()
-        object.__setattr__(self, "reference_path", "edit")
-        if not self._legacy_role:
-            object.__setattr__(self, "_legacy_role", "scene")
-
-
-@dataclass(frozen=True)
-class OutfitReferenceSpec(ReferenceSpec):
-    """Deprecated compatibility wrapper for Outfit reference."""
-
-    def __post_init__(self):
-        super().__post_init__()
-        object.__setattr__(self, "reference_path", "edit")
-        if not self._legacy_role:
-            object.__setattr__(self, "_legacy_role", "outfit")
 
 
 @dataclass(frozen=True)
 class StyleReferenceSpec(ReferenceSpec):
-    """Deprecated compatibility wrapper for Style reference."""
+    """Reference that contributes style information through Qwen Vision."""
 
-    def __post_init__(self):
-        super().__post_init__()
-        object.__setattr__(self, "reference_path", "style")
-        if not self._legacy_role:
-            object.__setattr__(self, "_legacy_role", "style")
+    reference_path: str = "style"
+    appearance_reference: bool = False
 
 
 @dataclass(frozen=True)
 class ReferenceChain:
-    """Immutable sequence of ReferenceSpec items."""
+    """Immutable ordered sequence of references."""
 
     specs: Tuple[ReferenceSpec, ...] = ()
 
@@ -158,7 +85,6 @@ class ReferenceChain:
         return self.specs
 
     def append(self, spec: ReferenceSpec) -> "ReferenceChain":
-        """Append a specification returning a new ReferenceChain instance."""
         return ReferenceChain(specs=self.specs + (spec,))
 
     def __iter__(self):
