@@ -194,7 +194,7 @@ def _combine_reference_chains(
             continue
 
         if entry.image is None:
-            raise ValueError(f"[CcC Krea2] Visual reference {index} has neither IMAGE nor cache.")
+            raise ValueError(f"[Krea2 CcC Edit] Visual reference {index} has neither IMAGE nor cache.")
         prep = _prepare_qwen_image(
             image=entry.image,
             clip=clip,
@@ -221,7 +221,7 @@ def _combine_reference_chains(
     if latent_semantic.get("enabled"):
         latent_image = latent_semantic.get("image")
         if latent_image is None:
-            raise ValueError("[CcC Krea2] Latent semantic metadata is enabled but does not contain an image.")
+            raise ValueError("[Krea2 CcC Edit] Latent semantic metadata is enabled but does not contain an image.")
         chain = _append_semantic(
             chain=chain,
             image=latent_image,
@@ -280,17 +280,17 @@ def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
 
 
 class CcCKrea2Edit:
-    """Krea2 Edit orchestrator consuming the split CcC Latent/Reference node outputs."""
+    """Krea2 CcC Edit orchestrator consuming Krea2 CcC Latent and reference node outputs."""
 
     CATEGORY = NODE_CATEGORY
     RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING")
     RETURN_NAMES = ("patched_model", "positive", "negative", "latent", "edit_info")
     FUNCTION = "process"
     DESCRIPTION = (
-        "Krea2 Edit orchestrator. CcC resolves target geometry and reference preparation while "
+        "Krea2 CcC Edit orchestrator. Krea2 CcC Edit resolves target geometry and reference preparation while "
         "appearance refs, fit state, per-pass boosts and RoPE placement travel with CONDITIONING. "
         "The grounded negative branch always uses an empty text prompt and neutral reference boosts. "
-        "CcC Krea2 owns a single edit runtime for all visual references."
+        "Krea2 CcC Edit owns a single edit runtime for all visual references."
     )
 
     @classmethod
@@ -333,7 +333,7 @@ class CcCKrea2Edit:
             latent=latent,
         )
 
-        # CcC prepares geometry, Qwen images and VAE reference latents.
+        # Krea2 CcC Edit prepares geometry, Qwen images and VAE reference latents.
         _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
             model=model,
             clip=clip,
@@ -384,11 +384,11 @@ class CcCKrea2Edit:
             "Qwen Contract: positional visual blocks with optional Image N prompt annotations",
             "Negative Prompt: fixed empty string",
             (
-                "Edit Runtime: CcC Krea2"
+                "Edit Runtime: Krea2 CcC Edit"
                 if runtime_mode == "ccc"
                 else "Edit Runtime: patch disabled"
             ),
-            f"CcC Forward Override: {'yes' if runtime_mode == 'ccc' else 'no'}",
+            f"Krea2 CcC Edit Forward Override: {'yes' if runtime_mode == 'ccc' else 'no'}",
         ]
 
         if reference_count:
