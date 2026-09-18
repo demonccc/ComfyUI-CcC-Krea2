@@ -220,6 +220,20 @@ def test_latent_dimension_modes_are_explicit_and_align_to_16():
     assert preset_h % 16 == 0
 
 
+def test_fixed_latent_dimensions_are_not_capped_by_3mp_preset_ceiling():
+    width, height, source = _resolve_dimensions(
+        dimensions="fixed",
+        dimensions_image=None,
+        width=2048,
+        height=2048,
+        resolution="3.0 MP",
+        aspect_ratio="1:1",
+    )
+    assert (width, height) == (2048, 2048)
+    assert width * height > 3_000_000
+    assert source == "fixed 2048 x 2048"
+
+
 def test_latent_surface_separates_dimensions_and_content():
     inputs = CcCKrea2Latent.INPUT_TYPES()
     required = inputs["required"]
