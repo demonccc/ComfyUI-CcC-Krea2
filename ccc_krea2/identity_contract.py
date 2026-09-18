@@ -85,7 +85,7 @@ def build_grounded_negative_user_content(
     """Build the Identity Edit grounded unconditional branch.
 
     The negative branch receives the same appearance images in the same order, but no role text
-    or edit instruction. Split CcC Edit fixes ``user_negative_prompt`` to the empty string and
+    or edit instruction. Krea2 CcC Edit fixes ``user_negative_prompt`` to the empty string and
     keeps negative reference boosts neutral at 1.0.
     """
     blocks = []
