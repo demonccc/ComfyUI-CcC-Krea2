@@ -30,6 +30,14 @@ Qwen is independent from the VAE path. `semantic` decides whether the same image
 
 `boost` applies to the positive pass. The grounded negative uses the same reference images with boost fixed to `1.0`.
 
+### Semantic Reference
+
+`Krea2 CcC Semantic Reference` is Qwen-only and does not add another Identity Edit VAE/LoRA reference.
+
+For `mode = semantic_only`, CcC now mirrors the Krea2Moodboard `extract=subject` path: the complete image is encoded by Qwen, its exact vision span is identified, and Moodboard subject whitening is applied to that span before the positive conditioning reaches Krea 2. This keeps content/composition structure available while leaving identity to the normal Visual References.
+
+Semantic-only always uses the full image. The built-in directive asks Qwen to preserve pose, action, outfit, people, interactions, objects, background, framing and composition while ignoring the semantic reference subject's identity. `fidelity` acts like Moodboard strength: `1.0` keeps raw vision rows and lower values apply stronger subject/content extraction; the default is `0.5`.
+
 ### Size Resolver
 
 `Krea2 CcC Size Resolver` combines two images without carrying image content forward:
