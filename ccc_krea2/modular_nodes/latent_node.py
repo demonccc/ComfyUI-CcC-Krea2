@@ -226,7 +226,7 @@ class CcCKrea2Latent:
                 "resize_method": (RESIZE_METHODS, {"default": "auto"}),
                 "latent_semantic": ("BOOLEAN", {"default": False}),
                 "latent_semantic_instruction": ("STRING", {"multiline": True, "default": ""}),
-                "latent_grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 16}),
+                "latent_grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 32}),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
