@@ -9,7 +9,7 @@ from .reference_specs import PreparedVisionImage, ReferenceChain
 from .geometry import resize_tensor
 
 
-EASY_GEOMETRY_HARD_CAP_MEGAPIXELS = 2.5
+EASY_GEOMETRY_HARD_CAP_MEGAPIXELS = 3.0
 EASY_ASPECT_RATIOS = ("auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
 
 
@@ -263,11 +263,6 @@ def calculate_target_latent_resolution(
     elif geometry_mode in ("fixed", "crop_subject"):
         geometry_source = "fixed_megapixels"
         active_mp = fixed_megapixels
-        if fixed_megapixels > 2.0:
-            warnings.append(
-                f"Warning: Fixed MP is set to {fixed_megapixels:.2f} MP, exceeding recommended 2.0 MP limit."
-            )
-
         if ":" in aspect_ratio:
             parts = aspect_ratio.split(":")
             try:
