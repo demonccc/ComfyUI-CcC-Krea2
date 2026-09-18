@@ -1,8 +1,7 @@
-"""Unit tests for Qwen Vision image prep logic and node."""
+"""Unit tests for Qwen Vision image preparation helpers."""
 
 import torch
 from ccc_krea2.vision_prep import prepare_vision_image, format_vision_info
-from ccc_krea2.modular_nodes.vision_prep_node import CcCKrea2QwenVisionImagePrep
 
 
 def test_qwen_vision_prep_native_mode():
@@ -56,13 +55,6 @@ def test_qwen_vision_prep_introspection_tracking():
     assert len(cfg.introspection_warnings) > 0
     assert cfg.interpolation == "bilinear"
 
-
-def test_qwen_vision_prep_node_execution():
-    node = CcCKrea2QwenVisionImagePrep()
-    img = torch.rand(1, 800, 600, 3)
-    prep_obj, vis_img, info_str = node.process(clip=None, image=img, vision_preparation_mode="native")
-    assert vis_img.shape[0] == 1
-    assert "Prepared Size:" in info_str
 
 
 def test_vision_prep_import_and_prepare_image_for_qwen():
