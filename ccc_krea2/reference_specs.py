@@ -51,6 +51,9 @@ class ReferenceSpec:
     visual_reference_fit: str = "native"
     visual_resize_method: str = "lanczos"
     rope_position: str = "inside:center:center"
+    cached_appearance_latent: Optional[torch.Tensor] = None
+    cached_geometry: Optional[Any] = None
+    cached_qwen_visual: Optional[Any] = None
 
     # Qwen-only semantic processing
     semantic_extract: str = "none"
