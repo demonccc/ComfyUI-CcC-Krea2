@@ -8,7 +8,7 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
-REFERENCE_FIT = ("crop", "resize", "native")
+REFERENCE_FIT = ("crop", "resize", "contain", "native")
 PLACEMENT_GRIDS = ("inside", "outside")
 GRID_HORIZONTAL = ("center", "left", "right")
 GRID_VERTICAL = ("center", "up", "down")
@@ -24,9 +24,10 @@ class CcCKrea2VisualReference:
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one ordered Krea2 Edit appearance reference. reference_fit controls only the pixel path sent to VAE: "
-        "crop uses the target grid as an inside crop window positioned by the grid controls, resize always scales "
-        "proportionally to the target grid longest edge, and native preserves source size except for minimum VAE "
-        "alignment. semantic controls whether the same image is also shown to Qwen. prompt_annotation optionally "
+        "crop uses the target grid as an inside crop window positioned by the grid controls; resize maps the reference "
+        "long edge to the corresponding target edge; contain scales the reference to fit inside the target; and "
+        "native keeps a 1:1 source scale. resize, contain and native use minimal centered crop-down alignment to /16 "
+        "instead of padding or distorting. semantic controls whether the same image is also shown to Qwen. prompt_annotation optionally "
         "adds 'Image N: ...' text after the vision prefix."
     )
 
@@ -50,7 +51,7 @@ class CcCKrea2VisualReference:
                     RESIZE_METHODS,
                     {
                         "default": "lanczos",
-                        "tooltip": "Interpolation used only when reference_fit is resize.",
+                        "tooltip": "Interpolation used when reference_fit is resize or contain.",
                     },
                 ),
                 "semantic": (

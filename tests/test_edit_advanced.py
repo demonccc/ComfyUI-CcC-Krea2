@@ -32,7 +32,7 @@ def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
         "prompt_annotation",
     ]
     assert list(optional) == ["previous_references"]
-    assert required["reference_fit"][0] == ("crop", "resize", "native")
+    assert required["reference_fit"][0] == ("crop", "resize", "contain", "native")
     assert required["placement_grid"][0] == ("inside", "outside")
     assert required["grid_horizontal_position"][0] == ("center", "left", "right")
     assert required["grid_vertical_position"][0] == ("center", "up", "down")
@@ -93,16 +93,17 @@ def test_visual_reference_crop_forces_inside_grid():
 
 
 
-def test_krea2_v12_fit_regression_for_1719x1164_reference_against_992_square_target():
+def test_contain_regression_for_1719x1164_reference_against_992_square_target():
     geom = resolve_krea2edit_geometry(
         src_h=1164,
         src_w=1719,
         tgt_h=992,
         tgt_w=992,
-        fit_mode="fit",
+        fit_mode="contain",
     )
 
-    assert geom.mode_resolved == "fit"
+    assert geom.mode_resolved == "contain"
+    assert geom.crop_rectangle == (0, 13, 1719, 1137)
     assert geom.vae_input_pixel_size == (992, 656)
     assert geom.vae_latent_grid_size == (124, 82)
     assert geom.target_grid_size == (124, 124)

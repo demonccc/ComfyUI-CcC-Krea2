@@ -26,11 +26,14 @@ Size Resolver --> Latent -------+
 
 Use one node per ordered appearance reference.
 
-The VAE path exposes three modes:
+The VAE path exposes four modes:
 
-- `crop`: the target grid acts as an inside crop window over the source.
-- `resize`: resize proportionally so the source longest edge matches the target-grid longest edge.
-- `native`: preserve source pixels, applying only minimum VAE alignment when required.
+- `crop`: the target grid acts as an inside crop window over the source. It may intentionally discard content.
+- `resize`: map the reference long edge to the corresponding target edge, preserve aspect ratio, then center-crop only the minimum pixels required to land on a /16 grid.
+- `contain`: scale the reference so it fits inside the target, preserve aspect ratio, then center-crop only the minimum pixels required to land on a /16 grid.
+- `native`: keep the reference at 1:1 pixel scale and center-crop each edge down to /16. Native is the only mode that may remain larger than the target.
+
+The /16 adjustment is always crop-down. Krea2 CcC Edit does not pad or stretch a visual reference merely to satisfy VAE grid alignment.
 
 RoPE placement is controlled independently through `placement_grid`, horizontal position and vertical position.
 

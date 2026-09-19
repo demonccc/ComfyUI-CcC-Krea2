@@ -17,7 +17,7 @@ from ..reference_cache import (
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
-REFERENCE_FIT = ("crop", "resize", "native")
+REFERENCE_FIT = ("crop", "resize", "contain", "native")
 PLACEMENT_GRIDS = ("inside", "outside")
 GRID_HORIZONTAL = ("center", "left", "right")
 GRID_VERTICAL = ("center", "up", "down")

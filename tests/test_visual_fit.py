@@ -22,13 +22,13 @@ def test_public_crop_uses_positioned_inside_grid_window():
         grid_horizontal_position="left",
         grid_vertical_position="down",
     )
-    assert meta["mode_resolved"] == "crop_window"
+    assert meta["mode_resolved"] == "crop"
     assert meta["crop_rectangle"] == (0, 388, 640, 512)
     assert out_img.shape == (1, 512, 640, 3)
     assert meta["interpolation_method"] == "none"
 
 
-def test_public_resize_always_scales_up_or_down_with_selected_method():
+def test_public_resize_maps_reference_long_edge_to_corresponding_target_edge():
     small = torch.rand(1, 256, 128, 3)
     out_small, _, meta_small = resolve_visual_reference_fit(
         small,
@@ -53,7 +53,37 @@ def test_public_resize_always_scales_up_or_down_with_selected_method():
     assert meta_large["interpolation_method"] == "bicubic"
 
 
-def test_public_native_preserves_pixels_except_vae_alignment():
+def test_public_resize_uses_minimal_crop_to_land_on_16_grid_without_distortion():
+    img = torch.rand(1, 300, 217, 3)
+    out_img, _, meta = resolve_visual_reference_fit(
+        img,
+        target_h=192,
+        target_w=192,
+        mode="resize",
+        resize_method="bicubic",
+    )
+    assert out_img.shape == (1, 192, 128, 3)
+    assert meta["crop_rectangle"] == (8, 0, 200, 300)
+    assert meta["spatial_hw"] == (192, 128)
+
+
+def test_public_contain_scales_to_fit_inside_target_then_crops_only_for_16_grid():
+    img = torch.rand(1, 200, 300, 3)
+    out_img, _, meta = resolve_visual_reference_fit(
+        img,
+        target_h=160,
+        target_w=400,
+        mode="contain",
+        resize_method="bicubic",
+    )
+    assert meta["mode_resolved"] == "contain"
+    assert out_img.shape == (1, 160, 240, 3)
+    assert meta["crop_rectangle"] == (0, 0, 300, 200)
+    assert out_img.shape[1] <= 160
+    assert out_img.shape[2] <= 400
+
+
+def test_public_native_preserves_1_to_1_pixels_and_crops_down_to_16():
     img = torch.rand(1, 701, 603, 3)
     out_img, _, meta = resolve_visual_reference_fit(
         img,
@@ -62,8 +92,10 @@ def test_public_native_preserves_pixels_except_vae_alignment():
         mode="native",
     )
     assert meta["mode_resolved"] == "native"
-    assert out_img.shape == (1, 704, 608, 3)
-    assert meta["interpolation_method"] == "pad"
+    assert out_img.shape == (1, 688, 592, 3)
+    assert meta["crop_rectangle"] == (5, 6, 592, 688)
+    assert meta["interpolation_method"] == "none"
+    assert torch.equal(out_img, img[:, 6:694, 5:597, :])
 
 
 def test_style_slicing():

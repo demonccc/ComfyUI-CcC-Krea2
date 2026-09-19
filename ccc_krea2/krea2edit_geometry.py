@@ -2,11 +2,13 @@
 
 Public modes:
 - crop: use the target grid as an inside crop window over the source.
-- resize: scale proportionally to the target-grid longest edge.
-- native: preserve source pixels and only pad to minimum VAE alignment when required.
+- resize: map the reference long edge to the corresponding target edge, preserve
+  aspect ratio, then center-crop only the minimum pixels required for /16.
+- contain: scale the reference to fit inside the target, preserve aspect ratio,
+  then center-crop only the minimum pixels required for /16.
+- native: preserve 1:1 source scale and center-crop each edge down to /16.
 """
 
-import math
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
@@ -14,9 +16,6 @@ import torch
 import torch.nn.functional as F
 
 from .geometry import resize_tensor
-
-
-CROP_TOL = 0.08
 
 
 @dataclass
@@ -37,10 +36,6 @@ def _floor16(value: float) -> int:
     return max(16, int(value) // 16 * 16)
 
 
-def _round16(value: float) -> int:
-    return max(16, int(round(float(value) / 16.0)) * 16)
-
-
 def _positioned_crop_offset(available: int, position: str) -> int:
     if available <= 0:
         return 0
@@ -51,16 +46,22 @@ def _positioned_crop_offset(available: int, position: str) -> int:
     return available // 2
 
 
-def _crop_to_target_ar(src_h: int, src_w: int, tgt_h: int, tgt_w: int) -> Tuple[int, int, int, int]:
-    src_ar = src_w / float(src_h)
-    tgt_ar = tgt_w / float(tgt_h)
-    if src_ar > tgt_ar:
-        crop_h = src_h
-        crop_w = int(round(src_h * tgt_ar))
-    else:
-        crop_w = src_w
-        crop_h = int(round(src_w / tgt_ar))
-    return (src_w - crop_w) // 2, (src_h - crop_h) // 2, crop_w, crop_h
+def _centered_crop_for_scaled_grid(
+    src_h: int,
+    src_w: int,
+    scale: float,
+    out_h: int,
+    out_w: int,
+) -> Tuple[int, int, int, int]:
+    """Crop source pixels so one uniform scale lands exactly on a /16 output grid."""
+    if scale <= 0.0:
+        raise ValueError("Krea2 reference scale must be positive.")
+
+    crop_h = min(src_h, max(1, int(round(out_h / scale))))
+    crop_w = min(src_w, max(1, int(round(out_w / scale))))
+    top = (src_h - crop_h) // 2
+    left = (src_w - crop_w) // 2
+    return left, top, crop_w, crop_h
 
 
 def resolve_krea2edit_geometry(
@@ -68,46 +69,29 @@ def resolve_krea2edit_geometry(
     src_w: int,
     tgt_h: int,
     tgt_w: int,
-    fit_mode: str = "auto",
+    fit_mode: str = "native",
     grid_horizontal_position: Optional[str] = None,
     grid_vertical_position: Optional[str] = None,
     resize_method: str = "bicubic",
 ) -> ResolvedGeometry:
     """Resolve visual-reference geometry for the Krea2 CcC Edit pipeline."""
     requested = fit_mode
-    if fit_mode == "exact":
-        fit_mode = "auto"
+
+    # Backward-compatible aliases are internal only. Public nodes expose:
+    # crop / resize / contain / native.
+    if fit_mode == "fit":
+        fit_mode = "contain"
+    elif fit_mode == "exact":
+        fit_mode = "native"
     elif fit_mode == "stretch":
         fit_mode = "crop"
+    elif fit_mode == "auto":
+        fit_mode = "contain"
 
     target_cap_h = _floor16(tgt_h)
     target_cap_w = _floor16(tgt_w)
     target_lat_h = tgt_h // 8
     target_lat_w = tgt_w // 8
-
-    scale = min(tgt_h / float(src_h), tgt_w / float(src_w))
-    near_match = (
-        src_h * scale >= tgt_h * (1.0 - CROP_TOL)
-        and src_w * scale >= tgt_w * (1.0 - CROP_TOL)
-    )
-
-    if fit_mode == "auto":
-        if (src_w, src_h) == (tgt_w, tgt_h):
-            resolved = "exact"
-        elif near_match:
-            resolved = "crop_and_resize"
-        else:
-            resolved = "fit"
-    elif fit_mode == "fit":
-        resolved = "exact" if (src_w, src_h) == (tgt_w, tgt_h) else ("crop_and_resize" if near_match else "fit")
-    elif fit_mode == "crop":
-        resolved = "crop_window" if grid_horizontal_position is not None or grid_vertical_position is not None else "crop"
-    elif fit_mode == "resize":
-        resolved = "resize"
-    elif fit_mode in ("contain", "native", "contain_no_upscale", "fit_no_upscale"):
-        resolved = "contain_no_upscale" if fit_mode in ("contain_no_upscale", "fit_no_upscale") else fit_mode
-    else:
-        resolved = fit_mode
 
     left = 0
     top = 0
@@ -115,57 +99,86 @@ def resolve_krea2edit_geometry(
     crop_h = src_h
     interpolation = resize_method
 
-    if resolved == "exact":
-        vae_w = tgt_w
-        vae_h = tgt_h
-        interpolation = "none" if (src_w, src_h) == (vae_w, vae_h) else "bicubic"
-    elif resolved == "crop_window":
-        # The target grid acts as a window inside the source. Position selects which
-        # source region is kept. Crop mode never uses outside placement and does not
-        # intentionally rescale pixels.
-        crop_w = _floor16(min(src_w, tgt_w))
-        crop_h = _floor16(min(src_h, tgt_h))
+    if fit_mode == "crop":
+        # The target grid is a window over the source. Crop never resizes.
+        crop_w = _floor16(min(src_w, target_cap_w))
+        crop_h = _floor16(min(src_h, target_cap_h))
+        if crop_w > src_w or crop_h > src_h:
+            raise ValueError("[Krea2 CcC Edit] crop reference is smaller than the minimum /16 VAE grid.")
         left = _positioned_crop_offset(src_w - crop_w, grid_horizontal_position or "center")
         top = _positioned_crop_offset(src_h - crop_h, grid_vertical_position or "center")
         vae_w = crop_w
         vae_h = crop_h
         interpolation = "none"
-    elif resolved in ("crop", "crop_and_resize"):
-        # Internal fit/crop path.
-        left, top, crop_w, crop_h = _crop_to_target_ar(src_h, src_w, tgt_h, tgt_w)
-        vae_w = tgt_w
-        vae_h = tgt_h
-    elif resolved == "resize":
-        # Always resize, preserving aspect ratio. The source longest edge is mapped to
-        # the target grid longest edge, regardless of whether that means up/down scaling.
-        target_longest = max(tgt_h, tgt_w)
-        source_longest = max(src_h, src_w)
-        resize_scale = target_longest / float(source_longest)
-        vae_h = _round16(src_h * resize_scale)
-        vae_w = _round16(src_w * resize_scale)
-        interpolation = resize_method
-    elif resolved == "fit":
-        # For genuine aspect-ratio mismatches, preserve the complete
-        # source image and resize it uniformly to a /16-snapped fit-inside grid. The
-        # narrower reference grid is then centered inside the target by the runtime RoPE.
+        resolved = "crop"
+
+    elif fit_mode == "resize":
+        # CcC resize: the long edge of the REFERENCE is mapped to the corresponding
+        # axis of the TARGET. The other edge follows proportionally. A minimal
+        # centered source crop makes that uniform scale land exactly on /16.
+        if src_h >= src_w:
+            scale = target_cap_h / float(src_h)
+            vae_h = target_cap_h
+            vae_w = _floor16(src_w * scale)
+        else:
+            scale = target_cap_w / float(src_w)
+            vae_w = target_cap_w
+            vae_h = _floor16(src_h * scale)
+
+        left, top, crop_w, crop_h = _centered_crop_for_scaled_grid(
+            src_h=src_h,
+            src_w=src_w,
+            scale=scale,
+            out_h=vae_h,
+            out_w=vae_w,
+        )
+        interpolation = "none" if (crop_w, crop_h) == (vae_w, vae_h) else resize_method
+        resolved = "resize"
+
+    elif fit_mode == "contain":
+        # Fit inside the target. Unlike crop, contain never chooses a target-AR crop.
+        # It only trims the few source pixels needed so one uniform scale lands on /16.
+        scale = min(target_cap_h / float(src_h), target_cap_w / float(src_w))
         vae_h = min(_floor16(src_h * scale), target_cap_h)
         vae_w = min(_floor16(src_w * scale), target_cap_w)
-    elif resolved == "contain":
-        vae_h = min(_floor16(round(src_h * scale)), target_cap_h)
-        vae_w = min(_floor16(round(src_w * scale)), target_cap_w)
-    elif resolved == "contain_no_upscale":
-        downscale = min(1.0, scale)
-        if downscale >= 1.0:
-            vae_h = min(max(16, math.ceil(src_h / 16) * 16), target_cap_h)
-            vae_w = min(max(16, math.ceil(src_w / 16) * 16), target_cap_w)
-            interpolation = "pad" if (vae_w, vae_h) != (src_w, src_h) else "none"
-        else:
-            vae_h = min(_floor16(round(src_h * downscale)), target_cap_h)
-            vae_w = min(_floor16(round(src_w * downscale)), target_cap_w)
-    elif resolved == "native":
-        vae_h = max(16, math.ceil(src_h / 16) * 16)
-        vae_w = max(16, math.ceil(src_w / 16) * 16)
-        interpolation = "pad" if (vae_w, vae_h) != (src_w, src_h) else "none"
+        left, top, crop_w, crop_h = _centered_crop_for_scaled_grid(
+            src_h=src_h,
+            src_w=src_w,
+            scale=scale,
+            out_h=vae_h,
+            out_w=vae_w,
+        )
+        interpolation = "none" if (crop_w, crop_h) == (vae_w, vae_h) else resize_method
+        resolved = "contain"
+
+    elif fit_mode in ("contain_no_upscale", "fit_no_upscale"):
+        # Internal compatibility mode: contain, but do not enlarge a smaller source.
+        scale = min(1.0, target_cap_h / float(src_h), target_cap_w / float(src_w))
+        vae_h = min(_floor16(src_h * scale), target_cap_h)
+        vae_w = min(_floor16(src_w * scale), target_cap_w)
+        left, top, crop_w, crop_h = _centered_crop_for_scaled_grid(
+            src_h=src_h,
+            src_w=src_w,
+            scale=scale,
+            out_h=vae_h,
+            out_w=vae_w,
+        )
+        interpolation = "none" if (crop_w, crop_h) == (vae_w, vae_h) else resize_method
+        resolved = "contain_no_upscale"
+
+    elif fit_mode == "native":
+        # Native keeps a 1:1 pixel scale. Alignment is crop-down, never pad-up.
+        if src_h < 16 or src_w < 16:
+            raise ValueError("[Krea2 CcC Edit] native reference edges must be at least 16 pixels.")
+        crop_w = _floor16(src_w)
+        crop_h = _floor16(src_h)
+        left = (src_w - crop_w) // 2
+        top = (src_h - crop_h) // 2
+        vae_w = crop_w
+        vae_h = crop_h
+        interpolation = "none"
+        resolved = "native"
+
     else:
         raise ValueError(f"Unsupported Krea2 reference fit mode: {fit_mode}")
 
@@ -184,7 +197,9 @@ def resolve_krea2edit_geometry(
         target_grid_size=(target_lat_w, target_lat_h),
         centered_fractional_offset=(offset_y, offset_x),
         interpolation_method=interpolation,
-        whether_interpolation_occurred=(crop_w, crop_h) != (vae_w, vae_h),
+        whether_interpolation_occurred=(
+            interpolation != "none" and (crop_w, crop_h) != (vae_w, vae_h)
+        ),
     )
 
 
@@ -201,17 +216,13 @@ def process_image_and_mask_geometry(
     vae_w, vae_h = geom.vae_input_pixel_size
     cropped = image[:, top:top + crop_h, left:left + crop_w, :]
 
-    if geom.interpolation_method == "pad":
-        pad_h = vae_h - cropped.shape[1]
-        pad_w = vae_w - cropped.shape[2]
-        pad_top = pad_h // 2
-        pad_bottom = pad_h - pad_top
-        pad_left = pad_w // 2
-        pad_right = pad_w - pad_left
-        nchw = cropped.permute(0, 3, 1, 2)
-        processed = F.pad(nchw, (pad_left, pad_right, pad_top, pad_bottom), mode="replicate").permute(0, 2, 3, 1)
-    elif (cropped.shape[1], cropped.shape[2]) != (vae_h, vae_w):
-        processed = resize_tensor(cropped, target_h=vae_h, target_w=vae_w, method=geom.interpolation_method)
+    if (cropped.shape[1], cropped.shape[2]) != (vae_h, vae_w):
+        processed = resize_tensor(
+            cropped,
+            target_h=vae_h,
+            target_w=vae_w,
+            method=geom.interpolation_method,
+        )
     else:
         processed = cropped
 
@@ -220,22 +231,11 @@ def process_image_and_mask_geometry(
         if mask.ndim == 2:
             mask = mask.unsqueeze(0)
         cropped_mask = mask[:, top:top + crop_h, left:left + crop_w]
-        if geom.interpolation_method == "pad":
-            pad_h = vae_h - cropped_mask.shape[1]
-            pad_w = vae_w - cropped_mask.shape[2]
-            pad_top = pad_h // 2
-            pad_bottom = pad_h - pad_top
-            pad_left = pad_w // 2
-            pad_right = pad_w - pad_left
-            processed_mask = F.pad(
-                cropped_mask.unsqueeze(1),
-                (pad_left, pad_right, pad_top, pad_bottom),
-                mode="constant",
-                value=0.0,
-            ).squeeze(1)
-        elif (cropped_mask.shape[1], cropped_mask.shape[2]) != (vae_h, vae_w):
+        if (cropped_mask.shape[1], cropped_mask.shape[2]) != (vae_h, vae_w):
             processed_mask = F.interpolate(
-                cropped_mask.unsqueeze(1), size=(vae_h, vae_w), mode="nearest-exact"
+                cropped_mask.unsqueeze(1),
+                size=(vae_h, vae_w),
+                mode="nearest-exact",
             ).squeeze(1)
         else:
             processed_mask = cropped_mask
@@ -247,7 +247,7 @@ def resolve_visual_reference_fit(
     image: torch.Tensor,
     target_h: int,
     target_w: int,
-    mode: str = "auto",
+    mode: str = "native",
     mask: Optional[torch.Tensor] = None,
     grid_horizontal_position: Optional[str] = None,
     grid_vertical_position: Optional[str] = None,

@@ -37,10 +37,12 @@ def test_split_edit_negative_prompt_is_fixed_empty_and_not_user_editable():
 def test_reference_fit_modes_expose_simple_public_contract():
     native = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="native")
     resize = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="resize")
+    contain = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="contain")
     crop = VisualReferenceEntry(image=torch.zeros((1, 64, 32, 3)), reference_fit="crop")
 
     assert native.resolved_fit_mode == "native"
     assert resize.resolved_fit_mode == "resize"
+    assert contain.resolved_fit_mode == "contain"
     assert crop.resolved_fit_mode == "crop"
 
 

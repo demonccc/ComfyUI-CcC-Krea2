@@ -27,7 +27,7 @@ source image
    |      optional Image N annotation
    |
    +--> appearance path
-          crop | resize | native
+          crop | resize | contain | native
           VAE encode
           reference latent
           boost
@@ -81,7 +81,10 @@ Public visual modes:
 
 - `crop`
 - `resize`
+- `contain`
 - `native`
+
+`resize` maps the reference long edge to the corresponding target axis. `contain` instead calculates the maximum uniform scale that fits inside both target axes. Both preserve aspect ratio and use minimal centered crop-down alignment to /16. `native` keeps a 1:1 pixel scale and also crops down to /16 rather than padding.
 
 RoPE placement is independent from pixel preparation.
 

@@ -8,22 +8,25 @@ Declares one ordered appearance reference.
 | --- | --- | --- | --- |
 | `image` | IMAGE | — | Source reference image. |
 | `boost` | 0.0 .. 10.0 | 1.0 | Positive target-to-reference attention boost. |
-| `reference_fit` | crop, resize, native | native | Pixel preparation before VAE encoding. |
+| `reference_fit` | crop, resize, contain, native | native | How the visual reference fits the target latent before VAE encoding. |
 | `placement_grid` | inside, outside | inside | RoPE placement grid. Crop always forces inside. |
 | `grid_horizontal_position` | center, left, right | center | Horizontal placement. |
 | `grid_vertical_position` | center, up, down | center | Vertical placement. |
-| `resize_method` | lanczos, bicubic, bilinear, area | lanczos | Interpolation for resize mode. |
+| `resize_method` | lanczos, bicubic, bilinear, area | lanczos | Interpolation for resize and contain modes. |
 | `semantic` | boolean | true | Also show the source image to Qwen. |
 | `semantic_resize` | boolean | true | Enable Qwen-only downscale when above the configured cap. |
 | `semantic_grounding_px` | 32 .. 4096, step 32 | 768 | Maximum Qwen longest edge when semantic resize is enabled. |
 | `semantic_resize_method` | lanczos, bicubic, bilinear, area | lanczos | Qwen downscale interpolation. |
 | `prompt_annotation` | text | empty | Optional `Image N: ...` Qwen annotation. |
 
-### Geometry modes
+### Reference fit modes
 
-- `crop`: keep an inside source crop selected by the placement controls.
-- `resize`: resize proportionally to the target-grid longest edge.
-- `native`: preserve source pixels except for minimum VAE alignment.
+- `crop`: use the target as an inside window over the reference. Content outside the selected window can be discarded.
+- `resize`: use the reference orientation as the anchor. Its long edge is mapped to the corresponding target axis, the other edge follows proportionally, and only the minimum centered source crop required for /16 alignment is removed.
+- `contain`: calculate the maximum uniform scale that keeps the reference inside the target, then apply only the minimum centered source crop required for /16 alignment.
+- `native`: keep a 1:1 source pixel scale and center-crop width and height down to /16. It can be larger than the target.
+
+For `resize`, `contain`, and `native`, /16 alignment is crop-down rather than pad-up or non-uniform resizing. The alignment crop is only a few edge pixels needed by the VAE grid and is distinct from the explicit `crop` mode.
 
 Qwen preparation is independent from VAE geometry.
 
