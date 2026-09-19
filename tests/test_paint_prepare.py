@@ -55,15 +55,38 @@ def test_native_canvas_is_not_resized_and_alignment_only_adds_pixels():
 
 
 def test_signed_mask_grow_expands_and_shrinks():
-    mask = torch.zeros((1, 9, 9), dtype=torch.float32)
-    mask[:, 4, 4] = 1.0
+    image = _base_image(height=16, width=16)
+    mask = torch.zeros((1, 16, 16), dtype=torch.float32)
+    mask[:, 8, 8] = 1.0
 
-    _, _, _, grown, _ = _prepare(mask, mask_grow=2)
+    _, _, _, grown, _ = prepare_paint_context(
+        image,
+        mask,
+        expand_left=0,
+        expand_top=0,
+        expand_right=0,
+        expand_bottom=0,
+        mask_grow=2,
+        mask_blur_mode="gaussian_sigma",
+        mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    )
     assert int((grown > 0.5).sum()) == 25
 
-    wide = torch.zeros((1, 9, 9), dtype=torch.float32)
-    wide[:, 2:7, 2:7] = 1.0
-    _, _, _, shrunk, _ = _prepare(wide, mask_grow=-2)
+    wide = torch.zeros((1, 16, 16), dtype=torch.float32)
+    wide[:, 6:11, 6:11] = 1.0
+    _, _, _, shrunk, _ = prepare_paint_context(
+        image,
+        wide,
+        expand_left=0,
+        expand_top=0,
+        expand_right=0,
+        expand_bottom=0,
+        mask_grow=-2,
+        mask_blur_mode="gaussian_sigma",
+        mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    )
     assert int((shrunk > 0.5).sum()) == 1
 
 
