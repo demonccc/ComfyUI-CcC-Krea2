@@ -1,23 +1,24 @@
-"""Checked-in workflow contract for the split scene + subject Edit test."""
+"""Checked-in workflow contracts for Krea2 CcC Edit and Paint tests."""
 
 import json
 from pathlib import Path
 
 
-WORKFLOW = Path("workflows/01_scene_subject.json")
+EDIT_WORKFLOW = Path("workflows/01_scene_subject.json")
+PAINT_WORKFLOW = Path("workflows/02_anypaint_remove_people.json")
 
 
 def _nodes_by_type(workflow, type_name):
     return [node for node in workflow["nodes"] if node["type"] == type_name]
 
 
-def test_only_one_edit_workflow_is_checked_in():
+def test_expected_workflows_are_checked_in():
     workflows = sorted(Path("workflows").rglob("*.json"))
-    assert workflows == [WORKFLOW]
+    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW]
 
 
 def test_scene_subject_workflow_uses_split_nodes():
-    workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
+    workflow = json.loads(EDIT_WORKFLOW.read_text(encoding="utf-8"))
 
     visual_nodes = _nodes_by_type(workflow, "CcCKrea2VisualReference")
     resolver_nodes = _nodes_by_type(workflow, "CcCKrea2SizeResolver")
@@ -43,8 +44,6 @@ def test_scene_subject_workflow_uses_split_nodes():
     assert "scene image" in scene["widgets_values"][10]
     assert "subject image" in subject["widgets_values"][10]
 
-    # Krea2 Edit exposes only positive prompt + patch toggle. The negative text branch is
-    # intentionally fixed to an empty string inside the node implementation.
     assert edit["widgets_values"] == [
         "Replace the person in the scene image with the person from the subject image.",
         True,
@@ -56,7 +55,7 @@ def test_scene_subject_workflow_uses_split_nodes():
 
 
 def test_scene_subject_size_resolver_feeds_fixed_latent_dimensions():
-    workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
+    workflow = json.loads(EDIT_WORKFLOW.read_text(encoding="utf-8"))
 
     resolver = _nodes_by_type(workflow, "CcCKrea2SizeResolver")[0]
     latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
@@ -79,14 +78,46 @@ def test_scene_subject_size_resolver_feeds_fixed_latent_dimensions():
     assert "empty" in latent_values
 
 
-def test_workflow_link_types_are_consistent():
-    workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
-    nodes = {node["id"]: node for node in workflow["nodes"]}
+def test_paint_workflow_uses_anypaint_runtime_and_mask_controls():
+    workflow = json.loads(PAINT_WORKFLOW.read_text(encoding="utf-8"))
 
-    for link_id, source_id, source_slot, target_id, target_slot, link_type in workflow["links"]:
-        source = nodes[source_id]["outputs"][source_slot]
-        target = nodes[target_id]["inputs"][target_slot]
-        assert source["type"] == link_type
-        assert target["type"] == link_type
-        assert link_id in (source.get("links") or [])
-        assert target["link"] == link_id
+    prepare_nodes = _nodes_by_type(workflow, "CcCKrea2PaintPrepare")
+    paint_nodes = _nodes_by_type(workflow, "CcCKrea2Paint")
+    lora_nodes = _nodes_by_type(workflow, "CcCKrea2LoRAStack")
+    sampler_nodes = _nodes_by_type(workflow, "KSampler")
+
+    assert len(prepare_nodes) == 1
+    assert len(paint_nodes) == 1
+    assert len(lora_nodes) == 1
+    assert len(sampler_nodes) == 1
+
+    prepare = prepare_nodes[0]
+    paint = paint_nodes[0]
+    lora = lora_nodes[0]
+    sampler = sampler_nodes[0]
+
+    assert prepare["widgets_values"] == [0, 0, 0, 0, 12, "gaussian_sigma", 4.0, "outside"]
+    assert paint["widgets_values"][1:] == [True, True]
+    assert lora["widgets_values"][3] == "krea2_anypaint_rank32.safetensors"
+    assert sampler["widgets_values"][2:7] == [8, 1.0, "euler", "simple", 1.0]
+
+    prepare_inputs = {item["name"]: item for item in prepare["inputs"]}
+    paint_inputs = {item["name"]: item for item in paint["inputs"]}
+    assert prepare_inputs["image"]["link"] is not None
+    assert prepare_inputs["mask"]["link"] is not None
+    assert paint_inputs["paint_context"]["type"] == "KREA2_PAINT_CONTEXT"
+    assert paint_inputs["paint_context"]["link"] is not None
+
+
+def test_all_workflow_link_types_are_consistent():
+    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW):
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        nodes = {node["id"]: node for node in workflow["nodes"]}
+
+        for link_id, source_id, source_slot, target_id, target_slot, link_type in workflow["links"]:
+            source = nodes[source_id]["outputs"][source_slot]
+            target = nodes[target_id]["inputs"][target_slot]
+            assert source["type"] == link_type
+            assert target["type"] == link_type
+            assert link_id in (source.get("links") or [])
+            assert target["link"] == link_id
