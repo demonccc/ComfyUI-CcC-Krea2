@@ -159,3 +159,83 @@ Runtime controls remain editable:
 - `prompt_annotation`
 
 No VAE encode or Qwen Vision execution is required for a cached reference.
+
+
+## Krea2 CcC Paint Prepare
+
+Builds the native paint canvas without resizing the source image.
+
+Required:
+
+- `image`
+
+Optional:
+
+- `mask`
+
+Canvas controls:
+
+- `expand_left`
+- `expand_top`
+- `expand_right`
+- `expand_bottom`
+
+The source image is placed unchanged inside the expanded canvas. Final dimensions are aligned upward to multiples of 16 by adding pixels on the right and bottom.
+
+Mask controls:
+
+| Control | Values | Default | Behavior |
+| --- | --- | --- | --- |
+| `mask_grow` | -256 .. 256 | 0 | Positive expands the generation region; negative shrinks it. |
+| `mask_blur_mode` | standard, gaussian_sigma | gaussian_sigma | Selects box-style feathering or Gaussian sigma feathering. |
+| `mask_blur_amount` | 0 .. 128 | 0 | Feather radius/sigma. Zero means no blur. |
+| `mask_blur_direction` | outside, inside, both | outside | Chooses where the soft transition is allowed relative to the hard mask boundary. |
+
+Direction semantics:
+
+- `outside`: keep the generated region at full strength and feather into the preserved surroundings.
+- `inside`: keep the outside strictly protected and feather only inside the generated region.
+- `both`: feather across both sides of the original boundary.
+
+Processing order:
+
+```text
+source mask + outpaint canvas
+  -> signed grow/shrink
+  -> directional feather
+  -> generated_mask
+  -> keep_mask
+  -> neutralized semantic reference
+```
+
+Outputs:
+
+- `paint_context`
+- `prepared_image`
+- `semantic_reference`
+- `generated_mask`
+- `keep_mask`
+- `paint_prepare_info`
+
+## Krea2 CcC Paint
+
+Consumes `KREA2_PAINT_CONTEXT` and prepares the runtime inputs for AnyPaint-style Krea 2 sampling.
+
+It:
+
+1. Grounds Qwen with the neutralized semantic reference.
+2. VAE-encodes the semantic reference as the registered appearance reference.
+3. VAE-encodes the known canvas.
+4. Converts the soft generation mask to a token-aligned ComfyUI `noise_mask`.
+5. Applies the registered t=0 reference runtime with optional isolated reference K/V cache.
+
+The reference is registered over the complete target grid. Known-region preservation happens during sampling through the latent/noise-mask path rather than by a final source-image composite.
+
+Recommended first test:
+
+- Krea 2 Turbo
+- `krea2_anypaint_rank32.safetensors`
+- 8 steps
+- CFG 1
+- Euler
+- simple scheduler

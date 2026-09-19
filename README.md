@@ -131,11 +131,30 @@ https://github.com/ArtemKo7v/ComfyUI-Krea2IdentityMod
 
 In particular, that project demonstrated the usefulness of persisting raw appearance latents and identified the Qwen3-VL visual cache boundary that requires `merged + grid + deepstack`, rather than caching final prompt-conditioned conditioning.
 
-## Test Workflow
+## Paint
 
-The repository contains one current edit workflow:
+Krea2 CcC Paint adds arbitrary-mask inpainting and outpainting without resizing the source image.
 
-[`workflows/01_scene_subject.json`](workflows/01_scene_subject.json)
+The Paint path is split into:
+
+- **Krea2 CcC Paint Prepare**: builds the aligned native canvas, combines the inpaint mask with outpaint expansion, applies signed mask grow/shrink plus directional feathering, and creates the neutralized semantic reference.
+- **Krea2 CcC Paint**: image-grounds Qwen, VAE-encodes the semantic reference, creates the known-image latent with a soft token-aligned noise mask, and installs the registered t=0 reference/KV-cache runtime.
+
+Paint Prepare mask controls:
+
+- `mask_grow`: positive expands the generated region; negative shrinks it.
+- `mask_blur_mode`: `standard` or `gaussian_sigma`.
+- `mask_blur_amount`: `0` disables feathering.
+- `mask_blur_direction`: `outside`, `inside`, or `both`.
+
+`outside` keeps the full generated region strong and feathers into the preserved surroundings, which is a useful default for removing people or objects.
+
+## Test Workflows
+
+The repository contains:
+
+- [`workflows/01_scene_subject.json`](workflows/01_scene_subject.json) — Scene + Subject Edit.
+- [`workflows/02_anypaint_remove_people.json`](workflows/02_anypaint_remove_people.json) — AnyPaint inpaint test for removing masked people/objects.
 
 ## Other Public Nodes
 
