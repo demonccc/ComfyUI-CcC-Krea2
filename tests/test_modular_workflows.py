@@ -32,4 +32,7 @@ def test_reference_size_resolver_and_latent_socket_types_are_distinct():
     assert latent.RETURN_TYPES == ("LATENT", "STRING")
     assert latent.INPUT_TYPES()["required"]["width"][0] == "INT"
     assert latent.INPUT_TYPES()["required"]["height"][0] == "INT"
+    assert "preset_size" in latent.INPUT_TYPES()["required"]
+    assert "resolution" not in latent.INPUT_TYPES()["required"]
+    assert "aspect_ratio" not in latent.INPUT_TYPES()["required"]
     assert edit.INPUT_TYPES()["required"]["latent"][0] == "LATENT"
