@@ -96,7 +96,7 @@ def test_qwen_grounding_zero_keeps_native_pixels_for_tokenizer():
     assert prepared.debug_metadata["resolved_method"] == "none"
 
 
-def test_v12_fit_preserves_complete_portrait_source_on_square_target():
+def test_v12_fit_contains_portrait_with_minimal_alignment_crop():
     geom = resolve_krea2edit_geometry(
         src_h=2059,
         src_w=965,
@@ -105,7 +105,7 @@ def test_v12_fit_preserves_complete_portrait_source_on_square_target():
         fit_mode="fit",
     )
     assert geom.mode_resolved == "contain"
-    assert geom.crop_rectangle == (0, 0, 965, 2059)
+    assert geom.crop_rectangle == (3, 0, 959, 2059)
     assert geom.vae_input_pixel_size == (656, 1408)
     assert geom.vae_latent_grid_size == (82, 176)
 
