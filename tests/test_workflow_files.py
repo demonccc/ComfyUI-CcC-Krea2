@@ -75,7 +75,9 @@ def test_scene_subject_size_resolver_feeds_fixed_latent_dimensions():
 
     latent_values = latent["widgets_values"]
     assert latent_values[0] == "fixed"
-    assert "empty" in latent_values
+    assert latent_values[4] == "preserve_aspect_krea_bounds"
+    assert latent_values[5] == "empty"
+    assert latent_values[6] == "crop"
 
 
 def test_paint_workflow_uses_anypaint_runtime_and_mask_controls():
