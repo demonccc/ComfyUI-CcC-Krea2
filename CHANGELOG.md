@@ -11,6 +11,9 @@
 
 ### Changed
 
+- Added Krea geometry policies to Krea2 CcC Latent for fixed and image-derived dimensions: nearest curated Krea aspect or aspect-preserving Krea bounds.
+- Replaced Latent image-fit modes with explicit content-fit behavior: crop, contain with white padding, or stretch. Presets bypass geometry resolution.
+
 - Replaced megapixel + aspect-ratio latent preset generation with explicit curated Krea target sizes. Preset labels show exact dimensions, aspect ratio, and approximate megapixels; fixed and image-derived modes remain separate.
 
 - Standardized semantic grounding controls on a 32-pixel cadence to match Qwen3-VL visual grid alignment.
