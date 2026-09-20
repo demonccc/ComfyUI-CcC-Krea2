@@ -1,6 +1,5 @@
 """Krea2 CcC Latent node."""
 
-import math
 from typing import Any, Dict, Optional, Tuple
 
 import torch
@@ -12,8 +11,24 @@ from ..target_latent import TargetVisionContext, get_image_dims, normalize_vae_o
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
 CONTENT_MODES = ("empty", "from_image")
-RESOLUTIONS = ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP", "3.0 MP")
-ASPECT_RATIOS = ("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
+KREA_PRESET_GEOMETRIES = {
+    "1024 x 1024 | 1:1 | ~1.05 MP": (1024, 1024),
+    "1216 x 832 | ~3:2 | ~1.01 MP": (1216, 832),
+    "832 x 1216 | ~2:3 | ~1.01 MP": (832, 1216),
+    "1536 x 1024 | 3:2 | ~1.57 MP": (1536, 1024),
+    "1024 x 1536 | 2:3 | ~1.57 MP": (1024, 1536),
+    "1536 x 1152 | 4:3 | ~1.77 MP": (1536, 1152),
+    "1152 x 1536 | 3:4 | ~1.77 MP": (1152, 1536),
+    "1536 x 864 | 16:9 | ~1.33 MP": (1536, 864),
+    "864 x 1536 | 9:16 | ~1.33 MP": (864, 1536),
+    "2048 x 1536 | 4:3 | ~3.15 MP": (2048, 1536),
+    "1536 x 2048 | 3:4 | ~3.15 MP": (1536, 2048),
+    "2048 x 1152 | 16:9 | ~2.36 MP": (2048, 1152),
+    "1152 x 2048 | 9:16 | ~2.36 MP": (1152, 2048),
+    "2048 x 2048 | 1:1 | ~4.19 MP": (2048, 2048),
+}
+KREA_PRESET_SIZES = tuple(KREA_PRESET_GEOMETRIES)
+DEFAULT_KREA_PRESET_SIZE = "1024 x 1024 | 1:1 | ~1.05 MP"
 IMAGE_FIT_MODES = ("long_edge", "native", "stretch")
 RESIZE_METHODS = ("auto", "nearest-exact", "bilinear", "bicubic", "area", "lanczos")
 
@@ -26,14 +41,14 @@ def _align_geometry(width: float, height: float) -> Tuple[int, int]:
     return _align_dimension(width), _align_dimension(height)
 
 
-def _preset_geometry(resolution: str, aspect_ratio: str) -> Tuple[int, int]:
-    megapixels = float(resolution.replace(" MP", ""))
-    rw, rh = (float(part) for part in aspect_ratio.split(":"))
-    ratio = rw / rh
-    pixels = max(1, int(megapixels * 1_000_000))
-    raw_h = math.sqrt(pixels / ratio)
-    raw_w = raw_h * ratio
-    return _align_geometry(raw_w, raw_h)
+def _preset_geometry(preset_size: str) -> Tuple[int, int]:
+    try:
+        return KREA_PRESET_GEOMETRIES[preset_size]
+    except KeyError as exc:
+        raise ValueError(
+            f"[Krea2 CcC Edit] Invalid Krea preset size '{preset_size}'. "
+            f"Expected one of: {', '.join(KREA_PRESET_SIZES)}."
+        ) from exc
 
 
 def _resolve_dimensions(
@@ -41,8 +56,7 @@ def _resolve_dimensions(
     dimensions_image: Optional[torch.Tensor],
     width: int,
     height: int,
-    resolution: str,
-    aspect_ratio: str,
+    preset_size: str,
 ) -> Tuple[int, int, str]:
     if dimensions == "from_image":
         if dimensions_image is None:
@@ -58,8 +72,8 @@ def _resolve_dimensions(
         return target_w, target_h, f"fixed {int(width)} x {int(height)}"
 
     if dimensions == "preset":
-        target_w, target_h = _preset_geometry(resolution, aspect_ratio)
-        return target_w, target_h, f"preset {resolution} @ {aspect_ratio}"
+        target_w, target_h = _preset_geometry(preset_size)
+        return target_w, target_h, f"preset {preset_size}"
 
     raise ValueError(
         f"[Krea2 CcC Edit] Invalid dimensions mode '{dimensions}'. "
@@ -192,7 +206,8 @@ class CcCKrea2Latent:
     FUNCTION = "process"
     DESCRIPTION = (
         "Builds the Krea2 Edit target latent. Dimensions can come from an image, fixed width/height, or a "
-        "resolution/aspect-ratio preset. Content can be empty or image-based. Final dimensions are aligned to /16."
+        "curated Krea-size preset. Content can be empty or image-based. Presets are explicit /16 geometries; "
+        "fixed and image-derived dimensions remain available separately."
     )
 
     @classmethod
@@ -219,8 +234,7 @@ class CcCKrea2Latent:
                         "step": 16,
                     },
                 ),
-                "resolution": (RESOLUTIONS, {"default": "2.0 MP"}),
-                "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1"}),
+                "preset_size": (KREA_PRESET_SIZES, {"default": DEFAULT_KREA_PRESET_SIZE}),
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "image_fit": (IMAGE_FIT_MODES, {"default": "long_edge"}),
                 "resize_method": (RESIZE_METHODS, {"default": "auto"}),
@@ -241,8 +255,7 @@ class CcCKrea2Latent:
         dimensions="preset",
         width=1024,
         height=1024,
-        resolution="2.0 MP",
-        aspect_ratio="1:1",
+        preset_size=DEFAULT_KREA_PRESET_SIZE,
         content="empty",
         image_fit="long_edge",
         resize_method="auto",
@@ -258,8 +271,7 @@ class CcCKrea2Latent:
             dimensions_image=dimensions_image,
             width=width,
             height=height,
-            resolution=resolution,
-            aspect_ratio=aspect_ratio,
+            preset_size=preset_size,
         )
 
         if latent_semantic and (content != "from_image" or content_image is None):
@@ -299,7 +311,7 @@ class CcCKrea2Latent:
             f"Latent Semantic: {'enabled' if latent_semantic else 'disabled'}",
         ]
         if dimensions == "preset":
-            lines.append(f"Preset: {resolution} @ {aspect_ratio}")
+            lines.append(f"Preset: {preset_size}")
         if latent_semantic:
             lines.append(f"Latent Grounding: {int(latent_grounding_px)} px")
             if latent_semantic_instruction.strip():
