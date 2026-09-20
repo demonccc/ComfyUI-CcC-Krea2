@@ -36,3 +36,17 @@ def test_reference_size_resolver_and_latent_socket_types_are_distinct():
     assert "resolution" not in latent.INPUT_TYPES()["required"]
     assert "aspect_ratio" not in latent.INPUT_TYPES()["required"]
     assert edit.INPUT_TYPES()["required"]["latent"][0] == "LATENT"
+
+
+def test_latent_preset_sizes_are_explicit_krea_geometries():
+    latent = NODE_CLASS_MAPPINGS["CcCKrea2Latent"]
+    preset_values = latent.INPUT_TYPES()["required"]["preset_size"][0]
+    assert preset_values[0] == "1024 x 1024 | 1:1 | ~1.05 MP"
+    assert "1216 x 832 | ~3:2 | ~1.01 MP" in preset_values
+    assert "832 x 1216 | ~2:3 | ~1.01 MP" in preset_values
+    assert "2048 x 2048 | 1:1 | ~4.19 MP" in preset_values
+    for label in preset_values:
+        size = label.split(" | ", 1)[0]
+        width, height = [int(part.strip()) for part in size.split("x")]
+        assert width % 16 == 0
+        assert height % 16 == 0
