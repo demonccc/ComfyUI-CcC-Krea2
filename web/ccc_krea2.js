@@ -80,7 +80,7 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2Latent") {
             const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
             const contentWidget = node.widgets?.find((w) => w.name === "content");
-            const imageFitWidget = node.widgets?.find((w) => w.name === "image_fit");
+            const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
             const semanticWidget = node.widgets?.find((w) => w.name === "latent_semantic");
 
             const setDisabled = (name, disabled) => {
@@ -93,13 +93,13 @@ app.registerExtension({
                 setDisabled("width", mode !== "fixed");
                 setDisabled("height", mode !== "fixed");
                 setDisabled("preset_size", mode !== "preset");
+                setDisabled("geometry_policy", mode === "preset");
             };
 
             const updateContentState = () => {
                 const fromImage = contentWidget?.value === "from_image";
-                setDisabled("image_fit", !fromImage);
-                const native = imageFitWidget?.value === "native";
-                setDisabled("resize_method", !fromImage || native);
+                setDisabled("content_fit", !fromImage);
+                setDisabled("resize_method", !fromImage);
             };
 
             const updateSemanticState = () => {
@@ -111,7 +111,7 @@ app.registerExtension({
             for (const [widget, callback] of [
                 [dimensionsWidget, updateDimensionsState],
                 [contentWidget, updateContentState],
-                [imageFitWidget, updateContentState],
+                [contentFitWidget, updateContentState],
                 [semanticWidget, updateSemanticState],
             ]) {
                 if (!widget) continue;
