@@ -74,7 +74,41 @@ Dimension modes:
 - `fixed`
 - `preset`
 
-Preset resolutions include 0.5, 1.0, 1.5, 2.0, 2.5 and 3.0 MP. The 3.0 MP entry is a convenience preset, not a hard limit: `fixed` and `from_image` remain free to resolve larger geometries when explicitly requested.
+Preset sizes are explicit target geometries rather than a generated combination of megapixels plus aspect ratio.
+
+Current presets:
+
+| Size | Aspect ratio | Approx. pixels |
+| --- | --- | --- |
+| `1024 x 1024` | `1:1` | `~1.05 MP` |
+| `1216 x 832` | `~3:2` | `~1.01 MP` |
+| `832 x 1216` | `~2:3` | `~1.01 MP` |
+| `1536 x 1024` | `3:2` | `~1.57 MP` |
+| `1024 x 1536` | `2:3` | `~1.57 MP` |
+| `1536 x 1152` | `4:3` | `~1.77 MP` |
+| `1152 x 1536` | `3:4` | `~1.77 MP` |
+| `1536 x 864` | `16:9` | `~1.33 MP` |
+| `864 x 1536` | `9:16` | `~1.33 MP` |
+| `2048 x 1536` | `4:3` | `~3.15 MP` |
+| `1536 x 2048` | `3:4` | `~3.15 MP` |
+| `2048 x 1152` | `16:9` | `~2.36 MP` |
+| `1152 x 2048` | `9:16` | `~2.36 MP` |
+| `2048 x 2048` | `1:1` | `~4.19 MP` |
+
+Why explicit sizes:
+
+- Krea 2 Turbo is documented by Krea as generating from roughly 1K to 2K, with `width` and `height` as the primary resolution controls.
+- The official inference code rounds each dimension up to the model alignment, which is VAE compression multiplied by the DiT patch size; for the released model this is a 16-pixel cadence.
+- Krea's official Hugging Face Space exposes concrete presets such as `1024 x 1024`, `1216 x 832`, `832 x 1216`, and `2048 x 2048`.
+- Megapixels are therefore descriptive metadata for a preset, not the rule used to derive its geometry.
+
+Official references:
+
+- Krea 2 official repository: https://github.com/krea-ai/krea-2
+- Krea 2 official sampling implementation: https://github.com/krea-ai/krea-2/blob/main/sampling.py
+- Krea 2 official Hugging Face Space preset implementation: https://huggingface.co/spaces/krea/Krea-2/blob/main/app.py
+
+The preset list in CcC is curated, not an official exhaustive Krea whitelist. `fixed` remains available for deliberate custom geometries, while `from_image` remains a separate image-derived path.
 
 Content modes:
 
@@ -87,7 +121,7 @@ Image fit:
 - `native`
 - `stretch`
 
-Final dimensions are aligned to multiples of 16. Krea2 CcC Edit does not impose LoRA-specific megapixel limits; any narrower recommendation belongs to the particular model or adapter being used.
+Final dimensions are aligned to multiples of 16. Preset dimensions are already /16 and are used exactly as listed.
 
 When latent semantic guidance is enabled, `latent_grounding_px` is an integer with step 32 and defaults to 768, matching the same Qwen3-VL visual-grid cadence used by Krea2 CcC Visual Reference and Krea2 CcC Semantic Reference.
 
