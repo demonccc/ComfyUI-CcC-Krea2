@@ -11,7 +11,7 @@
 
 ### Changed
 
-- Extended Krea2 CcC Latent presets and generic geometry helpers to 3.0 MP without imposing a LoRA-specific hard limit on the node.
+- Replaced megapixel + aspect-ratio latent preset generation with explicit curated Krea target sizes. Preset labels show exact dimensions, aspect ratio, and approximate megapixels; fixed and image-derived modes remain separate.
 
 - Standardized semantic grounding controls on a 32-pixel cadence to match Qwen3-VL visual grid alignment.
 
