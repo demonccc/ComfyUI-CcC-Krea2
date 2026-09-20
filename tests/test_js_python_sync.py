@@ -17,6 +17,10 @@ def test_latent_preset_widget_is_conditionally_disabled():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
     assert 'node.comfyClass === "CcCKrea2Latent"' in js
     assert 'setDisabled("preset_size", mode !== "preset")' in js
+    assert 'setDisabled("geometry_policy", mode === "preset")' in js
+    assert 'setDisabled("content_fit", !fromImage)' in js
+    assert 'setDisabled("resize_method", !fromImage)' in js
+    assert 'image_fit' not in js
     assert 'setDisabled("resolution", mode !== "preset")' not in js
     assert 'setDisabled("aspect_ratio", mode !== "preset")' not in js
 
