@@ -11,6 +11,9 @@ from ..target_latent import TargetVisionContext, get_image_dims, normalize_vae_o
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
 CONTENT_MODES = ("empty", "from_image")
+GEOMETRY_POLICIES = ("nearest_krea_aspect", "preserve_aspect_krea_bounds")
+KREA_MIN_DIMENSION = 1024
+KREA_MAX_DIMENSION = 2048
 KREA_PRESET_GEOMETRIES = {
     "1024 x 1024 | 1:1 | ~1.05 MP": (1024, 1024),
     "1216 x 832 | ~3:2 | ~1.01 MP": (1216, 832),
@@ -27,7 +30,7 @@ KREA_PRESET_GEOMETRIES = {
 }
 KREA_PRESET_SIZES = tuple(KREA_PRESET_GEOMETRIES)
 DEFAULT_KREA_PRESET_SIZE = "1024 x 1024 | 1:1 | ~1.05 MP"
-IMAGE_FIT_MODES = ("long_edge", "native", "stretch")
+CONTENT_FIT_MODES = ("crop", "contain", "stretch")
 RESIZE_METHODS = ("auto", "nearest-exact", "bilinear", "bicubic", "area", "lanczos")
 
 
@@ -49,29 +52,94 @@ def _preset_geometry(preset_size: str) -> Tuple[int, int]:
         ) from exc
 
 
+def _nearest_krea_geometry(width: int, height: int) -> Tuple[int, int]:
+    source_ratio = width / float(height)
+
+    def score(geometry: Tuple[int, int]) -> Tuple[float, float]:
+        candidate_w, candidate_h = geometry
+        candidate_ratio = candidate_w / float(candidate_h)
+        ratio_error = abs((candidate_ratio / source_ratio) - 1.0)
+        size_error = (
+            abs(candidate_w - width) / float(max(1, width))
+            + abs(candidate_h - height) / float(max(1, height))
+        )
+        return ratio_error, size_error
+
+    return min(KREA_PRESET_GEOMETRIES.values(), key=score)
+
+
+def _preserve_aspect_krea_bounds(width: int, height: int) -> Tuple[int, int]:
+    lower_scale = max(
+        KREA_MIN_DIMENSION / float(width),
+        KREA_MIN_DIMENSION / float(height),
+    )
+    upper_scale = min(
+        KREA_MAX_DIMENSION / float(width),
+        KREA_MAX_DIMENSION / float(height),
+    )
+
+    if lower_scale > upper_scale:
+        raise ValueError(
+            "[Krea2 CcC Edit] preserve_aspect_krea_bounds cannot fit this aspect ratio "
+            f"inside {KREA_MIN_DIMENSION}..{KREA_MAX_DIMENSION} px on both axes. "
+            "Use nearest_krea_aspect or choose another source geometry."
+        )
+
+    scale = min(max(1.0, lower_scale), upper_scale)
+    target_w, target_h = _align_geometry(width * scale, height * scale)
+    target_w = min(KREA_MAX_DIMENSION, max(KREA_MIN_DIMENSION, target_w))
+    target_h = min(KREA_MAX_DIMENSION, max(KREA_MIN_DIMENSION, target_h))
+    return target_w, target_h
+
+
+def _resolve_krea_geometry(width: int, height: int, geometry_policy: str) -> Tuple[int, int]:
+    if width <= 0 or height <= 0:
+        raise ValueError("[Krea2 CcC Edit] Source geometry must be greater than zero.")
+
+    if geometry_policy == "nearest_krea_aspect":
+        return _nearest_krea_geometry(width, height)
+    if geometry_policy == "preserve_aspect_krea_bounds":
+        return _preserve_aspect_krea_bounds(width, height)
+
+    raise ValueError(
+        f"[Krea2 CcC Edit] Invalid geometry_policy '{geometry_policy}'. "
+        f"Expected one of: {', '.join(GEOMETRY_POLICIES)}."
+    )
+
+
 def _resolve_dimensions(
     dimensions: str,
     dimensions_image: Optional[torch.Tensor],
     width: int,
     height: int,
     preset_size: str,
+    geometry_policy: str,
 ) -> Tuple[int, int, str]:
+    if dimensions == "preset":
+        target_w, target_h = _preset_geometry(preset_size)
+        return target_w, target_h, f"preset {preset_size}"
+
     if dimensions == "from_image":
         if dimensions_image is None:
             raise ValueError("[Krea2 CcC Edit] dimensions='from_image' requires dimensions_image.")
         src_h, src_w = get_image_dims(dimensions_image)
-        target_w, target_h = _align_geometry(src_w, src_h)
-        return target_w, target_h, f"image dimensions {src_w} x {src_h}"
+        target_w, target_h = _resolve_krea_geometry(src_w, src_h, geometry_policy)
+        return (
+            target_w,
+            target_h,
+            f"image {src_w} x {src_h} -> {geometry_policy}",
+        )
 
     if dimensions == "fixed":
-        if int(width) <= 0 or int(height) <= 0:
+        source_w, source_h = int(width), int(height)
+        if source_w <= 0 or source_h <= 0:
             raise ValueError("[Krea2 CcC Edit] fixed width and height must be greater than zero.")
-        target_w, target_h = _align_geometry(int(width), int(height))
-        return target_w, target_h, f"fixed {int(width)} x {int(height)}"
-
-    if dimensions == "preset":
-        target_w, target_h = _preset_geometry(preset_size)
-        return target_w, target_h, f"preset {preset_size}"
+        target_w, target_h = _resolve_krea_geometry(source_w, source_h, geometry_policy)
+        return (
+            target_w,
+            target_h,
+            f"fixed {source_w} x {source_h} -> {geometry_policy}",
+        )
 
     raise ValueError(
         f"[Krea2 CcC Edit] Invalid dimensions mode '{dimensions}'. "
@@ -79,11 +147,11 @@ def _resolve_dimensions(
     )
 
 
-def _center_place(
+def _fit_content_image(
     image: torch.Tensor,
     target_w: int,
     target_h: int,
-    image_fit: str,
+    content_fit: str,
     resize_method: str,
 ) -> Tuple[torch.Tensor, Dict[str, Any]]:
     if image.ndim == 3:
@@ -91,68 +159,65 @@ def _center_place(
 
     batch, src_h, src_w, channels = image.shape
 
-    if image_fit == "stretch":
-        placed = resize_tensor(image, target_h=target_h, target_w=target_w, method=resize_method)
-        return placed.clamp(0.0, 1.0), {
+    if content_fit == "stretch":
+        fitted = resize_tensor(image, target_h=target_h, target_w=target_w, method=resize_method)
+        return fitted.clamp(0.0, 1.0), {
             "mode": "stretch",
             "source_size": (src_w, src_h),
             "fitted_size": (target_w, target_h),
-            "scale": (target_w / float(src_w), target_h / float(src_h)),
             "crop": (0, 0, target_w, target_h),
             "padding": (0, 0, 0, 0),
             "resize_method": resize_method,
         }
 
-    if image_fit == "long_edge":
-        scale = max(target_w, target_h) / float(max(src_w, src_h))
-        fitted_w = max(1, int(round(src_w * scale)))
-        fitted_h = max(1, int(round(src_h * scale)))
-        fitted = (
-            image
-            if (fitted_w, fitted_h) == (src_w, src_h)
-            else resize_tensor(image, target_h=fitted_h, target_w=fitted_w, method=resize_method)
+    if content_fit == "crop":
+        scale = max(target_w / float(src_w), target_h / float(src_h))
+        fitted_w = max(target_w, int(round(src_w * scale)))
+        fitted_h = max(target_h, int(round(src_h * scale)))
+        fitted = resize_tensor(image, target_h=fitted_h, target_w=fitted_w, method=resize_method)
+        src_x0 = max(0, (fitted_w - target_w) // 2)
+        src_y0 = max(0, (fitted_h - target_h) // 2)
+        cropped = fitted[:, src_y0 : src_y0 + target_h, src_x0 : src_x0 + target_w, :]
+        return cropped.clamp(0.0, 1.0), {
+            "mode": "crop",
+            "source_size": (src_w, src_h),
+            "fitted_size": (fitted_w, fitted_h),
+            "crop": (src_x0, src_y0, target_w, target_h),
+            "padding": (0, 0, 0, 0),
+            "resize_method": resize_method,
+        }
+
+    if content_fit == "contain":
+        scale = min(target_w / float(src_w), target_h / float(src_h))
+        fitted_w = max(1, min(target_w, int(round(src_w * scale))))
+        fitted_h = max(1, min(target_h, int(round(src_h * scale))))
+        fitted = resize_tensor(image, target_h=fitted_h, target_w=fitted_w, method=resize_method)
+        dst_x0 = (target_w - fitted_w) // 2
+        dst_y0 = (target_h - fitted_h) // 2
+        canvas = torch.ones(
+            (batch, target_h, target_w, channels),
+            dtype=image.dtype,
+            device=image.device,
         )
-    elif image_fit == "native":
-        scale = 1.0
-        fitted_w, fitted_h = src_w, src_h
-        fitted = image
-    else:
-        raise ValueError(
-            f"[Krea2 CcC Edit] Invalid image_fit '{image_fit}'. "
-            f"Expected long_edge, native, or stretch."
-        )
+        canvas[:, dst_y0 : dst_y0 + fitted_h, dst_x0 : dst_x0 + fitted_w, :] = fitted
+        return canvas.clamp(0.0, 1.0), {
+            "mode": "contain",
+            "source_size": (src_w, src_h),
+            "fitted_size": (fitted_w, fitted_h),
+            "crop": (0, 0, fitted_w, fitted_h),
+            "padding": (
+                dst_x0,
+                dst_y0,
+                target_w - dst_x0 - fitted_w,
+                target_h - dst_y0 - fitted_h,
+            ),
+            "resize_method": resize_method,
+        }
 
-    src_x0 = max(0, (fitted_w - target_w) // 2)
-    src_y0 = max(0, (fitted_h - target_h) // 2)
-    copy_w = min(target_w, fitted_w)
-    copy_h = min(target_h, fitted_h)
-
-    dst_x0 = max(0, (target_w - fitted_w) // 2)
-    dst_y0 = max(0, (target_h - fitted_h) // 2)
-
-    cropped = fitted[:, src_y0 : src_y0 + copy_h, src_x0 : src_x0 + copy_w, :]
-    canvas = torch.ones(
-        (batch, target_h, target_w, channels),
-        dtype=image.dtype,
-        device=image.device,
+    raise ValueError(
+        f"[Krea2 CcC Edit] Invalid content_fit '{content_fit}'. "
+        f"Expected one of: {', '.join(CONTENT_FIT_MODES)}."
     )
-    canvas[:, dst_y0 : dst_y0 + copy_h, dst_x0 : dst_x0 + copy_w, :] = cropped
-
-    return canvas.clamp(0.0, 1.0), {
-        "mode": image_fit,
-        "source_size": (src_w, src_h),
-        "fitted_size": (fitted_w, fitted_h),
-        "scale": scale,
-        "crop": (src_x0, src_y0, copy_w, copy_h),
-        "padding": (
-            dst_x0,
-            dst_y0,
-            target_w - dst_x0 - copy_w,
-            target_h - dst_y0 - copy_h,
-        ),
-        "resize_method": resize_method if image_fit == "long_edge" else "none",
-    }
-
 
 def _build_target_latent(
     vae: Any,
@@ -160,7 +225,7 @@ def _build_target_latent(
     content_image: Optional[torch.Tensor],
     target_w: int,
     target_h: int,
-    image_fit: str,
+    content_fit: str,
     resize_method: str,
     batch_size: int,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -175,11 +240,11 @@ def _build_target_latent(
             raise ValueError("[Krea2 CcC Edit] content='from_image' requires content_image.")
         if vae is None:
             raise ValueError("[Krea2 CcC Edit] VAE is required for image content.")
-        canvas, placement = _center_place(
+        canvas, placement = _fit_content_image(
             image=content_image,
             target_w=target_w,
             target_h=target_h,
-            image_fit=image_fit,
+            content_fit=content_fit,
             resize_method=resize_method,
         )
         samples = normalize_vae_output(vae.encode(canvas), batch_size=batch_size)
@@ -204,8 +269,8 @@ class CcCKrea2Latent:
     FUNCTION = "process"
     DESCRIPTION = (
         "Builds the Krea2 Edit target latent. Dimensions can come from an image, fixed width/height, or a "
-        "curated Krea-size preset. Content can be empty or image-based. Presets are explicit /16 geometries; "
-        "fixed and image-derived dimensions remain available separately."
+        "curated Krea-size preset. Fixed and image-derived dimensions resolve through a Krea geometry policy; "
+        "presets bypass geometry resolution. Image content can use crop, contain, or stretch before VAE encoding."
     )
 
     @classmethod
@@ -233,8 +298,9 @@ class CcCKrea2Latent:
                     },
                 ),
                 "preset_size": (KREA_PRESET_SIZES, {"default": DEFAULT_KREA_PRESET_SIZE}),
+                "geometry_policy": (GEOMETRY_POLICIES, {"default": "preserve_aspect_krea_bounds"}),
                 "content": (CONTENT_MODES, {"default": "empty"}),
-                "image_fit": (IMAGE_FIT_MODES, {"default": "long_edge"}),
+                "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
                 "resize_method": (RESIZE_METHODS, {"default": "auto"}),
                 "latent_semantic": ("BOOLEAN", {"default": False}),
                 "latent_semantic_instruction": ("STRING", {"multiline": True, "default": ""}),
@@ -254,8 +320,9 @@ class CcCKrea2Latent:
         width=1024,
         height=1024,
         preset_size=DEFAULT_KREA_PRESET_SIZE,
+        geometry_policy="preserve_aspect_krea_bounds",
         content="empty",
-        image_fit="long_edge",
+        content_fit="crop",
         resize_method="auto",
         latent_semantic=False,
         latent_semantic_instruction="",
@@ -270,6 +337,7 @@ class CcCKrea2Latent:
             width=width,
             height=height,
             preset_size=preset_size,
+            geometry_policy=geometry_policy,
         )
 
         if latent_semantic and (content != "from_image" or content_image is None):
@@ -283,7 +351,7 @@ class CcCKrea2Latent:
             content_image=content_image,
             target_w=target_w,
             target_h=target_h,
-            image_fit=image_fit,
+            content_fit=content_fit,
             resize_method=resize_method,
             batch_size=int(batch_size),
         )
@@ -301,9 +369,10 @@ class CcCKrea2Latent:
             f"Dimensions Source: {dimensions_label}",
             f"Target Pixel Geometry: {target_w} x {target_h}",
             f"Target Latent Geometry: {target_w // 8} x {target_h // 8}",
+            f"Geometry Policy: {geometry_policy if dimensions != 'preset' else '<preset>'}",
             f"Content: {content}",
-            f"Image Fit: {image_fit if content == 'from_image' else '<unused>'}",
-            f"Resize Method: {resize_method if content == 'from_image' and image_fit != 'native' else '<unused>'}",
+            f"Content Fit: {content_fit if content == 'from_image' else '<unused>'}",
+            f"Resize Method: {resize_method if content == 'from_image' else '<unused>'}",
             f"Content Placement: {placement}",
             f"Batch Size: {int(batch_size)}",
             f"Latent Semantic: {'enabled' if latent_semantic else 'disabled'}",
