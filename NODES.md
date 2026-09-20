@@ -106,18 +106,31 @@ Official references:
 - Krea 2 official sampling implementation: https://github.com/krea-ai/krea-2/blob/main/sampling.py
 - Krea 2 official Hugging Face Space preset implementation: https://huggingface.co/spaces/krea/Krea-2/blob/main/app.py
 
-The preset list in CcC is curated, not an official exhaustive Krea whitelist. `fixed` remains available for deliberate custom geometries, while `from_image` remains a separate image-derived path.
+The preset list in CcC is curated, not an official exhaustive Krea whitelist.
+
+Geometry resolution:
+
+- `preset` uses the selected preset exactly and bypasses geometry policy.
+- `fixed` starts from the requested width/height and then resolves it through `geometry_policy`.
+- `from_image` starts from `dimensions_image` and then resolves it through `geometry_policy`.
+
+Geometry policies:
+
+- `nearest_krea_aspect`: selects the curated Krea preset geometry whose aspect ratio is closest to the source geometry; when the same aspect exists at multiple sizes, the closer size wins.
+- `preserve_aspect_krea_bounds`: preserves the source aspect ratio as closely as /16 alignment allows, keeps both axes within the Krea 1024..2048 working range, and rejects aspect ratios that cannot satisfy both bounds without distortion.
 
 Content modes:
 
 - `empty`
 - `from_image`
 
-Image fit:
+When `content=from_image`, `content_fit` controls how the content image fills the already-resolved target geometry:
 
-- `long_edge`
-- `native`
-- `stretch`
+- `crop`: preserve aspect, cover the target, then center-crop the excess.
+- `contain`: preserve aspect, fit the complete image, then fill unused target pixels with white padding.
+- `stretch`: resize directly to target width/height without preserving aspect ratio.
+
+`resize_method` controls interpolation for those content transformations.
 
 Final dimensions are aligned to multiples of 16. Preset dimensions are already /16 and are used exactly as listed.
 
