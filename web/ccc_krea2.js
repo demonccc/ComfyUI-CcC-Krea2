@@ -92,8 +92,7 @@ app.registerExtension({
                 const mode = dimensionsWidget?.value ?? "preset";
                 setDisabled("width", mode !== "fixed");
                 setDisabled("height", mode !== "fixed");
-                setDisabled("resolution", mode !== "preset");
-                setDisabled("aspect_ratio", mode !== "preset");
+                setDisabled("preset_size", mode !== "preset");
             };
 
             const updateContentState = () => {
