@@ -13,6 +13,14 @@ def test_visual_reference_semantic_widgets_are_conditionally_disabled():
     assert 'setDisabled("prompt_annotation", !enabled)' in js
 
 
+def test_latent_preset_widget_is_conditionally_disabled():
+    js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
+    assert 'node.comfyClass === "CcCKrea2Latent"' in js
+    assert 'setDisabled("preset_size", mode !== "preset")' in js
+    assert 'setDisabled("resolution", mode !== "preset")' not in js
+    assert 'setDisabled("aspect_ratio", mode !== "preset")' not in js
+
+
 def test_js_syntax_validation():
     import shutil
     import subprocess
