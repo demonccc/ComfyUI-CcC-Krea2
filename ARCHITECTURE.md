@@ -36,11 +36,19 @@ source image
 
 The Qwen image does not need to match target pixel geometry. The appearance image does use target geometry rules before VAE encoding.
 
-### Target megapixel policy
+### Target resolution policy
 
-Krea2 CcC Latent exposes convenience presets through 3.0 MP, but Krea2 CcC Edit does not treat 3.0 MP as a global model limit. Fixed dimensions and image-derived dimensions may resolve above that value when the user explicitly requests them.
+Krea2 CcC Latent does not derive preset geometry from a megapixel target. Presets are explicit width/height pairs.
 
-Megapixel limits that come from a specific LoRA, adapter or checkpoint must be treated as model-specific guidance, not enforced as a generic Krea2 CcC Edit restriction.
+Krea's official repository documents Turbo output in the roughly 1K-2K range and exposes `width` / `height` as the primary resolution controls. Its sampling implementation aligns each axis to `VAE compression x DiT patch size`, which is 16 pixels for the released model. The official Hugging Face Space also exposes concrete target sizes instead of megapixel-derived geometry.
+
+Official references:
+
+- https://github.com/krea-ai/krea-2
+- https://github.com/krea-ai/krea-2/blob/main/sampling.py
+- https://huggingface.co/spaces/krea/Krea-2/blob/main/app.py
+
+CcC therefore treats megapixels only as descriptive metadata for a preset. The CcC preset table is curated rather than claimed as an official exhaustive Krea bucket list. `fixed` remains the explicit custom-geometry path and `from_image` remains image-derived.
 
 ### Semantic grounding cadence
 
