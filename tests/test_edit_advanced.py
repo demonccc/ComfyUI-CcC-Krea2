@@ -4,7 +4,7 @@ import torch
 
 from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
 from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _runtime_latent
-from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _center_place, _resolve_dimensions
+from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _fit_content_image, _resolve_dimensions
 from ccc_krea2.modular_nodes.rope_position import build_incontext_3d_rope_pos_ids, resolve_rope_axes
 from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from ccc_krea2.modular_nodes.size_resolver_node import CcCKrea2SizeResolver, _resolve_size
@@ -185,7 +185,7 @@ def test_size_resolver_outputs_only_width_and_height_from_two_images():
     assert node.process(size_image, aspect_image) == (1600, 1000)
 
 
-def test_latent_dimension_modes_are_explicit_and_align_to_16():
+def test_latent_dimension_modes_are_explicit_and_krea_resolved():
     image = torch.zeros((1, 1003, 1501, 3))
 
     width, height, source = _resolve_dimensions(
@@ -193,49 +193,49 @@ def test_latent_dimension_modes_are_explicit_and_align_to_16():
         dimensions_image=image,
         width=1024,
         height=1024,
-        resolution="1.0 MP",
-        aspect_ratio="1:1",
+        preset_size="1024 x 1024 | 1:1 | ~1.05 MP",
+        geometry_policy="preserve_aspect_krea_bounds",
     )
-    assert (width, height) == (1504, 1008)
-    assert source == "image dimensions 1501 x 1003"
+    assert (width, height) == (1536, 1024)
+    assert source == "image 1501 x 1003 -> preserve_aspect_krea_bounds"
 
     fixed_w, fixed_h, _ = _resolve_dimensions(
         dimensions="fixed",
         dimensions_image=None,
         width=1501,
         height=1003,
-        resolution="1.0 MP",
-        aspect_ratio="1:1",
+        preset_size="1024 x 1024 | 1:1 | ~1.05 MP",
+        geometry_policy="nearest_krea_aspect",
     )
-    assert (fixed_w, fixed_h) == (1504, 1008)
+    assert (fixed_w, fixed_h) == (1536, 1024)
 
-    preset_w, preset_h, _ = _resolve_dimensions(
+    preset_w, preset_h, source = _resolve_dimensions(
         dimensions="preset",
         dimensions_image=None,
         width=1024,
         height=1024,
-        resolution="1.0 MP",
-        aspect_ratio="16:9",
+        preset_size="2048 x 1152 | 16:9 | ~2.36 MP",
+        geometry_policy="preserve_aspect_krea_bounds",
     )
-    assert preset_w % 16 == 0
-    assert preset_h % 16 == 0
+    assert (preset_w, preset_h) == (2048, 1152)
+    assert source == "preset 2048 x 1152 | 16:9 | ~2.36 MP"
 
 
-def test_fixed_latent_dimensions_are_not_capped_by_3mp_preset_ceiling():
+def test_fixed_latent_dimensions_can_resolve_above_3mp():
     width, height, source = _resolve_dimensions(
         dimensions="fixed",
         dimensions_image=None,
         width=2048,
         height=2048,
-        resolution="3.0 MP",
-        aspect_ratio="1:1",
+        preset_size="1024 x 1024 | 1:1 | ~1.05 MP",
+        geometry_policy="preserve_aspect_krea_bounds",
     )
     assert (width, height) == (2048, 2048)
     assert width * height > 3_000_000
-    assert source == "fixed 2048 x 2048"
+    assert source == "fixed 2048 x 2048 -> preserve_aspect_krea_bounds"
 
 
-def test_latent_surface_separates_dimensions_and_content():
+def test_latent_surface_separates_dimensions_geometry_and_content():
     inputs = CcCKrea2Latent.INPUT_TYPES()
     required = inputs["required"]
     optional = inputs["optional"]
@@ -245,10 +245,10 @@ def test_latent_surface_separates_dimensions_and_content():
         "dimensions",
         "width",
         "height",
-        "resolution",
-        "aspect_ratio",
+        "preset_size",
+        "geometry_policy",
         "content",
-        "image_fit",
+        "content_fit",
         "resize_method",
         "latent_semantic",
         "latent_semantic_instruction",
@@ -256,49 +256,53 @@ def test_latent_surface_separates_dimensions_and_content():
         "batch_size",
     ]
     assert required["dimensions"][0] == ("from_image", "fixed", "preset")
-    assert required["resolution"][0] == ("0.5 MP", "1.0 MP", "1.5 MP", "2.0 MP", "2.5 MP", "3.0 MP")
-    assert required["aspect_ratio"][0] == ("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16")
+    assert required["geometry_policy"][0] == (
+        "nearest_krea_aspect",
+        "preserve_aspect_krea_bounds",
+    )
     assert required["content"][0] == ("empty", "from_image")
-    assert required["image_fit"][0] == ("long_edge", "native", "stretch")
+    assert required["content_fit"][0] == ("crop", "contain", "stretch")
     assert required["latent_grounding_px"][1]["step"] == 32
     assert list(optional) == ["dimensions_image", "content_image"]
 
 
-def test_content_native_keeps_image_size_centered():
+def test_content_contain_keeps_complete_image_with_white_padding():
     image = torch.zeros((1, 300, 500, 3))
-    canvas, placement = _center_place(
+    canvas, placement = _fit_content_image(
         image=image,
         target_w=800,
         target_h=600,
-        image_fit="native",
-        resize_method="auto",
+        content_fit="contain",
+        resize_method="bilinear",
     )
     assert canvas.shape == (1, 600, 800, 3)
-    assert placement["fitted_size"] == (500, 300)
-    assert placement["scale"] == 1.0
+    assert placement["fitted_size"] == (800, 480)
+    assert placement["padding"] == (0, 60, 0, 60)
+    assert torch.all(canvas[:, 0, :, :] == 1.0)
 
 
-def test_content_long_edge_matches_longest_target_edge():
+def test_content_crop_covers_target_and_discards_excess():
     image = torch.zeros((1, 500, 300, 3))
-    canvas, placement = _center_place(
+    canvas, placement = _fit_content_image(
         image=image,
         target_w=800,
         target_h=600,
-        image_fit="long_edge",
+        content_fit="crop",
         resize_method="bicubic",
     )
     assert canvas.shape == (1, 600, 800, 3)
-    assert placement["fitted_size"] == (480, 800)
-    assert placement["scale"] == 1.6
+    assert placement["fitted_size"][0] >= 800
+    assert placement["fitted_size"][1] >= 600
+    assert placement["padding"] == (0, 0, 0, 0)
 
 
 def test_content_stretch_fills_target_geometry():
     image = torch.zeros((1, 500, 300, 3))
-    canvas, placement = _center_place(
+    canvas, placement = _fit_content_image(
         image=image,
         target_w=800,
         target_h=600,
-        image_fit="stretch",
+        content_fit="stretch",
         resize_method="bicubic",
     )
     assert canvas.shape == (1, 600, 800, 3)
@@ -315,12 +319,10 @@ def test_latent_semantic_metadata_uses_content_image():
     image = torch.zeros((1, 128, 128, 3))
     latent, _ = CcCKrea2Latent().process(
         vae=_MockVAE(),
-        dimensions="fixed",
-        width=128,
-        height=128,
+        dimensions="preset",
         content="from_image",
         content_image=image,
-        image_fit="native",
+        content_fit="contain",
         latent_semantic=True,
         latent_semantic_instruction="Reimagine the target content",
     )
@@ -328,7 +330,6 @@ def test_latent_semantic_metadata_uses_content_image():
     assert metadata["enabled"] is True
     assert metadata["image"] is image
     assert metadata["instruction"] == "Reimagine the target content"
-
 
 def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
     required = CcCKrea2Edit.INPUT_TYPES()["required"]
@@ -340,11 +341,11 @@ def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
         "dimensions_image",
         "width",
         "height",
-        "resolution",
-        "aspect_ratio",
+        "preset_size",
+        "geometry_policy",
         "content",
         "content_image",
-        "image_fit",
+        "content_fit",
         "resize_method",
     ):
         assert moved not in required
