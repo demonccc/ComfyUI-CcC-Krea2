@@ -48,7 +48,14 @@ Official references:
 - https://github.com/krea-ai/krea-2/blob/main/sampling.py
 - https://huggingface.co/spaces/krea/Krea-2/blob/main/app.py
 
-CcC therefore treats megapixels only as descriptive metadata for a preset. The CcC preset table is curated rather than claimed as an official exhaustive Krea bucket list. `fixed` remains the explicit custom-geometry path and `from_image` remains image-derived.
+CcC therefore treats megapixels only as descriptive metadata for a preset. The CcC preset table is curated rather than claimed as an official exhaustive Krea bucket list.
+
+Target geometry has two resolution paths for non-preset inputs:
+
+- `nearest_krea_aspect` maps the requested fixed/image-derived geometry to the closest curated Krea preset aspect and uses size as the tie-breaker.
+- `preserve_aspect_krea_bounds` keeps the requested aspect while resolving both axes into the 1024..2048 Krea working range and /16 alignment. Geometries too extreme to satisfy both axis bounds are rejected instead of being silently distorted.
+
+Preset dimensions bypass those policies. Content fitting is a separate stage: `crop`, `contain`, or `stretch` is applied only when an image is actually used as latent content.
 
 ### Semantic grounding cadence
 
