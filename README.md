@@ -81,13 +81,20 @@ Content:
 - `empty`
 - `from_image`
 
-Content fit modes:
+Geometry policies for `fixed` and `from_image`:
 
-- `long_edge`
-- `native`
+- `nearest_krea_aspect`
+- `preserve_aspect_krea_bounds`
+
+`preset` bypasses geometry resolution because its target size is already explicit.
+
+Content fit modes when `content=from_image`:
+
+- `crop`
+- `contain`
 - `stretch`
 
-Final target dimensions are aligned to multiples of 16.
+`contain` uses white padding for pixels not occupied by the source image. Final target dimensions are aligned to multiples of 16.
 
 Preset sizes are explicit target geometries rather than a generated combination of megapixels plus aspect ratio.
 
