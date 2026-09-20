@@ -104,7 +104,7 @@ def test_v12_fit_preserves_complete_portrait_source_on_square_target():
         tgt_w=1408,
         fit_mode="fit",
     )
-    assert geom.mode_resolved == "fit"
+    assert geom.mode_resolved == "contain"
     assert geom.crop_rectangle == (0, 0, 965, 2059)
     assert geom.vae_input_pixel_size == (656, 1408)
     assert geom.vae_latent_grid_size == (82, 176)
