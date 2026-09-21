@@ -18,8 +18,8 @@ def _extras(conditioning):
 
 
 def test_split_edit_uses_positional_qwen_builders():
-    assert edit_node.edit_engine_runtime.build_krea2_user_content is build_grounded_positive_user_content
-    assert edit_node.edit_engine_runtime.build_krea2_negative_user_content is build_grounded_negative_user_content
+    assert edit_node.edit_engine_runtime.build_grounded_positive_user_content is build_grounded_positive_user_content
+    assert edit_node.edit_engine_runtime.build_grounded_negative_user_content is build_grounded_negative_user_content
 
 
 def test_split_edit_negative_prompt_is_fixed_empty_and_not_user_editable():
