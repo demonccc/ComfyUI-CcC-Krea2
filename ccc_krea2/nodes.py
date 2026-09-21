@@ -2,6 +2,7 @@
 
 from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
 from .t2i import CcCKrea2TextToImage
+from .modular_nodes.attention_region_node import CcCKrea2AttentionRegion
 from .modular_nodes.visual_reference_node import CcCKrea2VisualReference
 from .modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
@@ -20,6 +21,7 @@ from .modular_nodes.cache_nodes import (
 
 
 NODE_CLASS_MAPPINGS = {
+    "CcCKrea2AttentionRegion": CcCKrea2AttentionRegion,
     "CcCKrea2VisualReference": CcCKrea2VisualReference,
     "CcCKrea2SemanticReference": CcCKrea2SemanticReference,
     "CcCKrea2SizeResolver": CcCKrea2SizeResolver,
@@ -41,6 +43,7 @@ NODE_CLASS_MAPPINGS = {
 
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "CcCKrea2AttentionRegion": "Krea2 CcC Attention Region",
     "CcCKrea2VisualReference": "Krea2 CcC Visual Reference",
     "CcCKrea2SemanticReference": "Krea2 CcC Semantic Reference",
     "CcCKrea2SizeResolver": "Krea2 CcC Size Resolver",
