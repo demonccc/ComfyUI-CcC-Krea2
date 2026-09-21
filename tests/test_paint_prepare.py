@@ -27,6 +27,7 @@ def _geometry(mask=None, height=16, width=16):
 
 def _prepare(mask=None, **overrides):
     params = {
+        "fill_holes": False,
         "mask_grow": 0,
         "mask_blur_mode": "gaussian_sigma",
         "mask_blur_amount": 0.0,
@@ -47,6 +48,33 @@ def test_prepare_creates_sampling_latent_and_token_aligned_noise_mask():
     assert context["reference_latent"].shape == (1, 16, 2, 2)
     assert semantic.shape[-1] == 3
     assert torch.allclose(keep, 1.0 - generated)
+
+
+def test_fill_holes_fills_only_enclosed_mask_interiors():
+    ring = torch.zeros((1, 16, 16), dtype=torch.float32)
+    ring[:, 3:13, 3] = 1.0
+    ring[:, 3:13, 12] = 1.0
+    ring[:, 3, 3:13] = 1.0
+    ring[:, 12, 3:13] = 1.0
+
+    _, _, _, _, original, _ = _prepare(ring, fill_holes=False)
+    _, _, _, _, filled, _ = _prepare(ring, fill_holes=True)
+
+    assert original[0, 8, 8] == 0.0
+    assert filled[0, 8, 8] == 1.0
+    assert filled[0, 0, 0] == 0.0
+
+
+def test_fill_holes_does_not_close_an_open_boundary():
+    open_ring = torch.zeros((1, 16, 16), dtype=torch.float32)
+    open_ring[:, 3:13, 3] = 1.0
+    open_ring[:, 3:13, 12] = 1.0
+    open_ring[:, 12, 3:13] = 1.0
+    open_ring[:, 3, 3:7] = 1.0
+    open_ring[:, 3, 9:13] = 1.0
+
+    _, _, _, _, filled, _ = _prepare(open_ring, fill_holes=True)
+    assert filled[0, 8, 8] == 0.0
 
 
 def test_signed_mask_grow_expands_and_shrinks():
@@ -99,6 +127,7 @@ def test_semantic_reference_neutralizes_generated_pixels():
     context, _, prepared, semantic, generated, _ = prepare_paint_context(
         FakeVAE(),
         geometry,
+        fill_holes=False,
         mask_grow=0,
         mask_blur_mode="gaussian_sigma",
         mask_blur_amount=0.0,
