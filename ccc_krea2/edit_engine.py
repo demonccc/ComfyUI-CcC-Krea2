@@ -8,9 +8,11 @@ from .krea2edit_geometry import resolve_krea2edit_geometry, process_image_and_ma
 from .style_processing import expand_style_reference_spans
 from .conditioning import (
     encode_krea2_qwen_context,
-    build_krea2_user_content,
-    build_krea2_negative_user_content,
     attach_reference_latents_to_conditioning,
+)
+from .identity_contract import (
+    build_grounded_negative_user_content,
+    build_grounded_positive_user_content,
 )
 from .target_latent import should_include_target_in_vision, TargetVisionContext
 from .reference_cache import CachedQwenImage
@@ -69,7 +71,10 @@ def run_krea2_edit_orchestrator(
 
     # Step 3: Prompt text
     pos_base = positive_prompt or ""
-    neg_base = negative_prompt or ""
+    # Krea2 CcC Edit has no negative text prompt. The unconditional branch keeps
+    # only the appearance-image vision blocks; reference boosts are neutralized later.
+    del negative_prompt
+    neg_base = ""
 
     # Step 4: Build Qwen vision image maps and reference specs
     pos_qwen_images: List[torch.Tensor] = []
@@ -240,9 +245,13 @@ def run_krea2_edit_orchestrator(
             )
 
     # Format user content using the Krea2 CcC Edit grounded prompt contract.
-    user_content = build_krea2_user_content(resolved_references=resolved_refs, user_prompt=pos_base)
-    neg_user_content = build_krea2_negative_user_content(
-        resolved_references=resolved_refs, user_negative_prompt=neg_base
+    user_content = build_grounded_positive_user_content(
+        resolved_references=resolved_refs,
+        user_prompt=pos_base,
+    )
+    neg_user_content = build_grounded_negative_user_content(
+        resolved_references=resolved_refs,
+        user_negative_prompt=neg_base,
     )
 
     # Step 5: Encode Qwen Contexts for positive and negative
