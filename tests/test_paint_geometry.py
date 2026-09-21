@@ -59,7 +59,7 @@ def test_pad_selects_containing_krea_geometry_without_resizing_source():
 
 
 def test_explicit_outpaint_expansion_is_separate_from_temporary_krea_padding():
-    image = _image(1024, 1024)
+    image = _image(1024, 1344)
     context, _, prepared_mask = _prepare(
         image,
         mode="pad",
@@ -73,11 +73,11 @@ def test_explicit_outpaint_expansion_is_separate_from_temporary_krea_padding():
 
     assert prepared_mask.shape == (1, 1024, 1536)
     assert torch.all(user == 0)
-    assert torch.all(expansion[:, :, :1024] == 0)
-    assert torch.all(expansion[:, :, 1024:1152] == 1)
-    assert torch.all(expansion[:, :, 1152:] == 0)
-    assert torch.all(krea_padding[:, :, :1152] == 0)
-    assert torch.all(krea_padding[:, :, 1152:] == 1)
+    assert torch.all(expansion[:, :, :1344] == 0)
+    assert torch.all(expansion[:, :, 1344:1472] == 1)
+    assert torch.all(expansion[:, :, 1472:] == 0)
+    assert torch.all(krea_padding[:, :, :1472] == 0)
+    assert torch.all(krea_padding[:, :, 1472:] == 1)
     assert torch.equal(prepared_mask, torch.maximum(expansion, krea_padding))
 
 
