@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, Tuple
 
+import numpy as np
+from PIL import Image, ImageDraw, ImageOps
 import torch
 import torch.nn.functional as F
 
@@ -13,6 +15,31 @@ from ..constants import NODE_CATEGORY
 
 _ALIGNMENT = 16
 _SEMANTIC_REFERENCE_MAX_EDGE = 384
+
+
+def _fill_mask_holes(mask: torch.Tensor) -> torch.Tensor:
+    """Fill enclosed background regions while preserving the existing soft mask boundary."""
+    if mask.ndim == 2:
+        mask = mask.unsqueeze(0)
+    if mask.ndim != 3:
+        raise ValueError(f"[Krea2 CcC Paint Prepare] mask must be [B,H,W], got {tuple(mask.shape)}.")
+
+    result = mask.clone()
+    binary = (mask.detach().float().cpu() >= 0.5).to(torch.uint8).numpy()
+
+    for batch_index in range(binary.shape[0]):
+        # Pad with one guaranteed exterior-background border, then flood that exterior.
+        image = Image.fromarray(binary[batch_index] * 255, mode="L")
+        padded = ImageOps.expand(image, border=1, fill=0)
+        ImageDraw.floodfill(padded, (0, 0), 128, border=255)
+
+        flooded = np.asarray(padded, dtype=np.uint8)[1:-1, 1:-1]
+        holes = flooded == 0
+        if holes.any():
+            hole_mask = torch.from_numpy(holes.copy()).to(device=result.device)
+            result[batch_index][hole_mask] = 1.0
+
+    return result.clamp(0.0, 1.0)
 
 
 def _grow_or_shrink(mask: torch.Tensor, amount: int) -> torch.Tensor:
@@ -135,6 +162,7 @@ def prepare_paint_context(
     vae: Any,
     paint_geometry: Dict[str, Any],
     *,
+    fill_holes: bool,
     mask_grow: int,
     mask_blur_mode: str,
     mask_blur_amount: float,
@@ -149,6 +177,8 @@ def prepare_paint_context(
 
     known_image = known_image[..., :3].float().clamp(0.0, 1.0)
     hard_mask = hard_mask.float().clamp(0.0, 1.0)
+    if fill_holes:
+        hard_mask = _fill_mask_holes(hard_mask)
     hard_generated = _grow_or_shrink(hard_mask, int(mask_grow)).clamp(0.0, 1.0)
     generated_mask = _apply_feather(
         hard_generated,
@@ -177,6 +207,7 @@ def prepare_paint_context(
         "canvas_width": int(known_image.shape[2]),
         "canvas_height": int(known_image.shape[1]),
         "geometry_mode": paint_geometry.get("mode"),
+        "fill_holes": bool(fill_holes),
         "mask_grow": int(mask_grow),
         "mask_blur_mode": str(mask_blur_mode),
         "mask_blur_amount": float(mask_blur_amount),
@@ -193,7 +224,7 @@ class CcCKrea2PaintPrepare:
     RETURN_NAMES = ("paint_context", "latent", "prepared_image", "semantic_reference", "generated_mask", "keep_mask", "paint_prepare_info")
     FUNCTION = "prepare"
     DESCRIPTION = (
-        "Consumes Krea2 CcC Paint Geometry, applies mask grow/feather, creates the semantic reference, "
+        "Consumes Krea2 CcC Paint Geometry, optionally fills enclosed mask holes, applies mask grow/feather, creates the semantic reference, "
         "VAE-encodes the known Krea canvas, and returns the sampling latent with token-aligned noise_mask."
     )
 
@@ -203,6 +234,7 @@ class CcCKrea2PaintPrepare:
             "required": {
                 "vae": ("VAE",),
                 "paint_geometry": ("KREA2_PAINT_GEOMETRY",),
+                "fill_holes": ("BOOLEAN", {"default": False}),
                 "mask_grow": ("INT", {"default": 0, "min": -256, "max": 256, "step": 1}),
                 "mask_blur_mode": (["standard", "gaussian_sigma"], {"default": "gaussian_sigma"}),
                 "mask_blur_amount": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 128.0, "step": 0.5}),
@@ -210,10 +242,20 @@ class CcCKrea2PaintPrepare:
             }
         }
 
-    def prepare(self, vae, paint_geometry, mask_grow=0, mask_blur_mode="gaussian_sigma", mask_blur_amount=0.0, mask_blur_direction="outside"):
+    def prepare(
+        self,
+        vae,
+        paint_geometry,
+        fill_holes=False,
+        mask_grow=0,
+        mask_blur_mode="gaussian_sigma",
+        mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    ):
         result = prepare_paint_context(
             vae=vae,
             paint_geometry=paint_geometry,
+            fill_holes=fill_holes,
             mask_grow=mask_grow,
             mask_blur_mode=mask_blur_mode,
             mask_blur_amount=mask_blur_amount,
@@ -224,6 +266,7 @@ class CcCKrea2PaintPrepare:
             "=== Krea2 CcC Paint Prepare ===",
             f"Canvas: {context['canvas_width']}x{context['canvas_height']}",
             f"Geometry Mode: {context['geometry_mode']}",
+            f"Fill Holes: {'yes' if fill_holes else 'no'}",
             f"Mask Grow: {mask_grow}px",
             f"Mask Feather: {mask_blur_mode} amount={float(mask_blur_amount):.2f} direction={mask_blur_direction}",
             f"Semantic Reference: {semantic_reference.shape[2]}x{semantic_reference.shape[1]} max-edge {_SEMANTIC_REFERENCE_MAX_EDGE}px",
