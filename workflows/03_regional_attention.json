@@ -316,7 +316,7 @@
         true,
         768,
         "lanczos",
-        "It is the target scene. Preserve its composition, pose, actions, lighting, and interactions.",
+        "This is the scene image.",
         "global",
         ""
       ],
@@ -371,7 +371,7 @@
         true,
         768,
         "lanczos",
-        "Use this image for the woman's identity and physical appearance.",
+        "This is the woman reference image.",
         "only in region",
         "woman"
       ],
@@ -841,7 +841,7 @@
         true,
         768,
         "lanczos",
-        "Use this image for the man's identity and physical appearance.",
+        "This is the man reference image.",
         "only in region",
         "man"
       ],
