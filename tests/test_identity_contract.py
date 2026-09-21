@@ -189,6 +189,8 @@ def test_public_edit_and_visual_reference_surfaces_match_refactored_contract():
         "semantic_grounding_px",
         "semantic_resize_method",
         "prompt_annotation",
+        "attention_scope",
+        "region_tag",
     ]
 
     edit_inputs = CcCKrea2Edit.INPUT_TYPES()
