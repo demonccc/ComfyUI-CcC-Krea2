@@ -20,6 +20,7 @@
 ### Changed
 
 - Paint Prepare now consumes finalized Paint Geometry, owns VAE encoding, and returns the KSampler LATENT with token-aligned noise_mask.
+- Explicit outpaint margins now keep their Geometry padding-fill as semantic/reference context while remaining fully generable, improving border color and lighting continuity.
 - Paint runtime now consumes the prepared appearance latent and no longer creates the target latent itself.
 - AnyPaint test workflow now uses Paint Geometry -> Paint Prepare -> Paint -> decode -> Paint Restore.
 
