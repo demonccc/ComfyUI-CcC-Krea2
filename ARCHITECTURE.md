@@ -5,6 +5,7 @@
 Krea2 CcC Edit has one edit execution path.
 
 ```text
+Attention Region -------------+
 IMAGE -> Visual Reference ----+
 IMAGE -> Visual Reference ----+--> Edit --> Krea2 CcC Edit runtime --> Krea2
 IMAGE -> Semantic Reference --+      ^
@@ -71,6 +72,8 @@ Appearance reference latents are attached to CONDITIONING together with per-refe
 - positive boost
 - neutral negative boost
 - RoPE placement
+- optional tagged target region
+- target attention scope
 
 The Krea2 CcC Edit runtime consumes that metadata and executes one in-context sequence:
 
@@ -79,6 +82,14 @@ The Krea2 CcC Edit runtime consumes that metadata and executes one in-context se
 ```
 
 Text occupies frame 0 coordinates, references use ordered reference frames, and target image tokens use target frame coordinates.
+
+### Tagged target attention regions
+
+Attention Region nodes form a chain of uniquely tagged rectangular boxes. With empty Latent content, box percentages refer directly to the final target canvas. With image content, boxes refer to the original content image and Latent carries them through `stretch`, `contain`, or `crop`.
+
+Crop has a strict invariant: every declared box must remain completely inside the retained crop. Partial intersection and complete removal are both errors. This prevents a target-side attention box from silently moving to the wrong token set.
+
+After target pixel geometry is finalized, Edit binds each regional Visual Reference by `region_tag`. The runtime projects the transformed normalized box to the actual Krea target token grid. `boost in region` applies target-to-reference bias only for queries inside that grid region. `only in region` additionally blocks target-to-reference attention outside it.
 
 ## Semantic Reference
 
