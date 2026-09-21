@@ -6,6 +6,7 @@ from pathlib import Path
 
 EDIT_WORKFLOW = Path("workflows/01_scene_subject.json")
 PAINT_WORKFLOW = Path("workflows/02_anypaint_remove_people.json")
+REGIONAL_WORKFLOW = Path("workflows/03_regional_attention.json")
 
 
 def _nodes_by_type(workflow, type_name):
@@ -14,7 +15,7 @@ def _nodes_by_type(workflow, type_name):
 
 def test_expected_workflows_are_checked_in():
     workflows = sorted(Path("workflows").rglob("*.json"))
-    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW]
+    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW]
 
 
 def test_scene_subject_workflow_uses_split_nodes():
@@ -126,8 +127,31 @@ def test_paint_workflow_uses_geometry_prepare_restore_and_anypaint_runtime():
     assert any(output["name"] == "latent" and output["type"] == "LATENT" for output in prepare["outputs"])
 
 
+def test_regional_attention_workflow_wires_tags_through_latent():
+    workflow = json.loads(REGIONAL_WORKFLOW.read_text(encoding="utf-8"))
+
+    regions = _nodes_by_type(workflow, "CcCKrea2AttentionRegion")
+    visuals = _nodes_by_type(workflow, "CcCKrea2VisualReference")
+    latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
+
+    assert len(regions) == 2
+    assert [node["widgets_values"][0] for node in regions] == ["woman", "man"]
+    assert len(visuals) == 3
+
+    woman = next(node for node in visuals if node.get("title") == "Woman Regional Reference")
+    man = next(node for node in visuals if node.get("title") == "Man Regional Reference")
+    assert woman["widgets_values"][-2:] == ["only in region", "woman"]
+    assert man["widgets_values"][-2:] == ["only in region", "man"]
+
+    latent_inputs = {item["name"]: item for item in latent["inputs"]}
+    assert latent_inputs["attention_regions"]["type"] == "KREA2_ATTENTION_REGION_CHAIN"
+    assert latent_inputs["attention_regions"]["link"] is not None
+    assert latent["widgets_values"][0] == "from_image"
+    assert latent["widgets_values"][5:8] == ["from_image", "contain", "lanczos"]
+
+
 def test_all_workflow_link_types_are_consistent():
-    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW):
+    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW):
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         nodes = {node["id"]: node for node in workflow["nodes"]}
 
