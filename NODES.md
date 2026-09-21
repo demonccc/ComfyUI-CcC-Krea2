@@ -266,6 +266,7 @@ Mask controls:
 
 | Control | Values | Default | Behavior |
 | --- | --- | --- | --- |
+| `fill_holes` | boolean | false | Fills only background regions completely enclosed by the mask. Open gaps are not closed. |
 | `mask_grow` | -256 .. 256 | 0 | Positive expands the generation region; negative shrinks it. |
 | `mask_blur_mode` | standard, gaussian_sigma | gaussian_sigma | Box-style or Gaussian feathering. |
 | `mask_blur_amount` | 0 .. 128 | 0 | Feather radius/sigma. |
@@ -275,6 +276,7 @@ Processing:
 
 ```text
 prepared image + prepared mask
+  -> optional fill holes
   -> signed grow/shrink
   -> directional feather
   -> generated_mask / keep_mask
