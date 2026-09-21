@@ -45,8 +45,8 @@ def test_scene_subject_workflow_uses_split_nodes():
     assert subject["widgets_values"][-2:] == ["global", ""]
     assert scene["widgets_values"][6:10] == [True, True, 768, "lanczos"]
     assert subject["widgets_values"][6:10] == [True, True, 768, "lanczos"]
-    assert "scene image" in scene["widgets_values"][10]
-    assert "subject image" in subject["widgets_values"][10]
+    assert scene["widgets_values"][10] == "This is the scene image."
+    assert subject["widgets_values"][10] == "This is the subject image."
 
     assert edit["widgets_values"] == [
         "Replace the person in the scene image with the person from the subject image.",
@@ -143,6 +143,8 @@ def test_regional_attention_workflow_wires_tags_through_latent():
 
     woman = next(node for node in visuals if node.get("title") == "Woman Regional Reference")
     man = next(node for node in visuals if node.get("title") == "Man Regional Reference")
+    assert woman["widgets_values"][10] == "This is the woman reference image."
+    assert man["widgets_values"][10] == "This is the man reference image."
     assert woman["widgets_values"][-2:] == ["only in region", "woman"]
     assert man["widgets_values"][-2:] == ["only in region", "man"]
 
@@ -198,6 +200,7 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_five_views(
         "lanczos",
     ]
     assert subject["widgets_values"][6:10] == [True, True, 1024, "lanczos"]
+    assert subject["widgets_values"][10] == "This is the subject image."
     assert subject["widgets_values"][-2:] == ["global", ""]
 
     subject_inputs = {item["name"]: item for item in subject["inputs"]}
