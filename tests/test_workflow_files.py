@@ -38,8 +38,10 @@ def test_scene_subject_workflow_uses_split_nodes():
 
     assert scene["widgets_values"][:6] == [1.0, "resize", "inside", "center", "center", "lanczos"]
     assert subject["widgets_values"][:6] == [4.0, "resize", "inside", "center", "center", "lanczos"]
-    assert len(scene["widgets_values"]) == 11
-    assert len(subject["widgets_values"]) == 11
+    assert len(scene["widgets_values"]) == 13
+    assert len(subject["widgets_values"]) == 13
+    assert scene["widgets_values"][-2:] == ["global", ""]
+    assert subject["widgets_values"][-2:] == ["global", ""]
     assert scene["widgets_values"][6:10] == [True, True, 768, "lanczos"]
     assert subject["widgets_values"][6:10] == [True, True, 768, "lanczos"]
     assert "scene image" in scene["widgets_values"][10]
