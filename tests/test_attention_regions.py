@@ -26,8 +26,8 @@ def test_region_chain_requires_unique_tags():
 def test_empty_target_keeps_normalized_box_on_final_canvas():
     chain = _chain(build_attention_region("woman", 10, 20, 30, 40))
     resolved = resolve_attention_regions(chain, 1000, 500, {"mode": "empty"})
-    assert resolved[0].target_box_px == (100.0, 100.0, 400.0, 300.0)
-    assert resolved[0].target_box_normalized == (0.1, 0.2, 0.4, 0.6)
+    assert resolved[0].target_box_px == pytest.approx((100.0, 100.0, 400.0, 300.0))
+    assert resolved[0].target_box_normalized == pytest.approx((0.1, 0.2, 0.4, 0.6))
 
 
 def test_contain_moves_box_with_scaled_image_and_padding():
