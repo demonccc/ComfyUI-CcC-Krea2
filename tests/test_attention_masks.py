@@ -2,7 +2,7 @@
 
 import math
 import torch
-from ccc_krea2.patch import _compute_ref_attention_bias_patchified
+from ccc_krea2.patch import _compute_ref_attention_bias_patchified, _target_region_box_mask
 
 
 def test_batch_1_mask_applies_expected_boost():
@@ -133,3 +133,55 @@ def test_regions_outside_mask_retain_zero_additional_bias():
     assert bias is not None
     # All attention bias values must be exactly 0.0 (NO -1e4 penalty)
     assert torch.all(bias == 0.0)
+
+
+def test_target_region_boost_only_applies_to_target_queries_inside_box():
+    boost = 2.0
+    expected = math.log(boost)
+    target_mask = _target_region_box_mask(
+        (0.0, 0.0, 0.5, 1.0),
+        target_grid=(2, 4),
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    bias = _compute_ref_attention_bias_patchified(
+        boosts=[boost],
+        txt_len=2,
+        ref_token_lens=[4],
+        tgt_len=8,
+        ref_target_masks=[target_mask],
+        ref_attention_scopes=["boost in region"],
+        target_grid=(2, 4),
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    target_to_ref = bias[0, 0, 6:, 2:6]
+    inside_rows = [0, 1, 4, 5]
+    outside_rows = [2, 3, 6, 7]
+    assert torch.allclose(target_to_ref[inside_rows], torch.full((4, 4), expected))
+    assert torch.all(target_to_ref[outside_rows] == 0.0)
+
+
+def test_target_region_only_blocks_reference_outside_box():
+    target_mask = _target_region_box_mask(
+        (0.0, 0.0, 0.5, 1.0),
+        target_grid=(2, 4),
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    bias = _compute_ref_attention_bias_patchified(
+        boosts=[1.0],
+        txt_len=2,
+        ref_token_lens=[4],
+        tgt_len=8,
+        ref_target_masks=[target_mask],
+        ref_attention_scopes=["only in region"],
+        target_grid=(2, 4),
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    target_to_ref = bias[0, 0, 6:, 2:6]
+    inside_rows = [0, 1, 4, 5]
+    outside_rows = [2, 3, 6, 7]
+    assert torch.all(target_to_ref[inside_rows] == 0.0)
+    assert torch.isneginf(target_to_ref[outside_rows]).all()
