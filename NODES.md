@@ -251,6 +251,8 @@ Guardrails:
 
 Temporary padding is always marked as generable in the returned mask. Image and mask share exactly the same crop/pad transform.
 
+Explicit outpaint expansion and temporary Krea padding are tracked separately. Both remain generable, but Paint Prepare can preserve the explicit expansion's configured `padding_fill` as reference context while still neutralizing temporary Krea padding.
+
 Outputs:
 
 - `paint_geometry`
@@ -280,13 +282,15 @@ prepared image + prepared mask
   -> signed grow/shrink
   -> directional feather
   -> generated_mask / keep_mask
-  -> neutralized semantic reference
+  -> preserve explicit outpaint padding-fill as semantic context
+  -> neutralize manual/generated holes and temporary Krea padding
+  -> semantic reference
   -> VAE known-image latent
   -> token-aligned noise_mask
   -> sampling LATENT
 ```
 
-Paint Prepare also VAE-encodes the semantic reference for the Paint runtime.
+Paint Prepare also VAE-encodes the semantic reference for the Paint runtime. Explicit `expand_left/top/right/bottom` margins remain fully generable, but their edge/reflect/neutral/white fill is kept in the semantic/reference image so AnyPaint can see border color and lighting continuity. A normal user-painted mask is still neutralized as before.
 
 Outputs:
 
