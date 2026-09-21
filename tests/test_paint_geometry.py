@@ -17,7 +17,18 @@ def _image(height, width):
     return image
 
 
-def _prepare(image, mode="pad", fill="edge", hpos="center", vpos="center", mask=None):
+def _prepare(
+    image,
+    mode="pad",
+    fill="edge",
+    hpos="center",
+    vpos="center",
+    mask=None,
+    expand_left=0,
+    expand_top=0,
+    expand_right=0,
+    expand_bottom=0,
+):
     return prepare_paint_geometry(
         image,
         mask,
@@ -25,10 +36,10 @@ def _prepare(image, mode="pad", fill="edge", hpos="center", vpos="center", mask=
         padding_fill=fill,
         horizontal_position=hpos,
         vertical_position=vpos,
-        expand_left=0,
-        expand_top=0,
-        expand_right=0,
-        expand_bottom=0,
+        expand_left=expand_left,
+        expand_top=expand_top,
+        expand_right=expand_right,
+        expand_bottom=expand_bottom,
     )
 
 
@@ -45,6 +56,29 @@ def test_pad_selects_containing_krea_geometry_without_resizing_source():
     assert torch.allclose(prepared[:, y:y + 1500, x:x + 1000], image)
     assert torch.all(prepared_mask[:, y:y + 1500, x:x + 1000] == 0)
     assert torch.all(prepared_mask[:, :y] == 1) if y else True
+
+
+def test_explicit_outpaint_expansion_is_separate_from_temporary_krea_padding():
+    image = _image(1024, 1024)
+    context, _, prepared_mask = _prepare(
+        image,
+        mode="pad",
+        hpos="left",
+        expand_right=128,
+    )
+
+    expansion = context["working_expansion_mask"]
+    krea_padding = context["working_krea_padding_mask"]
+    user = context["working_user_mask"]
+
+    assert prepared_mask.shape == (1, 1024, 1536)
+    assert torch.all(user == 0)
+    assert torch.all(expansion[:, :, :1024] == 0)
+    assert torch.all(expansion[:, :, 1024:1152] == 1)
+    assert torch.all(expansion[:, :, 1152:] == 0)
+    assert torch.all(krea_padding[:, :, :1152] == 0)
+    assert torch.all(krea_padding[:, :, 1152:] == 1)
+    assert torch.equal(prepared_mask, torch.maximum(expansion, krea_padding))
 
 
 def test_padding_fill_modes_are_available_and_edge_is_non_destructive():
