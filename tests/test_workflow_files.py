@@ -109,7 +109,7 @@ def test_paint_workflow_uses_geometry_prepare_restore_and_anypaint_runtime():
     sampler = sampler_nodes[0]
 
     assert geometry["widgets_values"] == ["pad", "edge", "center", "center", 0, 0, 0, 0]
-    assert prepare["widgets_values"] == [12, "gaussian_sigma", 4.0, "outside"]
+    assert prepare["widgets_values"] == [False, 12, "gaussian_sigma", 4.0, "outside"]
     assert paint["widgets_values"][1:] == [True, True]
     assert lora["widgets_values"][3] == "krea2_anypaint_rank32.safetensors"
     assert sampler["widgets_values"][2:7] == [8, 1.0, "euler", "simple", 1.0]
