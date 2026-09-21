@@ -6,6 +6,7 @@ Krea2 CcC Edit provides ComfyUI nodes for Krea 2 generation and reference-guided
 
 The edit pipeline is intentionally split into a small set of focused nodes:
 
+- **Krea2 CcC Attention Region**
 - **Krea2 CcC Visual Reference**
 - **Krea2 CcC Semantic Reference**
 - **Krea2 CcC Size Resolver**
@@ -21,6 +22,12 @@ Semantic Reference --+          ^
                                 |
 Size Resolver --> Latent -------+
 ```
+
+### Attention Region
+
+Use one chainable node per tagged rectangular target region. The box is expressed as percentages of the target/content image and is carried through Latent target transforms before being projected to the Krea token grid.
+
+When Latent content is an image, `contain` and `stretch` transform the boxes with the image. `crop` is intentionally strict: if the crop removes any part of a declared Attention Region, Latent raises an error. Boxes are never silently clipped or deleted.
 
 ### Visual Reference
 
@@ -44,6 +51,14 @@ The Qwen path is independent from VAE geometry. `semantic` controls whether the 
 `prompt_annotation` optionally adds `Image N: <annotation>` after the physical vision prefix.
 
 `boost` applies to the positive pass. The grounded negative uses the same appearance references with neutral boost `1.0`.
+
+Regional attention is optional per Visual Reference:
+
+- `global`: current behavior; the reference can influence the complete target.
+- `boost in region`: the configured boost is applied only to target tokens inside the matching `region_tag`.
+- `only in region`: the reference is blocked outside the matching region; inside it, the normal boost still applies.
+
+The region tag must exist in the Attention Region chain attached to Krea2 CcC Latent.
 
 ### Semantic Reference
 
