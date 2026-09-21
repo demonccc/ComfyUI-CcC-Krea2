@@ -80,35 +80,50 @@ def test_scene_subject_size_resolver_feeds_fixed_latent_dimensions():
     assert latent_values[6] == "crop"
 
 
-def test_paint_workflow_uses_anypaint_runtime_and_mask_controls():
+def test_paint_workflow_uses_geometry_prepare_restore_and_anypaint_runtime():
     workflow = json.loads(PAINT_WORKFLOW.read_text(encoding="utf-8"))
 
+    geometry_nodes = _nodes_by_type(workflow, "CcCKrea2PaintGeometry")
     prepare_nodes = _nodes_by_type(workflow, "CcCKrea2PaintPrepare")
     paint_nodes = _nodes_by_type(workflow, "CcCKrea2Paint")
+    restore_nodes = _nodes_by_type(workflow, "CcCKrea2PaintRestore")
     lora_nodes = _nodes_by_type(workflow, "CcCKrea2LoRAStack")
     sampler_nodes = _nodes_by_type(workflow, "KSampler")
 
+    assert len(geometry_nodes) == 1
     assert len(prepare_nodes) == 1
     assert len(paint_nodes) == 1
+    assert len(restore_nodes) == 1
     assert len(lora_nodes) == 1
     assert len(sampler_nodes) == 1
 
+    geometry = geometry_nodes[0]
     prepare = prepare_nodes[0]
     paint = paint_nodes[0]
+    restore = restore_nodes[0]
     lora = lora_nodes[0]
     sampler = sampler_nodes[0]
 
-    assert prepare["widgets_values"] == [0, 0, 0, 0, 12, "gaussian_sigma", 4.0, "outside"]
+    assert geometry["widgets_values"] == ["pad", "edge", "center", "center", 0, 0, 0, 0]
+    assert prepare["widgets_values"] == [12, "gaussian_sigma", 4.0, "outside"]
     assert paint["widgets_values"][1:] == [True, True]
     assert lora["widgets_values"][3] == "krea2_anypaint_rank32.safetensors"
     assert sampler["widgets_values"][2:7] == [8, 1.0, "euler", "simple", 1.0]
 
+    geometry_inputs = {item["name"]: item for item in geometry["inputs"]}
     prepare_inputs = {item["name"]: item for item in prepare["inputs"]}
     paint_inputs = {item["name"]: item for item in paint["inputs"]}
-    assert prepare_inputs["image"]["link"] is not None
-    assert prepare_inputs["mask"]["link"] is not None
+    restore_inputs = {item["name"]: item for item in restore["inputs"]}
+    assert geometry_inputs["image"]["link"] is not None
+    assert geometry_inputs["mask"]["link"] is not None
+    assert prepare_inputs["vae"]["link"] is not None
+    assert prepare_inputs["paint_geometry"]["type"] == "KREA2_PAINT_GEOMETRY"
+    assert prepare_inputs["paint_geometry"]["link"] is not None
     assert paint_inputs["paint_context"]["type"] == "KREA2_PAINT_CONTEXT"
     assert paint_inputs["paint_context"]["link"] is not None
+    assert restore_inputs["paint_geometry"]["link"] is not None
+    assert restore_inputs["generated_mask"]["link"] is not None
+    assert any(output["name"] == "latent" and output["type"] == "LATENT" for output in prepare["outputs"])
 
 
 def test_all_workflow_link_types_are_consistent():
