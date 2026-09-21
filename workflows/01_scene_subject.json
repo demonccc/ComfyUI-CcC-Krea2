@@ -316,7 +316,7 @@
         true,
         768,
         "lanczos",
-        "It is the scene image. Use this image for the scene, composition, pose, action, and interactions.",
+        "This is the scene image.",
         "global",
         ""
       ],
@@ -371,7 +371,7 @@
         true,
         768,
         "lanczos",
-        "It is the subject image. Use this image for the subject identity and appearance.",
+        "This is the subject image.",
         "global",
         ""
       ],
