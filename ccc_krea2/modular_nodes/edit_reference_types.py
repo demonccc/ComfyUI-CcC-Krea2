@@ -23,6 +23,8 @@ class VisualReferenceEntry:
     semantic_grounding_px: int = 768
     semantic_resize_method: str = "lanczos"
     prompt_annotation: str = ""
+    attention_scope: str = "global"
+    region_tag: str = ""
 
     @property
     def rope_position(self) -> str:
