@@ -32,7 +32,7 @@ Declares one ordered appearance reference.
 | `semantic_resize` | boolean | true | Enable Qwen-only downscale when above the configured cap. |
 | `semantic_grounding_px` | 32 .. 4096, step 32 | 768 | Maximum Qwen longest edge when semantic resize is enabled. |
 | `semantic_resize_method` | lanczos, bicubic, bilinear, area | lanczos | Qwen downscale interpolation. |
-| `prompt_annotation` | text | empty | Optional `Image N: ...` Qwen annotation. |
+| `prompt_annotation` | text | empty | Optional role-only label inserted as `Image N: <text>` before the positive prompt. Use it only to identify the image (for example `This is the subject image.`); edit instructions belong in `positive_prompt`. It is never copied to the negative branch. |
 | `attention_scope` | global, boost in region, only in region | global | Target-side spatial scope for this reference. |
 | `region_tag` | text | empty | Tag of the Attention Region used by regional scopes. |
 
@@ -45,7 +45,7 @@ Declares one ordered appearance reference.
 
 For `resize`, `contain`, and `native`, /16 alignment is crop-down rather than pad-up or non-uniform resizing. The alignment crop is only a few edge pixels needed by the VAE grid and is distinct from the explicit `crop` mode.
 
-Qwen preparation is independent from VAE geometry.
+Qwen preparation is independent from VAE geometry. Visual `prompt_annotation` text is identification-only: all physical vision blocks come first, then `Image N: ...` role labels, then the raw positive edit prompt. The negative branch keeps the appearance-image vision blocks but has no role labels or negative text.
 
 Regional attention is target-side. `boost in region` applies the existing reference boost only to target queries inside the resolved region. `only in region` additionally blocks target queries outside the region from attending to that reference.
 
