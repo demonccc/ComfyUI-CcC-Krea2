@@ -5,6 +5,7 @@ from typing import Any, Optional
 import torch
 
 from .. import edit_engine as edit_engine_runtime
+from ..attention_regions import resolved_regions_by_tag
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
 from ..identity_contract import (
@@ -265,6 +266,33 @@ def _conditioning_extras(conditioning):
     return {}
 
 
+def _resolve_reference_attention(visual_entries, latent):
+    resolved = tuple(latent.get("ccc_krea2_attention_regions") or ())
+    by_tag = resolved_regions_by_tag(resolved)
+    boxes = []
+    scopes = []
+    for index, entry in enumerate(visual_entries, start=1):
+        scope = str(getattr(entry, "attention_scope", "global") or "global")
+        tag = str(getattr(entry, "region_tag", "") or "").strip()
+        scopes.append(scope)
+        if scope == "global":
+            boxes.append(None)
+            continue
+        if not tag:
+            raise ValueError(
+                f"[Krea2 CcC Edit] Visual Reference {index} uses regional attention but has no region tag."
+            )
+        region = by_tag.get(tag)
+        if region is None:
+            available = ", ".join(sorted(by_tag)) or "<none>"
+            raise ValueError(
+                f"[Krea2 CcC Edit] Visual Reference {index} targets unknown Attention Region '{tag}'. "
+                f"Available tags: {available}."
+            )
+        boxes.append(tuple(region.target_box_normalized))
+    return boxes, scopes
+
+
 def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     extras = _conditioning_extras(conditioning)
     refs = list(extras.get("reference_latents") or [])
@@ -347,6 +375,7 @@ class CcCKrea2Edit:
         reference_count = len(visual_entries)
         rope_positions = [entry.rope_position for entry in visual_entries]
         positive_boosts = [float(entry.boost) for entry in visual_entries]
+        target_regions, attention_scopes = _resolve_reference_attention(visual_entries, latent)
 
         if reference_count:
             positive = attach_reference_runtime_to_conditioning(
@@ -354,12 +383,16 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=positive_boosts,
+                reference_target_regions=target_regions,
+                reference_attention_scopes=attention_scopes,
             )
             negative = attach_reference_runtime_to_conditioning(
                 negative,
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=None,
+                reference_target_regions=target_regions,
+                reference_attention_scopes=attention_scopes,
             )
 
         if apply_krea2_edit_patch and reference_count:
@@ -405,6 +438,7 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: cached={'yes' if entry.cache is not None else 'no'}, "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
+                f"attention_scope={entry.attention_scope}, region_tag={entry.region_tag or '<none>'}, "
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method={entry.semantic_resize_method}, prompt_annotation={annotation}"
             )
