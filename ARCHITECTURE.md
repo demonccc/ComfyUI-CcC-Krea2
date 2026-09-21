@@ -117,6 +117,39 @@ Latent owns:
 - target image placement
 - optional latent semantic metadata
 
+## Paint geometry and restore
+
+Paint keeps source pixels at native scale and normalizes only the working canvas:
+
+```text
+source image + mask
+        |
+        v
+Paint Geometry
+  pad or crop only
+  no source resize
+        |
+        v
+Paint Prepare
+  VAE known canvas
+  token-aligned noise_mask
+        |
+        v
+KSampler -> VAE Decode
+        |
+        v
+Paint Restore
+  depad exactly
+  or composite crop back
+```
+
+`pad` selects a curated Krea geometry that contains the requested canvas. `crop` selects one that fits inside it. Both use the same curated target table as Latent; impossible directions fail instead of silently resizing.
+
+The image and mask always share the same spatial transform. Explicit outpaint expansion belongs to the requested canvas; only temporary Krea padding is removed by Restore.
+
+Paint Prepare owns the sampling latent because it is the node that has the finalized working image, finalized mask, and VAE. Paint then owns only Qwen conditioning and the registered reference runtime.
+
+
 ## Ownership
 
 The current public edit architecture is implemented by Krea2 CcC Edit modules only. External projects that influenced individual ideas or techniques are acknowledged separately in [NOTICE](NOTICE).

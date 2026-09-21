@@ -209,56 +209,68 @@ Runtime controls remain editable:
 No VAE encode or Qwen Vision execution is required for a cached reference.
 
 
+## Krea2 CcC Paint Geometry
+
+Resolves an image + mask pair to a curated Krea working geometry without resizing the source.
+
+Controls:
+
+| Control | Values | Default | Behavior |
+| --- | --- | --- | --- |
+| `geometry_mode` | pad, crop | pad | Pad outward to a containing Krea geometry, or crop inward to an inner Krea geometry. |
+| `padding_fill` | edge, reflect, neutral, white | edge | Pixel fill used for temporary padding and explicit outpaint expansion. |
+| `horizontal_position` | center, left, right | center | Chooses where padding is placed or where the crop window is anchored horizontally. |
+| `vertical_position` | center, top, bottom | center | Chooses where padding is placed or where the crop window is anchored vertically. |
+| `expand_left/top/right/bottom` | 0 .. 8192, step 16 | 0 | Explicit outpaint expansion. It belongs to the requested/native canvas and is preserved after restore. |
+
+The Krea working geometry is selected from the same curated target table used by **Krea2 CcC Latent**. Feasible candidates are ranked by aspect-ratio proximity, then size proximity.
+
+Guardrails:
+
+- `crop` requires at least one curated Krea geometry that fits completely inside the requested canvas. Otherwise it fails with a message to use padding.
+- `pad` requires at least one curated Krea geometry that completely contains the requested canvas. Otherwise it fails with a message to use crop.
+
+Temporary padding is always marked as generable in the returned mask. Image and mask share exactly the same crop/pad transform.
+
+Outputs:
+
+- `paint_geometry`
+- `prepared_image`
+- `prepared_mask`
+- `geometry_info`
+
 ## Krea2 CcC Paint Prepare
 
-Builds the native paint canvas without resizing the source image.
-
-Required:
-
-- `image`
-
-Optional:
-
-- `mask`
-
-Canvas controls:
-
-- `expand_left`
-- `expand_top`
-- `expand_right`
-- `expand_bottom`
-
-The source image is placed unchanged inside the expanded canvas. Final dimensions are aligned upward to multiples of 16 by adding pixels on the right and bottom.
+Consumes `KREA2_PAINT_GEOMETRY` plus the VAE.
 
 Mask controls:
 
 | Control | Values | Default | Behavior |
 | --- | --- | --- | --- |
 | `mask_grow` | -256 .. 256 | 0 | Positive expands the generation region; negative shrinks it. |
-| `mask_blur_mode` | standard, gaussian_sigma | gaussian_sigma | Selects box-style feathering or Gaussian sigma feathering. |
-| `mask_blur_amount` | 0 .. 128 | 0 | Feather radius/sigma. Zero means no blur. |
-| `mask_blur_direction` | outside, inside, both | outside | Chooses where the soft transition is allowed relative to the hard mask boundary. |
+| `mask_blur_mode` | standard, gaussian_sigma | gaussian_sigma | Box-style or Gaussian feathering. |
+| `mask_blur_amount` | 0 .. 128 | 0 | Feather radius/sigma. |
+| `mask_blur_direction` | outside, inside, both | outside | Controls which side of the hard boundary receives the soft transition. |
 
-Direction semantics:
-
-- `outside`: keep the generated region at full strength and feather into the preserved surroundings.
-- `inside`: keep the outside strictly protected and feather only inside the generated region.
-- `both`: feather across both sides of the original boundary.
-
-Processing order:
+Processing:
 
 ```text
-source mask + outpaint canvas
+prepared image + prepared mask
   -> signed grow/shrink
   -> directional feather
-  -> generated_mask
-  -> keep_mask
+  -> generated_mask / keep_mask
   -> neutralized semantic reference
+  -> VAE known-image latent
+  -> token-aligned noise_mask
+  -> sampling LATENT
 ```
+
+Paint Prepare also VAE-encodes the semantic reference for the Paint runtime.
 
 Outputs:
 
 - `paint_context`
+- `latent`
 - `prepared_image`
 - `semantic_reference`
 - `generated_mask`
@@ -267,17 +279,25 @@ Outputs:
 
 ## Krea2 CcC Paint
 
-Consumes `KREA2_PAINT_CONTEXT` and prepares the runtime inputs for AnyPaint-style Krea 2 sampling.
+Consumes `KREA2_PAINT_CONTEXT`. It no longer creates the target latent.
 
 It:
 
 1. Grounds Qwen with the neutralized semantic reference.
-2. VAE-encodes the semantic reference as the registered appearance reference.
-3. VAE-encodes the known canvas.
-4. Converts the soft generation mask to a token-aligned ComfyUI `noise_mask`.
-5. Applies the registered t=0 reference runtime with optional isolated reference K/V cache.
+2. Attaches the appearance reference latent prepared by Paint Prepare.
+3. Applies the registered t=0 reference runtime with optional isolated reference K/V cache.
+4. Returns patched model plus positive/negative conditioning.
 
-The reference is registered over the complete target grid. Known-region preservation happens during sampling through the latent/noise-mask path rather than by a final source-image composite.
+The `LATENT` used by KSampler comes directly from **Krea2 CcC Paint Prepare**.
+
+## Krea2 CcC Paint Restore
+
+Consumes the decoded working image plus the `KREA2_PAINT_GEOMETRY` context.
+
+- `pad`: removes only the temporary Krea padding and preserves explicit user-requested expansion.
+- `crop`: composites the generated crop back at its exact original coordinates. When `generated_mask` is connected, only that generated/feathered region replaces the preserved base canvas.
+
+No inverse resize is performed.
 
 Recommended first test:
 
@@ -287,3 +307,4 @@ Recommended first test:
 - CFG 1
 - Euler
 - simple scheduler
+

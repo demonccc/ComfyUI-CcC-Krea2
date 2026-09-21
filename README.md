@@ -178,21 +178,31 @@ In particular, that project demonstrated the usefulness of persisting raw appear
 
 ## Paint
 
-Krea2 CcC Paint adds arbitrary-mask inpainting and outpainting without resizing the source image.
+Krea2 CcC Paint uses a temporary Krea working geometry without resizing the known source image.
 
-The Paint path is split into:
+The Paint path is split into four focused nodes:
 
-- **Krea2 CcC Paint Prepare**: builds the aligned native canvas, combines the inpaint mask with outpaint expansion, applies signed mask grow/shrink plus directional feathering, and creates the neutralized semantic reference.
-- **Krea2 CcC Paint**: image-grounds Qwen, VAE-encodes the semantic reference, creates the known-image latent with a soft token-aligned noise mask, and installs the registered t=0 reference/KV-cache runtime.
+- **Krea2 CcC Paint Geometry**: maps the requested native canvas to a curated Krea target using only `pad` or `crop`. The source is never resized.
+- **Krea2 CcC Paint Prepare**: applies mask grow/feather, builds the semantic reference, VAE-encodes the working canvas, and returns the sampling `LATENT` with a token-aligned `noise_mask`.
+- **Krea2 CcC Paint**: image-grounds Qwen, attaches the pre-encoded appearance reference, and installs the registered t=0 reference/KV-cache runtime.
+- **Krea2 CcC Paint Restore**: returns the decoded result to the requested native canvas. Pad mode removes only temporary Krea padding; crop mode composites the generated crop back into the preserved native canvas.
 
-Paint Prepare mask controls:
+Paint Geometry modes:
 
-- `mask_grow`: positive expands the generated region; negative shrinks it.
-- `mask_blur_mode`: `standard` or `gaussian_sigma`.
-- `mask_blur_amount`: `0` disables feathering.
-- `mask_blur_direction`: `outside`, `inside`, or `both`.
+- `pad`: chooses the closest curated Krea geometry that fully contains the requested canvas. Padding can be placed left/center/right and top/center/bottom.
+- `crop`: chooses the closest curated Krea geometry that fits completely inside the requested canvas. Crop origin follows the same horizontal/vertical position controls.
 
-`outside` keeps the full generated region strong and feathers into the preserved surroundings, which is a useful default for removing people or objects.
+Padding fill options are `edge` (default), `reflect`, `neutral`, and `white`. All temporary padding is included in the generation mask.
+
+Guardrails prevent implicit resizing:
+
+- If no curated Krea geometry can fit inside the requested canvas, `crop` fails and asks to use padding.
+- If no curated Krea geometry can contain the requested canvas, `pad` fails and asks to use crop.
+
+Explicit `expand_left/top/right/bottom` values belong to the requested native/outpaint canvas. Restore removes only the temporary Krea normalization added after those expansions.
+
+The source image and its mask always undergo the same geometric transform so mask coordinates cannot drift.
+
 
 ## Test Workflows
 

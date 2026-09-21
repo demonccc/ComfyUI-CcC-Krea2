@@ -4,12 +4,19 @@
 
 ### Added
 
+- Paint Geometry node with reversible pad/crop-only Krea normalization, configurable edge/reflect/neutral/white padding, placement controls, and crop/pad guardrails.
+- Paint Restore node for exact depadding or generated-crop compositing back to the requested native canvas.
+
 - Portable visual-reference caches using safetensors.
 - Cached raw VAE appearance latents for repeated target-specific edits.
 - Cached Qwen3-VL visual features (merged, grid and DeepStack) while preserving prompt-dependent language conditioning.
 - Cached Visual Reference node that mixes with normal ordered references.
 
 ### Changed
+
+- Paint Prepare now consumes finalized Paint Geometry, owns VAE encoding, and returns the KSampler LATENT with token-aligned noise_mask.
+- Paint runtime now consumes the prepared appearance latent and no longer creates the target latent itself.
+- AnyPaint test workflow now uses Paint Geometry -> Paint Prepare -> Paint -> decode -> Paint Restore.
 
 - Added Krea geometry policies to Krea2 CcC Latent for fixed and image-derived dimensions: nearest curated Krea aspect or aspect-preserving Krea bounds.
 - Replaced Latent image-fit modes with explicit content-fit behavior: crop, contain with white padding, or stretch. Presets bypass geometry resolution.

@@ -51,3 +51,10 @@ def test_only_current_edit_nodes_are_registered():
     assert "CcCKrea2PaintPrepare" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2PaintRestore" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2Paint" in NODE_CLASS_MAPPINGS
+
+
+def test_paint_geometry_nodes_use_public_category():
+    assert NODE_CLASS_MAPPINGS["CcCKrea2PaintGeometry"].CATEGORY == "Krea2 CcC Edit"
+    assert NODE_CLASS_MAPPINGS["CcCKrea2PaintPrepare"].CATEGORY == "Krea2 CcC Edit"
+    assert NODE_CLASS_MAPPINGS["CcCKrea2PaintRestore"].CATEGORY == "Krea2 CcC Edit"
+    assert NODE_CLASS_MAPPINGS["CcCKrea2Paint"].CATEGORY == "Krea2 CcC Edit"

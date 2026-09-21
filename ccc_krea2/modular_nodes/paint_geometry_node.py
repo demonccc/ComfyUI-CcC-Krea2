@@ -298,7 +298,7 @@ class CcCKrea2PaintGeometry:
 class CcCKrea2PaintRestore:
     """Restore a Paint result from temporary Krea pad/crop geometry."""
 
-    CATEEGORY = NODE_CATEGORY
+    CATEGORY = NODE_CATEGORY
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = "restore"
