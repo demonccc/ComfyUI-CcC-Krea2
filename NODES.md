@@ -1,5 +1,20 @@
 # Krea2 CcC Edit Nodes
 
+## Krea2 CcC Attention Region
+
+Declares one tagged rectangular target region and can be chained with more regions.
+
+| Control | Values | Default | Behavior |
+| --- | --- | --- | --- |
+| `tag` | text | subject | Unique tag used by Visual Reference. |
+| `x` | 0 .. 100 | 0 | Left edge as percentage of the target/content image. |
+| `y` | 0 .. 100 | 0 | Top edge as percentage of the target/content image. |
+| `width` | 0.1 .. 100 | 100 | Region width as percentage. |
+| `height` | 0.1 .. 100 | 100 | Region height as percentage. |
+| `previous_regions` | KREA2_ATTENTION_REGION_CHAIN | optional | Chains another tagged region. |
+
+Tags must be unique. Latent resolves the boxes through target pixel transforms and stores the transformed coordinates for Edit. If image-content `crop` removes even part of a box, Latent raises an error instead of clipping that box.
+
 ## Krea2 CcC Visual Reference
 
 Declares one ordered appearance reference.
@@ -18,6 +33,8 @@ Declares one ordered appearance reference.
 | `semantic_grounding_px` | 32 .. 4096, step 32 | 768 | Maximum Qwen longest edge when semantic resize is enabled. |
 | `semantic_resize_method` | lanczos, bicubic, bilinear, area | lanczos | Qwen downscale interpolation. |
 | `prompt_annotation` | text | empty | Optional `Image N: ...` Qwen annotation. |
+| `attention_scope` | global, boost in region, only in region | global | Target-side spatial scope for this reference. |
+| `region_tag` | text | empty | Tag of the Attention Region used by regional scopes. |
 
 ### Reference fit modes
 
@@ -29,6 +46,8 @@ Declares one ordered appearance reference.
 For `resize`, `contain`, and `native`, /16 alignment is crop-down rather than pad-up or non-uniform resizing. The alignment crop is only a few edge pixels needed by the VAE grid and is distinct from the explicit `crop` mode.
 
 Qwen preparation is independent from VAE geometry.
+
+Regional attention is target-side. `boost in region` applies the existing reference boost only to target queries inside the resolved region. `only in region` additionally blocks target queries outside the region from attending to that reference.
 
 `semantic_grounding_px` uses a step of 32 because Qwen3-VL effectively aligns visual processing to a 32-pixel spatial cadence (16-pixel vision patches with merge size 2). Values such as 380 are not invalid, but they are aligned internally to the same kind of grid, so using 384 makes the effective resolution explicit and experiments easier to compare.
 
