@@ -4,6 +4,11 @@
 
 ### Added
 
+- Chainable `Krea2 CcC Attention Region` nodes with unique tags and percentage-based target boxes.
+- Visual Reference regional attention scopes: `global`, `boost in region`, and `only in region`.
+- Target-side region transport through Latent geometry, strict crop guardrails, and token-grid projection for regional attention.
+- Regional attention example workflow with two tagged subjects.
+
 - Paint Geometry node with reversible pad/crop-only Krea normalization, configurable edge/reflect/neutral/white padding, placement controls, and crop/pad guardrails.
 - Paint Restore node for exact depadding or generated-crop compositing back to the requested native canvas.
 
