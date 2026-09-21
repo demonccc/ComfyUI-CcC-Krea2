@@ -1,6 +1,7 @@
 """Tests verifying negative conditioning behavior and negative Qwen image streams."""
 
 import torch
+from ccc_krea2.constants import VISION_PAD_TOKEN
 from ccc_krea2.edit_engine import run_krea2_edit_orchestrator
 from ccc_krea2.reference_specs import ReferenceChain, ReferenceSpec, StyleReferenceSpec
 from ccc_krea2.vision_prep import prepare_vision_image
@@ -96,6 +97,13 @@ def test_negative_conditioning_image_streams():
     # Positive images: 1 appearance + 1 semantic + 4 style crops = 6 images
     assert len(pos_call["images"]) == 6
 
-    # Negative images: ONLY the 1 appearance ref
+    # Negative images: ONLY the 1 appearance ref.
     assert len(neg_call["images"]) == 1
+
+    # Krea2 CcC Edit ignores negative text completely. The only user-content
+    # payload is the vision placeholder required for the appearance image.
+    assert neg_call["prompt"] == VISION_PAD_TOKEN
+    assert "blurry" not in neg_call["prompt"]
+    assert "Subject identity" not in neg_call["prompt"]
+    assert "subject" not in neg_call["prompt"].lower()
 
