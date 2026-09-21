@@ -5,6 +5,7 @@ from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
 def test_split_edit_nodes_are_registered_and_valid():
     for name in (
+        "CcCKrea2AttentionRegion",
         "CcCKrea2VisualReference",
         "CcCKrea2SemanticReference",
         "CcCKrea2SizeResolver",
@@ -19,12 +20,14 @@ def test_split_edit_nodes_are_registered_and_valid():
 
 
 def test_reference_size_resolver_and_latent_socket_types_are_distinct():
+    region = NODE_CLASS_MAPPINGS["CcCKrea2AttentionRegion"]
     visual = NODE_CLASS_MAPPINGS["CcCKrea2VisualReference"]
     semantic = NODE_CLASS_MAPPINGS["CcCKrea2SemanticReference"]
     resolver = NODE_CLASS_MAPPINGS["CcCKrea2SizeResolver"]
     latent = NODE_CLASS_MAPPINGS["CcCKrea2Latent"]
     edit = NODE_CLASS_MAPPINGS["CcCKrea2Edit"]
 
+    assert region.RETURN_TYPES == ("KREA2_ATTENTION_REGION_CHAIN",)
     assert visual.RETURN_TYPES == ("KREA2_VISUAL_REFERENCE_CHAIN",)
     assert semantic.RETURN_TYPES == ("KREA2_SEMANTIC_REFERENCE_CHAIN",)
     assert resolver.RETURN_TYPES == ("INT", "INT")
@@ -33,6 +36,7 @@ def test_reference_size_resolver_and_latent_socket_types_are_distinct():
     assert latent.INPUT_TYPES()["required"]["width"][0] == "INT"
     assert latent.INPUT_TYPES()["required"]["height"][0] == "INT"
     assert "preset_size" in latent.INPUT_TYPES()["required"]
+    assert latent.INPUT_TYPES()["optional"]["attention_regions"][0] == "KREA2_ATTENTION_REGION_CHAIN"
     assert latent.INPUT_TYPES()["required"]["geometry_policy"][0] == (
         "nearest_krea_aspect",
         "preserve_aspect_krea_bounds",
