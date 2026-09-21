@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, Tuple
 
+from ..attention_regions import REFERENCE_ATTENTION_SCOPES
 from ..constants import NODE_CATEGORY
 from ..reference_cache import (
     CcCKrea2ReferenceCache,
@@ -201,6 +202,8 @@ class CcCKrea2CachedVisualReference:
                         "tooltip": "Optional text appended as Image N annotation.",
                     },
                 ),
+                "attention_scope": (REFERENCE_ATTENTION_SCOPES, {"default": "global"}),
+                "region_tag": ("STRING", {"default": ""}),
             },
             "optional": {
                 "previous_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
@@ -216,9 +219,19 @@ class CcCKrea2CachedVisualReference:
         grid_vertical_position: str = "center",
         semantic: bool = True,
         prompt_annotation: str = "",
+        attention_scope: str = "global",
+        region_tag: str = "",
         previous_references: Optional[VisualReferenceChain] = None,
     ) -> Tuple[VisualReferenceChain]:
         chain = previous_references if previous_references is not None else VisualReferenceChain()
+        attention_scope = str(attention_scope)
+        if attention_scope not in REFERENCE_ATTENTION_SCOPES:
+            raise ValueError(f"[Krea2 CcC Cached Visual Reference] Invalid attention_scope '{attention_scope}'.")
+        resolved_region_tag = str(region_tag or "").strip()
+        if attention_scope != "global" and not resolved_region_tag:
+            raise ValueError(
+                "[Krea2 CcC Cached Visual Reference] regional attention requires a non-empty region_tag."
+            )
         reference_fit = cache.metadata.get("reference_fit", "native")
         entry = VisualReferenceEntry(
             image=None,
@@ -234,5 +247,7 @@ class CcCKrea2CachedVisualReference:
             semantic_grounding_px=int(cache.metadata.get("semantic_grounding_px", "768")),
             semantic_resize_method=cache.metadata.get("semantic_resize_method", "lanczos"),
             prompt_annotation=prompt_annotation.strip() if semantic else "",
+            attention_scope=attention_scope,
+            region_tag=resolved_region_tag if attention_scope != "global" else "",
         )
         return (chain.append(entry),)
