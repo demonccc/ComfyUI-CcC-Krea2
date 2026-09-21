@@ -7,6 +7,7 @@ from pathlib import Path
 EDIT_WORKFLOW = Path("workflows/01_scene_subject.json")
 PAINT_WORKFLOW = Path("workflows/02_anypaint_remove_people.json")
 REGIONAL_WORKFLOW = Path("workflows/03_regional_attention.json")
+CHARACTER_SHEET_WORKFLOW = Path("workflows/04_character_sheet_identity.json")
 
 
 def _nodes_by_type(workflow, type_name):
@@ -15,7 +16,7 @@ def _nodes_by_type(workflow, type_name):
 
 def test_expected_workflows_are_checked_in():
     workflows = sorted(Path("workflows").rglob("*.json"))
-    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW]
+    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW]
 
 
 def test_scene_subject_workflow_uses_split_nodes():
@@ -152,8 +153,65 @@ def test_regional_attention_workflow_wires_tags_through_latent():
     assert latent["widgets_values"][5:8] == ["from_image", "contain", "lanczos"]
 
 
+def test_character_sheet_workflow_builds_one_identity_reference_from_five_views():
+    workflow = json.loads(CHARACTER_SHEET_WORKFLOW.read_text(encoding="utf-8"))
+
+    sheets = _nodes_by_type(workflow, "CcCKrea2CharacterSheet")
+    visuals = _nodes_by_type(workflow, "CcCKrea2VisualReference")
+    previews = _nodes_by_type(workflow, "PreviewImage")
+    latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
+
+    assert len(sheets) == 1
+    assert len(visuals) == 2
+    assert len(previews) == 1
+
+    sheet = sheets[0]
+    assert sheet["widgets_values"] == [
+        "4 heads + 1 body (2x2 + 1)",
+        1024,
+        "contain",
+        8,
+        8,
+        "white",
+    ]
+
+    sheet_inputs = {item["name"]: item for item in sheet["inputs"]}
+    assert set(sheet_inputs) == {
+        "front_view",
+        "three_quarter_view",
+        "profile_view",
+        "extra_view",
+        "full_body_view",
+    }
+    assert all(item["link"] is not None for item in sheet_inputs.values())
+
+    subject = next(
+        node for node in visuals
+        if node.get("title") == "Character Sheet Visual Reference"
+    )
+    assert subject["widgets_values"][:6] == [
+        4.0,
+        "native",
+        "inside",
+        "center",
+        "center",
+        "lanczos",
+    ]
+    assert subject["widgets_values"][6:10] == [True, True, 1024, "lanczos"]
+    assert subject["widgets_values"][-2:] == ["global", ""]
+
+    subject_inputs = {item["name"]: item for item in subject["inputs"]}
+    assert subject_inputs["image"]["link"] is not None
+    assert subject_inputs["previous_references"]["link"] is not None
+
+    latent_inputs = {item["name"]: item for item in latent["inputs"]}
+    assert latent_inputs["dimensions_image"]["link"] is not None
+    assert latent["widgets_values"][0] == "from_image"
+    assert latent["widgets_values"][5] == "empty"
+
+
 def test_all_workflow_link_types_are_consistent():
-    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW):
+    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW):
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         nodes = {node["id"]: node for node in workflow["nodes"]}
 
