@@ -162,7 +162,7 @@ def prepare_paint_context(
     vae: Any,
     paint_geometry: Dict[str, Any],
     *,
-    fill_holes: bool,
+    fill_holes: bool = False,
     mask_grow: int,
     mask_blur_mode: str,
     mask_blur_amount: float,
