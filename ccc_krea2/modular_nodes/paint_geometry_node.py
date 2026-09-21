@@ -91,11 +91,24 @@ def _pad_image(image: torch.Tensor, mask: torch.Tensor, *, left: int, top: int, 
     return canvas
 
 
-def _pad_mask(mask: torch.Tensor, *, left: int, top: int, right: int, bottom: int) -> torch.Tensor:
+def _pad_mask(
+    mask: torch.Tensor,
+    *,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+    fill_value: float = 1.0,
+) -> torch.Tensor:
     if not any((left, top, right, bottom)):
         return mask
     batch, height, width = mask.shape
-    canvas = torch.ones((batch, height + top + bottom, width + left + right), device=mask.device, dtype=mask.dtype)
+    canvas = torch.full(
+        (batch, height + top + bottom, width + left + right),
+        float(fill_value),
+        device=mask.device,
+        dtype=mask.dtype,
+    )
     canvas[:, top:top + height, left:left + width] = mask
     return canvas
 
@@ -156,8 +169,40 @@ def prepare_paint_geometry(
     source_mask = _normalize_mask(mask, batch=batch, height=source_h, width=source_w, device=source.device)
 
     # Explicit expansion belongs to the requested/final canvas, not to the temporary Krea normalization.
-    base_image = _pad_image(source, source_mask, left=int(expand_left), top=int(expand_top), right=int(expand_right), bottom=int(expand_bottom), fill=padding_fill)
-    base_mask = _pad_mask(source_mask, left=int(expand_left), top=int(expand_top), right=int(expand_right), bottom=int(expand_bottom))
+    # Keep its mask separate from the user-provided mask so Paint Prepare can preserve
+    # the padding-fill color/lighting as semantic context while still generating the area.
+    expansion = {
+        "left": int(expand_left),
+        "top": int(expand_top),
+        "right": int(expand_right),
+        "bottom": int(expand_bottom),
+    }
+    base_image = _pad_image(
+        source,
+        source_mask,
+        left=expansion["left"],
+        top=expansion["top"],
+        right=expansion["right"],
+        bottom=expansion["bottom"],
+        fill=padding_fill,
+    )
+    base_user_mask = _pad_mask(
+        source_mask,
+        left=expansion["left"],
+        top=expansion["top"],
+        right=expansion["right"],
+        bottom=expansion["bottom"],
+        fill_value=0.0,
+    )
+    base_expansion_mask = _pad_mask(
+        torch.zeros_like(source_mask),
+        left=expansion["left"],
+        top=expansion["top"],
+        right=expansion["right"],
+        bottom=expansion["bottom"],
+        fill_value=1.0,
+    )
+    base_mask = torch.maximum(base_user_mask, base_expansion_mask)
     base_h, base_w = base_image.shape[1:3]
 
     target_w, target_h = _select_krea_geometry(base_w, base_h, geometry_mode)
@@ -165,15 +210,65 @@ def prepare_paint_geometry(
     if geometry_mode == "pad":
         pad_left, pad_right = _axis_split(target_w - base_w, horizontal_position)
         pad_top, pad_bottom = _axis_split(target_h - base_h, vertical_position)
-        working_image = _pad_image(base_image, base_mask, left=pad_left, top=pad_top, right=pad_right, bottom=pad_bottom, fill=padding_fill)
-        working_mask = _pad_mask(base_mask, left=pad_left, top=pad_top, right=pad_right, bottom=pad_bottom)
-        transform = {"pad_left": int(pad_left), "pad_top": int(pad_top), "pad_right": int(pad_right), "pad_bottom": int(pad_bottom)}
+        working_image = _pad_image(
+            base_image,
+            base_mask,
+            left=pad_left,
+            top=pad_top,
+            right=pad_right,
+            bottom=pad_bottom,
+            fill=padding_fill,
+        )
+        working_user_mask = _pad_mask(
+            base_user_mask,
+            left=pad_left,
+            top=pad_top,
+            right=pad_right,
+            bottom=pad_bottom,
+            fill_value=0.0,
+        )
+        working_expansion_mask = _pad_mask(
+            base_expansion_mask,
+            left=pad_left,
+            top=pad_top,
+            right=pad_right,
+            bottom=pad_bottom,
+            fill_value=0.0,
+        )
+        working_krea_padding_mask = _pad_mask(
+            torch.zeros_like(base_mask),
+            left=pad_left,
+            top=pad_top,
+            right=pad_right,
+            bottom=pad_bottom,
+            fill_value=1.0,
+        )
+        working_mask = torch.maximum(
+            torch.maximum(working_user_mask, working_expansion_mask),
+            working_krea_padding_mask,
+        )
+        transform = {
+            "pad_left": int(pad_left),
+            "pad_top": int(pad_top),
+            "pad_right": int(pad_right),
+            "pad_bottom": int(pad_bottom),
+        }
     else:
         crop_left, _ = _axis_split(base_w - target_w, horizontal_position)
         crop_top, _ = _axis_split(base_h - target_h, vertical_position)
-        working_image = base_image[:, crop_top:crop_top + target_h, crop_left:crop_left + target_w, :]
-        working_mask = base_mask[:, crop_top:crop_top + target_h, crop_left:crop_left + target_w]
-        transform = {"crop_x": int(crop_left), "crop_y": int(crop_top), "crop_width": int(target_w), "crop_height": int(target_h)}
+        y_slice = slice(crop_top, crop_top + target_h)
+        x_slice = slice(crop_left, crop_left + target_w)
+        working_image = base_image[:, y_slice, x_slice, :]
+        working_user_mask = base_user_mask[:, y_slice, x_slice]
+        working_expansion_mask = base_expansion_mask[:, y_slice, x_slice]
+        working_krea_padding_mask = torch.zeros_like(working_user_mask)
+        working_mask = torch.maximum(working_user_mask, working_expansion_mask)
+        transform = {
+            "crop_x": int(crop_left),
+            "crop_y": int(crop_top),
+            "crop_width": int(target_w),
+            "crop_height": int(target_h),
+        }
 
     context: Dict[str, Any] = {
         "mode": geometry_mode,
@@ -195,8 +290,13 @@ def prepare_paint_geometry(
         "transform": transform,
         "base_image": base_image,
         "base_mask": base_mask,
+        "base_user_mask": base_user_mask,
+        "base_expansion_mask": base_expansion_mask,
         "working_image": working_image,
         "working_mask": working_mask,
+        "working_user_mask": working_user_mask,
+        "working_expansion_mask": working_expansion_mask,
+        "working_krea_padding_mask": working_krea_padding_mask,
     }
     return context, working_image, working_mask
 
