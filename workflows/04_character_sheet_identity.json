@@ -555,7 +555,7 @@
         true,
         768,
         "lanczos",
-        "It is the scene image. Preserve the scene, composition, pose, action, clothing, accessories, lighting, and interactions.",
+        "This is the scene image.",
         "global",
         ""
       ],
@@ -610,7 +610,7 @@
         true,
         1024,
         "lanczos",
-        "It is a character sheet showing multiple views of the same person. Use it only for identity, facial features, hair, anatomy, body shape, and body proportions. Ignore clothing and accessories from the character sheet.",
+        "This is the subject image.",
         "global",
         ""
       ],
@@ -755,7 +755,7 @@
         "Node name for S&R": "CcCKrea2Edit"
       },
       "widgets_values": [
-        "Replace the person in the scene image with the identity and complete physical build shown in the character sheet. The character sheet contains multiple views of the same person. Preserve the scene person's position, pose, action, clothing, accessories, and interactions. Keep every other scene element unchanged.",
+        "Replace the person in the scene image with the identity and complete physical build from the subject image. The subject image is a character sheet showing multiple views of the same person. Preserve the scene person's position, pose, action, clothing, accessories, and interactions. Keep every other scene element unchanged.",
         true
       ],
       "title": "Character Sheet Identity Edit"
