@@ -120,6 +120,38 @@ def test_directional_feather_has_distinct_semantics():
     assert both[0, 4, 7] > 0.0
 
 
+def test_semantic_reference_preserves_explicit_outpaint_context_but_neutralizes_manual_mask():
+    geometry = _geometry()
+    geometry["working_image"][:, :, 12:, :] = 0.95
+    geometry["working_image"][:, 5:9, 5:9, :] = 1.0
+
+    geometry["working_mask"][:, :, 12:] = 1.0
+    geometry["working_mask"][:, 5:9, 5:9] = 1.0
+
+    expansion = torch.zeros_like(geometry["working_mask"])
+    expansion[:, :, 12:] = 1.0
+    geometry["working_expansion_mask"] = expansion
+
+    context, _, prepared, semantic, generated, _ = prepare_paint_context(
+        FakeVAE(),
+        geometry,
+        fill_holes=False,
+        mask_grow=0,
+        mask_blur_mode="gaussian_sigma",
+        mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    )
+
+    # The explicit outpaint margin remains fully generable.
+    assert torch.all(generated[:, :, 12:] == 1.0)
+    # But its edge/reflect/etc. pixels remain visible in the semantic reference.
+    assert torch.allclose(semantic[:, :, 12:, :], prepared[:, :, 12:, :])
+    # A normal user mask is still neutralized.
+    assert semantic[0, 6, 6].mean() < prepared[0, 6, 6].mean()
+    assert torch.equal(context["expansion_context_mask"], expansion)
+    assert torch.all(context["semantic_neutralize_mask"][:, :, 12:] == 0.0)
+
+
 def test_semantic_reference_neutralizes_generated_pixels():
     geometry = _geometry()
     geometry["working_image"][:, 5:11, 5:11] = 1.0
