@@ -20,7 +20,7 @@ class _Spec:
     reference_path = "edit"
     appearance_reference = True
     alias = "subject image"
-    vision_instruction = "Use only the subject face and body."
+    vision_instruction = "This is the subject image."
 
 
 class _PlainSpec:
@@ -47,7 +47,7 @@ def test_grounded_positive_supports_optional_visual_prompt_annotation():
     text = build_grounded_positive_user_content(refs, "Replace the woman.")
     prefix = VISION_PAD_TOKEN * 2
     assert text.startswith(prefix)
-    assert "Image 2: Use only the subject face and body." in text
+    assert "Image 2: This is the subject image." in text
     assert text.endswith("Replace the woman.")
 
 
@@ -69,7 +69,7 @@ def test_grounded_negative_keeps_image_marker_but_drops_positive_annotations():
     text = build_grounded_negative_user_content([{"spec": _Spec()}], "")
     assert text == VISION_PAD_TOKEN
     assert "subject image" not in text
-    assert "face and body" not in text
+    assert "This is the subject image." not in text
 
 
 def test_grounded_negative_can_append_explicit_user_negative_without_reference_annotations():
