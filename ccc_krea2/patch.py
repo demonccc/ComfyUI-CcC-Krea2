@@ -54,6 +54,7 @@ def attach_reference_runtime_to_conditioning(
         values["reference_attention_scopes"] = list(reference_attention_scopes)
     return _conditioning_set_values(conditioning, values)
 
+
 def _prepare_reference_latent_for_model(model: Any, latent: torch.Tensor) -> torch.Tensor:
     """Normalize an image reference to Krea2/Wan's 5D latent contract before process_latent_in.
 
