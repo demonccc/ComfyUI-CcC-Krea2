@@ -177,6 +177,18 @@ def prepare_paint_context(
 
     known_image = known_image[..., :3].float().clamp(0.0, 1.0)
     hard_mask = hard_mask.float().clamp(0.0, 1.0)
+
+    expansion_mask = paint_geometry.get("working_expansion_mask")
+    if expansion_mask is None:
+        expansion_mask = torch.zeros_like(hard_mask)
+    elif not torch.is_tensor(expansion_mask):
+        raise ValueError("[Krea2 CcC Paint Prepare] working_expansion_mask must be a MASK tensor.")
+    else:
+        expansion_mask = expansion_mask.to(device=hard_mask.device, dtype=hard_mask.dtype).clamp(0.0, 1.0)
+        if expansion_mask.shape != hard_mask.shape:
+            raise ValueError(
+                "[Krea2 CcC Paint Prepare] working_expansion_mask must match working_mask geometry."
+            )
     if fill_holes:
         hard_mask = _fill_mask_holes(hard_mask)
     hard_generated = _grow_or_shrink(hard_mask, int(mask_grow)).clamp(0.0, 1.0)
@@ -188,8 +200,18 @@ def prepare_paint_context(
     )
     keep_mask = (1.0 - generated_mask).clamp(0.0, 1.0)
 
+    # Explicit outpaint expansion is still fully generable, but its Geometry padding
+    # (edge/reflect/neutral/white) remains visible to the semantic/appearance reference.
+    # This carries border color and lighting continuity into AnyPaint instead of replacing
+    # the whole new margin with one neutral tone. Manual masks, temporary Krea padding,
+    # and any grow/feather that reaches into known pixels remain neutralized.
+    semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
+    semantic_keep_mask = (1.0 - semantic_neutralize_mask).clamp(0.0, 1.0)
     semantic_fill = _neutral_fill(known_image, keep_mask)
-    semantic_full = known_image * keep_mask.unsqueeze(-1).to(known_image.dtype) + semantic_fill * generated_mask.unsqueeze(-1).to(known_image.dtype)
+    semantic_full = (
+        known_image * semantic_keep_mask.unsqueeze(-1).to(known_image.dtype)
+        + semantic_fill * semantic_neutralize_mask.unsqueeze(-1).to(known_image.dtype)
+    ).clamp(0.0, 1.0)
     semantic_reference = _downscale_semantic_reference(semantic_full)
 
     reference_latent = _extract_latent(vae.encode(semantic_reference))
@@ -204,6 +226,8 @@ def prepare_paint_context(
         "reference_latent": reference_latent,
         "generated_mask": generated_mask,
         "keep_mask": keep_mask,
+        "expansion_context_mask": expansion_mask,
+        "semantic_neutralize_mask": semantic_neutralize_mask,
         "canvas_width": int(known_image.shape[2]),
         "canvas_height": int(known_image.shape[1]),
         "geometry_mode": paint_geometry.get("mode"),
@@ -269,6 +293,7 @@ class CcCKrea2PaintPrepare:
             f"Fill Holes: {'yes' if fill_holes else 'no'}",
             f"Mask Grow: {mask_grow}px",
             f"Mask Feather: {mask_blur_mode} amount={float(mask_blur_amount):.2f} direction={mask_blur_direction}",
+            f"Expansion Context Pixels: {int((context['expansion_context_mask'] > 0.5).sum())}",
             f"Semantic Reference: {semantic_reference.shape[2]}x{semantic_reference.shape[1]} max-edge {_SEMANTIC_REFERENCE_MAX_EDGE}px",
             f"Generated Mask Range: {float(generated_mask.min()):.3f}..{float(generated_mask.max()):.3f}",
             "Latent: known-image samples + token-aligned noise_mask",
