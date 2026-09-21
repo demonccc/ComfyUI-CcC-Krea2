@@ -225,6 +225,8 @@ The repository contains:
 
 - [`workflows/01_scene_subject.json`](workflows/01_scene_subject.json) — Scene + Subject Edit.
 - [`workflows/02_anypaint_remove_people.json`](workflows/02_anypaint_remove_people.json) — AnyPaint inpaint test for removing masked people/objects.
+- [`workflows/03_regional_attention.json`](workflows/03_regional_attention.json) — Tagged regional attention with multiple identity references.
+- [`workflows/04_character_sheet_identity.json`](workflows/04_character_sheet_identity.json) — Builds a five-view Character Sheet and uses it as one identity reference while scene geometry remains independent.
 
 ## Other Public Nodes
 
