@@ -36,8 +36,10 @@ def attach_reference_runtime_to_conditioning(
     reference_count: int,
     rope_positions: Optional[List[str]] = None,
     reference_boosts: Optional[List[float]] = None,
+    reference_target_regions: Optional[List[Any]] = None,
+    reference_attention_scopes: Optional[List[str]] = None,
 ) -> List[Any]:
-    """Attach fit, RoPE and pass-specific boost metadata for visual references."""
+    """Attach fit, RoPE, boosts and target-region metadata for visual references."""
     if reference_count <= 0:
         return conditioning
     values: Dict[str, Any] = {
@@ -46,8 +48,11 @@ def attach_reference_runtime_to_conditioning(
     }
     if reference_boosts is not None and any(float(v) != 1.0 for v in reference_boosts):
         values["reference_boosts"] = [float(v) for v in reference_boosts]
+    if reference_target_regions is not None:
+        values["reference_target_regions"] = list(reference_target_regions)
+    if reference_attention_scopes is not None:
+        values["reference_attention_scopes"] = list(reference_attention_scopes)
     return _conditioning_set_values(conditioning, values)
-
 
 def _prepare_reference_latent_for_model(model: Any, latent: torch.Tensor) -> torch.Tensor:
     """Normalize an image reference to Krea2/Wan's 5D latent contract before process_latent_in.
@@ -107,6 +112,14 @@ def install_krea2_reference_conditioning() -> None:
         rope_positions = kwargs.get("reference_rope_positions")
         if rope_positions is not None:
             out["ccc_ref_rope_positions"] = comfy.conds.CONDConstant(list(rope_positions))
+
+        target_regions = kwargs.get("reference_target_regions")
+        if target_regions is not None:
+            out["ccc_ref_target_regions"] = comfy.conds.CONDConstant(list(target_regions))
+
+        attention_scopes = kwargs.get("reference_attention_scopes")
+        if attention_scopes is not None:
+            out["ccc_ref_attention_scopes"] = comfy.conds.CONDConstant(list(attention_scopes))
 
         return out
 
@@ -207,7 +220,10 @@ def patch_krea2_model(model: Any) -> Any:
 
         if dit_model is None or not ref_latents:
             fallback_kwargs = dict(kwargs)
-            for key in ("ref_latents", "ref_boosts", "ref_fit", "ccc_ref_rope_positions"):
+            for key in (
+                "ref_latents", "ref_boosts", "ref_fit", "ccc_ref_rope_positions",
+                "ccc_ref_target_regions", "ccc_ref_attention_scopes",
+            ):
                 fallback_kwargs.pop(key, None)
             return executor(x, timesteps, context, *wargs, **fallback_kwargs)
 
@@ -224,6 +240,11 @@ def patch_krea2_model(model: Any) -> Any:
             str(v)
             for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
         ]
+        target_regions = _normalize_runtime_list(kwargs.get("ccc_ref_target_regions"), count, None)
+        attention_scopes = [
+            str(v)
+            for v in _normalize_runtime_list(kwargs.get("ccc_ref_attention_scopes"), count, "global")
+        ]
 
         return krea2_dit_incontext_forward(
             dit_model=dit_model,
@@ -234,6 +255,8 @@ def patch_krea2_model(model: Any) -> Any:
             ref_boosts=boosts,
             ref_fit=fit_flags,
             ref_rope_positions=rope_positions,
+            ref_target_regions=target_regions,
+            ref_attention_scopes=attention_scopes,
             transformer_options=transformer_options,
         )
 
@@ -330,6 +353,52 @@ def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 100
         return torch.cat([emb, torch.zeros_like(emb[:, :1])], dim=-1) if dim % 2 else emb
 
 
+def _mask_to_flat(
+    spatial_mask: torch.Tensor,
+    grid_h: int,
+    grid_w: int,
+    mode: str,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    mask = spatial_mask[:1].float()
+    if mask.ndim == 2:
+        mask = mask.unsqueeze(0).unsqueeze(0)
+    elif mask.ndim == 3:
+        mask = mask.unsqueeze(1)
+    mask = F.interpolate(mask, size=(grid_h, grid_w), mode="nearest")[0, 0]
+    if mode == "hard":
+        mask = (mask > 0.5).float()
+    else:
+        mask = mask.clamp(0.0, 1.0)
+    return mask.reshape(-1).to(device=device, dtype=dtype)
+
+
+def _target_region_box_mask(
+    box: Any,
+    target_grid: Tuple[int, int],
+    device: torch.device,
+    dtype: torch.dtype,
+) -> Optional[torch.Tensor]:
+    if box is None:
+        return None
+    if not isinstance(box, (tuple, list)) or len(box) != 4:
+        raise ValueError(f"[Krea2 CcC Edit] Invalid target attention region: {box!r}")
+    x0, y0, x1, y1 = [float(v) for v in box]
+    if not (0.0 <= x0 < x1 <= 1.0 and 0.0 <= y0 < y1 <= 1.0):
+        raise ValueError(f"[Krea2 CcC Edit] Target attention region must be normalized, got {box!r}")
+
+    gh, gw = target_grid
+    ix0 = max(0, min(gw - 1, int(math.floor(x0 * gw))))
+    iy0 = max(0, min(gh - 1, int(math.floor(y0 * gh))))
+    ix1 = max(ix0 + 1, min(gw, int(math.ceil(x1 * gw))))
+    iy1 = max(iy0 + 1, min(gh, int(math.ceil(y1 * gh))))
+
+    mask = torch.zeros((1, gh, gw), device=device, dtype=dtype)
+    mask[:, iy0:iy1, ix0:ix1] = 1.0
+    return mask
+
+
 def _compute_ref_attention_bias_patchified(
     boosts: List[float],
     txt_len: int,
@@ -341,15 +410,21 @@ def _compute_ref_attention_bias_patchified(
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
     masked_boosts: Optional[List[float]] = None,
+    ref_target_masks: Optional[List[Optional[torch.Tensor]]] = None,
+    ref_attention_scopes: Optional[List[str]] = None,
+    target_grid: Optional[Tuple[int, int]] = None,
 ) -> Optional[torch.Tensor]:
-    """Build target-to-reference attention bias from per-reference boost values."""
+    """Build target-to-reference bias with optional target-region ownership."""
+    del masked_boosts
     if not boosts:
         return None
     device = device or torch.device("cpu")
     dtype = dtype or torch.float32
     ref_masks = list(ref_masks or [None] * len(boosts))
+    ref_target_masks = list(ref_target_masks or [None] * len(boosts))
     ref_token_grids = list(ref_token_grids or [(1, n) for n in ref_token_lens])
     mask_modes = list(mask_modes or ["hard"] * len(boosts))
+    ref_attention_scopes = list(ref_attention_scopes or ["global"] * len(boosts))
 
     offsets = [txt_len]
     for length in ref_token_lens:
@@ -360,37 +435,67 @@ def _compute_ref_attention_bias_patchified(
 
     any_effect = False
     for index, boost in enumerate(boosts):
-        spatial_mask = ref_masks[index] if index < len(ref_masks) else None
         ref_start = offsets[index]
         ref_end = ref_start + ref_token_lens[index]
         boost_log = math.log(max(float(boost), 1e-4))
 
-        if spatial_mask is None:
-            if float(boost) != 1.0:
-                bias[:, :, target_start:, ref_start:ref_end] = boost_log
-                any_effect = True
-            continue
-
-        if boost_log == 0.0:
-            continue
         gh, gw = ref_token_grids[index]
-        mask = spatial_mask[:1].float()
-        if mask.ndim == 2:
-            mask = mask.unsqueeze(0).unsqueeze(0)
-        elif mask.ndim == 3:
-            mask = mask.unsqueeze(1)
-        mask = F.interpolate(mask, size=(gh, gw), mode="nearest")[0, 0]
-        if mask_modes[index] == "hard":
-            mask = (mask > 0.5).float()
+        source_mask = ref_masks[index] if index < len(ref_masks) else None
+        if source_mask is None:
+            ref_weight = torch.ones(ref_token_lens[index], device=device, dtype=dtype)
         else:
-            mask = mask.clamp(0.0, 1.0)
-        flat = mask.reshape(-1).to(device=device, dtype=dtype)
-        if flat.numel() == ref_token_lens[index]:
-            bias[:, :, target_start:, ref_start:ref_end] += boost_log * flat.view(1, 1, 1, -1)
+            ref_weight = _mask_to_flat(
+                source_mask,
+                gh,
+                gw,
+                mask_modes[index] if index < len(mask_modes) else "hard",
+                device,
+                dtype,
+            )
+
+        scope = ref_attention_scopes[index] if index < len(ref_attention_scopes) else "global"
+        if scope not in ("global", "boost in region", "only in region"):
+            raise ValueError(f"[Krea2 CcC Edit] Invalid reference attention scope '{scope}'.")
+
+        target_mask = ref_target_masks[index] if index < len(ref_target_masks) else None
+        if scope == "global":
+            target_weight = torch.ones(tgt_len, device=device, dtype=dtype)
+        else:
+            if target_mask is None:
+                raise ValueError(
+                    f"[Krea2 CcC Edit] attention scope '{scope}' requires a resolved target region."
+                )
+            if target_grid is None:
+                raise ValueError("[Krea2 CcC Edit] regional attention requires target_grid.")
+            target_weight = _mask_to_flat(
+                target_mask,
+                target_grid[0],
+                target_grid[1],
+                "hard",
+                device,
+                dtype,
+            )
+            if target_weight.numel() != tgt_len:
+                raise ValueError(
+                    "[Krea2 CcC Edit] target attention region does not match the target token grid."
+                )
+
+        if boost_log != 0.0:
+            outer = target_weight.view(-1, 1) * ref_weight.view(1, -1)
+            bias[:, :, target_start:, ref_start:ref_end] += boost_log * outer.view(
+                1, 1, tgt_len, ref_token_lens[index]
+            )
+            any_effect = True
+        elif source_mask is not None:
+            any_effect = True
+
+        if scope == "only in region":
+            outside = target_weight <= 0.5
+            target_to_ref = bias[:, :, target_start:, ref_start:ref_end]
+            target_to_ref.masked_fill_(outside.view(1, 1, -1, 1), float("-inf"))
             any_effect = True
 
     return bias if any_effect else None
-
 
 def _build_incontext_3d_rope_pos_ids(
     batch_size: int,
@@ -427,7 +532,9 @@ def krea2_dit_incontext_forward(
     ref_boosts: Optional[List[float]] = None,
     transformer_options: Optional[Dict[str, Any]] = None,
     ref_fit: Optional[List[bool]] = None,
-    ref_rope_positions: Optional[List[str]] = None
+    ref_rope_positions: Optional[List[str]] = None,
+    ref_target_regions: Optional[List[Any]] = None,
+    ref_attention_scopes: Optional[List[str]] = None,
 ) -> torch.Tensor:
     """In-context Krea2 forward with optional Krea2 CcC Edit RoPE displacement."""
     transformer_options = transformer_options or {}
@@ -435,6 +542,8 @@ def krea2_dit_incontext_forward(
     boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
     fit_flags = [bool(v) for v in _normalize_runtime_list(ref_fit, n_refs, True)]
     rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
+    target_regions = _normalize_runtime_list(ref_target_regions, n_refs, None)
+    attention_scopes = [str(v) for v in _normalize_runtime_list(ref_attention_scopes, n_refs, "global")]
 
     temporal = x.ndim == 5
     if temporal:
@@ -498,11 +607,24 @@ def krea2_dit_incontext_forward(
     )
     freqs = dit_model.pe_embedder(pos)
 
+    target_region_masks = [
+        _target_region_box_mask(
+            box,
+            target_grid=(target_gh, target_gw),
+            device=combined.device,
+            dtype=combined.dtype,
+        )
+        for box in target_regions
+    ]
     attn_bias = _compute_ref_attention_bias_patchified(
         boosts=boosts,
         txt_len=txt_len,
         ref_token_lens=source_lens,
         tgt_len=target_len,
+        ref_token_grids=source_grids,
+        ref_target_masks=target_region_masks,
+        ref_attention_scopes=attention_scopes,
+        target_grid=(target_gh, target_gw),
         device=combined.device,
         dtype=combined.dtype,
     )
