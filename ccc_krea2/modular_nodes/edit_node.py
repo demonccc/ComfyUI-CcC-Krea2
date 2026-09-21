@@ -8,10 +8,6 @@ from .. import edit_engine as edit_engine_runtime
 from ..attention_regions import resolved_regions_by_tag
 from ..constants import NODE_CATEGORY
 from ..grounding import resize_grounding_image
-from ..identity_contract import (
-    build_grounded_negative_user_content,
-    build_grounded_positive_user_content,
-)
 from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
 from ..reference_specs import (
     PreparedVisionImage,
@@ -37,11 +33,8 @@ SEMANTIC_SUBJECT_DIRECTIVE = (
 )
 
 
-# Visual references are positional in the Krea2 grounding contract:
-# VISION_BLOCK * N + instruction. Semantic/style-only references may append
-# annotations after the complete visual prefix.
-edit_engine_runtime.build_krea2_user_content = build_grounded_positive_user_content
-edit_engine_runtime.build_krea2_negative_user_content = build_grounded_negative_user_content
+# Visual references are positional in the Krea2 grounding contract.
+# Prompt construction is owned directly by edit_engine.py / identity_contract.py.
 install_krea2_rope_positioning()
 
 
