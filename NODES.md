@@ -155,6 +155,40 @@ Final dimensions are aligned to multiples of 16. Preset dimensions are already /
 
 When latent semantic guidance is enabled, `latent_grounding_px` is an integer with step 32 and defaults to 768, matching the same Qwen3-VL visual-grid cadence used by Krea2 CcC Visual Reference and Krea2 CcC Semantic Reference.
 
+## Krea2 CcC Edit Prompt Creator
+
+Optional multimodal prompt-generation node. It does not replace or modify **Edit**, **Latent**, **Visual Reference**, or **Semantic Reference**.
+
+Inputs:
+
+- `clip`: the same multimodal Krea2/Qwen3-VL `CLIP` used by Edit.
+- `visual_references`: existing `KREA2_VISUAL_REFERENCE_CHAIN`; returned unchanged.
+- `reference_edit_image`: optional internal image used to understand an edit situation.
+
+Controls:
+
+| Control | Values | Default | Behavior |
+| --- | --- | --- | --- |
+| `mode` | enhance, create_from_image, create_from_theme | enhance | Selects how the prompt is created. |
+| `user_prompt` | text | empty | Existing instruction, image-guided hint, or creative theme. |
+| `max_tokens` | 32 .. 4096 | 512 | Generation length passed to the same CLIP text generator used by Comfy Generate Text. |
+| `temperature` | 0.01 .. 2.0 | 0.25 | Sampling temperature. |
+| `top_p` | 0 .. 1 | 0.90 | Nucleus sampling threshold. |
+
+Modes:
+
+- `enhance`: strengthens an existing edit instruction without changing its intent.
+- `create_from_image`: analyzes `reference_edit_image` for action, pose, interaction, environment, framing, and composition, then converts those details into text around the Krea visual-reference subject(s). The internal image is not inserted into the Visual Reference chain.
+- `create_from_theme`: expands a high-level theme into a concrete new scene/action while preserving the referenced subject(s).
+
+The node uses `clip.tokenize(..., images=[...])` plus `clip.generate(...)`, matching the multimodal generation path behind ComfyUI **Generate Text**. Krea visual-reference Image N numbering is preserved. `reference_edit_image` is internal to the Creator: generated prompts must describe its useful content explicitly rather than relying on Edit seeing that image.
+
+Outputs:
+
+- `created_prompt`
+- `visual_references` (passthrough, unchanged)
+- `creator_info`
+
 ## Krea2 CcC Edit
 
 Required:

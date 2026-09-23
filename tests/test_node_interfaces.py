@@ -11,6 +11,7 @@ def test_public_node_mappings():
         "CcCKrea2SizeResolver",
         "CcCKrea2Latent",
         "CcCKrea2Edit",
+        "CcCKrea2EditPromptCreator",
         "CcCKrea2CharacterSheet",
         "CcCKrea2PaintGeometry",
         "CcCKrea2PaintPrepare",
@@ -35,6 +36,7 @@ def test_split_edit_display_names():
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2SizeResolver"] == "Krea2 CcC Size Resolver"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Latent"] == "Krea2 CcC Latent"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Edit"] == "Krea2 CcC Edit"
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2EditPromptCreator"] == "Krea2 CcC Edit Prompt Creator"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2CharacterSheet"] == "Krea2 CcC Character Sheet"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2PaintGeometry"] == "Krea2 CcC Paint Geometry"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2PaintPrepare"] == "Krea2 CcC Paint Prepare"
@@ -46,6 +48,7 @@ def test_split_edit_display_names():
 
 def test_only_current_edit_nodes_are_registered():
     assert "CcCKrea2Edit" in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2EditPromptCreator" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2AttentionRegion" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2VisualReference" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2SemanticReference" in NODE_CLASS_MAPPINGS

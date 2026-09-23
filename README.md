@@ -227,6 +227,7 @@ The repository contains:
 - [`workflows/02_anypaint_remove_people.json`](workflows/02_anypaint_remove_people.json) — AnyPaint inpaint test for removing masked people/objects.
 - [`workflows/03_regional_attention.json`](workflows/03_regional_attention.json) — Tagged regional attention with multiple identity references.
 - [`workflows/04_character_sheet_identity.json`](workflows/04_character_sheet_identity.json) — Builds a generic multi-view Character Sheet with Krea-aligned sheet geometry and fixed no-crop fit, then uses it as one identity reference while scene geometry remains independent.
+- [`workflows/05_edit_prompt_creator.json`](workflows/05_edit_prompt_creator.json) — Uses the optional multimodal Edit Prompt Creator in `create_from_image` mode; the same reference edit image is also wired to Semantic Reference, which is intentionally disabled/muted in the example.
 
 ## Other Public Nodes
 

@@ -8,6 +8,7 @@ EDIT_WORKFLOW = Path("workflows/01_scene_subject.json")
 PAINT_WORKFLOW = Path("workflows/02_anypaint_remove_people.json")
 REGIONAL_WORKFLOW = Path("workflows/03_regional_attention.json")
 CHARACTER_SHEET_WORKFLOW = Path("workflows/04_character_sheet_identity.json")
+PROMPT_CREATOR_WORKFLOW = Path("workflows/05_edit_prompt_creator.json")
 
 
 def _nodes_by_type(workflow, type_name):
@@ -16,7 +17,7 @@ def _nodes_by_type(workflow, type_name):
 
 def test_expected_workflows_are_checked_in():
     workflows = sorted(Path("workflows").rglob("*.json"))
-    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW]
+    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW, PROMPT_CREATOR_WORKFLOW]
 
 
 def test_scene_subject_workflow_uses_split_nodes():
@@ -213,8 +214,49 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_generic_vie
     assert latent["widgets_values"][5] == "empty"
 
 
+def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_branch():
+    workflow = json.loads(PROMPT_CREATOR_WORKFLOW.read_text(encoding="utf-8"))
+
+    creators = _nodes_by_type(workflow, "CcCKrea2EditPromptCreator")
+    semantics = _nodes_by_type(workflow, "CcCKrea2SemanticReference")
+    visuals = _nodes_by_type(workflow, "CcCKrea2VisualReference")
+    edits = _nodes_by_type(workflow, "CcCKrea2Edit")
+
+    assert len(creators) == 1
+    assert len(semantics) == 1
+    assert len(visuals) == 1
+    assert len(edits) == 1
+
+    creator = creators[0]
+    semantic = semantics[0]
+    edit = edits[0]
+
+    assert creator["widgets_values"] == [
+        "create_from_image",
+        "Use the subject from Image 1 in the situation shown by the reference edit image.",
+        512,
+        0.25,
+        0.9,
+    ]
+    creator_inputs = {item["name"]: item for item in creator["inputs"]}
+    assert creator_inputs["clip"]["link"] is not None
+    assert creator_inputs["visual_references"]["link"] is not None
+    assert creator_inputs["reference_edit_image"]["link"] is not None
+
+    edit_inputs = {item["name"]: item for item in edit["inputs"]}
+    assert edit_inputs["positive_prompt"]["type"] == "STRING"
+    assert edit_inputs["positive_prompt"]["link"] is not None
+    assert edit_inputs["visual_references"]["link"] is not None
+    assert edit_inputs["semantic_references"]["link"] is not None
+
+    assert semantic["mode"] == 2
+    semantic_inputs = {item["name"]: item for item in semantic["inputs"]}
+    assert semantic_inputs["image"]["link"] is not None
+    assert semantic["outputs"][0]["links"]
+
+
 def test_all_workflow_link_types_are_consistent():
-    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW):
+    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW, PROMPT_CREATOR_WORKFLOW):
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         nodes = {node["id"]: node for node in workflow["nodes"]}
 

@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add optional Krea2 CcC Edit Prompt Creator with enhance, create_from_image, and create_from_theme modes, reusing the same multimodal Krea2 CLIP as Generate Text.
 - Chainable `Krea2 CcC Attention Region` nodes with unique tags and percentage-based target boxes.
 - Visual Reference regional attention scopes: `global`, `boost in region`, and `only in region`.
 - Target-side region transport through Latent geometry, strict crop guardrails, and token-grid projection for regional attention.
