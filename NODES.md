@@ -185,6 +185,24 @@ Execution:
 
 Negative text is fixed empty by the edit contract. Appearance images remain available to the grounded negative pass with neutral reference boosts.
 
+## Krea2 CcC Character Sheet
+
+Builds one deterministic Character Sheet image from generic portrait and body references.
+
+| Control | Values | Default | Behavior |
+| --- | --- | --- | --- |
+| `sheet_type` | 1 portrait, 2 portraits, 3 portraits, 4 portraits, 1 body, 2 bodies, 1 portrait + 2 bodies, 3 portraits + 1 body, 4 portraits + 1 body | 1 portrait | Selects the layout and which generic inputs are required. |
+| `sheet_geometry` | curated Krea preset geometries | 1024 x 1024 | Final sheet width and height. The choices are reused directly from Krea2 CcC Latent, rather than accepting arbitrary /16 sizes. |
+| `padding` | 0 .. 128 | 8 | Gap between slots. |
+| `outer_margin` | 0 .. 128 | 8 | Margin around the final sheet. |
+| `background` | white, gray, black | white | Fill visible around fitted sources. |
+
+Optional image inputs are `portrait_1` through `portrait_4` and `body_1` through `body_2`. The numbers only indicate ordering; the node does not require specific camera angles.
+
+Every source always uses **fit** behavior: preserve aspect ratio, scale until the complete source fits inside its slot, center it, and use the sheet background for any remaining space. Character Sheet does not expose crop/cover/stretch.
+
+The node is a deterministic compositor only. It does not invent missing views and does not run a model, Qwen, VAE, or latent processing.
+
 ## Other Public Nodes
 
 - `CcC Krea2 - LoRA Prompt Settings`

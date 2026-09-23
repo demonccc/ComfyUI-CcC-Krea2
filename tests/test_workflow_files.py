@@ -155,7 +155,7 @@ def test_regional_attention_workflow_wires_tags_through_latent():
     assert latent["widgets_values"][5:8] == ["from_image", "contain", "lanczos"]
 
 
-def test_character_sheet_workflow_builds_one_identity_reference_from_five_views():
+def test_character_sheet_workflow_builds_one_identity_reference_from_generic_views():
     workflow = json.loads(CHARACTER_SHEET_WORKFLOW.read_text(encoding="utf-8"))
 
     sheets = _nodes_by_type(workflow, "CcCKrea2CharacterSheet")
@@ -169,9 +169,8 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_five_views(
 
     sheet = sheets[0]
     assert sheet["widgets_values"] == [
-        "4 heads + 1 body (2x2 + 1)",
-        1024,
-        "contain",
+        "4 portraits + 1 body",
+        "1024 x 1024 | 1:1 | ~1.05 MP",
         8,
         8,
         "white",
@@ -179,11 +178,11 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_five_views(
 
     sheet_inputs = {item["name"]: item for item in sheet["inputs"]}
     assert set(sheet_inputs) == {
-        "front_view",
-        "three_quarter_view",
-        "profile_view",
-        "extra_view",
-        "full_body_view",
+        "portrait_1",
+        "portrait_2",
+        "portrait_3",
+        "portrait_4",
+        "body_1",
     }
     assert all(item["link"] is not None for item in sheet_inputs.values())
 
