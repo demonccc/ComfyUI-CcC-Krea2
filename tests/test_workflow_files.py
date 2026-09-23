@@ -171,6 +171,7 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_generic_vie
     assert sheet["widgets_values"] == [
         "4 portraits + 1 body",
         "1024 x 1024 | 1:1 | ~1.05 MP",
+        "lanczos",
         8,
         8,
         "white",

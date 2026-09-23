@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
 import torch
-import torch.nn.functional as F
 
 from ..constants import NODE_CATEGORY
+from ..geometry import resize_tensor
 from .latent_node import (
     DEFAULT_KREA_PRESET_SIZE,
     KREA_PRESET_GEOMETRIES,
@@ -60,6 +60,8 @@ BACKGROUND_VALUES = {
     "gray": 0.5,
     "black": 0.0,
 }
+
+CHARACTER_SHEET_RESIZE_METHODS = ("lanczos", "bicubic", "bilinear", "area")
 
 
 def _split_extent(total: int, parts: int, gap: int) -> Tuple[int, ...]:
@@ -276,6 +278,7 @@ def _fit_image(
     target_h: int,
     target_w: int,
     background_value: float,
+    resize_method: str,
 ) -> torch.Tensor:
     """Fit the complete source inside one slot without cropping or distortion."""
     image = _normalize_image(image, "slot")
@@ -287,15 +290,12 @@ def _fit_image(
     out_w = max(1, min(target_w, int(round(src_w * scale))))
     out_h = max(1, min(target_h, int(round(src_h * scale))))
 
-    nchw = image.permute(0, 3, 1, 2)
-    resized = F.interpolate(
-        nchw,
-        size=(out_h, out_w),
-        mode="bicubic",
-        align_corners=False,
-        antialias=True,
-    )
-    resized = resized.permute(0, 2, 3, 1).clamp(0.0, 1.0)
+    resized = resize_tensor(
+        image,
+        target_h=out_h,
+        target_w=out_w,
+        method=resize_method,
+    ).clamp(0.0, 1.0)
 
     slot = torch.full(
         (1, target_h, target_w, 3),
@@ -335,6 +335,13 @@ class CcCKrea2CharacterSheet:
                     {
                         "default": DEFAULT_KREA_PRESET_SIZE,
                         "tooltip": "Final Character Sheet geometry. Uses the same curated Krea presets as Krea2 CcC Latent.",
+                    },
+                ),
+                "resize_method": (
+                    CHARACTER_SHEET_RESIZE_METHODS,
+                    {
+                        "default": "lanczos",
+                        "tooltip": "Interpolation used when fitting each source into its slot.",
                     },
                 ),
                 "padding": (
@@ -394,6 +401,7 @@ class CcCKrea2CharacterSheet:
         self,
         sheet_type: str,
         sheet_geometry: str,
+        resize_method: str,
         padding: int,
         outer_margin: int,
         background: str,
@@ -462,6 +470,7 @@ class CcCKrea2CharacterSheet:
                 target_h=slot_h,
                 target_w=slot_w,
                 background_value=float(bg),
+                resize_method=resize_method,
             )
             canvas[:, y:y + slot_h, x:x + slot_w, :] = fitted
 

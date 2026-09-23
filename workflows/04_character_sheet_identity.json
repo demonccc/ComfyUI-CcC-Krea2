@@ -476,6 +476,7 @@
       "widgets_values": [
         "4 portraits + 1 body",
         "1024 x 1024 | 1:1 | ~1.05 MP",
+        "lanczos",
         8,
         8,
         "white"
@@ -980,7 +981,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Character Sheet identity workflow.\n\n1. Load four useful portrait views plus one full-body view of the SAME person. The portrait angles are generic; they do not need to be front/profile/3/4.\n2. Krea2 CcC Character Sheet composes them deterministically using the selected curated Krea sheet geometry.\n3. Every source uses fixed fit behavior: complete image, preserved aspect ratio, no crop and no stretch.\n4. Preview the sheet before generation.\n5. The sheet is used as ONE Visual Reference with reference_fit=native. It does not define target geometry.\n6. The scene image defines target dimensions/aspect through Krea2 CcC Latent.\n7. Qwen sees the character sheet at up to 1024px so the multiple identity views remain readable.\n\nCharacter Sheet settings:\n- 4 portraits + 1 body\n- sheet geometry: 1024 x 1024 | 1:1 | ~1.05 MP\n- fixed fit (no crop)\n- padding 8\n- outer margin 8\n- white background\n\nVisual reference order is scene -> character sheet.\nScene boost: 1.0\nCharacter sheet boost: 4.0\nCharacter sheet reference fit: native.\n\nThe Character Sheet geometry comes from the same curated Krea preset table used by Krea2 CcC Latent."
+        "Character Sheet identity workflow.\n\n1. Load four useful portrait views plus one full-body view of the SAME person. The portrait angles are generic; they do not need to be front/profile/3/4.\n2. Krea2 CcC Character Sheet composes them deterministically using the selected curated Krea sheet geometry.\n3. Every source uses fixed fit behavior: complete image, preserved aspect ratio, no crop and no stretch.\n4. Preview the sheet before generation.\n5. The sheet is used as ONE Visual Reference with reference_fit=native. It does not define target geometry.\n6. The scene image defines target dimensions/aspect through Krea2 CcC Latent.\n7. Qwen sees the character sheet at up to 1024px so the multiple identity views remain readable.\n\nCharacter Sheet settings:\n- 4 portraits + 1 body\n- sheet geometry: 1024 x 1024 | 1:1 | ~1.05 MP\n- fixed fit (no crop)\n- resize method: lanczos\n- padding 8\n- outer margin 8\n- white background\n\nVisual reference order is scene -> character sheet.\nScene boost: 1.0\nCharacter sheet boost: 4.0\nCharacter sheet reference fit: native.\n\nThe Character Sheet geometry comes from the same curated Krea preset table used by Krea2 CcC Latent."
       ],
       "title": "Workflow Notes"
     }
