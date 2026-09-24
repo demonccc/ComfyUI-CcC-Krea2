@@ -25,6 +25,16 @@ def test_latent_preset_widget_is_conditionally_disabled():
     assert 'setDisabled("aspect_ratio", mode !== "preset")' not in js
 
 
+def test_prompt_creator_system_prompt_stays_visible_read_only_for_presets():
+    js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
+    assert 'node.comfyClass === "CcCKrea2EditPromptCreator"' in js
+    assert 'w.name === "system_prompt"' in js
+    assert "systemPromptWidget.options.read_only = !editable" in js
+    assert "systemPromptWidget.disabled = false" in js
+    assert "systemPromptWidget.disabled = !editable" not in js
+    assert "PROMPT_CREATOR_PRESETS[mode]" in js
+
+
 def test_js_syntax_validation():
     import shutil
     import subprocess

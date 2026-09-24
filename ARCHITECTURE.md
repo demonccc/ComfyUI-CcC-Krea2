@@ -61,7 +61,7 @@ The Creator uses the same multimodal CLIP generation path as ComfyUI Generate Te
 
 Preset modes are enhance, create_from_image, and create_from_theme. Their canonical system prompts live in Python and are displayed by the frontend as read-only text. custom enables the same system_prompt field and sends that custom text to Qwen.
 
-thinking is passed into Qwen3-VL tokenization. Decoded <think>...</think> reasoning is split from the final answer: reasoning goes to the thinking output, while created_prompt receives only the final edit prompt. creator_info reports whether a thinking block was actually emitted.
+thinking is passed into Qwen3-VL tokenization. When enabled, Prompt Creator supplies a Qwen3-VL chat template with the assistant turn prefilled by <think>, forcing generation to begin inside the reasoning block. Text before </think> goes to the thinking output; text after </think> goes to created_prompt. If the block never closes, execution fails instead of treating unfinished reasoning as a final prompt.
 
 create_from_image treats the internal reference edit image as a detailed visual blueprint rather than an identity source. Its preset asks Qwen to reconstruct relevant pose, body position, people/interactions, objects, scene layout, framing, viewpoint, composition, and lighting while preserving explicit user identity/body constraints.
 

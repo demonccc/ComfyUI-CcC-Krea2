@@ -196,18 +196,30 @@ app.registerExtension({
                 previousMode === "custom" ? String(systemPromptWidget.value ?? "") : "";
 
             const setSystemPromptValue = (value) => {
-                systemPromptWidget.value = value;
-                if (systemPromptWidget.inputEl) {
-                    systemPromptWidget.inputEl.value = value;
+                if (systemPromptWidget.value !== value) {
+                    systemPromptWidget.value = value;
                 }
+
+                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
+                if (inputEl && "value" in inputEl && inputEl.value !== value) {
+                    inputEl.value = value;
+                }
+
+                systemPromptWidget.triggerDraw?.();
             };
 
             const setSystemPromptEditable = (editable) => {
-                systemPromptWidget.disabled = !editable;
-                if (systemPromptWidget.inputEl) {
-                    systemPromptWidget.inputEl.readOnly = !editable;
-                    systemPromptWidget.inputEl.style.opacity = editable ? "" : "0.6";
+                systemPromptWidget.options ??= {};
+                systemPromptWidget.options.read_only = !editable;
+                systemPromptWidget.disabled = false;
+
+                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
+                if (inputEl) {
+                    inputEl.readOnly = !editable;
+                    inputEl.style.opacity = editable ? "" : "0.65";
                 }
+
+                systemPromptWidget.triggerDraw?.();
             };
 
             const updatePromptCreatorState = () => {
@@ -252,7 +264,7 @@ app.registerExtension({
                 }
             };
 
-            setTimeout(updatePromptCreatorState, 20);
+            setTimeout(updatePromptCreatorState, 100);
         }
 
     },

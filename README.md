@@ -151,7 +151,7 @@ The system_prompt field always shows the effective prompt. For preset modes it i
 
 create_from_image asks Qwen to capture relevant pose/body position, other people and interactions, props, environment, spatial relationships, framing, camera angle, composition, and lighting while preserving explicit user constraints such as face, identity, anatomy, body shape, and body proportions.
 
-thinking follows the ComfyUI Generate Text model convention. When the checkpoint emits a <think>...</think> block, reasoning is returned separately on the thinking output and the final edit text remains in created_prompt. creator_info also reports whether reasoning was actually emitted.
+thinking uses the Qwen3-VL thinking convention and pre-fills the assistant turn with <think> when enabled. The reasoning before </think> is returned separately on the thinking output, while only the final edit text remains in created_prompt. An unfinished thinking block raises an error instead of producing an empty/invalid final prompt.
 
 All preset modes enforce final edit text with no system/meta preamble. Downstream visible references are named Image 1, Image 2, etc.; accidental "Krea Image N" wording is normalized to "Image N".
 

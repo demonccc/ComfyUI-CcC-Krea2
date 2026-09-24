@@ -86,15 +86,35 @@ def _resolve_system_prompt(mode: str, system_prompt: str) -> str:
 
 
 
-def _split_generated_text(clip: Any, generated_ids: Any, raw_prompt: str) -> Tuple[str, str]:
+def _thinking_llama_template(image_count: int) -> str:
+    vision_block = "<|vision_start|><|image_pad|><|vision_end|>"
+    images = vision_block * max(0, int(image_count))
+    return (
+        "<|im_start|>user\n"
+        f"{images}{{}}"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n"
+        "<think>"
+    )
+
+
+def _split_generated_text(
+    clip: Any,
+    generated_ids: Any,
+    raw_prompt: str,
+    thinking_prefilled: bool = False,
+) -> Tuple[str, str]:
     generated_text = str(clip.decode(generated_ids)).strip()
     reasoning, separator, text = generated_text.partition("</think>")
 
-    if separator and (reasoning.lstrip().startswith("<think>") or raw_prompt.rstrip().endswith("<think>")):
-        return text.strip(), reasoning.replace("<think>", "", 1).strip()
+    has_reasoning_prefix = reasoning.lstrip().startswith("<think>")
+    if separator and (thinking_prefilled or has_reasoning_prefix or raw_prompt.rstrip().endswith("<think>")):
+        cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
+        return text.strip(), cleaned_reasoning
 
-    if not separator and reasoning.lstrip().startswith("<think>"):
-        return "", reasoning.replace("<think>", "", 1).strip()
+    if not separator and (thinking_prefilled or has_reasoning_prefix):
+        cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
+        return "", cleaned_reasoning
 
     return generated_text, ""
 
@@ -206,6 +226,7 @@ def _build_generation_prompt(
     user_prompt: str,
     mapping_lines: List[str],
     has_reference_edit_image: bool,
+    thinking: bool,
 ) -> str:
     if mode not in PROMPT_CREATOR_MODES:
         raise ValueError(f"[Krea2 CcC Edit Prompt Creator] Invalid mode: {mode!r}.")
@@ -223,12 +244,23 @@ def _build_generation_prompt(
     mappings = "\n".join(mapping_lines) if mapping_lines else "No analyzable visual images were supplied."
     guidance = clean_user_prompt or "No additional user guidance."
 
+    thinking_instruction = ""
+    if thinking:
+        thinking_instruction = (
+            "\n\nTHINKING MODE IS ENABLED:\n"
+            "Before the final edit prompt, analyze the images, roles, user constraints, pose, interactions, "
+            "scene geometry, composition, and preservation requirements inside a <think>...</think> block. "
+            "The <think> block must contain actual reasoning and must be closed with </think>. "
+            "After </think>, output only the final Krea2 edit prompt."
+        )
+
     return (
         "IMAGE MAPPING:\n"
         f"{mappings}\n\n"
         "USER REQUEST / THEME:\n"
-        f"{guidance}\n\n"
-        "Write only the final Krea2 edit prompt."
+        f"{guidance}"
+        f"{thinking_instruction}\n\n"
+        "Write the requested Krea2 edit prompt now."
     )
 
 
@@ -349,14 +381,22 @@ class CcCKrea2EditPromptCreator:
             user_prompt=user_prompt,
             mapping_lines=mapping_lines,
             has_reference_edit_image=reference_edit_image is not None,
+            thinking=bool(thinking),
         )
+
+        tokenize_kwargs = {
+            "images": images,
+            "min_length": 1,
+            "thinking": bool(thinking),
+            "system_prompt": system_prompt,
+        }
+        thinking_prefilled = bool(thinking)
+        if thinking_prefilled:
+            tokenize_kwargs["llama_template"] = _thinking_llama_template(len(images))
 
         tokens = clip.tokenize(
             generation_prompt,
-            images=images,
-            min_length=1,
-            thinking=bool(thinking),
-            system_prompt=system_prompt,
+            **tokenize_kwargs,
         )
         generated_ids = clip.generate(
             tokens,
@@ -369,7 +409,12 @@ class CcCKrea2EditPromptCreator:
             repetition_penalty=1.05,
             seed=int(seed),
         )
-        raw_created_prompt, thinking_text = _split_generated_text(clip, generated_ids, generation_prompt)
+        raw_created_prompt, thinking_text = _split_generated_text(
+            clip,
+            generated_ids,
+            generation_prompt,
+            thinking_prefilled=thinking_prefilled,
+        )
         if not raw_created_prompt.strip() and thinking_text:
             raise RuntimeError(
                 "[Krea2 CcC Edit Prompt Creator] Qwen generation ended inside the thinking block before "
@@ -381,7 +426,7 @@ class CcCKrea2EditPromptCreator:
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
-            f"Thinking Output: {'present' if thinking_text else 'empty'}",
+            f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
             f"System Prompt Source: {'custom' if str(mode) == 'custom' else 'preset'}",
             f"Visual Reference Chain Entries: {len(visual_references.entries)}",
             f"Images Analyzed: {len(images)}",

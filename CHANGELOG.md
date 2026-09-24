@@ -13,6 +13,7 @@
 
 ### Changed
 
+- Prompt Creator preset system_prompt widgets now use ComfyUI's read_only option instead of disabling the widget, so preset text remains visible/greyed; thinking mode now prefills the Qwen3-VL assistant turn with <think> and separates reasoning at </think>.
 - Edit Prompt Creator now exposes system_prompt as the effective preset/custom prompt: preset modes display it read-only in the UI, custom enables editing, create_from_image requests substantially richer scene detail, and thinking output is reported separately without suppressing reasoning in the system prompt.
 - Edit Prompt Creator adds a custom mode, optional Qwen thinking with a separate thinking output, stricter final-prompt-only system contracts, and Image N reference naming; leaked meta-instructions are filtered/rejected before reaching Edit.
 - Edit Prompt Creator now exposes and passes an explicit sampling seed to Qwen3-VL generation, matching ComfyUI Generate Text sampling requirements.

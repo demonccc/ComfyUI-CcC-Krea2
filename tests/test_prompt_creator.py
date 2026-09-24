@@ -72,8 +72,9 @@ def test_prompt_creator_public_controls_and_output_compatibility():
 
 
 def test_create_from_image_uses_detailed_preset_thinking_and_passthrough():
+    # thinking=True pre-fills the assistant turn with <think>, so decode starts with reasoning text.
     clip = _FakeClip(
-        "<think>The internal image has a seated subject, another person nearby, and a white bed.</think>"
+        "The internal image has a seated subject, another person nearby, and a white bed.</think>"
         "The woman from Krea Image 1 is seated on a white bed with her body angled slightly to the side, "
         "while another person remains beside the bed."
     )
@@ -102,6 +103,8 @@ def test_create_from_image_uses_detailed_preset_thinking_and_passthrough():
     assert "INTERNAL REFERENCE EDIT IMAGE" in clip.tokenize_prompt
     assert clip.tokenize_kwargs["thinking"] is True
     assert clip.tokenize_kwargs["system_prompt"] == PRESET_SYSTEM_PROMPTS["create_from_image"]
+    assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
+    assert clip.tokenize_kwargs["llama_template"].count("<|image_pad|>") == 3
     assert "Do not compress a visually rich reference situation" in clip.tokenize_kwargs["system_prompt"]
     assert "other people in the scene" in clip.tokenize_kwargs["system_prompt"]
     assert clip.generate_kwargs["max_length"] == 2048
@@ -212,7 +215,8 @@ def test_appearance_only_reference_has_no_downstream_image_number():
 
 
 def test_thinking_truncation_without_final_prompt_is_reported():
-    clip = _FakeClip("<think>I am still reasoning when max tokens end.")
+    # With thinking prefilled, an unfinished generation contains reasoning text without a literal <think> prefix.
+    clip = _FakeClip("I am still reasoning when max tokens end.")
 
     with pytest.raises(RuntimeError, match="ended inside the thinking block"):
         CcCKrea2EditPromptCreator().create(

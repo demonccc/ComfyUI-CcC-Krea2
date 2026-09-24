@@ -227,17 +227,15 @@ Explicit user constraints such as preserving identity, face, anatomy, body shape
 
 ### Thinking
 
-thinking is passed directly to Qwen3-VL tokenization, matching ComfyUI Generate Text behavior.
+thinking is passed directly to Qwen3-VL tokenization. When enabled, the Prompt Creator also uses a Qwen3-VL chat template whose assistant turn is prefilled with <think>, so generation starts inside the reasoning block instead of relying on the model to choose whether to enter thinking mode.
 
-When Qwen emits a <think>...</think> block:
+When Qwen closes the prefilled block with </think>:
 
 - created_prompt receives only the final text after </think>;
 - thinking receives the reasoning text;
 - creator_info reports Thinking Output: present and also includes a Thinking section for debugging.
 
-If thinking=true but the model emits no think block, thinking is an empty string and creator_info reports Thinking Output: empty. This can depend on the loaded Qwen checkpoint.
-
-If generation ends inside an unfinished think block before producing a final prompt, the node raises a clear error suggesting a larger max_tokens value or disabling thinking.
+If generation ends inside the prefilled thinking block without producing </think> and a final prompt, the node raises a clear error suggesting a larger max_tokens value or disabling thinking. This prevents an unfinished reasoning trace from being mistaken for created_prompt.
 
 ### Final prompt cleanup
 
