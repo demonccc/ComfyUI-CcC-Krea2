@@ -170,7 +170,7 @@ preset uses the selected geometry exactly. fixed and from_image resolve through 
 
 ## Krea2 CcC Edit Prompt Creator
 
-Optional multimodal prompt-generation node. It uses the same Krea2/Qwen3-VL CLIP used by Edit and ComfyUI Generate Text.
+Optional multimodal prompt-generation node. It reuses the same Krea2/Qwen3-VL CLIP used by Edit and ComfyUI Generate Text.
 
 Required inputs/controls:
 
@@ -178,8 +178,10 @@ Required inputs/controls:
 | --- | --- | --- |
 | clip | CLIP | — |
 | visual_references | KREA2_VISUAL_REFERENCE_CHAIN | — |
-| mode | enhance, create_from_image, create_from_theme | enhance |
+| mode | enhance, create_from_image, create_from_theme, custom | enhance |
 | user_prompt | text | empty |
+| custom_system_prompt | text | empty |
+| thinking | boolean | false |
 | max_tokens | 32..4096, step 32 | 512 |
 | temperature | 0.01..2.0 | 0.25 |
 | top_p | 0..1 | 0.90 |
@@ -194,18 +196,28 @@ Outputs:
 - created_prompt
 - visual_references
 - creator_info
+- thinking
 
-Sampling is enabled for prompt generation. seed is passed directly to Qwen3-VL generation, matching the requirement of ComfyUI Generate Text when sampling is on.
+The original first three output slots are preserved; thinking is appended as a fourth output.
 
 Modes:
 
-- enhance: strengthens an existing edit instruction without changing its requested intent.
+- enhance: rewrites an existing edit instruction without changing its intent.
 - create_from_image: requires reference_edit_image and converts observed action/pose/interaction/environment/composition into explicit edit text.
 - create_from_theme: expands the user's theme into a concrete new situation while anchoring referenced subject appearance.
+- custom: uses custom_system_prompt as the behavior/prompt preset. The fixed final-output contract is still appended and enforced.
+
+thinking is passed to the Krea2/Qwen3-VL tokenizer. When enabled, reasoning is split from the model response and returned only on the thinking output. created_prompt remains the final prompt only.
+
+The final-output contract requires plain English edit text with no headings, Markdown, explanations, role text, system instructions, or meta preambles such as "You are a professional image editor" or "Your task is...".
+
+Downstream visible references are named only as Image 1, Image 2, and so on. The Creator normalizes accidental "Krea Image N" wording to "Image N".
+
+reference_edit_image is internal to the Creator and is not inserted into the Visual Reference chain. Its useful scene/action/pose/interaction/environment/composition details must be written explicitly into created_prompt; the image itself must not be mentioned.
+
+Sampling is enabled for prompt generation. seed is passed explicitly to Qwen3-VL generation.
 
 The returned visual_references object is passthrough; the chain is not modified.
-
-The reference_edit_image is internal to the Creator and is not inserted into Visual References. The generated prompt must describe useful content from it explicitly rather than referring to a hidden/base/reference image that Edit may not see.
 
 ## Krea2 CcC Edit
 

@@ -143,10 +143,17 @@ The Creator reuses the same multimodal Krea2/Qwen3-VL CLIP as ComfyUI Generate T
 Modes:
 
 - enhance: improve an existing edit instruction without changing its intent.
-- create_from_image: analyze reference_edit_image and turn its useful scene/action/composition into explicit edit text.
+- create_from_image: analyze reference_edit_image and turn its useful scene/action/pose/interaction/environment/composition into explicit edit text.
 - create_from_theme: expand a high-level theme into a concrete new situation while keeping referenced subjects anchored.
+- custom: use custom_system_prompt as an editable prompt preset.
 
-Controls are max_tokens, temperature, top_p, and seed. Sampling uses that explicit seed, as required by the Qwen3-VL Generate Text path. The Visual Reference chain is returned unchanged.
+Controls are user_prompt, custom_system_prompt, thinking, max_tokens, temperature, top_p, and seed. custom_system_prompt is used only in custom mode.
+
+When thinking is enabled, Qwen reasoning is returned separately on the thinking output. created_prompt remains clean final edit text.
+
+All modes share a fixed output contract: no system/meta preamble, no explanations, no Markdown/JSON/headings, and no references to hidden/internal inputs. Downstream visible references are named Image 1, Image 2, etc.; accidental "Krea Image N" wording is normalized to "Image N".
+
+The Visual Reference chain is returned unchanged.
 
 ## Character Sheet
 

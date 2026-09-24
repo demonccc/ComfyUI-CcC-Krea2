@@ -290,8 +290,8 @@
         540
       ],
       "size": [
-        520,
-        500
+        540,
+        560
       ],
       "flags": {},
       "order": 8,
@@ -332,6 +332,11 @@
           "name": "creator_info",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "thinking",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
@@ -340,6 +345,8 @@
       "widgets_values": [
         "create_from_image",
         "Use the subject from Image 1 in the situation shown by the reference edit image.",
+        "",
+        true,
         512,
         0.25,
         0.9,
@@ -767,7 +774,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Edit Prompt Creator create_from_image workflow.\n\nSubject path:\n- white_dog.jpg -> Krea2 CcC Visual Reference -> Edit Prompt Creator -> Edit.\n- The Visual Reference chain leaves Prompt Creator unchanged.\n\nReference edit image:\n- black_dog_running_river.jpg -> reference_edit_image on Prompt Creator.\n- The Creator analyzes this image internally and must turn its running/river/action/composition into explicit English edit text.\n- reference_edit_image is NOT inserted into the Visual Reference chain.\n- The same image supplies target dimensions to Latent only.\n- Latent settings are dimensions=from_image and content=empty. Do NOT set content=from_image unless a separate content_image is intentionally connected.\n\nSemantic branch:\n- The same reference edit image is also wired to Krea2 CcC Semantic Reference -> Edit.\n- That Semantic Reference node is intentionally disabled/muted in this workflow (mode=NEVER).\n- Enable it only when you want the river/action/environment to be reinforced semantically in addition to the generated text.\n\nPrompt Creator settings:\n- mode: create_from_image\n- max_tokens: 512\n- temperature: 0.25\n- top_p: 0.90\n- seed: 0\n- CLIP: the same Krea2/Qwen3-VL CLIP used by Edit.\n\nOther Creator modes available in the same node are enhance and create_from_theme."
+        "Edit Prompt Creator create_from_image workflow.\n\nSubject path:\n- white_dog.jpg -> Krea2 CcC Visual Reference -> Edit Prompt Creator -> Edit.\n- The Visual Reference chain leaves Prompt Creator unchanged.\n- Final prompts refer to downstream references as Image 1, Image 2, etc.; never as \"Krea Image N\".\n\nReference edit image:\n- black_dog_running_river.jpg -> reference_edit_image on Prompt Creator.\n- The Creator analyzes this image internally and turns its running/river/action/composition into explicit English edit text.\n- reference_edit_image is NOT inserted into the Visual Reference chain and must not be mentioned in created_prompt.\n- The same image supplies target dimensions to Latent only.\n- Latent settings are dimensions=from_image and content=empty. Do NOT set content=from_image unless a separate content_image is intentionally connected.\n\nPrompt Creator settings:\n- mode: create_from_image\n- custom_system_prompt: unused in preset modes\n- thinking: enabled (reasoning is available on the separate thinking output)\n- max_tokens: 512\n- temperature: 0.25\n- top_p: 0.90\n- seed: 0\n- CLIP: the same Krea2/Qwen3-VL CLIP used by Edit.\n\nModes:\n- enhance\n- create_from_image\n- create_from_theme\n- custom (uses custom_system_prompt)\n\nThe final-output contract is always enforced: created_prompt contains only the final edit instruction, with no system/meta preamble.\n\nSemantic branch:\n- The same reference edit image is also wired to Krea2 CcC Semantic Reference -> Edit.\n- That Semantic Reference node is intentionally disabled/muted in this workflow (mode=NEVER).\n- Enable it only when you want the river/action/environment reinforced semantically in addition to the generated text."
       ],
       "title": "Workflow Notes"
     }

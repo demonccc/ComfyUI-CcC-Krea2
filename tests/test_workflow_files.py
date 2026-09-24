@@ -247,6 +247,8 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
     assert creator["widgets_values"] == [
         "create_from_image",
         "Use the subject from Image 1 in the situation shown by the reference edit image.",
+        "",
+        True,
         512,
         0.25,
         0.9,
@@ -256,6 +258,11 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
     assert creator_inputs["clip"]["link"] is not None
     assert creator_inputs["visual_references"]["link"] is not None
     assert creator_inputs["reference_edit_image"]["link"] is not None
+    creator_outputs = {item["name"]: item for item in creator["outputs"]}
+    assert creator_outputs["created_prompt"]["type"] == "STRING"
+    assert creator_outputs["visual_references"]["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"
+    assert creator_outputs["creator_info"]["type"] == "STRING"
+    assert creator_outputs["thinking"]["type"] == "STRING"
 
     latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
     latent_inputs = {item["name"]: item for item in latent["inputs"]}

@@ -49,6 +49,9 @@ def test_nodes_doc_matches_current_edit_contracts():
     assert "semantic_only" in nodes
     assert "create_from_image" in nodes
     assert "create_from_theme" in nodes
+    assert "custom_system_prompt" in nodes
+    assert "thinking" in _section(nodes, "Krea2 CcC Edit Prompt Creator")
+    assert "Image 1" in _section(nodes, "Krea2 CcC Edit Prompt Creator")
     assert "paint_geometry" in _section(nodes, "Krea2 CcC Paint Prepare")
 
     edit = _section(nodes, "Krea2 CcC Edit")

@@ -53,10 +53,16 @@ Krea2/Qwen3-VL CLIP ----------------+-----------------------> Edit
                                     |
 Visual Reference chain ------------>+--> Prompt Creator --> Visual Reference passthrough --> Edit
 user_prompt ------------------------>+--> Prompt Creator --> created_prompt ----------------> Edit
-reference_edit_image --------------->+
+reference_edit_image --------------->+                    \--> thinking (optional debug/reasoning)
 ~~~
 
 The Creator uses the same multimodal CLIP generation path as ComfyUI Generate Text. It does not mutate the Visual Reference chain.
+
+Its four modes are enhance, create_from_image, create_from_theme, and custom. custom uses custom_system_prompt as the editable behavior preset; all modes still receive the fixed final-output contract.
+
+thinking is passed to Qwen3-VL tokenization. Reasoning is split from the decoded response and returned separately, while created_prompt contains only the final edit instruction.
+
+The Creator's final-output contract forbids system/meta preambles, explanations, headings, Markdown/JSON, and hidden-input references. Visible downstream references are named only as Image N. Accidental "Krea Image N" wording is normalized before created_prompt is emitted.
 
 reference_edit_image is visible to the Creator only unless the user separately wires that image into another existing path. Therefore create_from_image converts useful scene/action/pose/environment/composition details into explicit text rather than relying on Edit seeing that internal image.
 
