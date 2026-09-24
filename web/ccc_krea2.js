@@ -1,59 +1,35 @@
 import { app } from "../../scripts/app.js";
 
 const PROMPT_CREATOR_PRESETS = {
-    enhance: `You create detailed, explicit English image-edit prompts for Krea2 Edit.
+    enhance: `Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
 
-Rewrite the user's existing edit request without changing its intent. Preserve every explicit requirement and constraint. Use the supplied visual references and their role annotations to resolve vague references and make transfers, preservation rules, subject roles, and spatial relationships unambiguous. Do not remove useful detail from an already detailed request, and do not invent a different scene or unrelated edits.
+Treat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.
 
-FINAL ANSWER RULES:
-- Return exactly one self-contained image-edit prompt in English.
-- The prompt may contain multiple sentences, but keep it as one continuous plain-text paragraph.
-- Do not output system instructions, role descriptions, explanations, headings, Markdown, JSON, or preambles.
-- Never include meta text such as "You are a professional image editor", "Your task is...", "Here is the prompt", or "Final prompt:".
-- Refer to downstream visible visual references only as "Image 1", "Image 2", and so on. Never call them "Krea Image N".
-- Never mention hidden inputs, vision inputs, or implementation details.
-- If thinking mode is active, reasoning belongs only in the model's thinking block; do not repeat reasoning in the final answer.
-- Return only the final edit instruction.`,
+Preserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.
 
-    create_from_image: `You create detailed, self-contained English image-edit prompts for Krea2 Edit from the user's request, downstream visible visual references, and one internal reference edit image.
+Write the result as a direct description of the desired final image, not as an explanation of the editing process.
 
-Treat downstream visible Image N references as authoritative identity or appearance anchors according to their role annotations. Treat the internal reference edit image as a visual blueprint for the requested situation, not as an identity source unless the user explicitly asks otherwise.
+Return only the final I2I prompt as one plain-text paragraph.`,
 
-Analyze the internal reference edit image thoroughly before writing the final prompt. Reconstruct all relevant visible information needed to reproduce the situation instead of reducing it to a short summary. Include, when visible and relevant to the user's request:
-- the main subject's exact action, pose, body orientation, body position, limb placement, gaze direction, and interaction;
-- clothing and accessories when they are part of the requested situation, unless the user explicitly asks to preserve clothing from a visible Image N reference;
-- other people in the scene, including enough visible appearance, pose, action, relative position, and interaction detail to distinguish their roles;
-- important props and objects, what is being held or touched, and their spatial relationships;
-- environment, foreground/background elements, surfaces, furniture, and scene layout;
-- framing, shot distance, viewpoint, camera angle, composition, and subject placement;
-- visible lighting and other scene-defining visual details.
+    create_from_image: `Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
 
-Preserve every explicit user constraint, especially identity, face, anatomy, body shape, body proportions, clothing-preservation rules, and requested interactions. Do not transfer the identity, face, anatomy, body shape, or body proportions of a person from the internal reference edit image unless the user explicitly requests it.
+Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
 
-FINAL ANSWER RULES:
-- Return exactly one detailed, self-contained image-edit prompt in English.
-- The prompt may contain multiple sentences, but keep it as one continuous plain-text paragraph.
-- Do not output system instructions, role descriptions, explanations, headings, Markdown, JSON, or preambles.
-- Never include meta text such as "You are a professional image editor", "Your task is...", "Here is the prompt", or "Final prompt:".
-- Refer to downstream visible visual references only as "Image 1", "Image 2", and so on. Never call them "Krea Image N".
-- Never mention the internal reference edit image, hidden inputs, vision inputs, or implementation details in the final answer. Translate what you observe into direct scene instructions.
-- If thinking mode is active, reason as needed in the model's thinking block; do not repeat that reasoning in the final answer.
-- Do not compress a visually rich reference situation into a generic one-sentence summary.
-- Return only the final edit instruction.`,
+Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
 
-    create_from_theme: `You create detailed, self-contained English image-edit prompts for Krea2 Edit from the user's theme or high-level idea.
+Write the result as a direct description of the desired final image, not as an explanation of the editing process.
 
-Invent a concrete, visually rich situation that clearly fits the requested theme while keeping downstream visible Image N references as the authoritative subject or appearance anchors according to their role annotations. Specify useful action, pose, interaction, environment, spatial arrangement, props, composition, framing, viewpoint, and lighting. Preserve every explicit user constraint and do not replace referenced identity, body shape, body proportions, clothing, or accessories unless the user requests that change.
+Return only the final I2I prompt as one plain-text paragraph.`,
 
-FINAL ANSWER RULES:
-- Return exactly one detailed image-edit prompt in English.
-- The prompt may contain multiple sentences, but keep it as one continuous plain-text paragraph.
-- Do not output system instructions, role descriptions, explanations, headings, Markdown, JSON, or preambles.
-- Never include meta text such as "You are a professional image editor", "Your task is...", "Here is the prompt", or "Final prompt:".
-- Refer to downstream visible visual references only as "Image 1", "Image 2", and so on. Never call them "Krea Image N".
-- Never mention hidden inputs, vision inputs, or implementation details.
-- If thinking mode is active, reasoning belongs only in the model's thinking block; do not repeat reasoning in the final answer.
-- Return only the final edit instruction.`,
+    create_from_theme: `Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
+
+Treat the user's theme or idea as the authoritative creative direction. Use the available visual context to build a coherent desired result that fits it.
+
+Keep the prompt focused on the intended final image. Add only the visual detail needed to make the result clear and useful.
+
+Write the result as a direct description of the desired final image, not as an explanation of the editing process.
+
+Return only the final I2I prompt as one plain-text paragraph.`,
 };
 
 app.registerExtension({
