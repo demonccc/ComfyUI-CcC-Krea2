@@ -12,6 +12,37 @@ REGIONAL_WORKFLOW = Path("workflows/03_regional_attention.json")
 CHARACTER_SHEET_WORKFLOW = Path("workflows/04_character_sheet_identity.json")
 PROMPT_CREATOR_WORKFLOW = Path("workflows/05_edit_prompt_creator.json")
 T2I_WORKFLOW = Path("workflows/06_text_to_image.json")
+PROMPT_ENHANCE_WORKFLOW = Path("workflows/07_prompt_creator_enhance.json")
+PROMPT_THEME_WORKFLOW = Path("workflows/08_prompt_creator_create_from_theme.json")
+PROMPT_CUSTOM_WORKFLOW = Path("workflows/09_prompt_creator_custom.json")
+EDIT_CROP_WORKFLOW = Path("workflows/10_edit_fit_crop.json")
+EDIT_CONTAIN_WORKFLOW = Path("workflows/11_edit_fit_contain.json")
+EDIT_SEMANTIC_WORKFLOW = Path("workflows/12_edit_semantic_only.json")
+EDIT_STYLE_DIRECT_WORKFLOW = Path("workflows/13_edit_style_direct.json")
+EDIT_STYLE_INDIRECT_WORKFLOW = Path("workflows/14_edit_style_indirect.json")
+PAINT_OUTPAINT_WORKFLOW = Path("workflows/15_paint_outpaint.json")
+PAINT_CROP_WORKFLOW = Path("workflows/16_paint_crop_restore.json")
+PAINT_NO_KV_WORKFLOW = Path("workflows/17_paint_no_kv_cache.json")
+
+ALL_WORKFLOWS = (
+    EDIT_WORKFLOW,
+    PAINT_WORKFLOW,
+    REGIONAL_WORKFLOW,
+    CHARACTER_SHEET_WORKFLOW,
+    PROMPT_CREATOR_WORKFLOW,
+    T2I_WORKFLOW,
+    PROMPT_ENHANCE_WORKFLOW,
+    PROMPT_THEME_WORKFLOW,
+    PROMPT_CUSTOM_WORKFLOW,
+    EDIT_CROP_WORKFLOW,
+    EDIT_CONTAIN_WORKFLOW,
+    EDIT_SEMANTIC_WORKFLOW,
+    EDIT_STYLE_DIRECT_WORKFLOW,
+    EDIT_STYLE_INDIRECT_WORKFLOW,
+    PAINT_OUTPAINT_WORKFLOW,
+    PAINT_CROP_WORKFLOW,
+    PAINT_NO_KV_WORKFLOW,
+)
 
 
 def _nodes_by_type(workflow, type_name):
@@ -20,14 +51,7 @@ def _nodes_by_type(workflow, type_name):
 
 def test_expected_workflows_are_checked_in():
     workflows = sorted(Path("workflows").rglob("*.json"))
-    assert workflows == [
-        EDIT_WORKFLOW,
-        PAINT_WORKFLOW,
-        REGIONAL_WORKFLOW,
-        CHARACTER_SHEET_WORKFLOW,
-        PROMPT_CREATOR_WORKFLOW,
-        T2I_WORKFLOW,
-    ]
+    assert workflows == list(ALL_WORKFLOWS)
 
 
 def test_scene_subject_workflow_uses_split_nodes():
@@ -342,15 +366,76 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
     assert decoder_inputs["vae"]["link"] is not None
 
 
+def test_prompt_creator_modes_have_dedicated_workflows():
+    cases = {
+        PROMPT_CREATOR_WORKFLOW: ("create_from_image", PRESET_SYSTEM_PROMPTS["create_from_image"]),
+        PROMPT_ENHANCE_WORKFLOW: ("enhance", PRESET_SYSTEM_PROMPTS["enhance"]),
+        PROMPT_THEME_WORKFLOW: ("create_from_theme", PRESET_SYSTEM_PROMPTS["create_from_theme"]),
+    }
+    for workflow_path, (mode, system_prompt) in cases.items():
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        creator = _nodes_by_type(workflow, "CcCKrea2EditPromptCreator")[0]
+        assert creator["widgets_values"][0] == mode
+        assert creator["widgets_values"][2] == system_prompt
+
+    custom = json.loads(PROMPT_CUSTOM_WORKFLOW.read_text(encoding="utf-8"))
+    creator = _nodes_by_type(custom, "CcCKrea2EditPromptCreator")[0]
+    assert creator["widgets_values"][0] == "custom"
+    assert creator["widgets_values"][2].strip()
+
+
+def test_all_test_workflows_disable_body_swap_by_default():
+    for workflow_path in ALL_WORKFLOWS:
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        for stack in _nodes_by_type(workflow, "CcCKrea2LoRAStack"):
+            values = stack.get("widgets_values") or []
+            for index in range(2, len(values) - 2, 3):
+                enabled, name = values[index], values[index + 1]
+                if name == "bfs_body_swap_v1_krea2.safetensors":
+                    assert enabled is False, f"{workflow_path} enables BodySwap by default"
+
+
+def test_edit_option_workflows_cover_fit_and_semantic_modes():
+    crop = json.loads(EDIT_CROP_WORKFLOW.read_text(encoding="utf-8"))
+    contain = json.loads(EDIT_CONTAIN_WORKFLOW.read_text(encoding="utf-8"))
+    assert {node["widgets_values"][1] for node in _nodes_by_type(crop, "CcCKrea2VisualReference")} == {"crop"}
+    assert {node["widgets_values"][1] for node in _nodes_by_type(contain, "CcCKrea2VisualReference")} == {"contain"}
+
+    semantic_cases = {
+        EDIT_SEMANTIC_WORKFLOW: ("semantic_only", "full"),
+        EDIT_STYLE_DIRECT_WORKFLOW: ("style_direct", "2x2"),
+        EDIT_STYLE_INDIRECT_WORKFLOW: ("style_indirect", "4x4"),
+    }
+    for workflow_path, expected in semantic_cases.items():
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        node = _nodes_by_type(workflow, "CcCKrea2SemanticReference")[0]
+        assert node["mode"] == 0
+        assert (node["widgets_values"][0], node["widgets_values"][3]) == expected
+        assert not _nodes_by_type(workflow, "CcCKrea2EditPromptCreator")
+
+
+def test_paint_option_workflows_cover_outpaint_crop_and_no_kv_cache():
+    outpaint = json.loads(PAINT_OUTPAINT_WORKFLOW.read_text(encoding="utf-8"))
+    prepare = _nodes_by_type(outpaint, "CcCKrea2PaintPrepare")[0]
+    assert prepare["widgets_values"][:8] == [
+        "pad", "reflect", "center", "center", 256, 256, 256, 256
+    ]
+    mask_input = next(item for item in prepare["inputs"] if item["name"] == "mask")
+    assert mask_input["link"] is None
+
+    crop = json.loads(PAINT_CROP_WORKFLOW.read_text(encoding="utf-8"))
+    prepare = _nodes_by_type(crop, "CcCKrea2PaintPrepare")[0]
+    assert prepare["widgets_values"][0] == "crop"
+    assert prepare["widgets_values"][2:4] == ["right", "bottom"]
+    assert prepare["widgets_values"][8:13] == [True, 8, "standard", 6, "both"]
+
+    no_kv = json.loads(PAINT_NO_KV_WORKFLOW.read_text(encoding="utf-8"))
+    paint = _nodes_by_type(no_kv, "CcCKrea2Paint")[0]
+    assert paint["widgets_values"][1:] == [True, False]
+
+
 def test_all_workflow_link_types_are_consistent():
-    for workflow_path in (
-        EDIT_WORKFLOW,
-        PAINT_WORKFLOW,
-        REGIONAL_WORKFLOW,
-        CHARACTER_SHEET_WORKFLOW,
-        PROMPT_CREATOR_WORKFLOW,
-        T2I_WORKFLOW,
-    ):
+    for workflow_path in ALL_WORKFLOWS:
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         nodes = {node["id"]: node for node in workflow["nodes"]}
 
@@ -374,14 +459,7 @@ def test_all_workflows_use_only_current_public_ccc_nodes():
 
     from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 
-    for workflow_path in (
-        EDIT_WORKFLOW,
-        PAINT_WORKFLOW,
-        REGIONAL_WORKFLOW,
-        CHARACTER_SHEET_WORKFLOW,
-        PROMPT_CREATOR_WORKFLOW,
-        T2I_WORKFLOW,
-    ):
+    for workflow_path in ALL_WORKFLOWS:
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         types = {node["type"] for node in workflow["nodes"]}
         assert not (types & removed)
