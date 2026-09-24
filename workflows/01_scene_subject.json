@@ -185,7 +185,7 @@
         true,
         "krea2_identity_edit_v1_2.safetensors",
         1,
-        true,
+        false,
         "bfs_body_swap_v1_krea2.safetensors",
         0.35,
         false,
