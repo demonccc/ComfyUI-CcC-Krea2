@@ -1,0 +1,661 @@
+"""Krea2 CcC Edit runtime using conditioning-transported reference latents.
+
+Reference latents, fit flags, boosts and RoPE placement travel with CONDITIONING.
+"""
+
+import math
+from typing import Any, Dict, List, Optional, Tuple
+
+import torch
+import torch.nn.functional as F
+from einops import rearrange
+
+
+def _conditioning_set_values(conditioning: List[Any], values: Dict[str, Any]) -> List[Any]:
+    """Set conditioning metadata with a lightweight fallback for isolated tests."""
+    if not conditioning:
+        return conditioning
+    try:
+        import node_helpers
+
+        return node_helpers.conditioning_set_values(conditioning, values)
+    except (ImportError, AttributeError):
+        updated = []
+        for entry in conditioning:
+            if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                extras = dict(entry[1]) if isinstance(entry[1], dict) else {}
+                extras.update(values)
+                updated.append([entry[0], extras])
+            else:
+                updated.append(entry)
+        return updated
+
+
+def attach_reference_runtime_to_conditioning(
+    conditioning: List[Any],
+    reference_count: int,
+    rope_positions: Optional[List[str]] = None,
+    reference_boosts: Optional[List[float]] = None,
+    reference_target_regions: Optional[List[Any]] = None,
+    reference_attention_scopes: Optional[List[str]] = None,
+) -> List[Any]:
+    """Attach fit, RoPE, boosts and target-region metadata for visual references."""
+    if reference_count <= 0:
+        return conditioning
+    values: Dict[str, Any] = {
+        "reference_fit": [True] * reference_count,
+        "reference_rope_positions": list(rope_positions or ["none"] * reference_count),
+    }
+    if reference_boosts is not None and any(float(v) != 1.0 for v in reference_boosts):
+        values["reference_boosts"] = [float(v) for v in reference_boosts]
+    if reference_target_regions is not None:
+        values["reference_target_regions"] = list(reference_target_regions)
+    if reference_attention_scopes is not None:
+        values["reference_attention_scopes"] = list(reference_attention_scopes)
+    return _conditioning_set_values(conditioning, values)
+
+
+def _prepare_reference_latent_for_model(model: Any, latent: torch.Tensor) -> torch.Tensor:
+    """Normalize an image reference to Krea2/Wan's 5D latent contract before process_latent_in.
+
+    VAE image encoders commonly return B,C,H,W. Krea2 uses a Wan latent format whose channel
+    normalization tensors are B,C,T,H,W. Passing a 4D image latent directly into that
+    normalization can broadcast the channel axis into a bogus temporal dimension. Image
+    references therefore get an explicit singleton T axis before model latent scaling.
+    Existing 5D references are preserved unchanged.
+    """
+    if not torch.is_tensor(latent):
+        raise TypeError(
+            f"[Krea2 CcC Edit] Reference latent must be a torch.Tensor, got {type(latent).__name__}."
+        )
+    if latent.ndim == 4:
+        latent = latent.unsqueeze(2)
+    elif latent.ndim != 5:
+        raise ValueError(
+            "[Krea2 CcC Edit] Reference latent must be B,C,H,W or B,C,T,H,W; "
+            f"received shape {tuple(latent.shape)}."
+        )
+    return model.process_latent_in(latent)
+
+
+def install_krea2_reference_conditioning() -> None:
+    """Teach ComfyUI Krea2 to forward reference metadata from CONDITIONING to the DiT wrapper."""
+    try:
+        import comfy.conds
+        import comfy.model_base
+    except (ImportError, AttributeError):
+        return
+
+    krea2_cls = getattr(comfy.model_base, "Krea2", None)
+    if krea2_cls is None or getattr(krea2_cls, "_ccc_krea2_reference_conditioning_patched", False):
+        return
+
+    original_extra_conds = krea2_cls.extra_conds
+    original_extra_shapes = getattr(krea2_cls, "extra_conds_shapes", None)
+
+    def _ccc_krea2_extra_conds(self, **kwargs):
+        out = original_extra_conds(self, **kwargs)
+
+        ref_latents = kwargs.get("reference_latents")
+        if ref_latents is not None:
+            out["ref_latents"] = comfy.conds.CONDList(
+                [_prepare_reference_latent_for_model(self, lat) for lat in ref_latents]
+            )
+
+        ref_boosts = kwargs.get("reference_boosts")
+        if ref_boosts is not None:
+            out["ref_boosts"] = comfy.conds.CONDConstant(list(ref_boosts))
+
+        ref_fit = kwargs.get("reference_fit")
+        if ref_fit is not None:
+            out["ref_fit"] = comfy.conds.CONDConstant(list(ref_fit))
+
+        rope_positions = kwargs.get("reference_rope_positions")
+        if rope_positions is not None:
+            out["ccc_ref_rope_positions"] = comfy.conds.CONDConstant(list(rope_positions))
+
+        target_regions = kwargs.get("reference_target_regions")
+        if target_regions is not None:
+            out["ccc_ref_target_regions"] = comfy.conds.CONDConstant(list(target_regions))
+
+        attention_scopes = kwargs.get("reference_attention_scopes")
+        if attention_scopes is not None:
+            out["ccc_ref_attention_scopes"] = comfy.conds.CONDConstant(list(attention_scopes))
+
+        return out
+
+    krea2_cls.extra_conds = _ccc_krea2_extra_conds
+
+    if original_extra_shapes is not None:
+
+        def _ccc_krea2_extra_conds_shapes(self, **kwargs):
+            out = original_extra_shapes(self, **kwargs)
+            ref_latents = kwargs.get("reference_latents")
+            if ref_latents is not None:
+                out["ref_latents"] = [1, 16, sum(math.prod(lat.size()[2:]) for lat in ref_latents)]
+            return out
+
+        krea2_cls.extra_conds_shapes = _ccc_krea2_extra_conds_shapes
+
+    krea2_cls._ccc_krea2_reference_conditioning_patched = True
+
+
+def _normalize_runtime_list(value: Any, count: int, default: Any) -> List[Any]:
+    if count <= 0:
+        return []
+    if value is None:
+        return [default] * count
+    if torch.is_tensor(value):
+        raw = value.detach().flatten().tolist()
+    elif isinstance(value, (list, tuple)):
+        raw = list(value)
+    else:
+        raw = [value]
+    if len(raw) < count:
+        raw = [default] * (count - len(raw)) + raw
+    elif len(raw) > count:
+        raw = raw[-count:]
+    return raw
+
+
+def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> bool:
+    """Check whether a model patcher already carries a Krea2 CcC Edit runtime marker/wrapper."""
+    if getattr(model, "_ccc_patch_key", None) == patch_key:
+        return True
+    if hasattr(model, "wrappers"):
+        wrappers = getattr(model, "wrappers", {})
+        if isinstance(wrappers, dict):
+            for value in wrappers.values():
+                if isinstance(value, dict) and patch_key in value:
+                    return True
+                if isinstance(value, list):
+                    for wrapper in value:
+                        if getattr(wrapper, "wrapper_key", "") == patch_key:
+                            return True
+    if hasattr(model, "model_options"):
+        options = getattr(model, "model_options", {})
+        wrappers = options.get("transformer_options", {}).get("wrappers", {}) if isinstance(options, dict) else {}
+        if isinstance(wrappers, dict):
+            for value in wrappers.values():
+                if isinstance(value, dict) and patch_key in value:
+                    return True
+    return False
+
+
+def patch_krea2_model(model: Any) -> Any:
+    """Clone MODEL and register the Krea2 CcC Edit runtime wrapper that consumes references from CONDITIONING."""
+    if is_model_already_patched(model, "ccc_krea2_edit"):
+        raise RuntimeError(
+            "[Krea2 CcC Edit] Input MODEL is already patched by Krea2 CcC Edit. Connect Edit to the unpatched upstream MODEL."
+        )
+
+    install_krea2_reference_conditioning()
+    patched_model = model.clone()
+    patched_model._ccc_patch_key = "ccc_krea2_edit"
+
+    def krea2_edit_wrapper(
+        executor: Any,
+        x: torch.Tensor,
+        timesteps: torch.Tensor,
+        context: torch.Tensor,
+        *wargs: Any,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        dit_model = getattr(executor, "class_obj", None)
+
+        # ComfyUI signature drift: older cores call
+        #   (..., attention_mask, transformer_options)
+        # while newer Krea2 cores may call
+        #   (..., attention_mask, ref_latents, transformer_options).
+        # Prefer explicit conditioning kwargs, otherwise recover the positional ref list.
+        ref_latents = kwargs.get("ref_latents")
+        if ref_latents is None:
+            drift = list(wargs)
+            if drift and isinstance(drift[-1], dict):
+                drift.pop()
+            if len(drift) >= 2 and isinstance(drift[1], (list, tuple)):
+                candidate = drift[1]
+                if all(torch.is_tensor(item) for item in candidate):
+                    ref_latents = list(candidate)
+        ref_latents = list(ref_latents or [])
+
+        if dit_model is None or not ref_latents:
+            fallback_kwargs = dict(kwargs)
+            for key in (
+                "ref_latents", "ref_boosts", "ref_fit", "ccc_ref_rope_positions",
+                "ccc_ref_target_regions", "ccc_ref_attention_scopes",
+            ):
+                fallback_kwargs.pop(key, None)
+            return executor(x, timesteps, context, *wargs, **fallback_kwargs)
+
+        transformer_options = kwargs.get("transformer_options")
+        if transformer_options is None and wargs and isinstance(wargs[-1], dict):
+            transformer_options = wargs[-1]
+        if transformer_options is None:
+            transformer_options = {}
+
+        count = len(ref_latents)
+        boosts = [float(v) for v in _normalize_runtime_list(kwargs.get("ref_boosts"), count, 1.0)]
+        fit_flags = [bool(v) for v in _normalize_runtime_list(kwargs.get("ref_fit"), count, False)]
+        rope_positions = [
+            str(v)
+            for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
+        ]
+        target_regions = _normalize_runtime_list(kwargs.get("ccc_ref_target_regions"), count, None)
+        attention_scopes = [
+            str(v)
+            for v in _normalize_runtime_list(kwargs.get("ccc_ref_attention_scopes"), count, "global")
+        ]
+
+        return krea2_dit_incontext_forward(
+            dit_model=dit_model,
+            x=x,
+            timesteps=timesteps,
+            context=context,
+            ref_latents=ref_latents,
+            ref_boosts=boosts,
+            ref_fit=fit_flags,
+            ref_rope_positions=rope_positions,
+            ref_target_regions=target_regions,
+            ref_attention_scopes=attention_scopes,
+            transformer_options=transformer_options,
+        )
+
+    _register_wrapper(patched_model, krea2_edit_wrapper)
+    return patched_model
+
+
+def _register_wrapper(patched_model: Any, wrapper: Any) -> None:
+    registered = False
+    wrapper_type: Any = "diffusion_model"
+    try:
+        import comfy.patcher_extension
+
+        wrapper_type = comfy.patcher_extension.WrappersMP.DIFFUSION_MODEL
+    except Exception:
+        pass
+
+    if hasattr(patched_model, "add_wrapper_with_key"):
+        try:
+            patched_model.add_wrapper_with_key(wrapper_type, "ccc_krea2_edit", wrapper)
+            registered = True
+        except TypeError:
+            try:
+                patched_model.add_wrapper_with_key("ccc_krea2_edit", wrapper)
+                registered = True
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    if not registered:
+        if not hasattr(patched_model, "model_options"):
+            patched_model.model_options = {}
+        wrappers = patched_model.model_options.setdefault("transformer_options", {}).setdefault("wrappers", {})
+        key = str(wrapper_type)
+        value = wrappers.setdefault(key, {})
+        if isinstance(value, dict):
+            value["ccc_krea2_edit"] = [wrapper]
+        elif isinstance(value, list):
+            value.append(wrapper)
+
+
+def _pad_to_patch_size(tensor: torch.Tensor, patch_size: int) -> torch.Tensor:
+    try:
+        from comfy.ldm.common_dit import pad_to_patch_size
+
+        return pad_to_patch_size(tensor, (patch_size, patch_size), padding_mode="replicate")
+    except (ImportError, AttributeError):
+        h, w = tensor.shape[-2:]
+        pad_h = (patch_size - h % patch_size) % patch_size
+        pad_w = (patch_size - w % patch_size) % patch_size
+        return F.pad(tensor, (0, pad_w, 0, pad_h), mode="replicate") if pad_h or pad_w else tensor
+
+
+def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
+    try:
+        from comfy.utils import repeat_to_batch_size
+
+        return repeat_to_batch_size(tensor, target_bs)
+    except (ImportError, AttributeError):
+        if tensor.shape[0] == target_bs:
+            return tensor
+        if tensor.shape[0] > target_bs:
+            return tensor[:target_bs]
+        return tensor[:1].expand(target_bs, *tensor.shape[1:])
+
+
+def _fit_latent(src: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """Crop to target aspect ratio then resize in latent space when a reference cannot keep its own grid."""
+    sh, sw = src.shape[-2:]
+    if (sh, sw) == (height, width):
+        return src
+    scale = max(height / sh, width / sw)
+    crop_h = min(sh, int(round(height / scale)))
+    crop_w = min(sw, int(round(width / scale)))
+    y0 = (sh - crop_h) // 2
+    x0 = (sw - crop_w) // 2
+    src = src[..., y0:y0 + crop_h, x0:x0 + crop_w]
+    return F.interpolate(src.float(), size=(height, width), mode="bilinear")
+
+
+def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
+    try:
+        from comfy.ldm.flux.layers import timestep_embedding
+
+        return timestep_embedding(timesteps, dim, max_period=max_period)
+    except (ImportError, AttributeError):
+        half = dim // 2
+        freqs = torch.exp(
+            -math.log(max_period) * torch.arange(half, dtype=torch.float32, device=timesteps.device) / half
+        )
+        args = timesteps[:, None].float() * freqs[None]
+        emb = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+        return torch.cat([emb, torch.zeros_like(emb[:, :1])], dim=-1) if dim % 2 else emb
+
+
+def _mask_to_flat(
+    spatial_mask: torch.Tensor,
+    grid_h: int,
+    grid_w: int,
+    mode: str,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    mask = spatial_mask[:1].float()
+    if mask.ndim == 2:
+        mask = mask.unsqueeze(0).unsqueeze(0)
+    elif mask.ndim == 3:
+        mask = mask.unsqueeze(1)
+    mask = F.interpolate(mask, size=(grid_h, grid_w), mode="nearest")[0, 0]
+    if mode == "hard":
+        mask = (mask > 0.5).float()
+    else:
+        mask = mask.clamp(0.0, 1.0)
+    return mask.reshape(-1).to(device=device, dtype=dtype)
+
+
+def _target_region_box_mask(
+    box: Any,
+    target_grid: Tuple[int, int],
+    device: torch.device,
+    dtype: torch.dtype,
+) -> Optional[torch.Tensor]:
+    if box is None:
+        return None
+    if not isinstance(box, (tuple, list)) or len(box) != 4:
+        raise ValueError(f"[Krea2 CcC Edit] Invalid target attention region: {box!r}")
+    x0, y0, x1, y1 = [float(v) for v in box]
+    if not (0.0 <= x0 < x1 <= 1.0 and 0.0 <= y0 < y1 <= 1.0):
+        raise ValueError(f"[Krea2 CcC Edit] Target attention region must be normalized, got {box!r}")
+
+    gh, gw = target_grid
+    ix0 = max(0, min(gw - 1, int(math.floor(x0 * gw))))
+    iy0 = max(0, min(gh - 1, int(math.floor(y0 * gh))))
+    ix1 = max(ix0 + 1, min(gw, int(math.ceil(x1 * gw))))
+    iy1 = max(iy0 + 1, min(gh, int(math.ceil(y1 * gh))))
+
+    mask = torch.zeros((1, gh, gw), device=device, dtype=dtype)
+    mask[:, iy0:iy1, ix0:ix1] = 1.0
+    return mask
+
+
+def _compute_ref_attention_bias_patchified(
+    boosts: List[float],
+    txt_len: int,
+    ref_token_lens: List[int],
+    tgt_len: int,
+    ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
+    ref_token_grids: Optional[List[Tuple[int, int]]] = None,
+    mask_modes: Optional[List[str]] = None,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None,
+    masked_boosts: Optional[List[float]] = None,
+    ref_target_masks: Optional[List[Optional[torch.Tensor]]] = None,
+    ref_attention_scopes: Optional[List[str]] = None,
+    target_grid: Optional[Tuple[int, int]] = None,
+) -> Optional[torch.Tensor]:
+    """Build target-to-reference bias with optional target-region ownership."""
+    del masked_boosts
+    if not boosts:
+        return None
+    device = device or torch.device("cpu")
+    dtype = dtype or torch.float32
+    ref_masks = list(ref_masks or [None] * len(boosts))
+    ref_target_masks = list(ref_target_masks or [None] * len(boosts))
+    ref_token_grids = list(ref_token_grids or [(1, n) for n in ref_token_lens])
+    mask_modes = list(mask_modes or ["hard"] * len(boosts))
+    ref_attention_scopes = list(ref_attention_scopes or ["global"] * len(boosts))
+
+    offsets = [txt_len]
+    for length in ref_token_lens:
+        offsets.append(offsets[-1] + length)
+    target_start = offsets[-1]
+    seq_len = target_start + tgt_len
+    bias = torch.zeros((1, 1, seq_len, seq_len), device=device, dtype=dtype)
+
+    any_effect = False
+    for index, boost in enumerate(boosts):
+        ref_start = offsets[index]
+        ref_end = ref_start + ref_token_lens[index]
+        boost_log = math.log(max(float(boost), 1e-4))
+
+        gh, gw = ref_token_grids[index]
+        source_mask = ref_masks[index] if index < len(ref_masks) else None
+        if source_mask is None:
+            ref_weight = torch.ones(ref_token_lens[index], device=device, dtype=dtype)
+        else:
+            ref_weight = _mask_to_flat(
+                source_mask,
+                gh,
+                gw,
+                mask_modes[index] if index < len(mask_modes) else "hard",
+                device,
+                dtype,
+            )
+
+        scope = ref_attention_scopes[index] if index < len(ref_attention_scopes) else "global"
+        if scope not in ("global", "boost in region", "only in region"):
+            raise ValueError(f"[Krea2 CcC Edit] Invalid reference attention scope '{scope}'.")
+
+        target_mask = ref_target_masks[index] if index < len(ref_target_masks) else None
+        if scope == "global":
+            target_weight = torch.ones(tgt_len, device=device, dtype=dtype)
+        else:
+            if target_mask is None:
+                raise ValueError(
+                    f"[Krea2 CcC Edit] attention scope '{scope}' requires a resolved target region."
+                )
+            if target_grid is None:
+                raise ValueError("[Krea2 CcC Edit] regional attention requires target_grid.")
+            target_weight = _mask_to_flat(
+                target_mask,
+                target_grid[0],
+                target_grid[1],
+                "hard",
+                device,
+                dtype,
+            )
+            if target_weight.numel() != tgt_len:
+                raise ValueError(
+                    "[Krea2 CcC Edit] target attention region does not match the target token grid."
+                )
+
+        if boost_log != 0.0:
+            outer = target_weight.view(-1, 1) * ref_weight.view(1, -1)
+            bias[:, :, target_start:, ref_start:ref_end] += boost_log * outer.view(
+                1, 1, tgt_len, ref_token_lens[index]
+            )
+            any_effect = True
+        elif source_mask is not None:
+            any_effect = True
+
+        if scope == "only in region":
+            outside = target_weight <= 0.5
+            target_to_ref = bias[:, :, target_start:, ref_start:ref_end]
+            target_to_ref.masked_fill_(outside.view(1, 1, -1, 1), float("-inf"))
+            any_effect = True
+
+    return bias if any_effect else None
+
+def _build_incontext_3d_rope_pos_ids(
+    batch_size: int,
+    txt_len: int,
+    ref_token_grids: List[Tuple[int, int]],
+    target_grid: Tuple[int, int],
+    device: torch.device,
+    ref_rope_positions: Optional[List[str]] = None,
+) -> torch.Tensor:
+    """Default Identity Edit centered positions; modular Edit can replace this helper."""
+    tgt_h, tgt_w = target_grid
+    parts = [torch.zeros((txt_len, 3), device=device, dtype=torch.float32)] if txt_len else []
+    for index, (ref_h, ref_w) in enumerate(ref_token_grids):
+        y0 = max(0.0, (tgt_h - ref_h) / 2.0)
+        x0 = max(0.0, (tgt_w - ref_w) / 2.0)
+        ys = torch.arange(ref_h, device=device, dtype=torch.float32) + y0
+        xs = torch.arange(ref_w, device=device, dtype=torch.float32) + x0
+        yy, xx = torch.meshgrid(ys, xs, indexing="ij")
+        tt = torch.full_like(yy, float(index + 1))
+        parts.append(torch.stack([tt.flatten(), yy.flatten(), xx.flatten()], dim=-1))
+    ys = torch.arange(tgt_h, device=device, dtype=torch.float32)
+    xs = torch.arange(tgt_w, device=device, dtype=torch.float32)
+    yy, xx = torch.meshgrid(ys, xs, indexing="ij")
+    parts.append(torch.stack([torch.zeros_like(yy).flatten(), yy.flatten(), xx.flatten()], dim=-1))
+    return torch.cat(parts, dim=0).unsqueeze(0).repeat(batch_size, 1, 1)
+
+
+def krea2_dit_incontext_forward(
+    dit_model: Any,
+    x: torch.Tensor,
+    timesteps: torch.Tensor,
+    context: torch.Tensor,
+    ref_latents: List[torch.Tensor],
+    ref_boosts: Optional[List[float]] = None,
+    transformer_options: Optional[Dict[str, Any]] = None,
+    ref_fit: Optional[List[bool]] = None,
+    ref_rope_positions: Optional[List[str]] = None,
+    ref_target_regions: Optional[List[Any]] = None,
+    ref_attention_scopes: Optional[List[str]] = None,
+) -> torch.Tensor:
+    """In-context Krea2 forward with optional Krea2 CcC Edit RoPE displacement."""
+    transformer_options = transformer_options or {}
+    n_refs = len(ref_latents)
+    boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
+    fit_flags = [bool(v) for v in _normalize_runtime_list(ref_fit, n_refs, True)]
+    rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
+    target_regions = _normalize_runtime_list(ref_target_regions, n_refs, None)
+    attention_scopes = [str(v) for v in _normalize_runtime_list(ref_attention_scopes, n_refs, "global")]
+
+    temporal = x.ndim == 5
+    if temporal:
+        batch5, channels5, frames5, height5, width5 = x.shape
+        x = x.reshape(batch5 * frames5, channels5, height5, width5)
+
+    batch, _, original_h, original_w = x.shape
+    patch_size = getattr(dit_model, "patch", 2)
+    if not isinstance(patch_size, int):
+        patch_size = getattr(patch_size, "patch_size", 2)
+
+    x = _pad_to_patch_size(x, patch_size)
+    height, width = x.shape[-2:]
+    target_gh, target_gw = height // patch_size, width // patch_size
+
+    sources = []
+    for index, source in enumerate(ref_latents):
+        src = source.to(device=x.device, dtype=x.dtype)
+        if src.ndim == 5:
+            sb, sc, st, sh, sw = src.shape
+            src = src.reshape(sb * st, sc, sh, sw)
+        src = _repeat_to_batch_size(src, batch)
+        keep_own_grid = fit_flags[index] and src.shape[-2] <= height and src.shape[-1] <= width
+        if src.shape[-2:] != (height, width) and not keep_own_grid:
+            src = _fit_latent(src, height, width).to(x.dtype)
+        sources.append(_pad_to_patch_size(src, patch_size))
+
+    context = dit_model._unpack_context(context)
+    target_tokens = rearrange(
+        x, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=patch_size, pw=patch_size
+    )
+    target_tokens = dit_model.first(target_tokens)
+    source_tokens = [
+        dit_model.first(
+            rearrange(src, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=patch_size, pw=patch_size)
+        )
+        for src in sources
+    ]
+
+    t_emb = _timestep_embedding(timesteps, getattr(dit_model, "tdim", 256)).unsqueeze(1).to(target_tokens.dtype)
+    t = dit_model.tmlp(t_emb)
+    tvec = dit_model.tproj(t)
+
+    context = dit_model.txtfusion(context, mask=None, transformer_options=transformer_options)
+    context = dit_model.txtmlp(context)
+
+    txt_len = context.shape[1]
+    target_len = target_tokens.shape[1]
+    source_lens = [tokens.shape[1] for tokens in source_tokens]
+    source_len = sum(source_lens)
+    combined = torch.cat([context] + source_tokens + [target_tokens], dim=1)
+
+    source_grids = [(src.shape[-2] // patch_size, src.shape[-1] // patch_size) for src in sources]
+    pos = _build_incontext_3d_rope_pos_ids(
+        batch_size=batch,
+        txt_len=txt_len,
+        ref_token_grids=source_grids,
+        target_grid=(target_gh, target_gw),
+        ref_rope_positions=rope_positions,
+        device=combined.device,
+    )
+    freqs = dit_model.pe_embedder(pos)
+
+    target_region_masks = [
+        _target_region_box_mask(
+            box,
+            target_grid=(target_gh, target_gw),
+            device=combined.device,
+            dtype=combined.dtype,
+        )
+        for box in target_regions
+    ]
+    attn_bias = _compute_ref_attention_bias_patchified(
+        boosts=boosts,
+        txt_len=txt_len,
+        ref_token_lens=source_lens,
+        tgt_len=target_len,
+        ref_token_grids=source_grids,
+        ref_target_masks=target_region_masks,
+        ref_attention_scopes=attention_scopes,
+        target_grid=(target_gh, target_gw),
+        device=combined.device,
+        dtype=combined.dtype,
+    )
+
+    total_blocks = len(dit_model.blocks)
+    total_ref_len = source_len
+    for block_index, block in enumerate(dit_model.blocks):
+        # Preserve the current ComfyUI Krea2 transformer metadata contract while keeping the
+        # Identity Edit sequence order [text | refs | target]. This matters for attention patches
+        # that consume img_slice/block_index without changing reference semantics.
+        block_options = transformer_options.copy()
+        block_options["total_blocks"] = total_blocks
+        block_options["block_type"] = "single"
+        block_options["img_slice"] = [slice(txt_len + total_ref_len, None)]
+        block_options["block_index"] = block_index
+        combined = block(combined, tvec, freqs, attn_bias, transformer_options=block_options)
+
+    final = dit_model.last(combined, t)
+    output = final[:, txt_len + source_len:txt_len + source_len + target_len]
+    output = rearrange(
+        output,
+        "b (h w) (c ph pw) -> b c (h ph) (w pw)",
+        h=target_gh,
+        w=target_gw,
+        ph=patch_size,
+        pw=patch_size,
+        c=dit_model.channels,
+    )
+    output = output[:, :, :original_h, :original_w]
+
+    if temporal:
+        output = output.reshape(batch5, frames5, dit_model.channels, original_h, original_w).movedim(1, 2)
+    return output

@@ -1,0 +1,935 @@
+{
+  "last_node_id": 17,
+  "last_link_id": 24,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "Neutrino_v2_base_nvfp4_svd.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        0,
+        150
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            4,
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+        "krea2",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        0,
+        300
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            10,
+            14,
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "CcCKrea2LoRAStack",
+      "pos": [
+        350,
+        0
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "prompt_augmentation",
+          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LoRAStack"
+      },
+      "widgets_values": [
+        true,
+        1,
+        true,
+        "krea2_identity_edit_v1_2.safetensors",
+        1,
+        false,
+        "bfs_body_swap_v1_krea2.safetensors",
+        0.35,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        0,
+        560
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2,
+            11
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "white_dog.jpg"
+      ],
+      "title": "Subject Visual Reference"
+    },
+    {
+      "id": 7,
+      "type": "CcCKrea2VisualReference",
+      "pos": [
+        380,
+        560
+      ],
+      "size": [
+        430,
+        430
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "visual_references",
+          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2VisualReference"
+      },
+      "widgets_values": [
+        4,
+        "resize",
+        "inside",
+        "center",
+        "center",
+        "lanczos",
+        true,
+        true,
+        768,
+        "lanczos",
+        "This is the subject image.",
+        "global",
+        ""
+      ],
+      "title": "Subject Visual Reference"
+    },
+    {
+      "id": 8,
+      "type": "CcCKrea2EditPromptCreator",
+      "pos": [
+        860,
+        540
+      ],
+      "size": [
+        560,
+        680
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        },
+        {
+          "name": "visual_references",
+          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "created_prompt",
+          "type": "STRING",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "visual_references",
+          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "creator_info",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "thinking",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2EditPromptCreator"
+      },
+      "widgets_values": [
+        "custom",
+        "Use the subject from Image 1 as a heroic explorer in a misty mountain landscape.",
+        "Create a clear English I2I prompt for Krea2 Edit from the user's instructions and the available visual context. Preserve the user's intent and describe the desired final image directly. Return only one plain-text paragraph.",
+        true,
+        2048,
+        0.25,
+        0.9,
+        0
+      ],
+      "title": "Prompt Creator - custom"
+    },
+    {
+      "id": 10,
+      "type": "CcCKrea2Latent",
+      "pos": [
+        970,
+        1070
+      ],
+      "size": [
+        540,
+        520
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 10
+        },
+        {
+          "name": "dimensions_image",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "latent_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Latent"
+      },
+      "widgets_values": [
+        "from_image",
+        1024,
+        1024,
+        "1024 x 1024 | 1:1 | ~1.05 MP",
+        "preserve_aspect_krea_bounds",
+        "empty",
+        "crop",
+        "auto",
+        false,
+        "",
+        768,
+        1
+      ],
+      "title": "Target Dimensions From Reference Image - Empty Content"
+    },
+    {
+      "id": 11,
+      "type": "CcCKrea2Edit",
+      "pos": [
+        1480,
+        0
+      ],
+      "size": [
+        650,
+        400
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 12
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 13
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 14
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "link": 15
+        },
+        {
+          "name": "positive_prompt",
+          "type": "STRING",
+          "link": 7,
+          "widget": {
+            "name": "positive_prompt"
+          }
+        },
+        {
+          "name": "visual_references",
+          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            16
+          ]
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            19
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            20
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        },
+        {
+          "name": "edit_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Edit"
+      },
+      "widgets_values": [
+        "",
+        true
+      ],
+      "title": "Krea2 Edit"
+    },
+    {
+      "id": 12,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        2200,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingAuraFlow"
+      },
+      "widgets_values": [
+        1.15
+      ]
+    },
+    {
+      "id": 13,
+      "type": "BlackwellAttentionFix",
+      "pos": [
+        2550,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BlackwellAttentionFix"
+      },
+      "widgets_values": [
+        "pytorch"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "KSampler",
+      "pos": [
+        2900,
+        0
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 18
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 19
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 20
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        0,
+        "randomize",
+        8,
+        1,
+        "euler",
+        "beta",
+        1
+      ]
+    },
+    {
+      "id": 15,
+      "type": "VAEDecode",
+      "pos": [
+        3250,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 22
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 16,
+      "type": "SaveImage",
+      "pos": [
+        3600,
+        0
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 24
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "CcCKrea2_PromptCreator_custom"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "Note",
+      "pos": [
+        1460,
+        460
+      ],
+      "size": [
+        1020,
+        540
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "Note"
+      },
+      "widgets_values": [
+        "Prompt Creator custom-mode test. system_prompt is intentionally editable and contains a compact custom contract. This is not a built-in preset, but is included to exercise the fourth public Prompt Creator mode. BodySwap is disabled."
+      ],
+      "title": "Workflow Notes"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      5,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      7,
+      0,
+      8,
+      1,
+      "KREA2_VISUAL_REFERENCE_CHAIN"
+    ],
+    [
+      4,
+      2,
+      0,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      6,
+      8,
+      1,
+      11,
+      5,
+      "KREA2_VISUAL_REFERENCE_CHAIN"
+    ],
+    [
+      7,
+      8,
+      0,
+      11,
+      4,
+      "STRING"
+    ],
+    [
+      10,
+      3,
+      0,
+      10,
+      0,
+      "VAE"
+    ],
+    [
+      11,
+      5,
+      0,
+      10,
+      1,
+      "IMAGE"
+    ],
+    [
+      12,
+      4,
+      0,
+      11,
+      0,
+      "MODEL"
+    ],
+    [
+      13,
+      2,
+      0,
+      11,
+      1,
+      "CLIP"
+    ],
+    [
+      14,
+      3,
+      0,
+      11,
+      2,
+      "VAE"
+    ],
+    [
+      15,
+      10,
+      0,
+      11,
+      3,
+      "LATENT"
+    ],
+    [
+      16,
+      11,
+      0,
+      12,
+      0,
+      "MODEL"
+    ],
+    [
+      17,
+      12,
+      0,
+      13,
+      0,
+      "MODEL"
+    ],
+    [
+      18,
+      13,
+      0,
+      14,
+      0,
+      "MODEL"
+    ],
+    [
+      19,
+      11,
+      1,
+      14,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      20,
+      11,
+      2,
+      14,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      21,
+      11,
+      3,
+      14,
+      3,
+      "LATENT"
+    ],
+    [
+      22,
+      14,
+      0,
+      15,
+      0,
+      "LATENT"
+    ],
+    [
+      23,
+      3,
+      0,
+      15,
+      1,
+      "VAE"
+    ],
+    [
+      24,
+      15,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Models",
+      "bounding": [
+        -30,
+        -50,
+        720,
+        430
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Subject + Reference Edit Image",
+      "bounding": [
+        -30,
+        500,
+        850,
+        570
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Prompt Creator",
+      "bounding": [
+        820,
+        500,
+        620,
+        520
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Semantic Reference (Disabled)",
+      "bounding": [
+        380,
+        1030,
+        580,
+        460
+      ],
+      "color": "#7a5f2b"
+    },
+    {
+      "title": "Target Latent",
+      "bounding": [
+        930,
+        1030,
+        620,
+        600
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Krea2 CcC Edit",
+      "bounding": [
+        1440,
+        -50,
+        760,
+        500
+      ],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Sampling + Output",
+      "bounding": [
+        2160,
+        -50,
+        1800,
+        500
+      ],
+      "color": "#3f789e"
+    }
+  ],
+  "version": 0.4
+}
