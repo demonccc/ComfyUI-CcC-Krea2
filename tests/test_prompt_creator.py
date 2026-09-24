@@ -71,7 +71,7 @@ def test_prompt_creator_public_controls_and_output_compatibility():
     )
 
 
-def test_create_from_image_uses_detailed_preset_thinking_and_passthrough():
+def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     # thinking=True pre-fills the assistant turn with <think>, so decode starts with reasoning text.
     clip = _FakeClip(
         "The internal image has a seated subject, another person nearby, and a white bed.</think>"
@@ -105,8 +105,9 @@ def test_create_from_image_uses_detailed_preset_thinking_and_passthrough():
     assert clip.tokenize_kwargs["system_prompt"] == PRESET_SYSTEM_PROMPTS["create_from_image"]
     assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
     assert clip.tokenize_kwargs["llama_template"].count("<|image_pad|>") == 3
-    assert "Do not compress a visually rich reference situation" in clip.tokenize_kwargs["system_prompt"]
-    assert "other people in the scene" in clip.tokenize_kwargs["system_prompt"]
+    assert "authoritative visual blueprint" in clip.tokenize_kwargs["system_prompt"]
+    assert "direct description of the desired final image" in clip.tokenize_kwargs["system_prompt"]
+    assert "other people in the scene" not in clip.tokenize_kwargs["system_prompt"]
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
