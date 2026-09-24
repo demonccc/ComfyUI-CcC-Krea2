@@ -241,7 +241,7 @@ If generation ends inside an unfinished think block before producing a final pro
 
 ### Final prompt cleanup
 
-created_prompt is always post-processed before it reaches Edit:
+created_prompt is always post-processed before it reaches Edit. Visible references are named explicitly as `Image 1`, `Image 2`, and so on:
 
 - accidental meta preambles such as "You are a professional image editor..." / "Your task is..." are removed when possible;
 - an output consisting only of meta-instructions is rejected;
