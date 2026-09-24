@@ -202,28 +202,20 @@ The first three output slots remain compatible with the earlier node contract; t
 
 ### Mode and system_prompt behavior
 
-- enhance: rewrites an existing edit instruction without changing its intent.
-- create_from_image: requires reference_edit_image and builds a detailed prompt from its pose/action/interaction/environment/composition while keeping visible Image N references authoritative for identity/appearance.
-- create_from_theme: expands the user's theme into a detailed new situation while anchoring referenced subjects.
+- enhance: treats the user's instructions as the authoritative guide and uses available visual context to make the requested final image clearer without changing intent.
+- create_from_image: requires reference_edit_image and treats it as the authoritative visual blueprint for the desired result; the user's instructions decide what should be preserved, changed, emphasized, or adapted.
+- create_from_theme: treats the user's theme or idea as the authoritative creative direction and uses the available visual context to build a coherent final-image prompt.
 - custom: sends the editable system_prompt exactly as the Qwen system prompt.
 
 For enhance, create_from_image, and create_from_theme, the frontend shows the effective preset system_prompt in the text field but keeps it greyed/read-only. Selecting custom enables the same field for editing. When entering custom for the first time, the current preset becomes the starting text; an existing custom value is preserved when switching away and back.
 
 The backend does not trust the visible field for preset modes: it resolves the canonical preset by mode. In custom mode, it requires a non-empty system_prompt.
 
-### Detailed create_from_image behavior
+### Generalist preset behavior
 
-create_from_image explicitly asks Qwen not to collapse a visually rich reference into a short generic summary. When visible and relevant, it should describe:
+The built-in presets intentionally avoid hard-coding people, clothing, poses, objects, or other content-specific checklists. Prompt Creator analyzes the available visual context and follows the user's request, producing a direct description of the desired final image rather than explaining the edit operation.
 
-- exact action, pose, body orientation/position, limb placement, gaze, and interaction;
-- clothing/accessories when they belong to the requested situation;
-- other people, their distinguishing visible role, pose/action, relative position, and interaction;
-- important props/objects and spatial relationships;
-- environment and foreground/background layout;
-- framing, shot distance, viewpoint, camera angle, composition, and subject placement;
-- visible lighting and other scene-defining details.
-
-Explicit user constraints such as preserving identity, face, anatomy, body shape, body proportions, clothing, or interactions remain authoritative.
+For create_from_image, the reference edit image is the primary visual blueprint. The preset does not predefine which visual details are important; relevance is determined by the image and the user's instructions.
 
 ### Thinking
 
