@@ -221,12 +221,23 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## Example Workflows
 
-- workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit.
-- workflows/02_anypaint_remove_people.json — current three-node Paint path: Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — tagged regional attention with two identity references.
-- workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference.
-- workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator; the same reference image is wired to a Semantic Reference that is intentionally disabled/muted.
+- workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
+- workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
+- workflows/03_regional_attention.json — tagged regional attention with two identity references; BodySwap disabled by default.
+- workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference; BodySwap disabled by default.
+- workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
 - workflows/06_text_to_image.json — native Krea2 text-to-image path: Text to Image -> sampling -> VAE Decode -> SaveImage.
+- workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
+- workflows/08_prompt_creator_create_from_theme.json — Prompt Creator create_from_theme preset.
+- workflows/09_prompt_creator_custom.json — Prompt Creator custom-mode contract test.
+- workflows/10_edit_fit_crop.json — Edit reference_fit=crop path.
+- workflows/11_edit_fit_contain.json — Edit reference_fit=contain path.
+- workflows/12_edit_semantic_only.json — Edit semantic_only reference path.
+- workflows/13_edit_style_direct.json — Edit style_direct reference path with 2x2 processing.
+- workflows/14_edit_style_indirect.json — Edit style_indirect reference path with 4x4 processing.
+- workflows/15_paint_outpaint.json — expansion-only outpaint path.
+- workflows/16_paint_crop_restore.json — crop geometry + reverse restore/composite path.
+- workflows/17_paint_no_kv_cache.json — Paint runtime with KV cache disabled.
 
 See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.
 
