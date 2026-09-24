@@ -257,6 +257,13 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
     assert creator_inputs["visual_references"]["link"] is not None
     assert creator_inputs["reference_edit_image"]["link"] is not None
 
+    latent = _nodes_by_type(workflow, "CcCKrea2Latent")[0]
+    latent_inputs = {item["name"]: item for item in latent["inputs"]}
+    assert latent["widgets_values"][0] == "from_image"
+    assert latent["widgets_values"][5] == "empty"
+    assert latent_inputs["dimensions_image"]["link"] is not None
+    assert "content_image" not in latent_inputs
+
     edit_inputs = {item["name"]: item for item in edit["inputs"]}
     assert edit_inputs["positive_prompt"]["type"] == "STRING"
     assert edit_inputs["positive_prompt"]["link"] is not None
