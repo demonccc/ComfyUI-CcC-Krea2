@@ -11,6 +11,7 @@ PAINT_WORKFLOW = Path("workflows/02_anypaint_remove_people.json")
 REGIONAL_WORKFLOW = Path("workflows/03_regional_attention.json")
 CHARACTER_SHEET_WORKFLOW = Path("workflows/04_character_sheet_identity.json")
 PROMPT_CREATOR_WORKFLOW = Path("workflows/05_edit_prompt_creator.json")
+T2I_WORKFLOW = Path("workflows/06_text_to_image.json")
 
 
 def _nodes_by_type(workflow, type_name):
@@ -19,7 +20,14 @@ def _nodes_by_type(workflow, type_name):
 
 def test_expected_workflows_are_checked_in():
     workflows = sorted(Path("workflows").rglob("*.json"))
-    assert workflows == [EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW, PROMPT_CREATOR_WORKFLOW]
+    assert workflows == [
+        EDIT_WORKFLOW,
+        PAINT_WORKFLOW,
+        REGIONAL_WORKFLOW,
+        CHARACTER_SHEET_WORKFLOW,
+        PROMPT_CREATOR_WORKFLOW,
+        T2I_WORKFLOW,
+    ]
 
 
 def test_scene_subject_workflow_uses_split_nodes():
@@ -285,8 +293,64 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
     assert semantic["outputs"][0]["links"]
 
 
+def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
+    workflow = json.loads(T2I_WORKFLOW.read_text(encoding="utf-8"))
+
+    t2i_nodes = _nodes_by_type(workflow, "CcCKrea2TextToImage")
+    samplers = _nodes_by_type(workflow, "KSampler")
+    decoders = _nodes_by_type(workflow, "VAEDecode")
+
+    assert len(t2i_nodes) == 1
+    assert len(samplers) == 1
+    assert len(decoders) == 1
+
+    t2i = t2i_nodes[0]
+    sampler = samplers[0]
+    decoder = decoders[0]
+
+    assert t2i["widgets_values"] == [
+        "A cinematic photograph of a futuristic coastal city at golden hour, with reflective glass towers, elevated walkways, lush vegetation, and dramatic warm sunlight.",
+        "16:9",
+        1.0,
+        1,
+        1,
+        1,
+        "",
+    ]
+
+    t2i_inputs = {item["name"]: item for item in t2i["inputs"]}
+    assert set(t2i_inputs) == {"model", "clip"}
+    assert t2i_inputs["model"]["link"] is not None
+    assert t2i_inputs["clip"]["link"] is not None
+
+    outputs = {item["name"]: item for item in t2i["outputs"]}
+    assert outputs["model"]["type"] == "MODEL"
+    assert outputs["positive"]["type"] == "CONDITIONING"
+    assert outputs["negative"]["type"] == "CONDITIONING"
+    assert outputs["latent"]["type"] == "LATENT"
+    assert all(item["links"] for item in outputs.values())
+
+    sampler_inputs = {item["name"]: item for item in sampler["inputs"]}
+    assert sampler_inputs["model"]["link"] is not None
+    assert sampler_inputs["positive"]["link"] is not None
+    assert sampler_inputs["negative"]["link"] is not None
+    assert sampler_inputs["latent_image"]["link"] is not None
+    assert sampler["widgets_values"][2:7] == [8, 1, "euler", "beta", 1]
+
+    decoder_inputs = {item["name"]: item for item in decoder["inputs"]}
+    assert decoder_inputs["samples"]["link"] is not None
+    assert decoder_inputs["vae"]["link"] is not None
+
+
 def test_all_workflow_link_types_are_consistent():
-    for workflow_path in (EDIT_WORKFLOW, PAINT_WORKFLOW, REGIONAL_WORKFLOW, CHARACTER_SHEET_WORKFLOW, PROMPT_CREATOR_WORKFLOW):
+    for workflow_path in (
+        EDIT_WORKFLOW,
+        PAINT_WORKFLOW,
+        REGIONAL_WORKFLOW,
+        CHARACTER_SHEET_WORKFLOW,
+        PROMPT_CREATOR_WORKFLOW,
+        T2I_WORKFLOW,
+    ):
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         nodes = {node["id"]: node for node in workflow["nodes"]}
 
@@ -316,6 +380,7 @@ def test_all_workflows_use_only_current_public_ccc_nodes():
         REGIONAL_WORKFLOW,
         CHARACTER_SHEET_WORKFLOW,
         PROMPT_CREATOR_WORKFLOW,
+        T2I_WORKFLOW,
     ):
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
         types = {node["type"] for node in workflow["nodes"]}

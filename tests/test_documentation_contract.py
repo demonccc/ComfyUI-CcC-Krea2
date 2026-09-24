@@ -28,6 +28,7 @@ def test_readme_tracks_current_public_surface_and_workflows():
     assert "workflows/03_regional_attention.json" in readme
     assert "workflows/04_character_sheet_identity.json" in readme
     assert "workflows/05_edit_prompt_creator.json" in readme
+    assert "workflows/06_text_to_image.json" in readme
 
 
 def test_all_public_node_display_names_are_documented():

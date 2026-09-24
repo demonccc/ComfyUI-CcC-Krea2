@@ -206,6 +206,25 @@ LoRA Stack patches MODEL only and can carry immutable prompt augmentation assemb
 
 Text to Image consumes optional prompt_augmentation, encodes positive and negative text independently with CLIP, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT.
 
+The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
+
+~~~text
+UNET + CLIP
+    |
+    v
+CcC Krea2 - Text to Image
+    +--> MODEL ---------> ModelSamplingAuraFlow -> BlackwellAttentionFix -> KSampler
+    +--> positive -----------------------------------------------> KSampler
+    +--> negative -----------------------------------------------> KSampler
+    +--> LATENT -------------------------------------------------> KSampler
+                                                                    |
+                                                                    v
+                                                              VAE Decode
+                                                                    |
+                                                                    v
+                                                                SaveImage
+~~~
+
 Krea2 CcC Edit does not consume LoRA Prompt Settings or prompt_augmentation automatically.
 
 ## Ownership

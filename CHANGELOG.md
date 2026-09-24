@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added `workflows/06_text_to_image.json`, a complete native T2I example wiring CcC Krea2 - Text to Image into the Krea2 sampling/decode/output path.
 - Optional Krea2 CcC Edit Prompt Creator with enhance, create_from_image, and create_from_theme modes, reusing the same multimodal Krea2/Qwen3-VL CLIP as Generate Text.
 - Chainable Krea2 CcC Attention Region nodes with unique tags and percentage-based target boxes.
 - Visual Reference regional attention scopes: global, boost in region, and only in region.

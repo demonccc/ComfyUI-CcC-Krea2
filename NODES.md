@@ -523,3 +523,4 @@ The node applies prompt augmentation, encodes positive and negative text indepen
 - workflows/03_regional_attention.json — tagged regional references.
 - workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
 - workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Semantic Reference branch wired but disabled.
+- workflows/06_text_to_image.json — direct T2I example using CcC Krea2 - Text to Image outputs as KSampler model/positive/negative/latent inputs.

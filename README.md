@@ -226,6 +226,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 - workflows/03_regional_attention.json — tagged regional attention with two identity references.
 - workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference.
 - workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator; the same reference image is wired to a Semantic Reference that is intentionally disabled/muted.
+- workflows/06_text_to_image.json — native Krea2 text-to-image path: Text to Image -> sampling -> VAE Decode -> SaveImage.
 
 See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.
 
