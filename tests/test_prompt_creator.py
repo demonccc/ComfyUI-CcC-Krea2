@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
+    PRESET_SYSTEM_PROMPTS,
     PROMPT_CREATOR_MODES,
     CcCKrea2EditPromptCreator,
 )
@@ -53,7 +54,7 @@ def test_prompt_creator_public_controls_and_output_compatibility():
 
     assert required["mode"][0] == PROMPT_CREATOR_MODES
     assert PROMPT_CREATOR_MODES == ("enhance", "create_from_image", "create_from_theme", "custom")
-    assert required["custom_system_prompt"][1]["default"] == ""
+    assert required["system_prompt"][1]["default"] == PRESET_SYSTEM_PROMPTS["enhance"]
     assert required["thinking"][1]["default"] is False
     assert required["max_tokens"][1]["default"] == 512
     assert required["temperature"][1]["default"] == 0.25
@@ -61,7 +62,7 @@ def test_prompt_creator_public_controls_and_output_compatibility():
     assert required["seed"][1]["default"] == 0
     assert "reference_edit_image" in optional
 
-    # Preserve the original first three output slots; thinking is appended.
+    # Preserve original first three output slots; thinking remains appended.
     assert CcCKrea2EditPromptCreator.RETURN_NAMES == (
         "created_prompt",
         "visual_references",
@@ -70,10 +71,11 @@ def test_prompt_creator_public_controls_and_output_compatibility():
     )
 
 
-def test_create_from_image_uses_thinking_same_clip_and_passthrough():
+def test_create_from_image_uses_detailed_preset_thinking_and_passthrough():
     clip = _FakeClip(
-        "<think>The internal image shows a dog running through shallow water.</think>"
-        "The white dog from Krea Image 1 is running through a shallow river."
+        "<think>The internal image has a seated subject, another person nearby, and a white bed.</think>"
+        "The woman from Krea Image 1 is seated on a white bed with her body angled slightly to the side, "
+        "while another person remains beside the bed."
     )
     chain = _chain()
 
@@ -81,31 +83,32 @@ def test_create_from_image_uses_thinking_same_clip_and_passthrough():
         clip=clip,
         visual_references=chain,
         mode="create_from_image",
-        user_prompt="Keep the subject from Image 1.",
-        custom_system_prompt="",
+        user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
+        system_prompt="this must be ignored for preset modes",
         thinking=True,
-        max_tokens=512,
+        max_tokens=2048,
         temperature=0.25,
         top_p=0.90,
         seed=1234,
         reference_edit_image=_image(0.5),
     )
 
-    assert created == "The white dog from Image 1 is running through a shallow river."
-    assert thinking == "The internal image shows a dog running through shallow water."
+    assert created.startswith("The woman from Image 1 is seated on a white bed")
+    assert thinking.startswith("The internal image has a seated subject")
     assert passthrough is chain
     assert len(clip.tokenize_kwargs["images"]) == 3
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
     assert "Vision input 2 = Image 2" in clip.tokenize_prompt
     assert "INTERNAL REFERENCE EDIT IMAGE" in clip.tokenize_prompt
     assert clip.tokenize_kwargs["thinking"] is True
-    assert 'Never call a reference "Krea Image N"' in clip.tokenize_kwargs["system_prompt"]
-    assert clip.generate_kwargs["max_length"] == 512
-    assert clip.generate_kwargs["temperature"] == 0.25
-    assert clip.generate_kwargs["top_p"] == 0.90
+    assert clip.tokenize_kwargs["system_prompt"] == PRESET_SYSTEM_PROMPTS["create_from_image"]
+    assert "Do not compress a visually rich reference situation" in clip.tokenize_kwargs["system_prompt"]
+    assert "other people in the scene" in clip.tokenize_kwargs["system_prompt"]
+    assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
-    assert "Mode: create_from_image" in info
-    assert "Thinking: enabled" in info
+    assert "Thinking Output: present" in info
+    assert "System Prompt Source: preset" in info
+    assert "Thinking:" in info
 
 
 def test_meta_instruction_leak_is_removed_and_reference_name_is_normalized():
@@ -143,31 +146,31 @@ def test_meta_instruction_only_output_is_rejected():
         )
 
 
-def test_custom_mode_uses_custom_system_prompt_and_keeps_output_contract():
+def test_custom_mode_uses_exact_system_prompt():
     clip = _FakeClip("The woman from Image 1 is standing under neon lights.")
+    custom = "Build a cyberpunk situation around the referenced subject. Return only the edit prompt."
 
     created, _, info, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
         visual_references=_chain(),
         mode="custom",
         user_prompt="",
-        custom_system_prompt="Build a cyberpunk situation around the referenced subject.",
+        system_prompt=custom,
     )
 
     assert created == "The woman from Image 1 is standing under neon lights."
-    assert "Build a cyberpunk situation" in clip.tokenize_kwargs["system_prompt"]
-    assert "OUTPUT CONTRACT:" in clip.tokenize_kwargs["system_prompt"]
-    assert "Custom System Prompt: yes" in info
+    assert clip.tokenize_kwargs["system_prompt"] == custom
+    assert "System Prompt Source: custom" in info
 
 
-def test_custom_mode_requires_custom_system_prompt():
-    with pytest.raises(ValueError, match="requires a non-empty custom_system_prompt"):
+def test_custom_mode_requires_system_prompt():
+    with pytest.raises(ValueError, match="requires a non-empty system_prompt"):
         CcCKrea2EditPromptCreator().create(
             clip=_FakeClip(),
             visual_references=_chain(),
             mode="custom",
             user_prompt="",
-            custom_system_prompt="",
+            system_prompt="",
         )
 
 

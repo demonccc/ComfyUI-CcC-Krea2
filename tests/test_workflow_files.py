@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from ccc_krea2.modular_nodes.edit_prompt_creator_node import PRESET_SYSTEM_PROMPTS
+
 
 EDIT_WORKFLOW = Path("workflows/01_scene_subject.json")
 PAINT_WORKFLOW = Path("workflows/02_anypaint_remove_people.json")
@@ -246,10 +248,10 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
 
     assert creator["widgets_values"] == [
         "create_from_image",
-        "Use the subject from Image 1 in the situation shown by the reference edit image.",
-        "",
+        "Use the subject from Image 1 in the situation shown by the reference edit image. Maintain the face and the body shape.",
+        PRESET_SYSTEM_PROMPTS["create_from_image"],
         True,
-        512,
+        2048,
         0.25,
         0.9,
         0,

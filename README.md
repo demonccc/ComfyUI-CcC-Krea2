@@ -143,15 +143,17 @@ The Creator reuses the same multimodal Krea2/Qwen3-VL CLIP as ComfyUI Generate T
 Modes:
 
 - enhance: improve an existing edit instruction without changing its intent.
-- create_from_image: analyze reference_edit_image and turn its useful scene/action/pose/interaction/environment/composition into explicit edit text.
-- create_from_theme: expand a high-level theme into a concrete new situation while keeping referenced subjects anchored.
-- custom: use custom_system_prompt as an editable prompt preset.
+- create_from_image: analyze reference_edit_image and reconstruct a detailed situation instead of collapsing it to a short summary.
+- create_from_theme: expand a high-level theme into a concrete, detailed new situation while keeping referenced subjects anchored.
+- custom: edit and send the system_prompt directly.
 
-Controls are user_prompt, custom_system_prompt, thinking, max_tokens, temperature, top_p, and seed. custom_system_prompt is used only in custom mode.
+The system_prompt field always shows the effective prompt. For preset modes it is greyed/read-only; custom enables editing. Switching to custom starts from the current preset unless an earlier custom value exists.
 
-When thinking is enabled, Qwen reasoning is returned separately on the thinking output. created_prompt remains clean final edit text.
+create_from_image asks Qwen to capture relevant pose/body position, other people and interactions, props, environment, spatial relationships, framing, camera angle, composition, and lighting while preserving explicit user constraints such as face, identity, anatomy, body shape, and body proportions.
 
-All modes share a fixed output contract: no system/meta preamble, no explanations, no Markdown/JSON/headings, and no references to hidden/internal inputs. Downstream visible references are named Image 1, Image 2, etc.; accidental "Krea Image N" wording is normalized to "Image N".
+thinking follows the ComfyUI Generate Text model convention. When the checkpoint emits a <think>...</think> block, reasoning is returned separately on the thinking output and the final edit text remains in created_prompt. creator_info also reports whether reasoning was actually emitted.
+
+All preset modes enforce final edit text with no system/meta preamble. Downstream visible references are named Image 1, Image 2, etc.; accidental "Krea Image N" wording is normalized to "Image N".
 
 The Visual Reference chain is returned unchanged.
 

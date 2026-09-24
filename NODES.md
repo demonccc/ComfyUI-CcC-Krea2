@@ -180,7 +180,7 @@ Required inputs/controls:
 | visual_references | KREA2_VISUAL_REFERENCE_CHAIN | — |
 | mode | enhance, create_from_image, create_from_theme, custom | enhance |
 | user_prompt | text | empty |
-| custom_system_prompt | text | empty |
+| system_prompt | text | enhance preset |
 | thinking | boolean | false |
 | max_tokens | 32..4096, step 32 | 512 |
 | temperature | 0.01..2.0 | 0.25 |
@@ -198,24 +198,55 @@ Outputs:
 - creator_info
 - thinking
 
-The original first three output slots are preserved; thinking is appended as a fourth output.
+The first three output slots remain compatible with the earlier node contract; thinking is the fourth output.
 
-Modes:
+### Mode and system_prompt behavior
 
 - enhance: rewrites an existing edit instruction without changing its intent.
-- create_from_image: requires reference_edit_image and converts observed action/pose/interaction/environment/composition into explicit edit text.
-- create_from_theme: expands the user's theme into a concrete new situation while anchoring referenced subject appearance.
-- custom: uses custom_system_prompt as the behavior/prompt preset. The fixed final-output contract is still appended and enforced.
+- create_from_image: requires reference_edit_image and builds a detailed prompt from its pose/action/interaction/environment/composition while keeping visible Image N references authoritative for identity/appearance.
+- create_from_theme: expands the user's theme into a detailed new situation while anchoring referenced subjects.
+- custom: sends the editable system_prompt exactly as the Qwen system prompt.
 
-thinking is passed to the Krea2/Qwen3-VL tokenizer. When enabled, reasoning is split from the model response and returned only on the thinking output. created_prompt remains the final prompt only.
+For enhance, create_from_image, and create_from_theme, the frontend shows the effective preset system_prompt in the text field but keeps it greyed/read-only. Selecting custom enables the same field for editing. When entering custom for the first time, the current preset becomes the starting text; an existing custom value is preserved when switching away and back.
 
-The final-output contract requires plain English edit text with no headings, Markdown, explanations, role text, system instructions, or meta preambles such as "You are a professional image editor" or "Your task is...".
+The backend does not trust the visible field for preset modes: it resolves the canonical preset by mode. In custom mode, it requires a non-empty system_prompt.
 
-Downstream visible references are named only as Image 1, Image 2, and so on. The Creator normalizes accidental "Krea Image N" wording to "Image N".
+### Detailed create_from_image behavior
 
-reference_edit_image is internal to the Creator and is not inserted into the Visual Reference chain. Its useful scene/action/pose/interaction/environment/composition details must be written explicitly into created_prompt; the image itself must not be mentioned.
+create_from_image explicitly asks Qwen not to collapse a visually rich reference into a short generic summary. When visible and relevant, it should describe:
 
-Sampling is enabled for prompt generation. seed is passed explicitly to Qwen3-VL generation.
+- exact action, pose, body orientation/position, limb placement, gaze, and interaction;
+- clothing/accessories when they belong to the requested situation;
+- other people, their distinguishing visible role, pose/action, relative position, and interaction;
+- important props/objects and spatial relationships;
+- environment and foreground/background layout;
+- framing, shot distance, viewpoint, camera angle, composition, and subject placement;
+- visible lighting and other scene-defining details.
+
+Explicit user constraints such as preserving identity, face, anatomy, body shape, body proportions, clothing, or interactions remain authoritative.
+
+### Thinking
+
+thinking is passed directly to Qwen3-VL tokenization, matching ComfyUI Generate Text behavior.
+
+When Qwen emits a <think>...</think> block:
+
+- created_prompt receives only the final text after </think>;
+- thinking receives the reasoning text;
+- creator_info reports Thinking Output: present and also includes a Thinking section for debugging.
+
+If thinking=true but the model emits no think block, thinking is an empty string and creator_info reports Thinking Output: empty. This can depend on the loaded Qwen checkpoint.
+
+If generation ends inside an unfinished think block before producing a final prompt, the node raises a clear error suggesting a larger max_tokens value or disabling thinking.
+
+### Final prompt cleanup
+
+created_prompt is always post-processed before it reaches Edit:
+
+- accidental meta preambles such as "You are a professional image editor..." / "Your task is..." are removed when possible;
+- an output consisting only of meta-instructions is rejected;
+- "Krea Image N" is normalized to "Image N";
+- the internal reference edit image must be converted into explicit scene instructions and must not be named in the final prompt.
 
 The returned visual_references object is passthrough; the chain is not modified.
 
