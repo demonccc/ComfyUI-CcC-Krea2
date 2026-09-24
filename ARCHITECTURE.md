@@ -1,31 +1,95 @@
 # Architecture
 
+## Public Surface
+
+The current package registers **14 public nodes**:
+
+~~~text
+Edit:
+  Krea2 CcC Attention Region
+  Krea2 CcC Visual Reference
+  Krea2 CcC Semantic Reference
+  Krea2 CcC Size Resolver
+  Krea2 CcC Latent
+  Krea2 CcC Edit Prompt Creator
+  Krea2 CcC Edit
+
+Utility:
+  Krea2 CcC Character Sheet
+
+Paint:
+  Krea2 CcC Paint Prepare
+  Krea2 CcC Paint
+  Krea2 CcC Paint Restore
+
+LoRA / T2I:
+  CcC Krea2 - LoRA Prompt Settings
+  CcC Krea2 - LoRA Stack
+  CcC Krea2 - Text to Image
+~~~
+
+There is no public Reference Cache node family and no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
+
 ## Single Edit Runtime
 
 Krea2 CcC Edit has one edit execution path.
 
-```text
-Attention Region -------------+
-IMAGE -> Visual Reference ----+
-IMAGE -> Visual Reference ----+--> Edit --> Krea2 CcC Edit runtime --> Krea2
-IMAGE -> Semantic Reference --+      ^
-                                     |
-Size Resolver -> Latent -------------+
-```
+~~~text
+Attention Region(s) ------------------------+
+IMAGE -> Visual Reference(s) ---------------+
+IMAGE -> Semantic Reference(s) -------------+--> Edit --> Krea2 CcC Edit runtime --> Krea2
+                                             ^
+Size Resolver -> Latent ---------------------+
+~~~
 
-No alternate runtime is selected based on other installed custom nodes.
+No alternate edit runtime is selected based on other installed custom nodes.
 
-## Visual Reference: two independent representations
+### Optional Prompt Creator
 
-A visual reference can travel through two independent paths.
+Edit Prompt Creator is an optional pre-processing layer, not another edit runtime.
 
-```text
+~~~text
+Krea2/Qwen3-VL CLIP ----------------+-----------------------> Edit
+                                    |
+Visual Reference chain ------------>+--> Prompt Creator --> Visual Reference passthrough --> Edit
+user_prompt ------------------------>+--> Prompt Creator --> created_prompt ----------------> Edit
+reference_edit_image --------------->+
+~~~
+
+The Creator uses the same multimodal CLIP generation path as ComfyUI Generate Text. It does not mutate the Visual Reference chain.
+
+reference_edit_image is visible to the Creator only unless the user separately wires that image into another existing path. Therefore create_from_image converts useful scene/action/pose/environment/composition details into explicit text rather than relying on Edit seeing that internal image.
+
+### Character Sheet
+
+Character Sheet is a deterministic IMAGE utility before Visual Reference:
+
+~~~text
+portrait/body IMAGE inputs
+        |
+        v
+Character Sheet
+  preserve aspect
+  fit complete source
+  no crop/stretch
+        |
+        v
+normal Visual Reference
+~~~
+
+It does not run Qwen, VAE, conditioning, or latent processing.
+
+## Visual Reference: Two Independent Representations
+
+A Visual Reference can travel through two independent paths.
+
+~~~text
 source image
    |
    +--> Qwen path
-   |      preserve aspect ratio
+   |      optional semantic participation
    |      optional downscale-only cap
-   |      optional Image N annotation
+   |      optional role-only Image N annotation
    |
    +--> appearance path
           crop | resize | contain | native
@@ -33,131 +97,110 @@ source image
           reference latent
           boost
           RoPE placement
-```
+          optional target attention scope
+~~~
 
-The Qwen image does not need to match target pixel geometry. The appearance image does use target geometry rules before VAE encoding.
+The Qwen copy does not need to match target pixel geometry. Appearance preparation resolves against the target geometry before VAE encoding.
 
-### Target resolution policy
+The positive branch uses configured reference boosts. The grounded negative branch uses the same appearance-image vision blocks, fixed empty negative text, no role annotation text, and neutral boost 1.0.
 
-Krea2 CcC Latent does not derive preset geometry from a megapixel target. Presets are explicit width/height pairs.
+### Tagged Target Attention Regions
 
-Krea's official repository documents Turbo output in the roughly 1K-2K range and exposes `width` / `height` as the primary resolution controls. Its sampling implementation aligns each axis to `VAE compression x DiT patch size`, which is 16 pixels for the released model. The official Hugging Face Space also exposes concrete target sizes instead of megapixel-derived geometry.
+Attention Region nodes form a chain of unique tags with percentage-based target/content boxes.
 
-Official references:
+With empty Latent content, percentages refer directly to the final target canvas. With image content, Latent transports those boxes through stretch, contain, or crop.
 
-- https://github.com/krea-ai/krea-2
-- https://github.com/krea-ai/krea-2/blob/main/sampling.py
-- https://huggingface.co/spaces/krea/Krea-2/blob/main/app.py
+Crop is strict: if the retained crop touches or removes any part of a declared region, Latent raises an error instead of clipping or relocating the region.
 
-CcC therefore treats megapixels only as descriptive metadata for a preset. The CcC preset table is curated rather than claimed as an official exhaustive Krea bucket list.
+Edit resolves region_tag for each regional Visual Reference:
 
-Target geometry has two resolution paths for non-preset inputs:
-
-- `nearest_krea_aspect` maps the requested fixed/image-derived geometry to the closest curated Krea preset aspect and uses size as the tie-breaker.
-- `preserve_aspect_krea_bounds` keeps the requested aspect while resolving both axes into the 1024..2048 Krea working range and /16 alignment. Geometries too extreme to satisfy both axis bounds are rejected instead of being silently distorted.
-
-Preset dimensions bypass those policies. Content fitting is a separate stage: `crop`, `contain`, or `stretch` is applied only when an image is actually used as latent content.
-
-### Semantic grounding cadence
-
-Krea2 CcC Visual Reference exposes `semantic_grounding_px` as an integer with step 32. Krea2 CcC Semantic Reference and the semantic path in Krea2 CcC Latent use the same 32-pixel cadence. This matches Qwen3-VL's effective spatial alignment: 16-pixel vision patches with merge size 2.
-
-Values outside that cadence are not intrinsically invalid. For example, 380 px can still be processed, but Qwen aligns its effective visual grid to multiples of 32, so 384 px is the clearer equivalent for controlled experiments.
-
-## Conditioning and runtime transport
-
-Appearance reference latents are attached to CONDITIONING together with per-reference runtime metadata:
-
-- fit state
-- positive boost
-- neutral negative boost
-- RoPE placement
-- optional tagged target region
-- target attention scope
-
-The Krea2 CcC Edit runtime consumes that metadata and executes one in-context sequence:
-
-```text
-[text | reference 1 | reference 2 | ... | target]
-```
-
-Text occupies frame 0 coordinates, references use ordered reference frames, and target image tokens use target frame coordinates.
-
-### Tagged target attention regions
-
-Attention Region nodes form a chain of uniquely tagged rectangular boxes. With empty Latent content, box percentages refer directly to the final target canvas. With image content, boxes refer to the original content image and Latent carries them through `stretch`, `contain`, or `crop`.
-
-Crop has a strict invariant: every declared box must remain completely inside the retained crop. Partial intersection and complete removal are both errors. This prevents a target-side attention box from silently moving to the wrong token set.
-
-After target pixel geometry is finalized, Edit binds each regional Visual Reference by `region_tag`. The runtime projects the transformed normalized box to the actual Krea target token grid. `boost in region` applies target-to-reference bias only for queries inside that grid region. `only in region` additionally blocks target-to-reference attention outside it.
+- boost in region: reference boost is applied only to target queries inside the region.
+- only in region: target queries outside the region are blocked from attending to that reference.
 
 ## Semantic Reference
 
-Semantic references are Qwen-only and do not create appearance latents.
+Semantic References are Qwen-only and do not create appearance latents.
 
-`semantic_only` operates on the complete Qwen vision span. Style modes may split the source into multiple physical Qwen images before span processing.
+semantic_only always uses the complete image. Style modes can process full, 2x2, or 4x4 physical Qwen images before style-span handling.
 
-## Target geometry
+## Target Geometry
 
-Target construction and reference preparation are separate.
+Latent owns target dimensions, /16 alignment, optional target content, target content placement, optional target semantic metadata, and transformed Attention Regions.
 
-Latent determines the final target width and height. Visual Reference then resolves its own pixel preparation against that target.
+Dimension modes are from_image, fixed, and preset.
 
-Public visual modes:
+For image-derived and fixed dimensions:
 
-- `crop`
-- `resize`
-- `contain`
-- `native`
+- nearest_krea_aspect
+- preserve_aspect_krea_bounds
 
-`resize` maps the reference long edge to the corresponding target axis. `contain` instead calculates the maximum uniform scale that fits inside both target axes. Both preserve aspect ratio and use minimal centered crop-down alignment to /16. `native` keeps a 1:1 pixel scale and also crops down to /16 rather than padding.
+Preset dimensions are explicit curated width/height pairs and bypass geometry policy.
 
-RoPE placement is independent from pixel preparation.
+When target content is enabled, content fit is independent: crop, contain, or stretch.
 
-## Size Resolver
+Visual Reference fit is a separate operation and supports crop, resize, contain, and native. RoPE placement is independent from Visual Reference pixel preparation.
 
-Size Resolver returns only width and height. It does not resize image content and does not create a latent.
+### Semantic Grounding Cadence
 
-## Latent
+Visual Reference semantic_grounding_px, Semantic Reference grounding_px, and Latent latent_grounding_px use a step of 32. This matches Qwen3-VL's effective spatial cadence.
 
-Latent owns:
+## Conditioning and Runtime Transport
 
-- target dimensions
-- /16 alignment
-- optional target content image
-- target image placement
-- optional latent semantic metadata
+Appearance reference latents are attached to CONDITIONING together with reference fit, positive boost, neutral negative boost, RoPE placement, optional target region, and target attention scope.
 
-## Paint prepare and restore
+The Edit runtime executes one in-context sequence:
 
-Paint keeps source pixels at native scale while **Paint Prepare** owns the complete pre-generation preparation:
+~~~text
+[text | reference 1 | reference 2 | ... | target]
+~~~
 
-```text
-source image + mask + VAE
+## Paint
+
+Paint has three public phases.
+
+~~~text
+source IMAGE + MASK + VAE
         |
         v
 Paint Prepare
   explicit outpaint expansion
-  pad or crop to Krea working geometry
+  pad/crop to curated Krea working geometry
   no source resize
-  fill/grow/feather mask
+  fill holes / grow / feather
   semantic reference
   VAE known canvas
   token-aligned noise_mask
         |
         +--> paint_context --> Paint
         +--> LATENT ---------> KSampler
-        +--> paint_geometry -------------------+
-                                                |
-KSampler -> VAE Decode                         |
-        |                                       |
-        +----------------> Paint Restore <-------+
-```
+        +--> paint_geometry ----------------------+
+                                                   |
+KSampler -> VAE Decode                            |
+        |                                          |
+        +------------------> Paint Restore <--------+
+~~~
 
-`pad` selects a curated Krea geometry that contains the requested canvas. `crop` selects one that fits inside it. Impossible directions fail instead of silently resizing.
+Paint Prepare uses internal geometry helpers but exposes the geometry controls directly. pad chooses a curated Krea geometry that contains the requested canvas; crop chooses one that fits inside it. Impossible directions fail rather than resizing the known source.
 
-The image and mask always share the same spatial transform. Explicit outpaint expansion belongs to the requested canvas; only temporary Krea padding is removed by Restore.
+Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas and is removed by Restore.
+
+Paint consumes KREA2_PAINT_CONTEXT. It grounds Qwen with the prepared semantic reference, attaches the pre-encoded appearance reference, and installs the Paint runtime. Its kv_cache switch is an internal runtime K/V optimization; it is not the removed public Reference Cache feature.
+
+Paint Restore uses paint_geometry from Paint Prepare:
+
+- pad: remove temporary Krea padding only.
+- crop: composite the decoded generated crop back at the exact original coordinates; optional generated_mask limits replacement to the generated/feathered region.
+
+## LoRA and T2I
+
+LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
+
+Text to Image consumes optional prompt_augmentation, encodes positive and negative text independently with CLIP, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT.
+
+Krea2 CcC Edit does not consume LoRA Prompt Settings or prompt_augmentation automatically.
 
 ## Ownership
 
-The current public edit architecture is implemented by Krea2 CcC Edit modules only. External projects that influenced individual ideas or techniques are acknowledged separately in [NOTICE](NOTICE).
+The public architecture is implemented by the nodes registered in ccc_krea2/nodes.py. Internal helper modules may contain implementation support that is not a public ComfyUI node.
+
+External projects that influenced individual ideas or techniques are acknowledged separately in NOTICE.

@@ -280,3 +280,45 @@ def test_all_workflow_link_types_are_consistent():
             assert target["type"] == link_type
             assert link_id in (source.get("links") or [])
             assert target["link"] == link_id
+
+
+def test_all_workflows_use_only_current_public_ccc_nodes():
+    removed = {
+        "CcCKrea2PaintGeometry",
+        "CcCKrea2ReferenceCacheCreate",
+        "CcCKrea2ReferenceCacheSave",
+        "CcCKrea2ReferenceCacheLoad",
+        "CcCKrea2CachedVisualReference",
+    }
+
+    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
+
+    for workflow_path in (
+        EDIT_WORKFLOW,
+        PAINT_WORKFLOW,
+        REGIONAL_WORKFLOW,
+        CHARACTER_SHEET_WORKFLOW,
+        PROMPT_CREATOR_WORKFLOW,
+    ):
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        types = {node["type"] for node in workflow["nodes"]}
+        assert not (types & removed)
+        for type_name in types:
+            if type_name.startswith("CcCKrea2"):
+                assert type_name in NODE_CLASS_MAPPINGS
+
+
+def test_character_sheet_workflow_uses_generic_reference_filenames():
+    workflow = json.loads(CHARACTER_SHEET_WORKFLOW.read_text(encoding="utf-8"))
+    loads = {
+        node["id"]: node["widgets_values"][0]
+        for node in _nodes_by_type(workflow, "LoadImage")
+        if node["id"] in {6, 7, 8, 9, 10}
+    }
+    assert loads == {
+        6: "character_portrait_1.jpg",
+        7: "character_portrait_2.jpg",
+        8: "character_portrait_3.jpg",
+        9: "character_portrait_4.jpg",
+        10: "character_body_1.jpg",
+    }

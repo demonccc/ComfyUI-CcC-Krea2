@@ -683,7 +683,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Regional Attention example.\n\nAttention Region nodes are chainable and use percentages of the target/content image:\n- woman: x=5, y=10, w=40, h=80\n- man: x=55, y=10, w=40, h=80\n\nThe scene is used as Latent content with contain. Latent carries both tagged boxes through the target pixel transform before Edit projects them onto the Krea token grid.\n\nScene Visual Reference stays global.\nWoman and Man Visual References use \"only in region\", so each reference is blocked outside its matching tagged region.\n\nGuardrail: if Latent content_fit is changed to crop and that crop touches any part of either attention box, Latent raises an error instead of clipping or deleting the box."
+        "Regional Attention workflow.\n\nAttention Region nodes are chainable and define percentage boxes on the target/content image:\n- woman: x=5, y=10, width=40, height=80\n- man: x=55, y=10, width=40, height=80\n\nThe Scene Visual Reference stays global.\nWoman and Man Visual References use attention_scope=\"only in region\" and bind to their matching region_tag.\n\nLatent uses the Scene as dimensions/content with content_fit=contain and carries both tagged boxes through the target transform before Edit projects them to the Krea target token grid.\n\nGuardrail: changing content_fit to crop is allowed only when the complete declared boxes survive the crop. Any partial or complete removal raises an error rather than silently clipping a region."
       ]
     },
     {

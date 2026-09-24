@@ -4,43 +4,31 @@
 
 ### Added
 
-- Add optional Krea2 CcC Edit Prompt Creator with enhance, create_from_image, and create_from_theme modes, reusing the same multimodal Krea2 CLIP as Generate Text.
-- Chainable `Krea2 CcC Attention Region` nodes with unique tags and percentage-based target boxes.
-- Visual Reference regional attention scopes: `global`, `boost in region`, and `only in region`.
+- Optional Krea2 CcC Edit Prompt Creator with enhance, create_from_image, and create_from_theme modes, reusing the same multimodal Krea2/Qwen3-VL CLIP as Generate Text.
+- Chainable Krea2 CcC Attention Region nodes with unique tags and percentage-based target boxes.
+- Visual Reference regional attention scopes: global, boost in region, and only in region.
 - Target-side region transport through Latent geometry, strict crop guardrails, and token-grid projection for regional attention.
 - Regional attention example workflow with two tagged subjects.
-
-- Paint Restore node for exact depadding or generated-crop compositing back to the requested native canvas.
-
+- Krea2 CcC Paint Restore for exact depadding or generated-crop compositing.
 
 ### Changed
 
-- Merged Paint Geometry into Krea2 CcC Paint Prepare. Paint Prepare now owns native image/mask geometry, outpaint expansion, pad/crop normalization, mask processing, VAE preparation, and returns paint_geometry for Restore.
-- Removed the four public Reference Cache nodes; normal Visual References remain the single public reference path.
-- AnyPaint test workflow now uses Paint Prepare -> Paint -> decode -> Paint Restore.
-- Character Sheet now uses generic portrait/body inputs, nine explicit sheet-type presets, fixed no-crop fit behavior with selectable resize interpolation, and the same curated Krea geometry presets as Latent.
-- Explicit outpaint margins now keep their Geometry padding-fill as semantic/reference context while remaining fully generable, improving border color and lighting continuity.
-- Paint runtime now consumes the prepared appearance latent and no longer creates the target latent itself.
-
-- Added Krea geometry policies to Krea2 CcC Latent for fixed and image-derived dimensions: nearest curated Krea aspect or aspect-preserving Krea bounds.
-- Replaced Latent image-fit modes with explicit content-fit behavior: crop, contain with white padding, or stretch. Presets bypass geometry resolution.
-
-- Replaced megapixel + aspect-ratio latent preset generation with explicit curated Krea target sizes. Preset labels show exact dimensions, aspect ratio, and approximate megapixels; fixed and image-derived modes remain separate.
-
-- Standardized semantic grounding controls on a 32-pixel cadence to match Qwen3-VL visual grid alignment.
-
-- Consolidated Krea2 CcC Edit around one Krea2 CcC Edit runtime.
-- Removed runtime delegation to other installed custom nodes.
-- Removed alternate edit backends and compatibility-only execution paths.
-- Removed obsolete Subject, Scene, Outfit, Style and generic Reference public-node implementations that were no longer registered.
-- Removed dead engine, settings, validation, mask, resolution and reference compatibility modules.
-- Simplified the reference specification to the current visual, semantic and style contract.
-- Split public editing into Visual Reference, Semantic Reference, Size Resolver, Latent and Edit nodes.
-- Visual Reference keeps Qwen preparation independent from VAE geometry.
-- Visual Reference exposes crop, resize and native appearance modes plus explicit RoPE placement.
-- Reference latents, fit state, boosts and RoPE placement travel through CONDITIONING.
-- Positive conditioning uses configured per-reference boosts; grounded negative uses neutral boosts.
-- Semantic-only references remain Qwen-only and do not add VAE reference latents.
+- Merged the former public Paint Geometry stage into Krea2 CcC Paint Prepare. Paint Prepare now owns native image/mask geometry, outpaint expansion, pad/crop normalization, mask processing, semantic-reference preparation, VAE preparation, and returns paint_geometry for Restore.
+- Removed the four Reference Cache nodes from the public ComfyUI node registry, workflows, and current documentation. Normal Visual Reference is the single public appearance-reference path.
+- Updated AnyPaint example workflow to the current Paint Prepare -> Paint -> decode -> Paint Restore path.
+- Character Sheet now uses generic portrait/body inputs, nine explicit layouts, fixed no-crop fit behavior with selectable resize interpolation, and the same curated Krea geometry presets as Latent.
+- Explicit outpaint margins keep their selected padding fill as semantic/reference context while remaining fully generable.
+- Paint runtime consumes the appearance latent prepared by Paint Prepare and no longer creates the target latent.
+- Added Krea geometry policies to Latent for fixed and image-derived dimensions: nearest curated Krea aspect or aspect-preserving Krea bounds.
+- Replaced Latent image-fit behavior with explicit content fit: crop, contain with white padding, or stretch.
+- Replaced megapixel-derived Edit presets with explicit curated Krea target sizes.
+- Standardized semantic grounding controls on a 32-pixel cadence.
+- Consolidated Edit around one Krea2 CcC runtime.
+- Removed runtime delegation to other installed custom nodes and obsolete public Subject/Scene/Outfit/Style/reference node implementations.
+- Split public editing into Visual Reference, Semantic Reference, Size Resolver, Latent, optional Edit Prompt Creator, and Edit.
+- Visual Reference keeps Qwen preparation independent from VAE geometry and exposes crop, resize, contain, and native appearance modes plus independent RoPE placement.
+- Positive conditioning uses configured per-reference boosts; grounded negative uses neutral boosts and fixed empty negative text.
+- Semantic-only references remain Qwen-only and do not add VAE appearance latents.
 - Size Resolver outputs only width and height.
-- Latent owns final target dimensions, /16 alignment and optional target content.
-- Documentation now describes only the current Krea2 CcC Edit architecture. Attribution and project influences remain in NOTICE.
+- Latent owns final target dimensions, /16 alignment, optional target content, optional target semantic metadata, and transformed Attention Regions.
+- Documentation and checked-in workflows now track the current 14-node public registry.

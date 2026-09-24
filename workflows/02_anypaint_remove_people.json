@@ -327,7 +327,7 @@
         4,
         "outside"
       ],
-      "title": "Remove People - Paint Prepare"
+      "title": "Paint Prepare - Geometry + Mask + Latent"
     },
     {
       "id": 7,
@@ -801,7 +801,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "AnyPaint remove-people test.\n\n1. Load an image and paint the removal region with ComfyUI Mask Editor.\n2. Paint Prepare now owns Krea geometry and defaults to pad + edge fill. It maps the source to the nearest containing curated Krea geometry without resizing it.\n3. Crop is guarded when the source is too small; padding is guarded when the source exceeds the available Krea target size.\n4. The same Paint Prepare node applies fill-holes/grow/feather, creates the semantic reference, sampling latent and token-aligned noise_mask.\n5. Paint Restore consumes paint_geometry directly from Paint Prepare and removes temporary Krea padding, or composites a generated crop back onto the requested native canvas.\n\nFor outpaint, use expand_left/top/right/bottom directly on Paint Prepare.\n\nRecommended runtime: Krea 2 Turbo + krea2_anypaint_rank32, 8 steps, CFG 1, Euler, simple."
+        "AnyPaint remove-people workflow using the current three-node public Paint path.\n\n1. Load an image and paint the removal region in ComfyUI Mask Editor.\n2. Krea2 CcC Paint Prepare receives IMAGE + MASK + VAE. It owns geometry_mode, padding fill, outpaint expansion, fill-holes, grow/shrink, feather, semantic-reference preparation, VAE preparation, and the sampling LATENT.\n3. Krea2 CcC Paint consumes paint_context and builds conditioning/model runtime.\n4. KSampler uses the LATENT from Paint Prepare.\n5. Krea2 CcC Paint Restore receives the decoded result, paint_geometry from Paint Prepare, and generated_mask.\n\nThere is no standalone public Paint Geometry node.\n\nFor outpaint, set expand_left/top/right/bottom directly on Paint Prepare.\n\nRecommended runtime: Krea 2 Turbo + krea2_anypaint_rank32, 8 steps, CFG 1, Euler, simple."
       ]
     },
     {

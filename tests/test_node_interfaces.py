@@ -22,6 +22,7 @@ def test_public_node_mappings():
     }
     assert set(NODE_CLASS_MAPPINGS) == expected
     assert set(NODE_DISPLAY_NAME_MAPPINGS) == expected
+    assert len(NODE_CLASS_MAPPINGS) == 14
 
 
 def test_split_edit_display_names():
