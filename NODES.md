@@ -183,6 +183,7 @@ Required inputs/controls:
 | max_tokens | 32..4096, step 32 | 512 |
 | temperature | 0.01..2.0 | 0.25 |
 | top_p | 0..1 | 0.90 |
+| seed | 0..18446744073709551615 | 0 |
 
 Optional input:
 
@@ -193,6 +194,8 @@ Outputs:
 - created_prompt
 - visual_references
 - creator_info
+
+Sampling is enabled for prompt generation. seed is passed directly to Qwen3-VL generation, matching the requirement of ComfyUI Generate Text when sampling is on.
 
 Modes:
 

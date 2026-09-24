@@ -250,6 +250,7 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
         512,
         0.25,
         0.9,
+        0,
     ]
     creator_inputs = {item["name"]: item for item in creator["inputs"]}
     assert creator_inputs["clip"]["link"] is not None

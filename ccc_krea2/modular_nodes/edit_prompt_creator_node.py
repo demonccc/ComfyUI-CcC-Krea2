@@ -183,6 +183,15 @@ class CcCKrea2EditPromptCreator:
                     "FLOAT",
                     {"default": 0.90, "min": 0.0, "max": 1.0, "step": 0.05},
                 ),
+                "seed": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 0xFFFFFFFFFFFFFFFF,
+                        "tooltip": "Sampling seed passed to Qwen3-VL text generation.",
+                    },
+                ),
             },
             "optional": {
                 "reference_edit_image": (
@@ -206,6 +215,7 @@ class CcCKrea2EditPromptCreator:
         max_tokens: int = 512,
         temperature: float = 0.25,
         top_p: float = 0.90,
+        seed: int = 0,
         reference_edit_image: Optional[torch.Tensor] = None,
     ):
         if visual_references is None:
@@ -242,6 +252,7 @@ class CcCKrea2EditPromptCreator:
             top_p=float(top_p),
             min_p=0.05,
             repetition_penalty=1.05,
+            seed=int(seed),
         )
         created_prompt = _decode_generated_text(clip, generated_ids, generation_prompt)
 
@@ -254,6 +265,7 @@ class CcCKrea2EditPromptCreator:
             f"Max Tokens: {int(max_tokens)}",
             f"Temperature: {float(temperature):.2f}",
             f"Top P: {float(top_p):.2f}",
+            f"Seed: {int(seed)}",
         ]
         if mapping_lines:
             info_lines.append("")

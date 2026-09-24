@@ -13,6 +13,7 @@
 
 ### Changed
 
+- Edit Prompt Creator now exposes and passes an explicit sampling seed to Qwen3-VL generation, matching ComfyUI Generate Text sampling requirements.
 - Merged the former public Paint Geometry stage into Krea2 CcC Paint Prepare. Paint Prepare now owns native image/mask geometry, outpaint expansion, pad/crop normalization, mask processing, semantic-reference preparation, VAE preparation, and returns paint_geometry for Restore.
 - Removed the four Reference Cache nodes from the public ComfyUI node registry, workflows, and current documentation. Normal Visual Reference is the single public appearance-reference path.
 - Updated AnyPaint example workflow to the current Paint Prepare -> Paint -> decode -> Paint Restore path.

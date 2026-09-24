@@ -146,7 +146,7 @@ Modes:
 - create_from_image: analyze reference_edit_image and turn its useful scene/action/composition into explicit edit text.
 - create_from_theme: expand a high-level theme into a concrete new situation while keeping referenced subjects anchored.
 
-Controls are max_tokens, temperature, and top_p. The Visual Reference chain is returned unchanged.
+Controls are max_tokens, temperature, top_p, and seed. Sampling uses that explicit seed, as required by the Qwen3-VL Generate Text path. The Visual Reference chain is returned unchanged.
 
 ## Character Sheet
 

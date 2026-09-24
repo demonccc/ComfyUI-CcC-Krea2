@@ -54,6 +54,7 @@ def test_prompt_creator_public_controls():
     assert required["max_tokens"][1]["default"] == 512
     assert required["temperature"][1]["default"] == 0.25
     assert required["top_p"][1]["default"] == 0.90
+    assert required["seed"][1]["default"] == 0
     assert "reference_edit_image" in optional
 
 
@@ -69,6 +70,7 @@ def test_create_from_image_uses_same_clip_and_passthrough():
         max_tokens=512,
         temperature=0.25,
         top_p=0.90,
+        seed=1234,
         reference_edit_image=_image(0.5),
     )
 
@@ -82,6 +84,7 @@ def test_create_from_image_uses_same_clip_and_passthrough():
     assert clip.generate_kwargs["max_length"] == 512
     assert clip.generate_kwargs["temperature"] == 0.25
     assert clip.generate_kwargs["top_p"] == 0.90
+    assert clip.generate_kwargs["seed"] == 1234
     assert "Mode: create_from_image" in info
 
 
