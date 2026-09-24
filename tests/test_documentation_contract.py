@@ -10,7 +10,7 @@ def _read(name):
 
 
 def _section(text, heading):
-    marker = f"## {heading}"
+    marker = f"## {heading}\n"
     start = text.index(marker)
     rest = text[start + len(marker):]
     end = rest.find("\n## ")
