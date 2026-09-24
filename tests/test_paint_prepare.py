@@ -2,7 +2,7 @@
 
 import torch
 
-from ccc_krea2.modular_nodes.paint_prepare_node import prepare_paint_context
+from ccc_krea2.modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare, prepare_paint_context
 
 
 class FakeVAE:
@@ -169,3 +169,19 @@ def test_semantic_reference_neutralizes_generated_pixels():
     assert semantic[0, 7, 7].mean() < 1.0
     assert generated[0, 7, 7] == 1.0
     assert context["geometry_mode"] == "pad"
+
+
+def test_public_paint_prepare_owns_geometry_controls_and_restore_context_output():
+    schema = CcCKrea2PaintPrepare.INPUT_TYPES()
+    required = schema["required"]
+    optional = schema["optional"]
+
+    assert "image" in required
+    assert "vae" in required
+    assert required["geometry_mode"][0] == ("pad", "crop")
+    assert required["padding_fill"][0] == ("edge", "reflect", "neutral", "white")
+    assert "expand_left" in required
+    assert "fill_holes" in required
+    assert "mask_grow" in required
+    assert "mask" in optional
+    assert CcCKrea2PaintPrepare.RETURN_NAMES[-2:] == ("paint_geometry", "paint_prepare_info")

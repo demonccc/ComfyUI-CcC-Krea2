@@ -10,16 +10,9 @@ from .modular_nodes.latent_node import CcCKrea2Latent
 from .modular_nodes.edit_node import CcCKrea2Edit
 from .modular_nodes.edit_prompt_creator_node import CcCKrea2EditPromptCreator
 from .modular_nodes.character_sheet_node import CcCKrea2CharacterSheet
-from .modular_nodes.paint_geometry_node import CcCKrea2PaintGeometry, CcCKrea2PaintRestore
+from .modular_nodes.paint_geometry_node import CcCKrea2PaintRestore
 from .modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare
 from .modular_nodes.paint_node import CcCKrea2Paint
-from .modular_nodes.cache_nodes import (
-    CcCKrea2ReferenceCacheCreate,
-    CcCKrea2ReferenceCacheSave,
-    CcCKrea2ReferenceCacheLoad,
-    CcCKrea2CachedVisualReference,
-)
-
 
 NODE_CLASS_MAPPINGS = {
     "CcCKrea2AttentionRegion": CcCKrea2AttentionRegion,
@@ -30,14 +23,9 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2Edit": CcCKrea2Edit,
     "CcCKrea2EditPromptCreator": CcCKrea2EditPromptCreator,
     "CcCKrea2CharacterSheet": CcCKrea2CharacterSheet,
-    "CcCKrea2PaintGeometry": CcCKrea2PaintGeometry,
     "CcCKrea2PaintPrepare": CcCKrea2PaintPrepare,
     "CcCKrea2PaintRestore": CcCKrea2PaintRestore,
     "CcCKrea2Paint": CcCKrea2Paint,
-    "CcCKrea2ReferenceCacheCreate": CcCKrea2ReferenceCacheCreate,
-    "CcCKrea2ReferenceCacheSave": CcCKrea2ReferenceCacheSave,
-    "CcCKrea2ReferenceCacheLoad": CcCKrea2ReferenceCacheLoad,
-    "CcCKrea2CachedVisualReference": CcCKrea2CachedVisualReference,
     "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
     "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
     "CcCKrea2TextToImage": CcCKrea2TextToImage,
@@ -53,14 +41,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2Edit": "Krea2 CcC Edit",
     "CcCKrea2EditPromptCreator": "Krea2 CcC Edit Prompt Creator",
     "CcCKrea2CharacterSheet": "Krea2 CcC Character Sheet",
-    "CcCKrea2PaintGeometry": "Krea2 CcC Paint Geometry",
     "CcCKrea2PaintPrepare": "Krea2 CcC Paint Prepare",
     "CcCKrea2PaintRestore": "Krea2 CcC Paint Restore",
     "CcCKrea2Paint": "Krea2 CcC Paint",
-    "CcCKrea2ReferenceCacheCreate": "Krea2 CcC Reference Cache Create",
-    "CcCKrea2ReferenceCacheSave": "Krea2 CcC Reference Cache Save",
-    "CcCKrea2ReferenceCacheLoad": "Krea2 CcC Reference Cache Load",
-    "CcCKrea2CachedVisualReference": "Krea2 CcC Cached Visual Reference",
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
     "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",

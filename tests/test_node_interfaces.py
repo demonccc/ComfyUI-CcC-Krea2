@@ -13,14 +13,9 @@ def test_public_node_mappings():
         "CcCKrea2Edit",
         "CcCKrea2EditPromptCreator",
         "CcCKrea2CharacterSheet",
-        "CcCKrea2PaintGeometry",
         "CcCKrea2PaintPrepare",
         "CcCKrea2PaintRestore",
         "CcCKrea2Paint",
-        "CcCKrea2ReferenceCacheCreate",
-        "CcCKrea2ReferenceCacheSave",
-        "CcCKrea2ReferenceCacheLoad",
-        "CcCKrea2CachedVisualReference",
         "CcCKrea2LoRAPromptSettings",
         "CcCKrea2LoRAStack",
         "CcCKrea2TextToImage",
@@ -38,12 +33,9 @@ def test_split_edit_display_names():
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Edit"] == "Krea2 CcC Edit"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2EditPromptCreator"] == "Krea2 CcC Edit Prompt Creator"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2CharacterSheet"] == "Krea2 CcC Character Sheet"
-    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2PaintGeometry"] == "Krea2 CcC Paint Geometry"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2PaintPrepare"] == "Krea2 CcC Paint Prepare"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2PaintRestore"] == "Krea2 CcC Paint Restore"
     assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Paint"] == "Krea2 CcC Paint"
-    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2ReferenceCacheCreate"] == "Krea2 CcC Reference Cache Create"
-    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2CachedVisualReference"] == "Krea2 CcC Cached Visual Reference"
 
 
 def test_only_current_edit_nodes_are_registered():
@@ -53,14 +45,12 @@ def test_only_current_edit_nodes_are_registered():
     assert "CcCKrea2VisualReference" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2SemanticReference" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2CharacterSheet" in NODE_CLASS_MAPPINGS
-    assert "CcCKrea2PaintGeometry" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2PaintPrepare" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2PaintRestore" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2Paint" in NODE_CLASS_MAPPINGS
 
 
-def test_paint_geometry_nodes_use_public_category():
-    assert NODE_CLASS_MAPPINGS["CcCKrea2PaintGeometry"].CATEGORY == "Krea2 CcC Edit"
+def test_paint_nodes_use_public_category():
     assert NODE_CLASS_MAPPINGS["CcCKrea2PaintPrepare"].CATEGORY == "Krea2 CcC Edit"
     assert NODE_CLASS_MAPPINGS["CcCKrea2PaintRestore"].CATEGORY == "Krea2 CcC Edit"
     assert NODE_CLASS_MAPPINGS["CcCKrea2Paint"].CATEGORY == "Krea2 CcC Edit"

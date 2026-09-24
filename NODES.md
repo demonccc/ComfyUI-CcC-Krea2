@@ -244,78 +244,25 @@ The node is a deterministic compositor only. It does not invent missing views an
 - `CcC Krea2 - LoRA Stack`
 - `CcC Krea2 - Text to Image`
 
-## Krea2 CcC Reference Cache Create
+## Krea2 CcC Paint Prepare
 
-Precomputes one visual reference.
+Prepares the complete Paint input in one node. It owns both reversible Krea geometry normalization and mask/latent preparation.
 
-Inputs include the source image, Krea2 CLIP, VAE, target latent, appearance geometry controls, and semantic grounding controls. `semantic_grounding_px` uses the same integer step-32 convention as Krea2 CcC Visual Reference.
+Inputs:
 
-Outputs:
+- `image`
+- `vae`
+- optional `mask`
 
-- `cache`
-- `cache_info`
-
-The cache stores the raw VAE appearance latent plus Qwen visual features. It does not store final prompt-dependent conditioning.
-
-## Krea2 CcC Reference Cache Save / Load
-
-Save writes portable `.safetensors` files under:
-
-```text
-ComfyUI/models/krea2_ccc_cache/
-```
-
-Load restores the cached tensors and metadata.
-
-## Krea2 CcC Cached Visual Reference
-
-Adds a loaded or newly created cache to the normal visual-reference chain.
-
-Runtime controls remain editable:
-
-- `boost`
-- RoPE placement
-- semantic enable/disable
-- `prompt_annotation`
-
-No VAE encode or Qwen Vision execution is required for a cached reference.
-
-
-## Krea2 CcC Paint Geometry
-
-Resolves an image + mask pair to a curated Krea working geometry without resizing the source.
-
-Controls:
+Geometry controls:
 
 | Control | Values | Default | Behavior |
 | --- | --- | --- | --- |
 | `geometry_mode` | pad, crop | pad | Pad outward to a containing Krea geometry, or crop inward to an inner Krea geometry. |
 | `padding_fill` | edge, reflect, neutral, white | edge | Pixel fill used for temporary padding and explicit outpaint expansion. |
-| `horizontal_position` | center, left, right | center | Chooses where padding is placed or where the crop window is anchored horizontally. |
-| `vertical_position` | center, top, bottom | center | Chooses where padding is placed or where the crop window is anchored vertically. |
-| `expand_left/top/right/bottom` | 0 .. 8192, step 16 | 0 | Explicit outpaint expansion. It belongs to the requested/native canvas and is preserved after restore. |
-
-The Krea working geometry is selected from the same curated target table used by **Krea2 CcC Latent**. Feasible candidates are ranked by aspect-ratio proximity, then size proximity.
-
-Guardrails:
-
-- `crop` requires at least one curated Krea geometry that fits completely inside the requested canvas. Otherwise it fails with a message to use padding.
-- `pad` requires at least one curated Krea geometry that completely contains the requested canvas. Otherwise it fails with a message to use crop.
-
-Temporary padding is always marked as generable in the returned mask. Image and mask share exactly the same crop/pad transform.
-
-Explicit outpaint expansion and temporary Krea padding are tracked separately. Both remain generable, but Paint Prepare can preserve the explicit expansion's configured `padding_fill` as reference context while still neutralizing temporary Krea padding.
-
-Outputs:
-
-- `paint_geometry`
-- `prepared_image`
-- `prepared_mask`
-- `geometry_info`
-
-## Krea2 CcC Paint Prepare
-
-Consumes `KREA2_PAINT_GEOMETRY` plus the VAE.
+| `horizontal_position` | center, left, right | center | Controls horizontal pad/crop placement. |
+| `vertical_position` | center, top, bottom | center | Controls vertical pad/crop placement. |
+| `expand_left/top/right/bottom` | 0 .. 8192, step 16 | 0 | Explicit outpaint expansion that belongs to the requested/final canvas. |
 
 Mask controls:
 
@@ -327,10 +274,14 @@ Mask controls:
 | `mask_blur_amount` | 0 .. 128 | 0 | Feather radius/sigma. |
 | `mask_blur_direction` | outside, inside, both | outside | Controls which side of the hard boundary receives the soft transition. |
 
+The source image is never resized during geometry normalization. `pad` chooses a curated Krea geometry that contains the requested canvas; `crop` chooses one that fits inside it. Impossible directions fail instead of silently resizing.
+
 Processing:
 
 ```text
-prepared image + prepared mask
+image + mask
+  -> explicit outpaint expansion
+  -> temporary Krea pad/crop geometry
   -> optional fill holes
   -> signed grow/shrink
   -> directional feather
@@ -343,8 +294,6 @@ prepared image + prepared mask
   -> sampling LATENT
 ```
 
-Paint Prepare also VAE-encodes the semantic reference for the Paint runtime. Explicit `expand_left/top/right/bottom` margins remain fully generable, but their edge/reflect/neutral/white fill is kept in the semantic/reference image so AnyPaint can see border color and lighting continuity. A normal user-painted mask is still neutralized as before.
-
 Outputs:
 
 - `paint_context`
@@ -353,7 +302,10 @@ Outputs:
 - `semantic_reference`
 - `generated_mask`
 - `keep_mask`
+- `paint_geometry`
 - `paint_prepare_info`
+
+`paint_geometry` is passed directly to **Krea2 CcC Paint Restore** so the final image can be depadded or composited back exactly.
 
 ## Krea2 CcC Paint
 

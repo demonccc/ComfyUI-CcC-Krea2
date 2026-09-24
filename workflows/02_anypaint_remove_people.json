@@ -225,26 +225,31 @@
       "id": 6,
       "type": "CcCKrea2PaintPrepare",
       "pos": [
-        900,
+        420,
         430
       ],
       "size": [
-        460,
-        390
+        560,
+        620
       ],
       "flags": {},
-      "order": 7,
+      "order": 6,
       "mode": 0,
       "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 4
+        },
         {
           "name": "vae",
           "type": "VAE",
           "link": 6
         },
         {
-          "name": "paint_geometry",
-          "type": "KREA2_PAINT_GEOMETRY",
-          "link": 7
+          "name": "mask",
+          "type": "MASK",
+          "link": 5
         }
       ],
       "outputs": [
@@ -292,6 +297,13 @@
           ]
         },
         {
+          "name": "paint_geometry",
+          "type": "KREA2_PAINT_GEOMETRY",
+          "links": [
+            24
+          ]
+        },
+        {
           "name": "paint_prepare_info",
           "type": "STRING",
           "links": []
@@ -301,6 +313,14 @@
         "Node name for S&R": "CcCKrea2PaintPrepare"
       },
       "widgets_values": [
+        "pad",
+        "edge",
+        "center",
+        "center",
+        0,
+        0,
+        0,
+        0,
         false,
         12,
         "gaussian_sigma",
@@ -781,74 +801,8 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "AnyPaint remove-people test.\\n\\n1. Load an image and paint the removal region with ComfyUI Mask Editor.\\n2. Paint Geometry defaults to pad + edge fill and maps the source to the nearest containing curated Krea geometry without resizing it.\\n3. Crop is guarded when the source is too small; padding is guarded when the source exceeds the available Krea target size.\\n4. Paint Prepare creates the sampling latent and token-aligned noise_mask.\\n5. Restore removes temporary Krea padding, or composites a generated crop back onto the requested native canvas.\\n\\nFor outpaint, use expand_left/top/right/bottom on Paint Geometry.\\n\\nRecommended runtime: Krea 2 Turbo + krea2_anypaint_rank32, 8 steps, CFG 1, Euler, simple."
+        "AnyPaint remove-people test.\n\n1. Load an image and paint the removal region with ComfyUI Mask Editor.\n2. Paint Prepare now owns Krea geometry and defaults to pad + edge fill. It maps the source to the nearest containing curated Krea geometry without resizing it.\n3. Crop is guarded when the source is too small; padding is guarded when the source exceeds the available Krea target size.\n4. The same Paint Prepare node applies fill-holes/grow/feather, creates the semantic reference, sampling latent and token-aligned noise_mask.\n5. Paint Restore consumes paint_geometry directly from Paint Prepare and removes temporary Krea padding, or composites a generated crop back onto the requested native canvas.\n\nFor outpaint, use expand_left/top/right/bottom directly on Paint Prepare.\n\nRecommended runtime: Krea 2 Turbo + krea2_anypaint_rank32, 8 steps, CFG 1, Euler, simple."
       ]
-    },
-    {
-      "id": 20,
-      "type": "CcCKrea2PaintGeometry",
-      "pos": [
-        380,
-        430
-      ],
-      "size": [
-        460,
-        420
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 4
-        },
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 5
-        }
-      ],
-      "outputs": [
-        {
-          "name": "paint_geometry",
-          "type": "KREA2_PAINT_GEOMETRY",
-          "links": [
-            7,
-            24
-          ]
-        },
-        {
-          "name": "prepared_image",
-          "type": "IMAGE",
-          "links": []
-        },
-        {
-          "name": "prepared_mask",
-          "type": "MASK",
-          "links": []
-        },
-        {
-          "name": "geometry_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2PaintGeometry"
-      },
-      "widgets_values": [
-        "pad",
-        "edge",
-        "center",
-        "center",
-        0,
-        0,
-        0,
-        0
-      ],
-      "title": "Krea Geometry - Pad/Crop"
     },
     {
       "id": 21,
@@ -926,7 +880,7 @@
       4,
       5,
       0,
-      20,
+      6,
       0,
       "IMAGE"
     ],
@@ -934,8 +888,8 @@
       5,
       5,
       1,
-      20,
-      1,
+      6,
+      2,
       "MASK"
     ],
     [
@@ -943,16 +897,8 @@
       3,
       0,
       6,
-      0,
-      "VAE"
-    ],
-    [
-      7,
-      20,
-      0,
-      6,
       1,
-      "KREA2_PAINT_GEOMETRY"
+      "VAE"
     ],
     [
       8,
@@ -1084,8 +1030,8 @@
     ],
     [
       24,
-      20,
-      0,
+      6,
+      6,
       21,
       1,
       "KREA2_PAINT_GEOMETRY"
@@ -1119,21 +1065,21 @@
       "color": "#3f789e"
     },
     {
-      "title": "Source + Krea Geometry",
+      "title": "Source + Paint Prepare",
       "bounding": [
         -40,
         390,
-        900,
-        560
+        1060,
+        880
       ],
       "color": "#3f789e"
     },
     {
-      "title": "Paint Prepare + Inspection",
+      "title": "Paint Inspection",
       "bounding": [
-        860,
+        1040,
         390,
-        1240,
+        1060,
         870
       ],
       "color": "#3f789e"
@@ -1153,7 +1099,7 @@
       "bounding": [
         1540,
         -40,
-        1850,
+        2150,
         300
       ],
       "color": "#3f789e"

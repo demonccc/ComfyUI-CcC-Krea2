@@ -128,59 +128,36 @@ Latent owns:
 - target image placement
 - optional latent semantic metadata
 
-## Paint geometry and restore
+## Paint prepare and restore
 
-Paint keeps source pixels at native scale and normalizes only the working canvas:
+Paint keeps source pixels at native scale while **Paint Prepare** owns the complete pre-generation preparation:
 
 ```text
-source image + mask
-        |
-        v
-Paint Geometry
-  pad or crop only
-  no source resize
+source image + mask + VAE
         |
         v
 Paint Prepare
+  explicit outpaint expansion
+  pad or crop to Krea working geometry
+  no source resize
+  fill/grow/feather mask
+  semantic reference
   VAE known canvas
   token-aligned noise_mask
         |
-        v
-KSampler -> VAE Decode
-        |
-        v
-Paint Restore
-  depad exactly
-  or composite crop back
+        +--> paint_context --> Paint
+        +--> LATENT ---------> KSampler
+        +--> paint_geometry -------------------+
+                                                |
+KSampler -> VAE Decode                         |
+        |                                       |
+        +----------------> Paint Restore <-------+
 ```
 
-`pad` selects a curated Krea geometry that contains the requested canvas. `crop` selects one that fits inside it. Both use the same curated target table as Latent; impossible directions fail instead of silently resizing.
+`pad` selects a curated Krea geometry that contains the requested canvas. `crop` selects one that fits inside it. Impossible directions fail instead of silently resizing.
 
 The image and mask always share the same spatial transform. Explicit outpaint expansion belongs to the requested canvas; only temporary Krea padding is removed by Restore.
-
-Paint Prepare owns the sampling latent because it is the node that has the finalized working image, finalized mask, and VAE. Paint then owns only Qwen conditioning and the registered reference runtime.
-
 
 ## Ownership
 
 The current public edit architecture is implemented by Krea2 CcC Edit modules only. External projects that influenced individual ideas or techniques are acknowledged separately in [NOTICE](NOTICE).
-
-## Reference cache
-
-Reference caching is an optimization layer, not a second runtime.
-
-```text
-source image
-   |
-   +--> appearance preparation --> VAE --> appearance_latent ----+
-   |                                                             |
-   +--> Qwen visual path --> merged + grid + deepstack ----------+--> cache.safetensors
-                                                                 |
-runtime                                                          |
-   prompt --> Qwen language path <--- cached Qwen visual --------+
-   target --> Krea2 CcC Edit runtime <--- cached appearance latent ---+
-```
-
-The final Qwen conditioning is always recomputed because it depends on the current prompt.
-
-The appearance latent is validated against the target geometry used to create it. Cached and uncached references converge on the same CONDITIONING/reference-latent transport and the same Krea2 CcC Edit runtime.

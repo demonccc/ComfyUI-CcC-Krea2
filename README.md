@@ -164,60 +164,15 @@ references
 
 Reference ordering is preserved physically.
 
-## Reference Cache
-
-Krea2 CcC Edit can precompute and persist one visual reference as a portable `.safetensors` cache.
-
-The cache contains two prompt-independent payloads:
-
-- the raw VAE appearance latent for the target geometry used during cache creation;
-- Qwen3-VL visual features: `merged`, `grid`, and all DeepStack tensors.
-
-The prompt-dependent Qwen language path is never cached. A new prompt still produces new conditioning while reusing the cached visual features.
-
-Public cache nodes:
-
-- **Krea2 CcC Reference Cache Create**
-- **Krea2 CcC Reference Cache Save**
-- **Krea2 CcC Reference Cache Load**
-- **Krea2 CcC Cached Visual Reference**
-
-Cached and normal visual references can be mixed in the same ordered reference chain. Runtime controls such as boost, RoPE placement, semantic enablement, and prompt annotation remain adjustable after loading the cache.
-
-Appearance cache geometry is target-specific. If the output geometry changes, create another appearance cache for that target. The Qwen payload itself is prompt-independent.
-
-The cache design was informed by **ComfyUI-Krea2IdentityMod** by ArtemKo7v:
-https://github.com/ArtemKo7v/ComfyUI-Krea2IdentityMod
-
-In particular, that project demonstrated the usefulness of persisting raw appearance latents and identified the Qwen3-VL visual cache boundary that requires `merged + grid + deepstack`, rather than caching final prompt-conditioned conditioning.
-
 ## Paint
 
-Krea2 CcC Paint uses a temporary Krea working geometry without resizing the known source image.
+Krea2 CcC Paint uses three public nodes:
 
-The Paint path is split into four focused nodes:
-
-- **Krea2 CcC Paint Geometry**: maps the requested native canvas to a curated Krea target using only `pad` or `crop`. The source is never resized.
-- **Krea2 CcC Paint Prepare**: applies mask grow/feather, builds the semantic reference, VAE-encodes the working canvas, and returns the sampling `LATENT` with a token-aligned `noise_mask`.
+- **Krea2 CcC Paint Prepare**: receives the native image/mask plus VAE, resolves reversible Krea `pad`/`crop` geometry, handles explicit outpaint expansion, processes fill-holes/grow/feather, builds the semantic reference, VAE-encodes the known canvas, and returns both the sampling `LATENT` and `paint_geometry`.
 - **Krea2 CcC Paint**: image-grounds Qwen, attaches the pre-encoded appearance reference, and installs the registered t=0 reference/KV-cache runtime.
-- **Krea2 CcC Paint Restore**: returns the decoded result to the requested native canvas. Pad mode removes only temporary Krea padding; crop mode composites the generated crop back into the preserved native canvas.
+- **Krea2 CcC Paint Restore**: returns the decoded result to the requested native canvas using `paint_geometry` from Paint Prepare. Pad mode removes only temporary Krea padding; crop mode composites the generated crop back into the preserved native canvas.
 
-Paint Geometry modes:
-
-- `pad`: chooses the closest curated Krea geometry that fully contains the requested canvas. Padding can be placed left/center/right and top/center/bottom.
-- `crop`: chooses the closest curated Krea geometry that fits completely inside the requested canvas. Crop origin follows the same horizontal/vertical position controls.
-
-Padding fill options are `edge` (default), `reflect`, `neutral`, and `white`. All temporary padding is included in the generation mask.
-
-Guardrails prevent implicit resizing:
-
-- If no curated Krea geometry can fit inside the requested canvas, `crop` fails and asks to use padding.
-- If no curated Krea geometry can contain the requested canvas, `pad` fails and asks to use crop.
-
-Explicit `expand_left/top/right/bottom` values belong to the requested native/outpaint canvas. Restore removes only the temporary Krea normalization added after those expansions.
-
-The source image and its mask always undergo the same geometric transform so mask coordinates cannot drift.
-
+Paint Prepare never resizes the known source image during geometry normalization. `pad` selects a curated Krea geometry that contains the requested canvas; `crop` selects one that fits inside it. Explicit `expand_left/top/right/bottom` values belong to the requested native/outpaint canvas and survive Restore.
 
 ## Test Workflows
 

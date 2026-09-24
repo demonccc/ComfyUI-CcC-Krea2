@@ -11,6 +11,13 @@ import torch
 import torch.nn.functional as F
 
 from ..constants import NODE_CATEGORY
+from .paint_geometry_node import (
+    GEOMETRY_MODES,
+    PADDING_FILLS,
+    HORIZONTAL_POSITIONS,
+    VERTICAL_POSITIONS,
+    prepare_paint_geometry,
+)
 
 
 _ALIGNMENT = 16
@@ -241,41 +248,94 @@ def prepare_paint_context(
 
 
 class CcCKrea2PaintPrepare:
-    """Build Paint masks, semantic reference and the sampling latent from prepared geometry."""
+    """Resolve Paint geometry, masks, semantic reference and sampling latent in one node."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("KREA2_PAINT_CONTEXT", "LATENT", "IMAGE", "IMAGE", "MASK", "MASK", "STRING")
-    RETURN_NAMES = ("paint_context", "latent", "prepared_image", "semantic_reference", "generated_mask", "keep_mask", "paint_prepare_info")
+    RETURN_TYPES = (
+        "KREA2_PAINT_CONTEXT",
+        "LATENT",
+        "IMAGE",
+        "IMAGE",
+        "MASK",
+        "MASK",
+        "KREA2_PAINT_GEOMETRY",
+        "STRING",
+    )
+    RETURN_NAMES = (
+        "paint_context",
+        "latent",
+        "prepared_image",
+        "semantic_reference",
+        "generated_mask",
+        "keep_mask",
+        "paint_geometry",
+        "paint_prepare_info",
+    )
     FUNCTION = "prepare"
     DESCRIPTION = (
-        "Consumes Krea2 CcC Paint Geometry, optionally fills enclosed mask holes, applies mask grow/feather, creates the semantic reference, "
-        "VAE-encodes the known Krea canvas, and returns the sampling latent with token-aligned noise_mask."
+        "Prepares Krea2 Paint from the native image and mask in one step: resolves reversible "
+        "Krea pad/crop geometry without resizing source pixels, applies optional outpaint expansion, "
+        "fills/grows/feathers the mask, creates the semantic reference, VAE-encodes the known canvas, "
+        "and returns the sampling latent plus paint_geometry for Paint Restore."
     )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "image": ("IMAGE",),
                 "vae": ("VAE",),
-                "paint_geometry": ("KREA2_PAINT_GEOMETRY",),
+                "geometry_mode": (GEOMETRY_MODES, {"default": "pad"}),
+                "padding_fill": (PADDING_FILLS, {"default": "edge"}),
+                "horizontal_position": (HORIZONTAL_POSITIONS, {"default": "center"}),
+                "vertical_position": (VERTICAL_POSITIONS, {"default": "center"}),
+                "expand_left": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
+                "expand_top": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
+                "expand_right": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
+                "expand_bottom": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
                 "fill_holes": ("BOOLEAN", {"default": False}),
                 "mask_grow": ("INT", {"default": 0, "min": -256, "max": 256, "step": 1}),
                 "mask_blur_mode": (["standard", "gaussian_sigma"], {"default": "gaussian_sigma"}),
                 "mask_blur_amount": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 128.0, "step": 0.5}),
                 "mask_blur_direction": (["outside", "inside", "both"], {"default": "outside"}),
-            }
+            },
+            "optional": {
+                "mask": ("MASK",),
+            },
         }
 
     def prepare(
         self,
+        image,
         vae,
-        paint_geometry,
+        geometry_mode="pad",
+        padding_fill="edge",
+        horizontal_position="center",
+        vertical_position="center",
+        expand_left=0,
+        expand_top=0,
+        expand_right=0,
+        expand_bottom=0,
         fill_holes=False,
         mask_grow=0,
         mask_blur_mode="gaussian_sigma",
         mask_blur_amount=0.0,
         mask_blur_direction="outside",
+        mask=None,
     ):
+        paint_geometry, _, _ = prepare_paint_geometry(
+            image=image,
+            mask=mask,
+            geometry_mode=geometry_mode,
+            padding_fill=padding_fill,
+            horizontal_position=horizontal_position,
+            vertical_position=vertical_position,
+            expand_left=expand_left,
+            expand_top=expand_top,
+            expand_right=expand_right,
+            expand_bottom=expand_bottom,
+        )
+
         result = prepare_paint_context(
             vae=vae,
             paint_geometry=paint_geometry,
@@ -285,11 +345,18 @@ class CcCKrea2PaintPrepare:
             mask_blur_amount=mask_blur_amount,
             mask_blur_direction=mask_blur_direction,
         )
-        context, _, _, semantic_reference, generated_mask, _ = result
+        context, latent, prepared_image, semantic_reference, generated_mask, keep_mask = result
+
+        transform = paint_geometry.get("transform", {})
         info = "\n".join([
             "=== Krea2 CcC Paint Prepare ===",
-            f"Canvas: {context['canvas_width']}x{context['canvas_height']}",
-            f"Geometry Mode: {context['geometry_mode']}",
+            f"Geometry Mode: {geometry_mode}",
+            f"Source: {paint_geometry['source_width']} x {paint_geometry['source_height']}",
+            f"Requested Canvas: {paint_geometry['base_width']} x {paint_geometry['base_height']}",
+            f"Krea Working Geometry: {paint_geometry['target_width']} x {paint_geometry['target_height']}",
+            f"Position: {horizontal_position} / {vertical_position}",
+            f"Padding Fill: {padding_fill if geometry_mode == 'pad' or any((expand_left, expand_top, expand_right, expand_bottom)) else '<unused>'}",
+            f"Transform: {transform}",
             f"Fill Holes: {'yes' if fill_holes else 'no'}",
             f"Mask Grow: {mask_grow}px",
             f"Mask Feather: {mask_blur_mode} amount={float(mask_blur_amount):.2f} direction={mask_blur_direction}",
@@ -298,4 +365,13 @@ class CcCKrea2PaintPrepare:
             f"Generated Mask Range: {float(generated_mask.min()):.3f}..{float(generated_mask.max()):.3f}",
             "Latent: known-image samples + token-aligned noise_mask",
         ])
-        return (*result, info)
+        return (
+            context,
+            latent,
+            prepared_image,
+            semantic_reference,
+            generated_mask,
+            keep_mask,
+            paint_geometry,
+            info,
+        )

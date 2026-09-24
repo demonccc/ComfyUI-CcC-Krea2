@@ -34,3 +34,17 @@ def test_architecture_documents_single_runtime_and_separate_qwen_vae_paths():
     assert "Qwen path" in architecture
     assert "appearance path" in architecture
     assert "[text | reference 1 | reference 2 | ... | target]" in architecture
+
+
+def test_removed_cache_and_geometry_nodes_are_not_documented_as_public():
+    nodes = _read("NODES.md")
+    readme = _read("README.md")
+    architecture = _read("ARCHITECTURE.md")
+
+    assert "Krea2 CcC Reference Cache Create" not in nodes
+    assert "Krea2 CcC Cached Visual Reference" not in nodes
+    assert "## Reference Cache" not in readme
+    assert "## Reference cache" not in architecture
+    assert "## Krea2 CcC Paint Geometry" not in nodes
+    assert "Paint Prepare" in readme
+    assert "paint_geometry" in nodes

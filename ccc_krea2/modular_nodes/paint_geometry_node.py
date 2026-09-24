@@ -1,4 +1,4 @@
-"""Geometry preparation and exact restore for Krea2 CcC Paint."""
+"""Internal Paint geometry helpers plus Krea2 CcC Paint Restore."""
 
 from __future__ import annotations
 
@@ -344,55 +344,6 @@ def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any], 
         return restored.clamp(0.0, 1.0)
 
     raise ValueError(f"[Krea2 CcC Paint Restore] Unknown geometry mode '{mode}'.")
-
-
-class CcCKrea2PaintGeometry:
-    """Resolve Paint to a curated Krea geometry using only padding or cropping."""
-
-    CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("KREA2_PAINT_GEOMETRY", "IMAGE", "MASK", "STRING")
-    RETURN_NAMES = ("paint_geometry", "prepared_image", "prepared_mask", "geometry_info")
-    FUNCTION = "prepare"
-    DESCRIPTION = (
-        "Maps the native paint canvas to a curated Krea target using pad or crop only. "
-        "The source is never resized. Padding fill can use edge, reflect, neutral or white. "
-        "The returned geometry context allows exact depadding or crop compositing later."
-    )
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "geometry_mode": (GEOMETRY_MODES, {"default": "pad"}),
-                "padding_fill": (PADDING_FILLS, {"default": "edge"}),
-                "horizontal_position": (HORIZONTAL_POSITIONS, {"default": "center"}),
-                "vertical_position": (VERTICAL_POSITIONS, {"default": "center"}),
-                "expand_left": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
-                "expand_top": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
-                "expand_right": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
-                "expand_bottom": ("INT", {"default": 0, "min": 0, "max": 8192, "step": 16}),
-            },
-            "optional": {"mask": ("MASK",)},
-        }
-
-    def prepare(self, image, geometry_mode="pad", padding_fill="edge", horizontal_position="center", vertical_position="center", expand_left=0, expand_top=0, expand_right=0, expand_bottom=0, mask=None):
-        context, prepared_image, prepared_mask = prepare_paint_geometry(
-            image=image, mask=mask, geometry_mode=geometry_mode, padding_fill=padding_fill,
-            horizontal_position=horizontal_position, vertical_position=vertical_position,
-            expand_left=expand_left, expand_top=expand_top, expand_right=expand_right, expand_bottom=expand_bottom,
-        )
-        info = "\n".join([
-            "=== Krea2 CcC Paint Geometry ===",
-            f"Mode: {geometry_mode}",
-            f"Source: {context['source_width']} x {context['source_height']}",
-            f"Requested Canvas: {context['base_width']} x {context['base_height']}",
-            f"Krea Working Geometry: {context['target_width']} x {context['target_height']}",
-            f"Position: {horizontal_position} / {vertical_position}",
-            f"Padding Fill: {padding_fill if geometry_mode == 'pad' or any((expand_left, expand_top, expand_right, expand_bottom)) else '<unused>'}",
-            f"Transform: {context['transform']}",
-        ])
-        return context, prepared_image, prepared_mask, info
 
 
 class CcCKrea2PaintRestore:
