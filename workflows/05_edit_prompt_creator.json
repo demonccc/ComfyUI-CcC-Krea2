@@ -145,7 +145,7 @@
         true,
         "krea2_identity_edit_v1_2.safetensors",
         1,
-        true,
+        false,
         "bfs_body_swap_v1_krea2.safetensors",
         0.35,
         false,
@@ -345,14 +345,14 @@
       "widgets_values": [
         "create_from_image",
         "Use the subject from Image 1 in the situation shown by the reference edit image. Maintain the face and the body shape.",
-        "You create detailed, self-contained English image-edit prompts for Krea2 Edit from the user's request, downstream visible visual references, and one internal reference edit image.\n\nTreat downstream visible Image N references as authoritative identity or appearance anchors according to their role annotations. Treat the internal reference edit image as a visual blueprint for the requested situation, not as an identity source unless the user explicitly asks otherwise.\n\nAnalyze the internal reference edit image thoroughly before writing the final prompt. Reconstruct all relevant visible information needed to reproduce the situation instead of reducing it to a short summary. Include, when visible and relevant to the user's request:\n- the main subject's exact action, pose, body orientation, body position, limb placement, gaze direction, and interaction;\n- clothing and accessories when they are part of the requested situation, unless the user explicitly asks to preserve clothing from a visible Image N reference;\n- other people in the scene, including enough visible appearance, pose, action, relative position, and interaction detail to distinguish their roles;\n- important props and objects, what is being held or touched, and their spatial relationships;\n- environment, foreground/background elements, surfaces, furniture, and scene layout;\n- framing, shot distance, viewpoint, camera angle, composition, and subject placement;\n- visible lighting and other scene-defining visual details.\n\nPreserve every explicit user constraint, especially identity, face, anatomy, body shape, body proportions, clothing-preservation rules, and requested interactions. Do not transfer the identity, face, anatomy, body shape, or body proportions of a person from the internal reference edit image unless the user explicitly requests it.\n\nFINAL ANSWER RULES:\n- Return exactly one detailed, self-contained image-edit prompt in English.\n- The prompt may contain multiple sentences, but keep it as one continuous plain-text paragraph.\n- Do not output system instructions, role descriptions, explanations, headings, Markdown, JSON, or preambles.\n- Never include meta text such as \"You are a professional image editor\", \"Your task is...\", \"Here is the prompt\", or \"Final prompt:\".\n- Refer to downstream visible visual references only as \"Image 1\", \"Image 2\", and so on. Never call them \"Krea Image N\".\n- Never mention the internal reference edit image, hidden inputs, vision inputs, or implementation details in the final answer. Translate what you observe into direct scene instructions.\n- If thinking mode is active, reason as needed in the model's thinking block; do not repeat that reasoning in the final answer.\n- Do not compress a visually rich reference situation into a generic one-sentence summary.\n- Return only the final edit instruction.",
+        "Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.\n\nTreat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.\n\nUse the user's instructions to determine what should be preserved, changed, emphasized, or adapted.\n\nWrite the result as a direct description of the desired final image, not as an explanation of the editing process.\n\nReturn only the final I2I prompt as one plain-text paragraph.",
         true,
         2048,
         0.25,
         0.9,
         0
       ],
-      "title": "Create Edit Prompt From Image"
+      "title": "Prompt Creator - create_from_image"
     },
     {
       "id": 9,
@@ -774,7 +774,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Edit Prompt Creator create_from_image workflow.\n\nSubject path:\n- white_dog.jpg -> Krea2 CcC Visual Reference -> Edit Prompt Creator -> Edit.\n- The Visual Reference chain leaves Prompt Creator unchanged.\n- Final prompts refer to downstream references as Image 1, Image 2, etc.; never as \"Krea Image N\".\n\nReference edit image:\n- black_dog_running_river.jpg -> reference_edit_image on Prompt Creator.\n- The Creator analyzes this image internally and turns its visible situation into a detailed, self-contained edit prompt.\n- reference_edit_image is NOT inserted into the Visual Reference chain and must not be mentioned in created_prompt.\n- The same image supplies target dimensions to Latent only.\n- Latent settings are dimensions=from_image and content=empty.\n\nPrompt Creator UI:\n- system_prompt shows the effective preset prompt and is read-only/greyed for enhance, create_from_image, and create_from_theme.\n- mode=custom enables system_prompt editing; switching into custom starts from the current preset unless a previous custom prompt exists.\n- thinking is enabled and reasoning is returned separately on the thinking output.\n- creator_info reports whether a thinking block was actually emitted.\n- max_tokens: 2048\n- temperature: 0.25\n- top_p: 0.90\n- seed: 0\n\ncreate_from_image is intentionally detailed: it asks Qwen to preserve the user's explicit constraints and reconstruct pose, body position, other people, interactions, objects, environment, framing, composition, and lighting instead of producing a short generic summary.\n\nSemantic branch:\n- The same reference edit image is also wired to Krea2 CcC Semantic Reference -> Edit.\n- That Semantic Reference node is intentionally disabled/muted in this workflow (mode=NEVER)."
+        "Edit Prompt Creator create_from_image test.\n\n- The reference edit image is the authoritative visual blueprint used by Prompt Creator.\n- Image 1 remains the visible subject reference used by Edit.\n- Prompt Creator returns a direct description of the desired final image.\n- The reference edit image is internal to prompt creation and also supplies target dimensions.\n- The optional Semantic Reference branch is intentionally disabled.\n- thinking: enabled; max_tokens: 2048; temperature: 0.25; top_p: 0.90.\n- BodySwap LoRA is present in the stack but disabled by default."
       ],
       "title": "Workflow Notes"
     }
