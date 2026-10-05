@@ -11,6 +11,7 @@ from ccc_krea2.modular_nodes.character_sheet_node import (
     PRESET_1_PORTRAIT_2_BODIES,
     PRESET_2_BODIES,
     PRESET_2_PORTRAITS,
+    PRESET_2_PORTRAITS_1_BODY,
     PRESET_3_PORTRAITS,
     PRESET_3_PORTRAITS_1_BODY,
     PRESET_4_PORTRAITS,
@@ -70,6 +71,7 @@ def test_character_sheet_presets_match_public_contract():
         "1 body",
         "2 bodies",
         "1 portrait + 2 bodies",
+        "2 portraits + 1 body",
         "3 portraits + 1 body",
         "4 portraits + 1 body",
     )
@@ -85,6 +87,27 @@ def test_character_sheet_geometry_reuses_latent_krea_presets():
     resize_choices, resize_options = required["resize_method"]
     assert tuple(resize_choices) == CHARACTER_SHEET_RESIZE_METHODS
     assert resize_options["default"] == "lanczos"
+
+
+def test_two_portraits_plus_body_uses_stacked_portraits_and_full_height_body():
+    rects = _layout_rects(
+        PRESET_2_PORTRAITS_1_BODY,
+        width=1024,
+        height=1024,
+        outer_margin=8,
+        padding=8,
+    )
+
+    portrait_1 = rects["portrait_1"]
+    portrait_2 = rects["portrait_2"]
+    body = rects["body_1"]
+
+    assert portrait_1[0] == portrait_2[0]
+    assert portrait_1[2] == portrait_2[2]
+    assert portrait_2[1] > portrait_1[1]
+    assert body[1] == 8
+    assert body[3] == 1008
+    assert body[0] > portrait_1[0]
 
 
 def test_four_portraits_plus_body_composes_selected_krea_geometry():
@@ -187,6 +210,14 @@ def test_single_portrait_fit_keeps_complete_source_without_crop():
                 "portrait_1": _solid((1.0, 0.0, 0.0)),
                 "body_1": _solid((1.0, 0.0, 1.0), 120, 48),
                 "body_2": _solid((0.0, 1.0, 1.0), 120, 48),
+            },
+        ),
+        (
+            PRESET_2_PORTRAITS_1_BODY,
+            {
+                "portrait_1": _solid((1.0, 0.0, 0.0)),
+                "portrait_2": _solid((0.0, 1.0, 0.0)),
+                "body_1": _solid((1.0, 0.0, 1.0), 120, 48),
             },
         ),
         (
