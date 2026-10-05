@@ -8,7 +8,7 @@ from .modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
 from .modular_nodes.latent_node import CcCKrea2Latent
 from .modular_nodes.edit_node import CcCKrea2Edit
-from .modular_nodes.edit_prompt_creator_node import CcCKrea2EditPromptCreator
+from .modular_nodes.edit_prompt_creator_public_node import CcCKrea2EditPromptCreator
 from .modular_nodes.character_sheet_node import CcCKrea2CharacterSheet
 from .modular_nodes.paint_geometry_node import CcCKrea2PaintRestore
 from .modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare
