@@ -22,6 +22,7 @@ PRESET_4_PORTRAITS = "4 portraits"
 PRESET_1_BODY = "1 body"
 PRESET_2_BODIES = "2 bodies"
 PRESET_1_PORTRAIT_2_BODIES = "1 portrait + 2 bodies"
+PRESET_2_PORTRAITS_1_BODY = "2 portraits + 1 body"
 PRESET_3_PORTRAITS_1_BODY = "3 portraits + 1 body"
 PRESET_4_PORTRAITS_1_BODY = "4 portraits + 1 body"
 
@@ -33,6 +34,7 @@ CHARACTER_SHEET_PRESETS = (
     PRESET_1_BODY,
     PRESET_2_BODIES,
     PRESET_1_PORTRAIT_2_BODIES,
+    PRESET_2_PORTRAITS_1_BODY,
     PRESET_3_PORTRAITS_1_BODY,
     PRESET_4_PORTRAITS_1_BODY,
 )
@@ -45,6 +47,7 @@ PRESET_INPUTS = {
     PRESET_1_BODY: ("body_1",),
     PRESET_2_BODIES: ("body_1", "body_2"),
     PRESET_1_PORTRAIT_2_BODIES: ("portrait_1", "body_1", "body_2"),
+    PRESET_2_PORTRAITS_1_BODY: ("portrait_1", "portrait_2", "body_1"),
     PRESET_3_PORTRAITS_1_BODY: ("portrait_1", "portrait_2", "portrait_3", "body_1"),
     PRESET_4_PORTRAITS_1_BODY: (
         "portrait_1",
@@ -136,26 +139,25 @@ def _portraits_plus_body_layout(
     outer_margin: int,
     padding: int,
 ) -> Dict[str, Tuple[int, int, int, int]]:
+    """Use the left two thirds for portraits and the right third for one body."""
     x0, y0, inner_w, inner_h = _inner_geometry(width, height, outer_margin)
     columns = _split_extent(inner_w, 3, padding)
     portrait_w = columns[0] + padding + columns[1]
     body_w = columns[2]
     body_x = x0 + portrait_w + padding
 
-    if len(portrait_names) == 4:
-        portrait_widths = _split_extent(portrait_w, 2, padding)
+    if len(portrait_names) == 2:
         portrait_heights = _split_extent(inner_h, 2, padding)
-        rects: Dict[str, Tuple[int, int, int, int]] = {}
-        index = 0
-        y = y0
-        for slot_h in portrait_heights:
-            x = x0
-            for slot_w in portrait_widths:
-                rects[portrait_names[index]] = (x, y, slot_w, slot_h)
-                index += 1
-                x += slot_w + padding
-            y += slot_h + padding
-    else:
+        rects: Dict[str, Tuple[int, int, int, int]] = {
+            portrait_names[0]: (x0, y0, portrait_w, portrait_heights[0]),
+            portrait_names[1]: (
+                x0,
+                y0 + portrait_heights[0] + padding,
+                portrait_w,
+                portrait_heights[1],
+            ),
+        }
+    elif len(portrait_names) == 3:
         portrait_heights = _split_extent(inner_h, 2, padding)
         portrait_widths = _split_extent(portrait_w, 2, padding)
         rects = {
@@ -173,6 +175,23 @@ def _portraits_plus_body_layout(
                 portrait_heights[1],
             ),
         }
+    elif len(portrait_names) == 4:
+        portrait_widths = _split_extent(portrait_w, 2, padding)
+        portrait_heights = _split_extent(inner_h, 2, padding)
+        rects = {}
+        index = 0
+        y = y0
+        for slot_h in portrait_heights:
+            x = x0
+            for slot_w in portrait_widths:
+                rects[portrait_names[index]] = (x, y, slot_w, slot_h)
+                index += 1
+                x += slot_w + padding
+            y += slot_h + padding
+    else:
+        raise ValueError(
+            "Portraits + body layout supports exactly 2, 3, or 4 portrait inputs."
+        )
 
     rects[body_name] = (body_x, y0, body_w, inner_h)
     return rects
@@ -227,6 +246,15 @@ def _layout_rects(
     if preset == PRESET_1_PORTRAIT_2_BODIES:
         return _row_layout(
             ("portrait_1", "body_1", "body_2"),
+            width,
+            height,
+            outer_margin,
+            padding,
+        )
+    if preset == PRESET_2_PORTRAITS_1_BODY:
+        return _portraits_plus_body_layout(
+            ("portrait_1", "portrait_2"),
+            "body_1",
             width,
             height,
             outer_margin,
