@@ -11,7 +11,7 @@ from .edit_reference_types import VisualReferenceChain
 
 
 class CcCKrea2EditPromptCreator(_BasePromptCreator):
-    """Expose visual_references as optional and isolate create_from_image analysis."""
+    """Expose visual_references as optional while preserving full multimodal analysis."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -45,19 +45,9 @@ class CcCKrea2EditPromptCreator(_BasePromptCreator):
             visual_references if visual_references is not None else VisualReferenceChain()
         )
 
-        # create_from_image has one authoritative visual blueprint: reference_edit_image.
-        # Do not expose downstream Visual Reference pixels to Qwen in this mode, otherwise
-        # the model can confuse Image 1 / Image 2 with the internal edit blueprint. The
-        # original chain is still returned unchanged and remains available to Krea2 Edit.
-        analysis_references = (
-            VisualReferenceChain()
-            if str(mode) == "create_from_image"
-            else passthrough_references
-        )
-
         created_prompt, _, creator_info, thinking_text = super().create(
             clip=clip,
-            visual_references=analysis_references,
+            visual_references=passthrough_references,
             mode=mode,
             user_prompt=user_prompt,
             system_prompt=system_prompt,
@@ -68,18 +58,5 @@ class CcCKrea2EditPromptCreator(_BasePromptCreator):
             seed=seed,
             reference_edit_image=reference_edit_image,
         )
-
-        if str(mode) == "create_from_image":
-            creator_info = creator_info.replace(
-                "Visual Reference Chain Entries: 0",
-                f"Visual Reference Chain Entries: {len(passthrough_references.entries)}",
-                1,
-            )
-            marker = f"Visual Reference Chain Entries: {len(passthrough_references.entries)}"
-            creator_info = creator_info.replace(
-                marker,
-                marker + "\nVisual Reference Analysis: isolated; only reference_edit_image is shown to Prompt Creator",
-                1,
-            )
 
         return created_prompt, passthrough_references, creator_info, thinking_text
