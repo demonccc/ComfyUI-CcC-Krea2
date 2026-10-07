@@ -203,7 +203,7 @@ The first three output slots remain compatible with the earlier node contract; t
 ### Mode and system_prompt behavior
 
 - enhance: treats the user's instructions as the authoritative guide and uses available visual context to make the requested final image clearer without changing intent.
-- create_from_image: requires reference_edit_image and treats it as the authoritative visual blueprint for the desired result; the user's instructions decide what should be preserved, changed, emphasized, or adapted.
+- create_from_image: requires reference_edit_image and treats it as the authoritative visual blueprint for the desired result; the user's instructions decide what should be preserved, changed, emphasized, or adapted. Visual References remain part of the multimodal analysis and keep their Image N mapping; reference_edit_image is an additional internal blueprint image, not a replacement for those references.
 - create_from_theme: treats the user's theme or idea as the authoritative creative direction and uses the available visual context to build a coherent final-image prompt.
 - custom: sends the editable system_prompt exactly as the Qwen system prompt.
 
