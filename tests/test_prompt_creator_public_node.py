@@ -40,7 +40,7 @@ def _chain():
     )
 
 
-def test_create_from_image_only_shows_reference_edit_image_to_qwen():
+def test_create_from_image_analyzes_visual_references_and_reference_edit_image():
     clip = _FakeClip()
     chain = _chain()
     reference_edit = _image(0.9)
@@ -55,13 +55,13 @@ def test_create_from_image_only_shows_reference_edit_image_to_qwen():
 
     assert created.startswith("The subject from Image 1")
     assert passthrough is chain
-    assert len(clip.tokenize_kwargs["images"]) == 1
-    assert torch.equal(clip.tokenize_kwargs["images"][0], reference_edit)
-    assert "Vision input 1 = INTERNAL REFERENCE EDIT IMAGE" in clip.tokenize_prompt
-    assert "Vision input 1 = Image 1" not in clip.tokenize_prompt
+    assert len(clip.tokenize_kwargs["images"]) == 2
+    assert torch.equal(clip.tokenize_kwargs["images"][0], chain.entries[0].image)
+    assert torch.equal(clip.tokenize_kwargs["images"][1], reference_edit)
+    assert "Vision input 1 = Image 1" in clip.tokenize_prompt
+    assert "Vision input 2 = INTERNAL REFERENCE EDIT IMAGE" in clip.tokenize_prompt
     assert "Visual Reference Chain Entries: 1" in info
-    assert "Visual Reference Analysis: isolated" in info
-    assert "Images Analyzed: 1" in info
+    assert "Images Analyzed: 2" in info
 
 
 def test_create_from_theme_still_uses_visual_reference_pixels():
