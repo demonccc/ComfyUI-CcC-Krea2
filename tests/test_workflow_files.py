@@ -158,7 +158,7 @@ def test_paint_workflow_uses_combined_prepare_restore_and_anypaint_runtime():
         "outside",
     ]
     assert paint["widgets_values"][1:] == [True, True]
-    assert lora["widgets_values"][3] == "krea2_anypaint_rank32.safetensors"
+    assert lora["widgets_values"][3] == "Krea2/krea2_anypaint_rank32.safetensors"
     assert sampler["widgets_values"][2:7] == [8, 1.0, "euler", "simple", 1.0]
 
     prepare_inputs = {item["name"]: item for item in prepare["inputs"]}
@@ -391,7 +391,7 @@ def test_all_test_workflows_disable_body_swap_by_default():
             values = stack.get("widgets_values") or []
             for index in range(2, len(values) - 2, 3):
                 enabled, name = values[index], values[index + 1]
-                if name == "bfs_body_swap_v1_krea2.safetensors":
+                if name == "Krea2/krea2_bodyswap_v1.safetensors":
                     assert enabled is False, f"{workflow_path} enables BodySwap by default"
 
 
