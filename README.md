@@ -232,9 +232,9 @@ There is **no public Krea2 CcC Paint Geometry node**.
 - workflows/09_prompt_creator_custom.json — Prompt Creator custom-mode contract test.
 - workflows/10_edit_fit_crop.json — Edit reference_fit=crop path.
 - workflows/11_edit_fit_contain.json — Edit reference_fit=contain path.
-- workflows/12_edit_semantic_only.json — Edit semantic_only reference path.
-- workflows/13_edit_style_direct.json — Edit style_direct reference path with 2x2 processing.
-- workflows/14_edit_style_indirect.json — Edit style_indirect reference path with 4x4 processing.
+- workflows/12_edit_semantic_only.json — Edit semantic_reference path.
+- workflows/13_edit_style_direct.json — Edit visual_reference path with 2x2 processing.
+- workflows/14_edit_style_indirect.json — Edit style_reference path with 4x4 processing.
 - workflows/15_paint_outpaint.json — expansion-only outpaint path.
 - workflows/16_paint_crop_restore.json — crop geometry + reverse restore/composite path.
 - workflows/17_paint_no_kv_cache.json — Paint runtime with KV cache disabled.
