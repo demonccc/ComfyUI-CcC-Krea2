@@ -30,7 +30,7 @@
         "Node name for S&R": "UNETLoader"
       },
       "widgets_values": [
-        "Neutrino_v2_base_nvfp4_svd.safetensors",
+        "moodyKrea2Mix_v3-Global-FP8.safetensors",
         "default"
       ]
     },
@@ -62,7 +62,7 @@
         "Node name for S&R": "CLIPLoader"
       },
       "widgets_values": [
-        "Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors",
+        "qwen3vl_4b_fp8_scaled.safetensors",
         "krea2",
         "default"
       ]
@@ -142,10 +142,10 @@
         true,
         1,
         true,
-        "krea2_identity_edit_v1_2.safetensors",
+        "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
-        "bfs_body_swap_v1_krea2.safetensors",
+        "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
         false,
         "None",
