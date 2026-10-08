@@ -228,7 +228,7 @@
       "widgets_values": [
         "black_dog_running_river.jpg"
       ],
-      "title": "semantic_only Reference Image"
+      "title": "semantic_reference Reference Image"
     },
     {
       "id": 7,
@@ -314,13 +314,13 @@
         "Node name for S&R": "CcCKrea2SemanticReference"
       },
       "widgets_values": [
-        "semantic_only",
+        "semantic_reference",
         "Use this image as the situation and composition guide while keeping the subject identity controlled by Image 1.",
         768,
         "full",
         0.5
       ],
-      "title": "Semantic Reference - semantic_only"
+      "title": "Semantic Reference - semantic_reference"
     },
     {
       "id": 10,
@@ -669,7 +669,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "CcCKrea2_Edit_semantic_only"
+        "CcCKrea2_Edit_semantic_reference"
       ]
     },
     {
@@ -692,7 +692,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Krea2 Edit semantic_only Semantic Reference test.\n\n- Image 1 is the appearance/identity reference.\n- The second image is supplied through Krea2 CcC Semantic Reference in semantic_only mode.\n- processing=full; fidelity=0.5; grounding_px=768.\n- Prompt Creator is intentionally not used so this workflow isolates the Semantic Reference path.\n- BodySwap LoRA is disabled by default."
+        "Krea2 Edit semantic_reference Semantic Reference test.\n\n- Image 1 is the appearance/identity reference.\n- The second image is supplied through Krea2 CcC Semantic Reference in semantic_reference mode.\n- processing=full; fidelity=0.5; grounding_px=768.\n- Prompt Creator is intentionally not used so this workflow isolates the Semantic Reference path.\n- BodySwap LoRA is disabled by default."
       ],
       "title": "Workflow Notes"
     }
