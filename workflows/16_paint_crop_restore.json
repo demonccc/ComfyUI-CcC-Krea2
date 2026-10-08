@@ -30,14 +30,14 @@
         "Node name for S&R": "UNETLoader",
         "models": [
           {
-            "name": "krea2_turbo_int8_convrot.safetensors",
-            "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_int8_convrot.safetensors",
+            "name": "moodyKrea2Mix_v3-Global-FP8.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/moodyKrea2Mix_v3-Global-FP8.safetensors",
             "directory": "diffusion_models"
           }
         ]
       },
       "widgets_values": [
-        "krea2_turbo_int8_convrot.safetensors",
+        "moodyKrea2Mix_v3-Global-FP8.safetensors",
         "default"
       ]
     },
@@ -159,8 +159,8 @@
         "Node name for S&R": "CcCKrea2LoRAStack",
         "models": [
           {
-            "name": "krea2_anypaint_rank32.safetensors",
-            "url": "https://huggingface.co/yijunwang2/krea2-anypaint/resolve/main/krea2_anypaint_rank32.safetensors",
+            "name": "Krea2/krea2_anypaint_rank32.safetensors",
+            "url": "https://huggingface.co/yijunwang2/krea2-anypaint/resolve/main/Krea2/krea2_anypaint_rank32.safetensors",
             "directory": "loras"
           }
         ]
@@ -169,7 +169,7 @@
         true,
         1,
         true,
-        "krea2_anypaint_rank32.safetensors",
+        "Krea2/krea2_anypaint_rank32.safetensors",
         1,
         false,
         "None",
