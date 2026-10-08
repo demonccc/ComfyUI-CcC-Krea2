@@ -388,7 +388,7 @@
         "Node name for S&R": "CcCKrea2SemanticReference"
       },
       "widgets_values": [
-        "semantic_only",
+        "semantic_reference",
         "Use the river scene, running action, water interaction, environment, framing, and spatial composition. Ignore the black dog's identity and appearance.",
         768,
         "full",
