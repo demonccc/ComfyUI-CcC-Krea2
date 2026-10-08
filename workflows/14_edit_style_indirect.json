@@ -228,7 +228,7 @@
       "widgets_values": [
         "black_dog_running_river.jpg"
       ],
-      "title": "style_indirect Reference Image"
+      "title": "style_reference Reference Image"
     },
     {
       "id": 7,
@@ -314,13 +314,13 @@
         "Node name for S&R": "CcCKrea2SemanticReference"
       },
       "widgets_values": [
-        "style_indirect",
+        "style_reference",
         "Use the visual qualities as an indirect style influence while preserving the subject identity from Image 1.",
         768,
         "4x4",
         0.5
       ],
-      "title": "Semantic Reference - style_indirect"
+      "title": "Semantic Reference - style_reference"
     },
     {
       "id": 10,
@@ -669,7 +669,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "CcCKrea2_Edit_style_indirect"
+        "CcCKrea2_Edit_style_reference"
       ]
     },
     {
@@ -692,7 +692,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Krea2 Edit style_indirect Semantic Reference test.\n\n- Image 1 is the appearance/identity reference.\n- The second image is supplied through Krea2 CcC Semantic Reference in style_indirect mode.\n- processing=4x4; fidelity=0.5; grounding_px=768.\n- Prompt Creator is intentionally not used so this workflow isolates the Semantic Reference path.\n- BodySwap LoRA is disabled by default."
+        "Krea2 Edit style_reference Semantic Reference test.\n\n- Image 1 is the appearance/identity reference.\n- The second image is supplied through Krea2 CcC Semantic Reference in style_reference mode.\n- processing=4x4; fidelity=0.5; grounding_px=768.\n- Prompt Creator is intentionally not used so this workflow isolates the Semantic Reference path.\n- BodySwap LoRA is disabled by default."
       ],
       "title": "Workflow Notes"
     }
