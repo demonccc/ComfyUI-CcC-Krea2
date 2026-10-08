@@ -549,7 +549,7 @@ def encode_krea2_qwen_context(
                     )
 
     # Apply Krea2 CcC Semantic Reference processing to positive Qwen vision spans.
-    # Style refs use style extraction; semantic_only refs use subject extraction so
+    # Visual/Style refs use style extraction; semantic_reference refs use subject extraction so
     # content/composition survive without becoming an additional VAE/LoRA reference.
     if is_positive and conditioning and physical_image_map:
         spans_info: List[StyleSpanOperation] = []

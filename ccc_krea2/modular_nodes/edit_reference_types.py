@@ -56,7 +56,7 @@ class SemanticReferenceEntry:
     """One Qwen-only semantic/style reference before vision preparation."""
 
     image: torch.Tensor
-    mode: str = "semantic_only"
+    mode: str = "semantic_reference"
     instruction: str = ""
     grounding_px: int = 768
     processing: str = "2x2"

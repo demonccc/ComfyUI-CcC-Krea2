@@ -81,11 +81,11 @@ Semantic Reference is Qwen-only and does not create an appearance/VAE reference 
 
 Modes:
 
-- semantic_only
-- style_direct
-- style_indirect
+- semantic_reference — Semantic Reference: transfers interpreted content from the image.
+- visual_reference — Visual Reference: uses the image as a strong visual anchor.
+- style_reference — Style Reference: transfers global aesthetic influence without using the image as a full visual anchor.
 
-semantic_only always uses the full image. Style modes can use full, 2x2, or 4x4 processing.
+semantic_reference always uses the full image. visual_reference and style_reference can use full, 2x2, or 4x4 processing.
 
 ## Latent and Target Geometry
 

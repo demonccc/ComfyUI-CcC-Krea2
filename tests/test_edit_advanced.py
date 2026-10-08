@@ -169,7 +169,7 @@ def test_positive_reference_boost_metadata_is_explicit_and_negative_defaults_to_
 
 def test_semantic_reference_exposes_advanced_semantic_controls():
     required = CcCKrea2SemanticReference.INPUT_TYPES()["required"]
-    assert required["mode"][0] == ("semantic_only", "style_direct", "style_indirect")
+    assert required["mode"][0] == ("semantic_reference", "visual_reference", "style_reference")
     assert required["processing"][0] == ("full", "2x2", "4x4")
     assert required["grounding_px"][1]["step"] == 32
 

@@ -130,7 +130,7 @@ Edit resolves region_tag for each regional Visual Reference:
 
 Semantic References are Qwen-only and do not create appearance latents.
 
-semantic_only always uses the complete image. Style modes can process full, 2x2, or 4x4 physical Qwen images before style-span handling.
+semantic_reference always uses the complete image. visual_reference and style_reference can process full, 2x2, or 4x4 physical Qwen images before reference-span handling.
 
 ## Target Geometry
 

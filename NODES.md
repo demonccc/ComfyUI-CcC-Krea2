@@ -87,7 +87,7 @@ Adds one Qwen-only semantic/style reference. It never creates an appearance VAE 
 | Control | Values | Default |
 | --- | --- | --- |
 | image | IMAGE | — |
-| mode | semantic_only, style_direct, style_indirect | semantic_only |
+| mode | semantic_reference, visual_reference, style_reference | semantic_reference |
 | instruction | text | empty |
 | grounding_px | 0..4096, step 32 | 768 |
 | processing | full, 2x2, 4x4 | full |
@@ -96,7 +96,7 @@ Adds one Qwen-only semantic/style reference. It never creates an appearance VAE 
 
 Output: semantic_references.
 
-semantic_only always resolves processing to full. Tiled processing is used only by style modes.
+semantic_reference always resolves processing to full. visual_reference and style_reference can use full, 2x2, or 4x4 processing.
 
 ## Krea2 CcC Size Resolver
 
