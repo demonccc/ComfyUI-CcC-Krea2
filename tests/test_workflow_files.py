@@ -402,9 +402,9 @@ def test_edit_option_workflows_cover_fit_and_semantic_modes():
     assert {node["widgets_values"][1] for node in _nodes_by_type(contain, "CcCKrea2VisualReference")} == {"contain"}
 
     semantic_cases = {
-        EDIT_SEMANTIC_WORKFLOW: ("semantic_only", "full"),
-        EDIT_STYLE_DIRECT_WORKFLOW: ("style_direct", "2x2"),
-        EDIT_STYLE_INDIRECT_WORKFLOW: ("style_indirect", "4x4"),
+        EDIT_SEMANTIC_WORKFLOW: ("semantic_reference", "full"),
+        EDIT_STYLE_DIRECT_WORKFLOW: ("visual_reference", "2x2"),
+        EDIT_STYLE_INDIRECT_WORKFLOW: ("style_reference", "4x4"),
     }
     for workflow_path, expected in semantic_cases.items():
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
