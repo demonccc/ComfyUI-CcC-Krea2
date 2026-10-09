@@ -174,6 +174,20 @@ def test_semantic_reference_exposes_advanced_semantic_controls():
     assert required["grounding_px"][1]["step"] == 32
 
 
+
+def test_semantic_reference_ui_names_preserve_legacy_runtime_modes():
+    image = torch.zeros((1, 64, 64, 3))
+    node = CcCKrea2SemanticReference()
+
+    semantic = node.process(image=image, mode="semantic_reference")[0].entries[0]
+    visual = node.process(image=image, mode="visual_reference")[0].entries[0]
+    style = node.process(image=image, mode="style_reference")[0].entries[0]
+
+    assert semantic.mode == "semantic_only"
+    assert visual.mode == "style_direct"
+    assert style.mode == "style_indirect"
+
+
 def test_size_resolver_outputs_only_width_and_height_from_two_images():
     size_image = torch.zeros((1, 1600, 1400, 3))
     aspect_image = torch.zeros((1, 640, 1024, 3))
