@@ -9,6 +9,11 @@ from .edit_reference_types import SemanticReferenceChain, SemanticReferenceEntry
 
 
 SEMANTIC_MODES = ("semantic_reference", "visual_reference", "style_reference")
+SEMANTIC_RUNTIME_MODES = {
+    "semantic_reference": "semantic_only",
+    "visual_reference": "style_direct",
+    "style_reference": "style_indirect",
+}
 STYLE_PROCESSING = ("full", "2x2", "4x4")
 
 
@@ -50,10 +55,11 @@ class CcCKrea2SemanticReference:
         chain = previous_references if previous_references is not None else SemanticReferenceChain()
         # semantic_reference extracts interpreted subject/content information. It must use the
         # full image so pose/composition/background remain available to Qwen.
-        effective_processing = "full" if mode == "semantic_reference" else processing
+        runtime_mode = SEMANTIC_RUNTIME_MODES.get(mode, mode)
+        effective_processing = "full" if runtime_mode == "semantic_only" else processing
         entry = SemanticReferenceEntry(
             image=image,
-            mode=mode,
+            mode=runtime_mode,
             instruction=instruction.strip(),
             grounding_px=int(grounding_px),
             processing=effective_processing,
