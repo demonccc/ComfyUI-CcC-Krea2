@@ -62,7 +62,7 @@
         "Node name for S&R": "CLIPLoader"
       },
       "widgets_values": [
-        "qwen3vl_4b_fp8_scaled.safetensors",
+        "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
         "krea2",
         "default"
       ]
