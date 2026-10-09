@@ -99,7 +99,7 @@ def _append_semantic(
     clip: Any,
     instruction: str,
     grounding_px: int,
-    mode: str = "semantic_reference",
+    mode: str = "semantic_only",
     processing: str = "2x2",
     fidelity: float = 1.0,
     alias: str = "",
@@ -111,7 +111,7 @@ def _append_semantic(
         semantic_resize=True,
         resize_method="lanczos",
     )
-    if mode == "semantic_reference":
+    if mode == "semantic_only":
         user_instruction = instruction.strip()
         semantic_instruction = (
             f"{SEMANTIC_SUBJECT_DIRECTIVE} {user_instruction}".strip()
@@ -138,7 +138,7 @@ def _append_semantic(
             include_in_vision=True,
             style_processing=processing,
             style_fidelity=fidelity,
-            indirect_style_transfer=(mode == "style_reference"),
+            indirect_style_transfer=(mode == "style_indirect"),
         )
     return chain.append(spec)
 
@@ -225,7 +225,7 @@ def _combine_reference_chains(
             alias="target image",
         )
 
-    pending_reference_modes = []
+    pending_styles = []
     for entry in (semantic_references or SemanticReferenceChain()).entries:
         payload = {
             "image": entry.image,
@@ -237,14 +237,14 @@ def _combine_reference_chains(
             "fidelity": entry.fidelity,
             "alias": "",
         }
-        if entry.mode == "semantic_reference":
+        if entry.mode == "semantic_only":
             chain = _append_semantic(chain=chain, **payload)
         else:
-            pending_reference_modes.append(payload)
+            pending_styles.append(payload)
 
-    # Visual/Style references remain last because a single logical reference can expand
+    # Style references remain last because a single logical style reference can expand
     # into multiple physical Qwen images.
-    for payload in pending_reference_modes:
+    for payload in pending_styles:
         chain = _append_semantic(chain=chain, **payload)
 
     return chain
