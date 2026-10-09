@@ -91,7 +91,7 @@ app.registerExtension({
             const processingWidget = node.widgets?.find((w) => w.name === "processing");
 
             const updateSemanticReferenceState = () => {
-                const semanticOnly = (modeWidget?.value ?? "semantic_only") === "semantic_only";
+                const semanticOnly = (modeWidget?.value ?? "semantic_reference") === "semantic_reference";
                 if (processingWidget) {
                     processingWidget.disabled = semanticOnly;
                     if (semanticOnly) processingWidget.value = "full";
