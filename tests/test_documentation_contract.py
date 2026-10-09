@@ -47,7 +47,7 @@ def test_nodes_doc_matches_current_edit_contracts():
     assert "semantic_grounding_px" in nodes
     assert "contain" in _section(nodes, "Krea2 CcC Visual Reference")
     assert "prompt_annotation" in nodes
-    assert "semantic_only" in nodes
+    assert "semantic_reference" in nodes
     assert "create_from_image" in nodes
     assert "create_from_theme" in nodes
     assert "system_prompt" in nodes
