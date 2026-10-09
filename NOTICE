@@ -1,0 +1,46 @@
+Krea2 CcC Edit (ComfyUI-CcC-Krea2)
+Copyright (C) 2026 Krea2 CcC Edit Contributors
+
+Krea2 CcC Edit is its own active implementation, but its development benefited from ideas,
+research, reference implementations, experiments, and design patterns published by the
+following open-source projects. These acknowledgements are intentionally kept here to
+credit the work that informed the project:
+
+1. ComfyUI by the ComfyUI project (comfyanonymous)
+   https://github.com/comfyanonymous/ComfyUI
+   Commit reference: c6f2a8905d4b53efcf46b7a544df20faef262ad0 (comfy/text_encoders/qwen3vl.py, comfy/text_encoders/qwen_vl.py, comfy/text_encoders/krea2.py)
+   Licensed under the GNU General Public License v3.0 (GPL-3.0).
+
+2. ComfyUI-Krea2Edit by lbouaraba
+   https://github.com/lbouaraba/comfyui-krea2edit
+   Commit reference: 5f8a02c8969b821434c442436dd534ed4461bb0e (_fit_encode_image pixel-space reference fitting, floor /16 grid alignment, RoPE 3D frame positioning)
+   Licensed under the Apache License, Version 2.0 (Apache-2.0).
+
+3. ComfyUI-EditUtils by lrzjason
+   https://github.com/lrzjason/ComfyUI-EditUtils
+   Commit reference: 8a4d7efb32e12a45bc89a74c102a0ef87a4192b1
+   Licensed under the GNU General Public License v3.0 (GPL-3.0).
+
+4. ComfyUI-Krea2Moodboard by RedNodeAI
+   https://github.com/RedNodeAI/ComfyUI-Krea2Moodboard
+   Commit reference: a7d83f12469a918a252277d34cd0e035070081d6 (token-span mapping, statistical style fidelity, multi-span indirect style transfer)
+   Licensed under the GNU General Public License v3.0 (GPL-3.0).
+
+5. ai-toolkit by Ostris
+   https://github.com/ostris/ai-toolkit
+   Research/reference influence included edit-conditioning experiments, timestep-zero reference concepts, and image-number prompt structures.
+   Licensed under the MIT License.
+
+6. ComfyUI-Krea2IdentityMod by ArtemKo7v
+   https://github.com/ArtemKo7v/ComfyUI-Krea2IdentityMod
+   Reference-cache inspiration included portable raw VAE appearance latents and the
+   Qwen3-VL prompt-independent visual cache boundary (merged, grid, DeepStack).
+   Licensed under the Apache License, Version 2.0 (Apache-2.0).
+
+
+
+This package is licensed under the GNU General Public License v3.0 (GPL-3.0).
+Model weights (Krea 2 checkpoints, Qwen3-VL text encoder, VAE, edit LoRAs) are separate works with their own respective licenses and are not distributed as part of this software package.
+
+
+The names above identify sources of inspiration, research, or licensed reference work. They do not describe alternate runtime backends in the current Krea2 CcC Edit architecture.
