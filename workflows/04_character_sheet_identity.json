@@ -71,14 +71,14 @@
         "Node name for S&R": "CLIPLoader",
         "models": [
           {
-            "name": "qwen3vl_4b_fp8_scaled.safetensors",
-            "url": "https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/resolve/main/qwen3vl_4b_fp8_scaled.safetensors",
+            "name": "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
+            "url": "https://huggingface.co/brewbadgertim/Huihui-Qwen3-VL-4B-Instruct-abliterated-Quants/resolve/main/qwen3VL4BAbliteratedComfyui_FP8.safetensors",
             "directory": "text_encoders"
           }
         ]
       },
       "widgets_values": [
-        "qwen3vl_4b_fp8_scaled.safetensors",
+        "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
         "krea2",
         "default"
       ]
