@@ -13,10 +13,12 @@ def test_visual_reference_semantic_widgets_are_conditionally_disabled():
     assert 'setDisabled("prompt_annotation", !enabled)' in js
 
 
-def test_semantic_reference_ui_uses_public_mode_name():
+def test_vision_reference_only_enables_processing_for_style():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
-    assert 'node.comfyClass === "CcCKrea2SemanticReference"' in js
-    assert '(modeWidget?.value ?? "semantic_reference") === "semantic_reference"' in js
+    assert 'node.comfyClass === "CcCKrea2VisionReference"' in js
+    assert 'w.name === "style_processing"' in js
+    assert '(modeWidget?.value ?? "semantic") === "style"' in js
+    assert "processingWidget.disabled = !styleMode" in js
 
 
 def test_latent_preset_widget_is_conditionally_disabled():
