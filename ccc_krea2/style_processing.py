@@ -140,14 +140,12 @@ def apply_statistical_style_fidelity(
             stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)
             idx = torch.arange(end - start, device=span.device) % 3
             target = stats[:, idx]
-        elif op.extract == "context":
-            # Context should keep coarse semantic/spatial information without
-            # retaining the source image's global visual/style statistics.
-            target = (span - mu) / sigma
+        elif op.extract in ("semantic", "context", "visual"):
+            target = span
         else:
             raise ValueError(
                 f"Invalid Vision extract mode '{op.extract}'. "
-                "Supported modes: 'style', 'subject', 'context'."
+                "Supported modes: 'style', 'subject', 'semantic', 'visual', 'context'."
             )
 
         transformed = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
@@ -156,22 +154,24 @@ def apply_statistical_style_fidelity(
         if op.extract == "style":
             summary_rows = min(summary_rows, 3)
 
+        if op.indirect_style_transfer and summary_rows == 0:
+            keep[start:end] = False
+            indirect_applied = True
+            continue
+
         if summary_rows > 0:
             if op.extract == "style":
-                # Style is intentionally represented by exactly the global
-                # statistics rather than the source subject/token structure.
                 style_stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)
                 summary = style_stats[:, :summary_rows]
             else:
-                # Preserve sequence order while reducing hundreds of visual rows
-                # to a compact semantic/context representation.
                 row_count = end - start
+                source_rows = span if op.extract == "visual" else transformed
                 pooled = []
                 for summary_index in range(summary_rows):
                     chunk_start = (summary_index * row_count) // summary_rows
                     chunk_end = ((summary_index + 1) * row_count) // summary_rows
                     chunk_end = max(chunk_end, chunk_start + 1)
-                    pooled.append(transformed[:, chunk_start:chunk_end].mean(dim=1, keepdim=True))
+                    pooled.append(source_rows[:, chunk_start:chunk_end].mean(dim=1, keepdim=True))
                 summary = torch.cat(pooled, dim=1)
 
             z[:, start : start + summary_rows] = summary
