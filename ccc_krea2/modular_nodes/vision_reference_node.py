@@ -113,7 +113,7 @@ class CcCKrea2VisionReference:
                 "=== Krea2 CcC Vision Reference ===",
                 f"Public Mode: {mode}",
                 f"Runtime Mode: {runtime_mode}",
-                f"Instruction: {'present' if instruction.strip() else 'empty'}",
+                f"Instruction: {instruction.strip()!r}" if instruction.strip() else "Instruction: <empty>",
                 f"Source Resolution: {source_width} x {source_height}",
                 f"Requested Style Processing: {style_processing}",
                 f"Effective Processing: {effective_processing}",
