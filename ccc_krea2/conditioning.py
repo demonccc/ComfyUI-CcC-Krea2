@@ -567,7 +567,7 @@ def encode_krea2_qwen_context(
             vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
             if vision_mode == "semantic":
                 extract = "subject"
-                fidelity = getattr(spec, "semantic_strength", 0.5)
+                fidelity = getattr(spec, "semantic_strength", 0.25)
                 indirect = False
             elif vision_mode == "visual":
                 extract = None
@@ -575,12 +575,12 @@ def encode_krea2_qwen_context(
                 indirect = False
             elif vision_mode == "style":
                 extract = "style"
-                fidelity = getattr(spec, "style_fidelity", 0.5)
-                indirect = True
+                fidelity = getattr(spec, "style_fidelity", 0.0)
+                indirect = False
             elif vision_mode == "context":
                 extract = "context"
-                fidelity = 1.0
-                indirect = True
+                fidelity = getattr(spec, "semantic_strength", 0.0)
+                indirect = False
             elif str(role_val).lower() == "style":
                 extract = "style"
                 fidelity = getattr(spec, "style_fidelity", 1.0)
