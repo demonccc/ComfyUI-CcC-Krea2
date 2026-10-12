@@ -81,12 +81,12 @@ Vision Reference is Qwen/Vision-only and never creates an appearance/VAE referen
 
 Modes:
 
-- **Semantic** — use the image for content and structure through Qwen prompt re-contextualization. The direct image rows are removed afterward so the reference does not become a second visual subject.
-- **Visual** — use the image as direct visual guidance. The raw Qwen visual span is order-preserving pooled to 64 rows so visual detail survives without overwhelming the text prompt.
-- **Style** — use the image for aesthetic influence, such as manga, illustration, film, or another visual treatment. It uses indirect Qwen re-contextualization and removes the direct image rows so people/objects from the style reference are not carried as generation subjects.
+- **Semantic** — use the image as a subject/content guide for the same subject requested by the text prompt. It uses the proven Moodboard subject extraction at a fixed internal 0.50 blend; the text prompt controls visual style.
+- **Visual** — use the image as direct visual guidance. Raw Qwen visual rows are retained exactly; this is intentionally the strongest and most literal preset.
+- **Style** — use the image for aesthetic influence, such as manga, illustration, film, or another visual treatment. It follows the proven Moodboard indirect recipe: Qwen sees the image, then direct image rows are removed so the DiT receives style only through re-contextualized prompt tokens.
 - **Context** — use the image for situation, relationships, action, framing, and scene context through indirect Qwen re-contextualization, then remove the direct image rows.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The free-form Vision `instruction` is applied only by **Visual**; the other presets use fixed scope directives so contradictory text cannot turn the reference into an extra subject.
 
 ## Latent and Target Geometry
 
