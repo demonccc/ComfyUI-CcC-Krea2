@@ -58,6 +58,7 @@ class ReferenceSpec:
     # Qwen-only semantic processing
     semantic_extract: str = "none"
     semantic_strength: float = 1.0
+    indirect_vision_context: bool = False
 
     # Style path
     style_fidelity: float = 0.5
