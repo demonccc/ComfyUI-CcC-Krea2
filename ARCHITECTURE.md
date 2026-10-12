@@ -8,7 +8,7 @@ The current package registers **14 public nodes**:
 Edit:
   Krea2 CcC Attention Region
   Krea2 CcC Visual Reference
-  Krea2 CcC Semantic Reference
+  Krea2 CcC Vision Reference
   Krea2 CcC Size Resolver
   Krea2 CcC Latent
   Krea2 CcC Edit Prompt Creator
@@ -37,7 +37,7 @@ Krea2 CcC Edit has one edit execution path.
 ~~~text
 Attention Region(s) ------------------------+
 IMAGE -> Visual Reference(s) ---------------+
-IMAGE -> Semantic Reference(s) -------------+--> Edit --> Krea2 CcC Edit runtime --> Krea2
+IMAGE -> Vision Reference(s) ---------------+--> Edit --> Krea2 CcC Edit runtime --> Krea2
                                              ^
 Size Resolver -> Latent ---------------------+
 ~~~
@@ -126,11 +126,18 @@ Edit resolves region_tag for each regional Visual Reference:
 - boost in region: reference boost is applied only to target queries inside the region.
 - only in region: target queries outside the region are blocked from attending to that reference.
 
-## Semantic Reference
+## Vision Reference
 
-Semantic References are Qwen-only and do not create appearance latents.
+Vision References are Qwen-only and do not create appearance latents.
 
-semantic_reference always uses the complete image. visual_reference and style_reference can process full, 2x2, or 4x4 physical Qwen images before reference-span handling.
+The public presets map to fixed runtime behaviors:
+
+- **Semantic** -> full-image subject/content extraction at maximum semantic extraction.
+- **Visual** -> full-image direct Qwen visual rows retained.
+- **Style** -> full, 2x2, or 4x4 style processing; the reference participates in Qwen encoding and its direct visual rows are removed afterward.
+- **Context** -> full-image situation/context guidance; the reference participates in Qwen encoding and its direct visual rows are removed afterward.
+
+Vision Reference has no public grounding or fidelity control. Source pixels are left untouched until Qwen's tokenizer/vision processor owns native image geometry. Only Style exposes `style_processing`.
 
 ## Target Geometry
 
@@ -151,7 +158,7 @@ Visual Reference fit is a separate operation and supports crop, resize, contain,
 
 ### Semantic Grounding Cadence
 
-Visual Reference semantic_grounding_px, Semantic Reference grounding_px, and Latent latent_grounding_px use a step of 32. This matches Qwen3-VL's effective spatial cadence.
+Visual Reference `semantic_grounding_px` and Latent `latent_grounding_px` use a step of 32. Vision Reference does not expose a grounding cap; its source image is passed to Qwen at tokenizer-native resolution.
 
 ## Conditioning and Runtime Transport
 
@@ -204,14 +211,15 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
 
-Text to Image consumes optional prompt_augmentation, encodes positive and negative text independently with CLIP, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT.
+Text to Image consumes optional prompt_augmentation and optional vision_references, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT. With Vision Reference connected, positive conditioning follows the same Qwen/Vision reference contract used by Edit; the explicit negative prompt remains text-only.
 
 The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
 
 ~~~text
-UNET + CLIP
-    |
-    v
+Vision Reference ----+
+                     |
+UNET + CLIP ---------+
+                     v
 CcC Krea2 - Text to Image
     +--> MODEL ---------> ModelSamplingAuraFlow -> BlackwellAttentionFix -> KSampler
     +--> positive -----------------------------------------------> KSampler
