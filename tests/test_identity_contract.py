@@ -10,8 +10,9 @@ from ccc_krea2.identity_contract import (
 from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
 from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _append_semantic, _prepare_qwen_image
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
-from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
+from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.reference_specs import ReferenceChain
+from ccc_krea2.vision_reference_runtime import build_vision_reference_spec
 from ccc_krea2.patch import attach_reference_runtime_to_conditioning
 
 
@@ -156,22 +157,33 @@ def test_semantic_only_uses_subject_extraction_without_appearance_latent():
     assert "Keep the complete scene semantics." in spec.vision_instruction
 
 
-def test_semantic_reference_forces_full_image_for_semantic_only():
-    node = CcCKrea2SemanticReference()
+def test_vision_reference_fixed_semantic_visual_style_context_behavior():
+    node = CcCKrea2VisionReference()
     image = torch.zeros((1, 256, 256, 3))
-    (chain,) = node.process(
-        image=image,
-        mode="semantic_only",
-        instruction="",
-        grounding_px=768,
-        processing="4x4",
-        fidelity=0.5,
-    )
-    assert chain.entries[0].processing == "full"
 
-    required = CcCKrea2SemanticReference.INPUT_TYPES()["required"]
-    assert required["processing"][1]["default"] == "full"
-    assert required["fidelity"][1]["default"] == 0.5
+    semantic_entry = node.process(image=image, mode="semantic")[0].entries[0]
+    semantic = build_vision_reference_spec(semantic_entry)
+    assert semantic.semantic_extract == "subject"
+    assert semantic.semantic_strength == 0.0
+    assert semantic.appearance_reference is False
+    assert semantic.prepared_image.vision_image.shape == image.shape
+
+    visual_entry = node.process(image=image, mode="visual", style_processing="4x4")[0].entries[0]
+    visual = build_vision_reference_spec(visual_entry)
+    assert visual.style_processing == "full"
+    assert visual.style_fidelity == 1.0
+    assert visual.indirect_style_transfer is False
+
+    style_entry = node.process(image=image, mode="style", style_processing="4x4")[0].entries[0]
+    style = build_vision_reference_spec(style_entry)
+    assert style.style_processing == "4x4"
+    assert style.style_fidelity == 1.0
+    assert style.indirect_style_transfer is True
+
+    context_entry = node.process(image=image, mode="context")[0].entries[0]
+    context = build_vision_reference_spec(context_entry)
+    assert context.indirect_vision_context is True
+    assert context.appearance_reference is False
 
 
 def test_public_edit_and_visual_reference_surfaces_match_refactored_contract():
@@ -202,4 +214,4 @@ def test_public_edit_and_visual_reference_surfaces_match_refactored_contract():
         "positive_prompt",
         "apply_krea2_edit_patch",
     ]
-    assert list(edit_inputs["optional"]) == ["visual_references", "semantic_references"]
+    assert list(edit_inputs["optional"]) == ["visual_references", "vision_references"]
