@@ -108,12 +108,15 @@ class CcCKrea2VisionReference:
         else:
             behavior = "unknown/custom runtime behavior"
 
+        instruction_applied = bool(instruction.strip()) and mode == "visual"
+
         info = "\n".join(
             [
                 "=== Krea2 CcC Vision Reference ===",
                 f"Public Mode: {mode}",
                 f"Runtime Mode: {runtime_mode}",
                 f"Instruction: {instruction.strip()!r}" if instruction.strip() else "Instruction: <empty>",
+                f"Instruction Applied: {'yes' if instruction_applied else 'no (preset uses fixed directive)'}",
                 f"Source Resolution: {source_width} x {source_height}",
                 f"Requested Style Processing: {style_processing}",
                 f"Effective Processing: {effective_processing}",
