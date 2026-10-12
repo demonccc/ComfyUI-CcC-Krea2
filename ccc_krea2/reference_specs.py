@@ -58,6 +58,7 @@ class ReferenceSpec:
     # Qwen-only Vision Reference processing
     vision_reference_mode: str = ""
     vision_summary_rows: int = 0
+    vision_indirect: bool = False
     semantic_extract: str = "none"
     semantic_strength: float = 1.0
     indirect_vision_context: bool = False
