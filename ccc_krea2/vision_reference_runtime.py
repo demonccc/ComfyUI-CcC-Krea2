@@ -84,14 +84,12 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
         )
 
     if entry.mode == "style_direct":
-        return StyleReferenceSpec(
+        return ReferenceSpec(
+            reference_path="edit",
             prepared_image=prep,
             vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction),
             appearance_reference=False,
             include_in_vision=True,
-            style_processing="full",
-            style_fidelity=1.0,
-            indirect_style_transfer=False,
         )
 
     if entry.mode == "style_indirect":
