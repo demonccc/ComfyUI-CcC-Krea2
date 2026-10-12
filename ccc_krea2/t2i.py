@@ -81,8 +81,8 @@ def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dic
 class CcCKrea2TextToImage:
     """CcC Krea2 - Text to Image native helper node."""
 
-    RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT")
-    RETURN_NAMES = ("model", "positive", "negative", "latent")
+    RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING")
+    RETURN_NAMES = ("model", "positive", "negative", "latent", "t2i_info")
     FUNCTION = "process"
     CATEGORY = NODE_CATEGORY
 
@@ -125,7 +125,7 @@ class CcCKrea2TextToImage:
         negative_prompt: str = "",
         prompt_augmentation: Optional[Any] = None,
         vision_references: Optional[VisionReferenceChain] = None,
-    ) -> Tuple[Any, Any, Any, Dict[str, Any]]:
+    ) -> Tuple[Any, Any, Any, Dict[str, Any], str]:
         if clip is None:
             raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
 
@@ -147,9 +147,11 @@ class CcCKrea2TextToImage:
         # Native empty SD3 latent creation
         latent = create_empty_sd3_latent(width=width, height=height, batch_size=batch_size)
 
-        if vision_references is not None and len(vision_references.entries) > 0:
+        vision_entries = tuple((vision_references or VisionReferenceChain()).entries)
+        pipeline_info = ""
+        if vision_entries:
             references = append_vision_references(ReferenceChain(), vision_references)
-            _, positive, _, _, _ = edit_engine_runtime.run_krea2_edit_orchestrator(
+            _, positive, _, _, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
                 model=model,
                 clip=clip,
                 vae=None,
@@ -166,5 +168,32 @@ class CcCKrea2TextToImage:
         neg_tokens = clip.tokenize(eff_neg)
         negative = clip.encode_from_tokens_scheduled(neg_tokens)
 
-        # Return unchanged input MODEL along with positive, negative, and latent
-        return (model, positive, negative, latent)
+        runtime_to_public = {
+            "semantic_only": "semantic",
+            "style_direct": "visual",
+            "style_indirect": "style",
+            "context_indirect": "context",
+        }
+        vision_modes = [
+            runtime_to_public.get(entry.mode, entry.mode)
+            for entry in vision_entries
+        ]
+
+        info_lines = [
+            "=== Krea2 CcC Text to Image ===",
+            f"Prompt Augmentation: {'yes' if prompt_augmentation is not None else 'no'}",
+            f"Vision References: {len(vision_entries)}",
+            f"Vision Modes: {', '.join(vision_modes) if vision_modes else '<none>'}",
+            f"Positive Conditioning: {'multimodal Qwen/Vision' if vision_entries else 'text-only'}",
+            "Negative Conditioning: text-only",
+            f"Effective Positive Prompt: {eff_pos!r}",
+            f"Effective Negative Prompt: {eff_neg!r}",
+            f"Aspect Ratio: {aspect_ratio}",
+            f"Resolved Resolution: {width} x {height}",
+            f"Batch Size: {batch_size}",
+        ]
+        if pipeline_info:
+            info_lines.extend(["", "Vision Pipeline:", str(pipeline_info)])
+
+        # Return unchanged input MODEL along with conditioning, latent, and diagnostics.
+        return model, positive, negative, latent, "\n".join(info_lines)
