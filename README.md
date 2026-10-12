@@ -9,7 +9,7 @@ The public surface currently contains **14 nodes**. Reference Cache nodes and th
 | Area | Node | Purpose |
 | --- | --- | --- |
 | Edit | **Krea2 CcC Visual Reference** | Ordered appearance reference with VAE fit, boost, RoPE placement, optional Qwen grounding, and optional regional attention. |
-| Edit | **Krea2 CcC Semantic Reference** | Qwen-only semantic/style reference; no appearance latent. |
+| Edit | **Krea2 CcC Vision Reference** | Qwen/Vision-only Semantic, Visual, Style, or Context reference; no appearance latent. |
 | Edit | **Krea2 CcC Attention Region** | Tagged target box used by regional Visual Reference attention. |
 | Edit | **Krea2 CcC Size Resolver** | Resolves width/height from one image's long edge and another image's aspect ratio. |
 | Edit | **Krea2 CcC Latent** | Owns target dimensions, Krea geometry policy, optional target content, semantic target context, and attention-region transport. |
@@ -29,7 +29,7 @@ The direct edit path remains simple:
 
 ~~~text
 Visual Reference(s) --------------------+
-Semantic Reference(s) ------------------+--> Krea2 CcC Edit --> MODEL / CONDITIONING / LATENT
+Vision Reference(s) --------------------+--> Krea2 CcC Edit --> MODEL / CONDITIONING / LATENT
                                         ^
 Attention Region(s) --> Latent ---------|
 Size Resolver -------> Latent ----------+
@@ -46,7 +46,7 @@ user_prompt ------------+--> Edit Prompt Creator --> created_prompt ------------
 reference_edit_image ---> Edit Prompt Creator
 ~~~
 
-The Creator does not modify Visual Reference, Semantic Reference, Latent, or Edit. In create_from_image, reference_edit_image is internal analysis input: the generated text must describe the observed situation explicitly instead of assuming Edit can see that image.
+The Creator does not modify Visual Reference, Vision Reference, Latent, or Edit. In create_from_image, reference_edit_image is internal analysis input: the generated text must describe the observed situation explicitly instead of assuming Edit can see that image.
 
 **Character Sheet** is also a utility before Visual Reference. It creates one deterministic IMAGE; the result can then be connected to a normal Visual Reference.
 
@@ -75,17 +75,18 @@ Regional attention is optional:
 
 A regional reference binds to a tagged **Attention Region** carried through Latent geometry.
 
-## Semantic Reference
+## Vision Reference
 
-Semantic Reference is Qwen-only and does not create an appearance/VAE reference latent.
+Vision Reference is Qwen/Vision-only and never creates an appearance/VAE reference latent. The source image is passed at tokenizer-native resolution; there is no public grounding or fidelity control.
 
 Modes:
 
-- semantic_reference — Semantic Reference: transfers interpreted content from the image.
-- visual_reference — Visual Reference: uses the image as a strong visual anchor.
-- style_reference — Style Reference: transfers global aesthetic influence without using the image as a full visual anchor.
+- **Semantic** — use the image for content and structure. The internal subject/content extraction is fixed to 100% semantic and always uses the full image.
+- **Visual** — use the image as direct visual guidance. Raw Qwen visual rows are retained and the full image is used.
+- **Style** — use the image for aesthetic influence, such as making the result look like manga, illustration, film, or another visual treatment. Style can process the image as full, 2x2, or 4x4 before its direct visual rows are removed from the final conditioning.
+- **Context** — use the image to understand situation, relationships, action, and scene context without keeping it as a direct visual anchor. Context always uses the full image.
 
-semantic_reference always uses the full image. visual_reference and style_reference can use full, 2x2, or 4x4 processing.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing.
 
 ## Latent and Target Geometry
 
@@ -217,7 +218,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 **LoRA Prompt Settings** can associate prepend/append positive and negative text with those four LoRA slots. The resulting prompt_augmentation is carried by LoRA Stack. The public **Text to Image** node consumes that augmentation; **Krea2 CcC Edit does not automatically consume it**.
 
-**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT.
+**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT. An optional **Vision Reference** chain can enrich the positive Qwen conditioning with Semantic, Visual, Style, or Context guidance; the explicit negative prompt remains text-only.
 
 ## Example Workflows
 
@@ -226,18 +227,19 @@ There is **no public Krea2 CcC Paint Geometry node**.
 - workflows/03_regional_attention.json — tagged regional attention with two identity references; BodySwap disabled by default.
 - workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference; BodySwap disabled by default.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
-- workflows/06_text_to_image.json — native Krea2 text-to-image path: Text to Image -> sampling -> VAE Decode -> SaveImage.
+- workflows/06_text_to_image.json — Krea2 text-to-image path with an optional Vision Reference feeding positive multimodal conditioning.
 - workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
 - workflows/08_prompt_creator_create_from_theme.json — Prompt Creator create_from_theme preset.
 - workflows/09_prompt_creator_custom.json — Prompt Creator custom-mode contract test.
 - workflows/10_edit_fit_crop.json — Edit reference_fit=crop path.
 - workflows/11_edit_fit_contain.json — Edit reference_fit=contain path.
-- workflows/12_edit_semantic_only.json — Edit semantic_reference path.
-- workflows/13_edit_style_direct.json — Edit visual_reference path with 2x2 processing.
-- workflows/14_edit_style_indirect.json — Edit style_reference path with 4x4 processing.
+- workflows/12_edit_vision_semantic.json — Edit with Vision Reference / Semantic.
+- workflows/13_edit_vision_visual.json — Edit with Vision Reference / Visual.
+- workflows/14_edit_vision_style.json — Edit with Vision Reference / Style using 4x4 style processing.
 - workflows/15_paint_outpaint.json — expansion-only outpaint path.
 - workflows/16_paint_crop_restore.json — crop geometry + reverse restore/composite path.
 - workflows/17_paint_no_kv_cache.json — Paint runtime with KV cache disabled.
+- workflows/18_edit_vision_context.json — Edit with Vision Reference / Context.
 
 See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.
 
