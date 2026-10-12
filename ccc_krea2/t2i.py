@@ -1,14 +1,13 @@
 """Native Text-to-Image helper node for Krea2 CcC Edit."""
 
 import math
+import re
 from typing import Tuple, Dict, Any, Optional
 import torch
 
-from .constants import NODE_CATEGORY, LOGGER_PREFIX, VISION_PAD_TOKEN
-from .conditioning import encode_krea2_qwen_context
-from .modular_nodes.edit_reference_types import VisionReferenceChain
-from .style_processing import expand_style_reference_spans
-from .vision_reference_runtime import build_vision_reference_spec
+from .constants import NODE_CATEGORY, LOGGER_PREFIX
+from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
+from .style_processing import slice_style_image
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
     apply_prompt_augmentation,
@@ -78,68 +77,172 @@ def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dic
     return {"samples": samples}
 
 
+T2I_VISION_SYSTEM_PROMPTS = {
+    "semantic": (
+        "Analyze the supplied reference image for text-to-image guidance. Extract only semantic/content information "
+        "that can be applied to the SAME subject or subjects already requested by the target prompt: subject category, "
+        "non-style attributes, pose, action, objects, composition, and spatial relationships. The target prompt is "
+        "authoritative. Do not introduce an additional person or duplicate a reference subject. Ignore visual medium, "
+        "rendering style, line work, lighting treatment, texture, and palette. Return one concise English guidance "
+        "sentence only, with no preamble and no mention of a reference image."
+    ),
+    "visual": (
+        "Analyze the supplied reference image for text-to-image guidance. Describe transferable visible appearance "
+        "for the SAME subject/result already requested by the target prompt: face and hair traits, clothing, accessories, "
+        "materials, colors, pose, and other useful visible details. The target prompt is authoritative. Do not introduce "
+        "the reference subject as an additional person and do not describe this as a separate image. Return one concise "
+        "English guidance sentence only, with no preamble."
+    ),
+    "style": (
+        "Analyze the supplied reference image or tiles only for visual STYLE. Extract medium, rendering, line work, "
+        "shading, palette, lighting treatment, texture, tone, and mood. Do not mention or transfer people, identities, "
+        "faces, hair, clothing, objects, pose, action, layout, composition, or scene content. Return one concise English "
+        "style guidance sentence only, with no preamble and no mention of a reference image."
+    ),
+    "context": (
+        "Analyze the supplied reference image only for scene CONTEXT that can be applied to the target prompt: setting, "
+        "environment, camera/framing, action, interaction, composition, and spatial relationships. The target prompt is "
+        "authoritative, including requested subject count. Refer to existing people only generically as the target subject "
+        "or role; do not introduce an additional person just because one appears in the reference. Ignore identity, face, "
+        "hair, clothing, exact appearance, medium, rendering style, palette, and texture. Return one concise English "
+        "context guidance sentence only, with no preamble."
+    ),
+}
+
+
+def _public_vision_mode(runtime_mode: str) -> str:
+    return {
+        "semantic_only": "semantic",
+        "style_direct": "visual",
+        "style_indirect": "style",
+        "context_indirect": "context",
+    }.get(runtime_mode, runtime_mode)
+
+
+def _t2i_analysis_images(entry: VisionReferenceEntry):
+    image = entry.image
+    if entry.mode != "style_indirect" or entry.processing == "full":
+        return [image]
+    return slice_style_image(image, mode=entry.processing)
+
+
+def _clean_generated_guidance(clip: Any, generated_ids: Any) -> str:
+    text = str(clip.decode(generated_ids)).strip()
+    if "</think>" in text:
+        text = text.split("</think>", 1)[1].strip()
+    text = re.sub(r"(?is)^<think>.*?</think>\s*", "", text).strip()
+
+    if text.startswith("~~~") and text.endswith("~~~"):
+        text = text[3:-3].strip()
+    if text.startswith("```") and text.endswith("```"):
+        text = text[3:-3].strip()
+
+    text = re.sub(
+        r"(?is)^\s*(?:here is|here's|guidance|description|style guidance|context guidance)\s*:\s*",
+        "",
+        text,
+        count=1,
+    )
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ('"', "'"):
+        text = text[1:-1].strip()
+
+    if not text:
+        raise RuntimeError("[Krea2 CcC T2I] Qwen returned empty Vision guidance.")
+    return text
+
+
+def _generate_t2i_vision_guidance(
+    clip: Any,
+    entry: VisionReferenceEntry,
+    target_prompt: str,
+):
+    public_mode = _public_vision_mode(entry.mode)
+    system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
+    analysis_images = _t2i_analysis_images(entry)
+
+    user_instruction = str(entry.instruction or "").strip()
+    analysis_prompt = (
+        "TARGET TEXT-TO-IMAGE PROMPT:\n"
+        f"{target_prompt or '<empty>'}\n\n"
+        f"VISION MODE: {public_mode}\n"
+        "Apply only information that belongs to this Vision mode. "
+        "If the additional guidance asks for information outside this mode, ignore that part.\n"
+        f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n\n"
+        "Return the extracted guidance now."
+    )
+
+    tokens = clip.tokenize(
+        analysis_prompt,
+        images=analysis_images,
+        min_length=1,
+        thinking=False,
+        system_prompt=system_prompt,
+    )
+    generated_ids = clip.generate(
+        tokens,
+        do_sample=True,
+        max_length=256,
+        temperature=0.15,
+        top_k=64,
+        top_p=0.90,
+        min_p=0.05,
+        repetition_penalty=1.05,
+        seed=0,
+    )
+    guidance = _clean_generated_guidance(clip, generated_ids)
+    return guidance, len(analysis_images)
+
+
 def _encode_t2i_vision(
     clip: Any,
     prompt: str,
     vision_references: VisionReferenceChain,
 ):
-    """Encode T2I Vision References without routing through the Edit orchestrator.
+    """Convert Vision References into mode-scoped text guidance, then encode text-only conditioning.
 
-    T2I keeps the text prompt first and places direct Vision guidance after it.
-    This matches the low-content-leak Moodboard layout: prompt tokens stay text-led,
-    while the later Vision rows still contribute direct semantic/visual/style/context
-    conditioning to the DiT.
+    This is intentionally different from Edit. The image is used only during Qwen analysis;
+    no direct image rows are passed into the final Krea2 conditioning. That prevents a reference
+    person or composition from competing with the user's T2I prompt while still letting the four
+    Vision modes contribute distinct information.
     """
-    physical_images = []
-    physical_image_map = []
-    prompt_parts = [prompt or ""]
-    specs = []
+    guidance_items = []
+    total_analysis_images = 0
 
-    for logical_slot, entry in enumerate(vision_references.entries, start=1):
-        spec = build_vision_reference_spec(entry)
-        specs.append(spec)
+    for index, entry in enumerate(vision_references.entries, start=1):
+        public_mode = _public_vision_mode(entry.mode)
+        guidance, analysis_image_count = _generate_t2i_vision_guidance(
+            clip=clip,
+            entry=entry,
+            target_prompt=prompt,
+        )
+        total_analysis_images += analysis_image_count
+        guidance_items.append(
+            {
+                "index": index,
+                "mode": public_mode,
+                "runtime_mode": entry.mode,
+                "processing": entry.processing,
+                "instruction": entry.instruction,
+                "guidance": guidance,
+                "analysis_images": analysis_image_count,
+            }
+        )
 
-        if getattr(spec, "reference_path", "") == "style":
-            prepared_images, _, _ = expand_style_reference_spans(
-                spec,
-                start_slot=logical_slot,
-                clip=clip,
-            )
-            role = "style"
-        else:
-            prepared_images = [spec.prepared_image]
-            role = "edit"
+    guidance_lines = [
+        f"{item['mode'].capitalize()} guidance: {item['guidance']}"
+        for item in guidance_items
+    ]
+    conditioning_prompt = prompt or ""
+    if guidance_lines:
+        conditioning_prompt = (
+            f"{conditioning_prompt}\n\n"
+            "Vision-derived guidance for the same requested result:\n"
+            + "\n".join(guidance_lines)
+        ).strip()
 
-        instruction = str(getattr(spec, "vision_instruction", "") or "").strip()
-        if instruction:
-            prompt_parts.append(instruction)
-        prompt_parts.append(VISION_PAD_TOKEN * len(prepared_images))
-
-        for crop_index, prepared in enumerate(prepared_images):
-            physical_index = len(physical_images) + 1
-            physical_images.append(prepared.vision_image)
-            physical_image_map.append(
-                {
-                    "role": role,
-                    "logical_role": role,
-                    "slot": logical_slot,
-                    "logical_vision_slot": logical_slot,
-                    "logical_reference_id": logical_slot,
-                    "physical_qwen_image_index": physical_index,
-                    "crop_tile_index": crop_index,
-                    "spec": spec,
-                }
-            )
-
-    vision_prompt = "\n".join(part for part in prompt_parts if part)
-    context = encode_krea2_qwen_context(
-        clip=clip,
-        prompt=vision_prompt,
-        physical_images=physical_images,
-        physical_image_map=physical_image_map,
-        is_positive=True,
-    )
-    return context.conditioning, context, specs, vision_prompt
+    tokens = clip.tokenize(conditioning_prompt)
+    conditioning = clip.encode_from_tokens_scheduled(tokens)
+    return conditioning, guidance_items, conditioning_prompt, total_analysis_images
 
 
 class CcCKrea2TextToImage:
@@ -212,11 +315,11 @@ class CcCKrea2TextToImage:
         latent = create_empty_sd3_latent(width=width, height=height, batch_size=batch_size)
 
         vision_entries = tuple((vision_references or VisionReferenceChain()).entries)
-        vision_context = None
-        vision_specs = []
-        vision_prompt = ""
+        vision_guidance = []
+        conditioning_prompt = eff_pos
+        vision_analysis_images = 0
         if vision_entries:
-            positive, vision_context, vision_specs, vision_prompt = _encode_t2i_vision(
+            positive, vision_guidance, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
                 clip=clip,
                 prompt=eff_pos,
                 vision_references=vision_references,
@@ -245,7 +348,7 @@ class CcCKrea2TextToImage:
             f"Prompt Augmentation: {'yes' if prompt_augmentation is not None else 'no'}",
             f"Vision References: {len(vision_entries)}",
             f"Vision Modes: {', '.join(vision_modes) if vision_modes else '<none>'}",
-            f"Positive Conditioning: {'multimodal Qwen/Vision' if vision_entries else 'text-only'}",
+            f"Positive Conditioning: {'text-only with Qwen Vision-derived guidance' if vision_entries else 'text-only'}",
             "Negative Conditioning: text-only",
             f"Effective Positive Prompt: {eff_pos!r}",
             f"Effective Negative Prompt: {eff_neg!r}",
@@ -261,42 +364,25 @@ class CcCKrea2TextToImage:
                 f"instruction={entry.instruction!r}"
             )
 
-        if vision_context is not None:
+        if vision_entries:
             info_lines.extend(
                 [
                     "",
                     "T2I Vision Pipeline:",
-                    "  Layout: text prompt first, Vision directive/image blocks after prompt",
-                    f"  Positive Row Count Before Vision Processing: {vision_context.pos_rows_before}",
-                    f"  Positive Row Count After Vision Processing: {vision_context.pos_rows_after}",
-                    f"  Physical Qwen Image Count: {len(vision_context.physical_images)}",
-                    f"  Token Stream Key: {vision_context.token_stream_key}",
+                    "  Vision Analysis: multimodal Qwen generation",
+                    "  Final Conditioning: text-only Krea2 encode",
+                    "  Direct Vision Rows in Final Conditioning: 0",
+                    f"  Vision Analysis Images: {vision_analysis_images}",
+                    f"  Conditioning Prompt: {conditioning_prompt!r}",
                 ]
             )
-            for index, spec in enumerate(vision_specs, start=1):
-                spans = []
-                for map_index, item in enumerate(vision_context.physical_image_map):
-                    if item.get("logical_vision_slot") == index and map_index < len(vision_context.vision_row_spans):
-                        spans.append(vision_context.vision_row_spans[map_index])
-                original_rows = sum(end - start for start, end in spans)
-                removed = sum(
-                    1
-                    for row_index in vision_context.removed_row_indices
-                    if any(start <= row_index < end for start, end in spans)
-                )
-                retained = max(0, original_rows - removed)
+            for item in vision_guidance:
                 info_lines.extend(
                     [
-                        f"  Vision Reference {index}:",
-                        f"    Mode: {getattr(spec, 'vision_reference_mode', '') or '<legacy>'}",
-                        f"    Row Spans: {spans}",
-                        f"    Original Vision Rows: {original_rows}",
-                        f"    Retained Vision Rows: {retained}",
-                        f"    Removed Vision Rows: {removed}",
-                        f"    Semantic Extract: {getattr(spec, 'semantic_extract', 'none')}",
-                        f"    Internal Semantic Fidelity: {float(getattr(spec, 'semantic_strength', 1.0)):.2f}",
-                        f"    Internal Style Fidelity: {float(getattr(spec, 'style_fidelity', 1.0)):.2f}",
-                        f"    Style Processing: {getattr(spec, 'style_processing', 'full')}",
+                        f"  Vision Reference {item['index']}:",
+                        f"    Mode: {item['mode']}",
+                        f"    Analysis Images: {item['analysis_images']}",
+                        f"    Guidance: {item['guidance']!r}",
                     ]
                 )
 
