@@ -90,6 +90,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction),
             appearance_reference=False,
             include_in_vision=True,
+            indirect_style_transfer=False,
         )
 
     if entry.mode == "style_indirect":
