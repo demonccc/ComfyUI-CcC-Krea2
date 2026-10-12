@@ -191,6 +191,42 @@ def test_vision_reference_presets_map_to_fixed_runtime_contracts():
     assert (context.mode, context.processing) == ("context_indirect", "full")
 
 
+def test_vision_reference_freeform_instruction_is_visual_only():
+    image = torch.zeros((1, 64, 64, 3))
+    node = CcCKrea2VisionReference()
+
+    semantic_chain, semantic_info = node.process(
+        image=image,
+        mode="semantic",
+        instruction="Use manga style and girl identity",
+    )
+    visual_chain, visual_info = node.process(
+        image=image,
+        mode="visual",
+        instruction="Use manga style and girl identity",
+    )
+    style_chain, style_info = node.process(
+        image=image,
+        mode="style",
+        instruction="Use manga style and girl identity",
+    )
+    context_chain, context_info = node.process(
+        image=image,
+        mode="context",
+        instruction="Use manga style and girl identity",
+    )
+
+    assert semantic_chain.entries[0].instruction == "Use manga style and girl identity"
+    assert visual_chain.entries[0].instruction == "Use manga style and girl identity"
+    assert style_chain.entries[0].instruction == "Use manga style and girl identity"
+    assert context_chain.entries[0].instruction == "Use manga style and girl identity"
+
+    assert "Instruction Applied: no (preset uses fixed directive)" in semantic_info
+    assert "Instruction Applied: yes" in visual_info
+    assert "Instruction Applied: no (preset uses fixed directive)" in style_info
+    assert "Instruction Applied: no (preset uses fixed directive)" in context_info
+
+
 def test_size_resolver_outputs_only_width_and_height_from_two_images():
     size_image = torch.zeros((1, 1600, 1400, 3))
     aspect_image = torch.zeros((1, 640, 1024, 3))
