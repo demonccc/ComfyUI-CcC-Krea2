@@ -132,12 +132,12 @@ Vision References are Qwen-only and do not create appearance latents.
 
 The public presets map to fixed runtime behaviors:
 
-- **Semantic** -> full image participates in Qwen; direct visual rows are removed after encoding and semantic influence remains through prompt-token re-contextualization.
-- **Visual** -> full-image direct Qwen visual span pooled to 64 ordered rows so the reference remains visual without dwarfing the text prompt.
-- **Style** -> full, 2x2, or 4x4 processing; direct visual rows are removed after Qwen and style transfers through prompt-token re-contextualization.
+- **Semantic** -> proven Moodboard subject extraction with fixed internal 0.50 blend; direct Vision rows remain, but style statistics are partially removed.
+- **Visual** -> full-image raw Qwen visual rows retained exactly.
+- **Style** -> full, 2x2, or 4x4 processing; proven Moodboard indirect transport removes direct visual rows after Qwen and style transfers through prompt-token re-contextualization.
 - **Context** -> full-image situation/context guidance; direct visual rows are removed after Qwen and context transfers through prompt-token re-contextualization.
 
-Vision Reference has no public grounding or fidelity control. Source pixels are left untouched until Qwen's tokenizer/vision processor owns native image geometry. Only Style exposes `style_processing`.
+Vision Reference has no public grounding or fidelity control. Source pixels are left untouched until Qwen's tokenizer/vision processor owns native image geometry. Only Style exposes `style_processing`. Free-form instruction is applied only in Visual mode; Semantic, Style, and Context use fixed directives.
 
 ## Target Geometry
 
