@@ -1,9 +1,12 @@
 """Runtime behavior tests for CcCKrea2TextToImage node."""
 
+from types import SimpleNamespace
+
 import pytest
 import torch
 
-from ccc_krea2.t2i import CcCKrea2TextToImage, calculate_t2i_resolution
+from ccc_krea2.constants import VISION_PAD_TOKEN
+from ccc_krea2.t2i import CcCKrea2TextToImage, _encode_t2i_vision, calculate_t2i_resolution
 from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.prompt_augmentation import PromptAugmentation
 
@@ -148,14 +151,35 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
 
     captured = {}
 
-    def fake_orchestrator(**kwargs):
-        captured.update(kwargs)
-        return kwargs["model"], ["vision_positive"], ["ignored_negative"], kwargs["target_latent"], "info"
-
-    monkeypatch.setattr(
-        "ccc_krea2.t2i.edit_engine_runtime.run_krea2_edit_orchestrator",
-        fake_orchestrator,
+    fake_spec = SimpleNamespace(
+        vision_reference_mode="semantic",
+        semantic_extract="subject",
+        semantic_strength=0.25,
+        style_fidelity=1.0,
+        style_processing="full",
     )
+    fake_context = SimpleNamespace(
+        pos_rows_before=100,
+        pos_rows_after=100,
+        physical_images=[image],
+        physical_image_map=[
+            {
+                "logical_vision_slot": 1,
+                "spec": fake_spec,
+            }
+        ],
+        vision_row_spans=[(10, 50)],
+        removed_row_indices=[],
+        token_stream_key="qwen3vl_4b",
+    )
+
+    def fake_encode(clip, prompt, vision_references):
+        captured["clip"] = clip
+        captured["prompt"] = prompt
+        captured["vision_references"] = vision_references
+        return ["vision_positive"], fake_context, [fake_spec], "vision prompt"
+
+    monkeypatch.setattr("ccc_krea2.t2i._encode_t2i_vision", fake_encode)
 
     out_model, positive, negative, latent, info = node.process(
         model=model,
@@ -167,10 +191,8 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
 
     assert out_model is model
     assert positive == ["vision_positive"]
-    assert captured["positive_prompt"] == "A futuristic city"
-    assert len(captured["references"]) == 1
-    assert captured["references"][0].appearance_reference is False
-    assert captured["references"][0].semantic_extract == "subject"
+    assert captured["prompt"] == "A futuristic city"
+    assert captured["vision_references"] is vision_chain
     assert clip.tokenize_calls == [("blurry", {})]
     assert negative == ["conditioning_for_tokens_for_blurry"]
     assert "samples" in latent
@@ -179,7 +201,49 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     assert "Vision References: 1" in info
     assert "Vision Modes: semantic" in info
     assert "Positive Conditioning: multimodal Qwen/Vision" in info
-    assert "Vision Pipeline:" in info
+    assert "T2I Vision Pipeline:" in info
+    assert "Layout: text prompt first, Vision directive/image blocks after prompt" in info
+
+
+def test_t2i_vision_layout_keeps_text_prompt_before_direct_reference(monkeypatch):
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="visual",
+        instruction="Use the visible character design.",
+    )
+    captured = {}
+
+    fake_context = SimpleNamespace(
+        conditioning=["encoded"],
+        pos_rows_before=100,
+        pos_rows_after=100,
+        physical_images=[image],
+        physical_image_map=[],
+        vision_row_spans=[],
+        removed_row_indices=[],
+        token_stream_key="qwen3vl_4b",
+    )
+
+    def fake_context_encoder(**kwargs):
+        captured.update(kwargs)
+        return fake_context
+
+    monkeypatch.setattr("ccc_krea2.t2i.encode_krea2_qwen_context", fake_context_encoder)
+
+    conditioning, _, specs, vision_prompt = _encode_t2i_vision(
+        clip=FakeCLIP(),
+        prompt="Only one manga girl facing forward.",
+        vision_references=vision_chain,
+    )
+
+    assert conditioning == ["encoded"]
+    assert len(specs) == 1
+    assert vision_prompt.startswith("Only one manga girl facing forward.")
+    assert VISION_PAD_TOKEN in vision_prompt
+    assert vision_prompt.index("Only one manga girl facing forward.") < vision_prompt.index(VISION_PAD_TOKEN)
+    assert captured["prompt"] == vision_prompt
+
 
 def test_t2i_predefined_aspect_ratios_and_orientation():
     """11, 13, 14. Predefined aspect ratios produce correctly oriented aligned dimensions close to megapixels."""
