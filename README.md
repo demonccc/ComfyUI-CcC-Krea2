@@ -81,10 +81,10 @@ Vision Reference is Qwen/Vision-only and never creates an appearance/VAE referen
 
 Modes:
 
-- **Semantic** — use the image for content and structure. The internal subject/content extraction is fixed to 100% semantic and always uses the full image.
+- **Semantic** — use the image for content and structure. Qwen's visual span is whitened to reduce visual/style statistics, then compacted to 32 ordered semantic summary rows.
 - **Visual** — use the image as direct visual guidance. Raw Qwen visual rows are retained and the full image is used.
-- **Style** — use the image for aesthetic influence, such as making the result look like manga, illustration, film, or another visual treatment. Style can process the image as full, 2x2, or 4x4 before its direct visual rows are removed from the final conditioning.
-- **Context** — use the image to understand situation, relationships, action, and scene context without keeping it as a direct visual anchor. Context always uses the full image.
+- **Style** — use the image for aesthetic influence, such as making the result look like manga, illustration, film, or another visual treatment. Each physical style image is reduced to three global statistic rows (mean, mean+std, mean-std), so subject/token structure is not carried directly.
+- **Context** — use the image for situation, relationships, action, framing, and scene context. Qwen's visual span is whitened and compacted to 16 coarse ordered context rows.
 
 Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing.
 
