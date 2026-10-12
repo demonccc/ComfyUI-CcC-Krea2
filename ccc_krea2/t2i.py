@@ -5,6 +5,10 @@ from typing import Tuple, Dict, Any, Optional
 import torch
 
 from .constants import NODE_CATEGORY, LOGGER_PREFIX
+from . import edit_engine as edit_engine_runtime
+from .reference_specs import ReferenceChain
+from .modular_nodes.edit_reference_types import VisionReferenceChain
+from .vision_reference_runtime import append_vision_references
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
     apply_prompt_augmentation,
@@ -104,6 +108,7 @@ class CcCKrea2TextToImage:
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
+                "vision_references": ("KREA2_VISION_REFERENCE_CHAIN",),
             },
         }
 
@@ -119,6 +124,7 @@ class CcCKrea2TextToImage:
         custom_aspect_height: int = 1,
         negative_prompt: str = "",
         prompt_augmentation: Optional[Any] = None,
+        vision_references: Optional[VisionReferenceChain] = None,
     ) -> Tuple[Any, Any, Any, Dict[str, Any]]:
         if clip is None:
             raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
@@ -130,13 +136,6 @@ class CcCKrea2TextToImage:
             augmentation=prompt_augmentation,
         )
 
-        # Native CLIP text encoding (independent positive and negative)
-        pos_tokens = clip.tokenize(eff_pos)
-        positive = clip.encode_from_tokens_scheduled(pos_tokens)
-
-        neg_tokens = clip.tokenize(eff_neg)
-        negative = clip.encode_from_tokens_scheduled(neg_tokens)
-
         # T2I resolution calculation
         width, height = calculate_t2i_resolution(
             aspect_ratio=aspect_ratio,
@@ -147,6 +146,25 @@ class CcCKrea2TextToImage:
 
         # Native empty SD3 latent creation
         latent = create_empty_sd3_latent(width=width, height=height, batch_size=batch_size)
+
+        if vision_references is not None and len(vision_references.entries) > 0:
+            references = append_vision_references(ReferenceChain(), vision_references)
+            _, positive, _, _, _ = edit_engine_runtime.run_krea2_edit_orchestrator(
+                model=model,
+                clip=clip,
+                vae=None,
+                references=references,
+                target_latent=latent,
+                positive_prompt=eff_pos,
+                negative_prompt="",
+            )
+        else:
+            pos_tokens = clip.tokenize(eff_pos)
+            positive = clip.encode_from_tokens_scheduled(pos_tokens)
+
+        # T2I keeps the explicit negative prompt text-only.
+        neg_tokens = clip.tokenize(eff_neg)
+        negative = clip.encode_from_tokens_scheduled(neg_tokens)
 
         # Return unchanged input MODEL along with positive, negative, and latent
         return (model, positive, negative, latent)
