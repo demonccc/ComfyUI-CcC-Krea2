@@ -153,6 +153,9 @@ def apply_statistical_style_fidelity(
         transformed = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
 
         summary_rows = max(0, min(int(op.summary_rows), end - start))
+        if op.extract == "style":
+            summary_rows = min(summary_rows, 3)
+
         if summary_rows > 0:
             if op.extract == "style":
                 # Style is intentionally represented by exactly the global
