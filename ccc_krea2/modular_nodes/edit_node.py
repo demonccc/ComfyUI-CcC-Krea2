@@ -16,7 +16,8 @@ from ..reference_specs import (
     StyleReferenceSpec,
     VisionPrepSpec,
 )
-from .edit_reference_types import SemanticReferenceChain, VisualReferenceChain
+from .edit_reference_types import VisionReferenceChain, VisualReferenceChain
+from ..vision_reference_runtime import append_vision_references
 from .rope_position import install_krea2_rope_positioning
 
 
@@ -159,7 +160,7 @@ def _runtime_latent(latent: dict) -> dict:
 def _combine_reference_chains(
     clip: Any,
     visual_references: Optional[VisualReferenceChain],
-    semantic_references: Optional[SemanticReferenceChain],
+    vision_references: Optional[VisionReferenceChain],
     latent: dict,
 ) -> ReferenceChain:
     """Translate the split public nodes into the common orchestrator ReferenceChain."""
@@ -225,28 +226,7 @@ def _combine_reference_chains(
             alias="target image",
         )
 
-    pending_styles = []
-    for entry in (semantic_references or SemanticReferenceChain()).entries:
-        payload = {
-            "image": entry.image,
-            "clip": clip,
-            "instruction": entry.instruction,
-            "grounding_px": entry.grounding_px,
-            "mode": entry.mode,
-            "processing": entry.processing,
-            "fidelity": entry.fidelity,
-            "alias": "",
-        }
-        if entry.mode == "semantic_only":
-            chain = _append_semantic(chain=chain, **payload)
-        else:
-            pending_styles.append(payload)
-
-    # Style references remain last because a single logical style reference can expand
-    # into multiple physical Qwen images.
-    for payload in pending_styles:
-        chain = _append_semantic(chain=chain, **payload)
-
+    chain = append_vision_references(chain, vision_references or VisionReferenceChain())
     return chain
 
 
@@ -327,7 +307,7 @@ class CcCKrea2Edit:
             },
             "optional": {
                 "visual_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
-                "semantic_references": ("KREA2_SEMANTIC_REFERENCE_CHAIN",),
+                "vision_references": ("KREA2_VISION_REFERENCE_CHAIN",),
             },
         }
 
@@ -340,17 +320,17 @@ class CcCKrea2Edit:
         positive_prompt="",
         apply_krea2_edit_patch=True,
         visual_references=None,
-        semantic_references=None,
+        vision_references=None,
     ):
         visual_entries = (visual_references or VisualReferenceChain()).entries
-        semantic_entries = (semantic_references or SemanticReferenceChain()).entries
+        vision_entries = (vision_references or VisionReferenceChain()).entries
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
         runtime_latent = _runtime_latent(latent)
 
         chain = _combine_reference_chains(
             clip=clip,
             visual_references=visual_references,
-            semantic_references=semantic_references,
+            vision_references=vision_references,
             latent=latent,
         )
 
@@ -399,7 +379,7 @@ class CcCKrea2Edit:
             "=== Krea2 CcC Edit Report ===",
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
-            f"Semantic References: {len(semantic_entries)}",
+            f"Vision References: {len(vision_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
