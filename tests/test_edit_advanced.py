@@ -221,10 +221,9 @@ def test_vision_reference_freeform_instruction_is_visual_only():
     assert style_chain.entries[0].instruction == "Use manga style and girl identity"
     assert context_chain.entries[0].instruction == "Use manga style and girl identity"
 
-    assert "Instruction Applied: no (preset uses fixed directive)" in semantic_info
-    assert "Instruction Applied: yes" in visual_info
-    assert "Instruction Applied: no (preset uses fixed directive)" in style_info
-    assert "Instruction Applied: no (preset uses fixed directive)" in context_info
+    for info in (semantic_info, visual_info, style_info, context_info):
+        assert "Instruction: 'Use manga style and girl identity'" in info
+        assert "Consumer Processing: deferred to connected node" in info
 
 
 def test_size_resolver_outputs_only_width_and_height_from_two_images():
