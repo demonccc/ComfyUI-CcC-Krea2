@@ -92,7 +92,10 @@ Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
 | style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
 | previous_references | KREA2_VISION_REFERENCE_CHAIN | optional | Previous Vision Reference chain. |
 
-Output: `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`).
+Outputs:
+
+- `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`)
+- `vision_info` (`STRING`) with effective mode, runtime mode, processing, source resolution, physical Qwen image count, and chain size.
 
 Preset behavior is fixed rather than controlled by a strength slider:
 
@@ -511,8 +514,9 @@ Outputs:
 - positive
 - negative
 - latent
+- t2i_info
 
-The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. When vision_references is connected, the positive branch uses multimodal Qwen conditioning from the Vision Reference chain while the explicit negative prompt remains text-only.
+The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. When vision_references is connected, the positive branch uses multimodal Qwen conditioning from the Vision Reference chain while the explicit negative prompt remains text-only. `t2i_info` reports the effective prompts, resolved resolution, Vision modes/runtime modes, and the underlying Vision pipeline report.
 
 ## Example Workflows
 
