@@ -136,6 +136,8 @@ def apply_statistical_style_fidelity(
                 stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)  # (B, 3, 12, fused//12)
                 idx = torch.arange(end - start, device=span.device) % 3
                 target = stats[:, idx]
+            elif op.extract == "context":
+                target = span
             else:
                 raise ValueError(
                     f"Invalid semantic extract mode '{op.extract}'. Supported modes: 'style', 'subject'."
@@ -172,6 +174,26 @@ def expand_style_reference_spans(
     prep_spec = spec.prepared_image.prep_spec
 
     for crop in slices:
+        if prep_spec.mode == "tokenizer_native":
+            crop = crop[..., :3].clamp(0.0, 1.0)
+            h, w = int(crop.shape[1]), int(crop.shape[2])
+            prepared_crops.append(
+                PreparedVisionImage(
+                    original_image=crop,
+                    vision_image=crop,
+                    prep_spec=prep_spec,
+                    debug_metadata={
+                        "src_hw": (h, w),
+                        "prep_hw": (h, w),
+                        "target_hw": (h, w),
+                        "direction": "none",
+                        "resolved_method": "none",
+                        "additional_adjustment": "owned by Qwen tokenizer",
+                    },
+                )
+            )
+            continue
+
         prep_crop = prepare_vision_image(
             image=crop,
             clip=clip,
