@@ -140,7 +140,9 @@ def apply_statistical_style_fidelity(
             stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)
             idx = torch.arange(end - start, device=span.device) % 3
             target = stats[:, idx]
-        elif op.extract in ("semantic", "context", "visual"):
+        elif op.extract == "context":
+            target = (span - mu) / sigma
+        elif op.extract in ("semantic", "visual"):
             target = span
         else:
             raise ValueError(
@@ -166,13 +168,22 @@ def apply_statistical_style_fidelity(
             else:
                 row_count = end - start
                 source_rows = span if op.extract == "visual" else transformed
-                pooled = []
-                for summary_index in range(summary_rows):
-                    chunk_start = (summary_index * row_count) // summary_rows
-                    chunk_end = ((summary_index + 1) * row_count) // summary_rows
-                    chunk_end = max(chunk_end, chunk_start + 1)
-                    pooled.append(source_rows[:, chunk_start:chunk_end].mean(dim=1, keepdim=True))
-                summary = torch.cat(pooled, dim=1)
+                if op.extract == "context":
+                    indices = torch.linspace(
+                        0,
+                        row_count - 1,
+                        steps=summary_rows,
+                        device=source_rows.device,
+                    ).round().long()
+                    summary = source_rows[:, indices]
+                else:
+                    pooled = []
+                    for summary_index in range(summary_rows):
+                        chunk_start = (summary_index * row_count) // summary_rows
+                        chunk_end = ((summary_index + 1) * row_count) // summary_rows
+                        chunk_end = max(chunk_end, chunk_start + 1)
+                        pooled.append(source_rows[:, chunk_start:chunk_end].mean(dim=1, keepdim=True))
+                    summary = torch.cat(pooled, dim=1)
 
             z[:, start : start + summary_rows] = summary
             keep[start + summary_rows : end] = False
