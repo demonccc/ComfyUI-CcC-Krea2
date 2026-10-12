@@ -99,10 +99,10 @@ Outputs:
 
 Preset behavior is fixed rather than controlled by a strength slider:
 
-- **Semantic**: full image; whitened content representation compacted to 32 ordered summary rows.
-- **Visual**: 100% direct Qwen visual representation, full image.
-- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; each physical Qwen image is reduced to 3 global style-statistic rows.
-- **Context**: situation/relationships/action/framing context, full image; whitened visual rows are compacted to 16 coarse ordered summary rows.
+- **Semantic**: full image; semantic information survives through Qwen re-contextualization while direct image rows are removed.
+- **Visual**: direct Qwen visual representation, full image, pooled to 64 ordered rows to balance reference and prompt.
+- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; direct image rows are removed after Qwen so style is carried through prompt re-contextualization.
+- **Context**: situation/relationships/action/framing context, full image; direct image rows are removed after Qwen and context is carried through prompt re-contextualization.
 
 There is no public `grounding_px` or `fidelity` control. Vision Reference keeps the source pixels untouched until the Qwen tokenizer/vision processor applies its native geometry.
 
