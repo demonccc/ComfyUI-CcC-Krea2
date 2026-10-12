@@ -86,15 +86,15 @@ app.registerExtension({
             }, 20);
         }
 
-        if (node.comfyClass === "CcCKrea2SemanticReference") {
+        if (node.comfyClass === "CcCKrea2VisionReference") {
             const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const processingWidget = node.widgets?.find((w) => w.name === "processing");
+            const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
 
-            const updateSemanticReferenceState = () => {
-                const semanticOnly = (modeWidget?.value ?? "semantic_reference") === "semantic_reference";
+            const updateVisionReferenceState = () => {
+                const styleMode = (modeWidget?.value ?? "semantic") === "style";
                 if (processingWidget) {
-                    processingWidget.disabled = semanticOnly;
-                    if (semanticOnly) processingWidget.value = "full";
+                    processingWidget.disabled = !styleMode;
+                    if (!styleMode) processingWidget.value = "full";
                 }
             };
 
@@ -102,11 +102,11 @@ app.registerExtension({
                 const originalCallback = modeWidget.callback;
                 modeWidget.callback = function () {
                     if (originalCallback) originalCallback.apply(this, arguments);
-                    updateSemanticReferenceState();
+                    updateVisionReferenceState();
                 };
             }
 
-            setTimeout(updateSemanticReferenceState, 20);
+            setTimeout(updateVisionReferenceState, 20);
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
