@@ -55,7 +55,9 @@ class ReferenceSpec:
     cached_geometry: Optional[Any] = None
     cached_qwen_visual: Optional[Any] = None
 
-    # Qwen-only semantic processing
+    # Qwen-only Vision Reference processing
+    vision_reference_mode: str = ""
+    vision_summary_rows: int = 0
     semantic_extract: str = "none"
     semantic_strength: float = 1.0
     indirect_vision_context: bool = False
