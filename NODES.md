@@ -95,16 +95,16 @@ Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
 Outputs:
 
 - `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`)
-- `vision_info` (`STRING`) with effective mode, runtime mode, processing, source resolution, physical Qwen image count, and chain size.
+- `vision_info` (`STRING`) with consumer-neutral declaration metadata: mode, internal mode, instruction, source resolution, effective Style processing, and chain size.
 
-Preset behavior is fixed rather than controlled by a strength slider:
+Vision Reference defines information semantics rather than a transport algorithm:
 
-- **Semantic**: full image; subject/content extraction with fixed internal 0.25 blend.
-- **Visual**: raw direct Qwen visual representation, full image, no row compaction.
-- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; fixed 0.00 fidelity collapses spatial rows toward Moodboard mean/mean±std style statistics.
-- **Context**: situation/relationships/action/framing context, full image; whitened Vision structure is reduced to 64 representative ordered rows.
+- **Semantic**: content/meaning, pose, action, objects, composition, and spatial relationships.
+- **Visual**: visible appearance and direct visual details.
+- **Style**: aesthetic/rendering treatment; full, 2x2, or 4x4 analysis.
+- **Context**: setting, action, framing, interaction, composition, and spatial relationships.
 
-There is no public `grounding_px` or `fidelity` control. Vision Reference keeps the source pixels untouched until the Qwen tokenizer/vision processor applies its native geometry. Free-form `instruction` is applied only in Visual mode; Semantic, Style, and Context use fixed preset directives.
+There is no public `grounding_px` or `fidelity` control. The connected consumer owns the actual processing/transport of the declared Vision information.
 
 ## Krea2 CcC Size Resolver
 
@@ -516,7 +516,7 @@ Outputs:
 - latent
 - t2i_info
 
-The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. When vision_references is connected, it uses a dedicated T2I Qwen path with the text prompt placed before direct Vision directive/image blocks. This keeps prompt tokens text-led while Vision rows provide Semantic, Visual, Style, or Context guidance. The explicit negative prompt remains text-only.
+The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. With Vision Reference, each reference is analyzed by Qwen multimodal generation using a mode-specific system prompt; the generated Semantic/Visual/Style/Context guidance is appended to the user's requested result and encoded as text-only Krea2 conditioning. Direct image rows are never present in final T2I conditioning. The explicit negative prompt remains text-only.
 
 ## Example Workflows
 
