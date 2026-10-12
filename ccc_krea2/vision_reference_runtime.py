@@ -13,9 +13,9 @@ from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionRefe
 
 
 SEMANTIC_DIRECTIVE = (
-    "Use this reference only for semantic content: subjects, objects, attributes, actions, pose, and scene meaning. "
-    "Apply that semantic information to the result requested by the user's prompt; the reference does not introduce "
-    "an additional independent subject. Ignore identity, exact appearance, rendering, lighting, palette, and style."
+    "Use the reference image as a subject/content guide for the SAME subject requested by the user's prompt. "
+    "Preserve semantic content such as subject type, attributes, pose, action, objects, composition, and scene meaning, "
+    "while the text prompt controls visual style and rendering. Do not add the reference subject as a second subject."
 )
 
 VISUAL_DIRECTIVE = (
@@ -24,8 +24,8 @@ VISUAL_DIRECTIVE = (
 )
 
 STYLE_DIRECTIVE = (
-    "Use this reference only as a style guide: adopt its rendering, line work, shading, color palette, lighting, "
-    "texture, medium, tone, and mood. Do not copy or introduce its subjects, people, identities, clothing, objects, "
+    "Use the reference image only as a style guide: adopt its color palette, lighting, texture, line work, shading, "
+    "medium, tone, and overall mood, but do not copy or introduce its subjects, people, identities, clothing, objects, "
     "layout, pose, or composition."
 )
 
@@ -38,29 +38,13 @@ CONTEXT_DIRECTIVE = (
 
 def _with_user_instruction(base: str, instruction: str, scope: str) -> str:
     user = (instruction or "").strip()
-    if not user:
+    if not user or scope != "visual":
         return base
 
-    guards = {
-        "semantic": (
-            "Interpret the additional guidance only as semantic/content guidance. "
-            "Ignore requests for exact visual identity or visual style."
-        ),
-        "visual": (
-            "Apply the additional guidance to the single subject/result requested by the user's prompt. "
-            "Do not introduce the reference subject as an additional subject."
-        ),
-        "style": (
-            "Interpret the additional guidance only as style guidance. Ignore any part about subject identity, "
-            "people, clothing, objects, pose, layout, or composition."
-        ),
-        "context": (
-            "Interpret the additional guidance only as situation/context guidance. Ignore any part about identity, "
-            "clothing, exact appearance, or visual style."
-        ),
-    }
-    guard = guards.get(scope, "")
-    return f"{base} {guard} Additional guidance: {user}".strip()
+    return (
+        f"{base} Apply this extra visual guidance to the SAME subject/result requested by the user's prompt; "
+        f"do not create an additional subject from the reference. Additional visual guidance: {user}"
+    )
 
 
 def prepare_tokenizer_native_image(image: torch.Tensor) -> PreparedVisionImage:
