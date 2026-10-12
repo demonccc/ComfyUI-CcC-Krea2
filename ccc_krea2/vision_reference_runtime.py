@@ -18,8 +18,7 @@ SEMANTIC_DIRECTIVE = (
 )
 
 VISUAL_DIRECTIVE = (
-    "Use this reference as direct visual guidance. Preserve visible appearance and details when they are relevant "
-    "to the requested result."
+    "Use this reference as direct visual guidance. Preserve its visible appearance and details."
 )
 
 STYLE_DIRECTIVE = (
