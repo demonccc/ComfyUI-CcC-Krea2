@@ -30,8 +30,8 @@ class CcCKrea2VisionReference:
     """Declare one Qwen/Vision-only reference without an appearance latent."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("KREA2_VISION_REFERENCE_CHAIN",)
-    RETURN_NAMES = ("vision_references",)
+    RETURN_TYPES = ("KREA2_VISION_REFERENCE_CHAIN", "STRING")
+    RETURN_NAMES = ("vision_references", "vision_info")
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one Vision Reference interpreted as Semantic, Visual, Style, or Context. "
@@ -74,7 +74,7 @@ class CcCKrea2VisionReference:
         instruction: str = "",
         style_processing: str = "full",
         previous_references: Optional[VisionReferenceChain] = None,
-    ) -> Tuple[VisionReferenceChain]:
+    ) -> Tuple[VisionReferenceChain, str]:
         chain = previous_references if previous_references is not None else VisionReferenceChain()
         runtime_mode = VISION_RUNTIME_MODES.get(mode, mode)
         effective_processing = style_processing if runtime_mode == "style_indirect" else "full"
@@ -84,4 +84,43 @@ class CcCKrea2VisionReference:
             instruction=instruction.strip(),
             processing=effective_processing,
         )
-        return (chain.append(entry),)
+        out_chain = chain.append(entry)
+
+        if image.ndim == 3:
+            source_height, source_width = int(image.shape[0]), int(image.shape[1])
+        else:
+            source_height, source_width = int(image.shape[1]), int(image.shape[2])
+
+        physical_images = {
+            "full": 1,
+            "2x2": 4,
+            "4x4": 16,
+        }.get(effective_processing, 1)
+
+        if runtime_mode == "semantic_only":
+            behavior = "100% semantic/content extraction; direct Vision rows retained"
+        elif runtime_mode == "style_direct":
+            behavior = "direct Qwen visual representation; direct Vision rows retained"
+        elif runtime_mode == "style_indirect":
+            behavior = "style influence; direct Vision rows removed after Qwen encoding"
+        elif runtime_mode == "context_indirect":
+            behavior = "context influence; direct Vision rows removed after Qwen encoding"
+        else:
+            behavior = "unknown/custom runtime behavior"
+
+        info = "\n".join(
+            [
+                "=== Krea2 CcC Vision Reference ===",
+                f"Public Mode: {mode}",
+                f"Runtime Mode: {runtime_mode}",
+                f"Instruction: {'present' if instruction.strip() else 'empty'}",
+                f"Source Resolution: {source_width} x {source_height}",
+                f"Requested Style Processing: {style_processing}",
+                f"Effective Processing: {effective_processing}",
+                f"Physical Qwen Images: {physical_images}",
+                f"Behavior: {behavior}",
+                "Appearance Latent: no",
+                f"Chain Entries: {len(out_chain.entries)}",
+            ]
+        )
+        return out_chain, info
