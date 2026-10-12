@@ -549,8 +549,8 @@ def encode_krea2_qwen_context(
                     )
 
     # Apply Krea2 CcC Vision Reference processing to positive Qwen vision spans.
-    # Style refs use style extraction; semantic refs use subject extraction; Context keeps raw rows until removal so
-    # content/composition survive without becoming an additional VAE/LoRA reference.
+    # Vision Reference presets retain compact extracted rows for Semantic/Style/Context.
+    # Visual keeps the raw Qwen vision rows unchanged.
     if is_positive and conditioning and physical_image_map:
         spans_info: List[StyleSpanOperation] = []
         for idx, item in enumerate(physical_image_map):
@@ -562,6 +562,7 @@ def encode_krea2_qwen_context(
             extract = None
             fidelity = 1.0
             indirect = False
+            summary_rows = int(getattr(spec, "vision_summary_rows", 0) or 0)
 
             if str(role_val).lower() == "style":
                 extract = "style"
@@ -573,7 +574,7 @@ def encode_krea2_qwen_context(
                 indirect = False
             elif getattr(spec, "indirect_vision_context", False):
                 extract = "context"
-                fidelity = 1.0
+                fidelity = getattr(spec, "semantic_strength", 0.0)
                 indirect = True
 
             if extract is not None:
@@ -588,6 +589,7 @@ def encode_krea2_qwen_context(
                         style_fidelity=fidelity,
                         indirect_style_transfer=indirect,
                         extract=extract,
+                        summary_rows=summary_rows,
                     )
                 )
 
