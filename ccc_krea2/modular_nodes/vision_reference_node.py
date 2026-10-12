@@ -98,13 +98,13 @@ class CcCKrea2VisionReference:
         }.get(effective_processing, 1)
 
         if runtime_mode == "semantic_only":
-            behavior = "semantic/content extraction compacted to 32 summary rows"
+            behavior = "semantic guidance via Qwen prompt re-contextualization; direct Vision rows removed"
         elif runtime_mode == "style_direct":
-            behavior = "direct Qwen visual representation; direct Vision rows retained"
+            behavior = "direct Qwen visual guidance compacted to 64 ordered Vision rows"
         elif runtime_mode == "style_indirect":
-            behavior = "style statistics retained as 3 summary rows per physical Qwen image"
+            behavior = "style guidance via Qwen prompt re-contextualization; direct Vision rows removed"
         elif runtime_mode == "context_indirect":
-            behavior = "coarse semantic/context representation compacted to 16 summary rows"
+            behavior = "context guidance via Qwen prompt re-contextualization; direct Vision rows removed"
         else:
             behavior = "unknown/custom runtime behavior"
 
