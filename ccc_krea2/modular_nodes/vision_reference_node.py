@@ -91,38 +91,17 @@ class CcCKrea2VisionReference:
         else:
             source_height, source_width = int(image.shape[1]), int(image.shape[2])
 
-        physical_images = {
-            "full": 1,
-            "2x2": 4,
-            "4x4": 16,
-        }.get(effective_processing, 1)
-
-        if runtime_mode == "semantic_only":
-            behavior = "subject/content extraction at fixed 0.25 internal blend; Vision rows retained"
-        elif runtime_mode == "style_direct":
-            behavior = "raw direct Qwen visual guidance; Vision rows retained"
-        elif runtime_mode == "style_indirect":
-            behavior = "direct style-statistics extraction at fixed 0.00 internal fidelity; Vision rows retained"
-        elif runtime_mode == "context_indirect":
-            behavior = "whitened coarse context extraction compacted to 64 ordered Vision rows"
-        else:
-            behavior = "unknown/custom runtime behavior"
-
-        instruction_applied = bool(instruction.strip()) and mode == "visual"
-
         info = "\n".join(
             [
                 "=== Krea2 CcC Vision Reference ===",
-                f"Public Mode: {mode}",
-                f"Runtime Mode: {runtime_mode}",
+                f"Mode: {mode}",
+                f"Internal Mode: {runtime_mode}",
                 f"Instruction: {instruction.strip()!r}" if instruction.strip() else "Instruction: <empty>",
-                f"Instruction Applied: {'yes' if instruction_applied else 'no (preset uses fixed directive)'}",
                 f"Source Resolution: {source_width} x {source_height}",
                 f"Requested Style Processing: {style_processing}",
-                f"Effective Processing: {effective_processing}",
-                f"Physical Qwen Images: {physical_images}",
-                f"Behavior: {behavior}",
+                f"Effective Style Processing: {effective_processing}",
                 "Appearance Latent: no",
+                "Consumer Processing: deferred to connected node",
                 f"Chain Entries: {len(out_chain.entries)}",
             ]
         )
