@@ -5,6 +5,7 @@ import torch
 from ccc_krea2.krea2edit_geometry import resolve_visual_reference_fit
 from ccc_krea2.reference_specs import StyleReferenceSpec
 from ccc_krea2.style_processing import (
+    StyleSpanOperation,
     apply_statistical_style_fidelity,
     expand_style_reference_spans,
     slice_style_image,
@@ -147,3 +148,68 @@ def test_apply_statistical_style_fidelity_and_indirect():
     assert indirect_multi is True
     assert len(removed_multi) == 20
     assert set(removed_multi) == set(range(10, 20)).union(set(range(40, 50)))
+
+
+
+def test_compact_vision_extraction_keeps_small_summary_spans():
+    cond = torch.randn(1, 100, 768)
+
+    semantic, compacted, removed = apply_statistical_style_fidelity(
+        cond,
+        spans_info=[
+            StyleSpanOperation(
+                logical_reference_id="semantic",
+                logical_vision_slot=1,
+                physical_qwen_index=1,
+                row_start=10,
+                row_end=30,
+                style_fidelity=0.0,
+                indirect_style_transfer=False,
+                extract="subject",
+                summary_rows=4,
+            )
+        ],
+    )
+    assert semantic.shape == (1, 84, 768)
+    assert compacted is True
+    assert len(removed) == 16
+
+    style, compacted, removed = apply_statistical_style_fidelity(
+        cond,
+        spans_info=[
+            StyleSpanOperation(
+                logical_reference_id="style",
+                logical_vision_slot=1,
+                physical_qwen_index=1,
+                row_start=10,
+                row_end=30,
+                style_fidelity=0.0,
+                indirect_style_transfer=True,
+                extract="style",
+                summary_rows=3,
+            )
+        ],
+    )
+    assert style.shape == (1, 83, 768)
+    assert compacted is True
+    assert len(removed) == 17
+
+    context, compacted, removed = apply_statistical_style_fidelity(
+        cond,
+        spans_info=[
+            StyleSpanOperation(
+                logical_reference_id="context",
+                logical_vision_slot=1,
+                physical_qwen_index=1,
+                row_start=10,
+                row_end=30,
+                style_fidelity=0.0,
+                indirect_style_transfer=True,
+                extract="context",
+                summary_rows=5,
+            )
+        ],
+    )
+    assert context.shape == (1, 85, 768)
+    assert compacted is True
+    assert len(removed) == 15
