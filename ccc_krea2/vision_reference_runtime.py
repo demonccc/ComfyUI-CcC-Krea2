@@ -93,7 +93,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_summary_rows=0,
             vision_indirect=False,
             semantic_extract="subject",
-            semantic_strength=0.5,
+            semantic_strength=0.25,
         )
 
     if entry.mode == "style_direct":
@@ -117,10 +117,10 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             include_in_vision=True,
             vision_reference_mode="style",
             vision_summary_rows=0,
-            vision_indirect=True,
+            vision_indirect=False,
             style_processing=entry.processing,
-            style_fidelity=0.5,
-            indirect_style_transfer=True,
+            style_fidelity=0.0,
+            indirect_style_transfer=False,
         )
 
     if entry.mode == "context_indirect":
@@ -131,10 +131,10 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="context",
-            vision_summary_rows=0,
-            vision_indirect=True,
-            semantic_strength=1.0,
-            indirect_vision_context=True,
+            vision_summary_rows=64,
+            vision_indirect=False,
+            semantic_strength=0.0,
+            indirect_vision_context=False,
         )
 
     raise ValueError(f"Unsupported Vision Reference runtime mode: {entry.mode}")
