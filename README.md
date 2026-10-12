@@ -81,10 +81,10 @@ Vision Reference is Qwen/Vision-only and never creates an appearance/VAE referen
 
 Modes:
 
-- **Semantic** — use the image as a subject/content guide for the same subject requested by the text prompt. It uses the proven Moodboard subject extraction at a fixed internal 0.50 blend; the text prompt controls visual style.
-- **Visual** — use the image as direct visual guidance. Raw Qwen visual rows are retained exactly; this is intentionally the strongest and most literal preset.
-- **Style** — use the image for aesthetic influence, such as manga, illustration, film, or another visual treatment. It follows the proven Moodboard indirect recipe: Qwen sees the image, then direct image rows are removed so the DiT receives style only through re-contextualized prompt tokens.
-- **Context** — use the image for situation, relationships, action, framing, and scene context through indirect Qwen re-contextualization, then remove the direct image rows.
+- **Semantic** — subject/content extraction with a fixed internal 0.25 blend. Most global style statistics are removed while semantic/spatial token structure remains.
+- **Visual** — raw Qwen visual guidance. The image rows are kept unchanged; in Text to Image the text prompt is encoded before the Vision block so the reference cannot rewrite the prompt tokens.
+- **Style** — direct Moodboard-style statistical extraction at fixed internal fidelity 0.00. Spatial subject/layout structure is collapsed toward per-reference mean/mean±std style statistics while the Vision rows remain available to Krea2.
+- **Context** — removes global style statistics, then keeps 64 representative ordered rows from the whitened Vision span to preserve coarse action, framing, composition, and spatial context.
 
 Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The free-form Vision `instruction` is applied only by **Visual**; the other presets use fixed scope directives so contradictory text cannot turn the reference into an extra subject.
 
@@ -218,7 +218,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 **LoRA Prompt Settings** can associate prepend/append positive and negative text with those four LoRA slots. The resulting prompt_augmentation is carried by LoRA Stack. The public **Text to Image** node consumes that augmentation; **Krea2 CcC Edit does not automatically consume it**.
 
-**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT. An optional **Vision Reference** chain can enrich the positive Qwen conditioning with Semantic, Visual, Style, or Context guidance; the explicit negative prompt remains text-only.
+**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT. An optional **Vision Reference** chain uses a dedicated T2I Qwen path rather than the Edit orchestrator. The text prompt is placed before direct Vision blocks, reducing reference-to-prompt leakage; the explicit negative prompt remains text-only.
 
 ## Example Workflows
 
