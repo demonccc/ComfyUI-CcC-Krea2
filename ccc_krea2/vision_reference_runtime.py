@@ -34,7 +34,9 @@ CONTEXT_DIRECTIVE = (
 
 def _with_user_instruction(base: str, instruction: str) -> str:
     user = (instruction or "").strip()
-    return f"{base} {user}".strip() if user else base
+    if not user:
+        return base
+    return f"{base} Additional guidance, only within this mode's scope: {user}"
 
 
 def prepare_tokenizer_native_image(image: torch.Tensor) -> PreparedVisionImage:
