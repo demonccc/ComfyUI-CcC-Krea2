@@ -6,7 +6,7 @@ from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
 from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _runtime_latent
 from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent, _fit_content_image, _resolve_dimensions
 from ccc_krea2.modular_nodes.rope_position import build_incontext_3d_rope_pos_ids, resolve_rope_axes
-from ccc_krea2.modular_nodes.semantic_reference_node import CcCKrea2SemanticReference
+from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.modular_nodes.size_resolver_node import CcCKrea2SizeResolver, _resolve_size
 from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
 from ccc_krea2.patch import attach_reference_runtime_to_conditioning
@@ -167,25 +167,28 @@ def test_positive_reference_boost_metadata_is_explicit_and_negative_defaults_to_
     assert "reference_boosts" not in negative[0][1]
 
 
-def test_semantic_reference_exposes_advanced_semantic_controls():
-    required = CcCKrea2SemanticReference.INPUT_TYPES()["required"]
-    assert required["mode"][0] == ("semantic_reference", "visual_reference", "style_reference")
-    assert required["processing"][0] == ("full", "2x2", "4x4")
-    assert required["grounding_px"][1]["step"] == 32
+def test_vision_reference_exposes_simple_public_presets():
+    required = CcCKrea2VisionReference.INPUT_TYPES()["required"]
+    assert list(required) == ["image", "mode", "instruction", "style_processing"]
+    assert required["mode"][0] == ("semantic", "visual", "style", "context")
+    assert required["style_processing"][0] == ("full", "2x2", "4x4")
+    assert "grounding_px" not in required
+    assert "fidelity" not in required
 
 
-
-def test_semantic_reference_ui_names_preserve_legacy_runtime_modes():
+def test_vision_reference_presets_map_to_fixed_runtime_contracts():
     image = torch.zeros((1, 64, 64, 3))
-    node = CcCKrea2SemanticReference()
+    node = CcCKrea2VisionReference()
 
-    semantic = node.process(image=image, mode="semantic_reference")[0].entries[0]
-    visual = node.process(image=image, mode="visual_reference")[0].entries[0]
-    style = node.process(image=image, mode="style_reference")[0].entries[0]
+    semantic = node.process(image=image, mode="semantic", style_processing="4x4")[0].entries[0]
+    visual = node.process(image=image, mode="visual", style_processing="4x4")[0].entries[0]
+    style = node.process(image=image, mode="style", style_processing="4x4")[0].entries[0]
+    context = node.process(image=image, mode="context", style_processing="4x4")[0].entries[0]
 
-    assert semantic.mode == "semantic_only"
-    assert visual.mode == "style_direct"
-    assert style.mode == "style_indirect"
+    assert (semantic.mode, semantic.processing) == ("semantic_only", "full")
+    assert (visual.mode, visual.processing) == ("style_direct", "full")
+    assert (style.mode, style.processing) == ("style_indirect", "4x4")
+    assert (context.mode, context.processing) == ("context_indirect", "full")
 
 
 def test_size_resolver_outputs_only_width_and_height_from_two_images():
@@ -351,7 +354,7 @@ def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
     required = CcCKrea2Edit.INPUT_TYPES()["required"]
     optional = CcCKrea2Edit.INPUT_TYPES()["optional"]
     assert "latent" in required
-    assert list(optional) == ["visual_references", "semantic_references"]
+    assert list(optional) == ["visual_references", "vision_references"]
     for moved in (
         "dimensions",
         "dimensions_image",
