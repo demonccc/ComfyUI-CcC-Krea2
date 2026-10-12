@@ -8,7 +8,7 @@ This document describes the **14 public nodes registered in ccc_krea2/nodes.py**
 | --- | --- |
 | Krea2 CcC Attention Region | CcCKrea2AttentionRegion |
 | Krea2 CcC Visual Reference | CcCKrea2VisualReference |
-| Krea2 CcC Semantic Reference | CcCKrea2SemanticReference |
+| Krea2 CcC Vision Reference | CcCKrea2VisionReference |
 | Krea2 CcC Size Resolver | CcCKrea2SizeResolver |
 | Krea2 CcC Latent | CcCKrea2Latent |
 | Krea2 CcC Edit Prompt Creator | CcCKrea2EditPromptCreator |
@@ -80,23 +80,28 @@ prompt_annotation is identification only, for example: This is the subject image
 
 The positive branch uses the configured boost. The grounded negative branch uses the same appearance-image vision blocks with no role annotation text, fixed empty negative text, and neutral boost 1.0.
 
-## Krea2 CcC Semantic Reference
+## Krea2 CcC Vision Reference
 
-Adds one Qwen-only semantic/style reference. It never creates an appearance VAE latent.
+Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
 
-| Control | Values | Default |
-| --- | --- | --- |
-| image | IMAGE | — |
-| mode | semantic_reference, visual_reference, style_reference | semantic_reference |
-| instruction | text | empty |
-| grounding_px | 0..4096, step 32 | 768 |
-| processing | full, 2x2, 4x4 | full |
-| fidelity | 0..1 | 0.5 |
-| previous_references | KREA2_SEMANTIC_REFERENCE_CHAIN | optional |
+| Control | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| image | IMAGE | — | Source image shown to Qwen Vision. |
+| mode | semantic, visual, style, context | semantic | Chooses what the reference contributes. |
+| instruction | text | empty | Optional extra instruction for this reference. |
+| style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
+| previous_references | KREA2_VISION_REFERENCE_CHAIN | optional | Previous Vision Reference chain. |
 
-Output: semantic_references.
+Output: `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`).
 
-semantic_reference always resolves processing to full. visual_reference and style_reference can use full, 2x2, or 4x4 processing.
+Preset behavior is fixed rather than controlled by a strength slider:
+
+- **Semantic**: 100% semantic/content extraction, full image.
+- **Visual**: 100% direct Qwen visual representation, full image.
+- **Style**: aesthetic/style influence; full, 2x2, or 4x4 style processing; direct reference rows are removed after encoding.
+- **Context**: situation/relationships/action context, full image; direct reference rows are removed after encoding.
+
+There is no public `grounding_px` or `fidelity` control. Vision Reference keeps the source pixels untouched until the Qwen tokenizer/vision processor applies its native geometry.
 
 ## Krea2 CcC Size Resolver
 
@@ -256,7 +261,7 @@ Required inputs/controls:
 Optional inputs:
 
 - visual_references
-- semantic_references
+- vision_references
 
 Outputs:
 
@@ -498,6 +503,7 @@ Optional inputs:
 
 - negative_prompt
 - prompt_augmentation
+- vision_references
 
 Outputs:
 
@@ -506,7 +512,7 @@ Outputs:
 - negative
 - latent
 
-The node applies prompt augmentation, encodes positive and negative text independently, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent.
+The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. When vision_references is connected, the positive branch uses multimodal Qwen conditioning from the Vision Reference chain while the explicit negative prompt remains text-only.
 
 ## Example Workflows
 
@@ -514,5 +520,10 @@ The node applies prompt augmentation, encodes positive and negative text indepen
 - workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
 - workflows/03_regional_attention.json — tagged regional references.
 - workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
-- workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Semantic Reference branch wired but disabled.
-- workflows/06_text_to_image.json — direct T2I example using CcC Krea2 - Text to Image outputs as KSampler model/positive/negative/latent inputs.
+- workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
+- workflows/06_text_to_image.json — T2I example with a Semantic Vision Reference enriching positive Qwen conditioning.
+
+- workflows/12_edit_vision_semantic.json — Vision Reference / Semantic.
+- workflows/13_edit_vision_visual.json — Vision Reference / Visual.
+- workflows/14_edit_vision_style.json — Vision Reference / Style.
+- workflows/18_edit_vision_context.json — Vision Reference / Context.
