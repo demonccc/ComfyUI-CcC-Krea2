@@ -564,7 +564,12 @@ def encode_krea2_qwen_context(
             indirect = False
             summary_rows = int(getattr(spec, "vision_summary_rows", 0) or 0)
 
-            if str(role_val).lower() == "style":
+            vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
+            if vision_mode:
+                extract = vision_mode
+                fidelity = 1.0
+                indirect = bool(getattr(spec, "vision_indirect", False))
+            elif str(role_val).lower() == "style":
                 extract = "style"
                 fidelity = getattr(spec, "style_fidelity", 1.0)
                 indirect = getattr(spec, "indirect_style_transfer", False)
