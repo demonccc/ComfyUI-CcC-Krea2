@@ -99,10 +99,10 @@ Outputs:
 
 Preset behavior is fixed rather than controlled by a strength slider:
 
-- **Semantic**: full image; proven Moodboard subject/content extraction with fixed internal 0.50 blend. The reference is declared as the same subject/content requested by the prompt.
+- **Semantic**: full image; subject/content extraction with fixed internal 0.25 blend.
 - **Visual**: raw direct Qwen visual representation, full image, no row compaction.
-- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; proven Moodboard indirect transport removes direct image rows after Qwen.
-- **Context**: situation/relationships/action/framing context, full image; direct image rows are removed after Qwen and context is carried through prompt re-contextualization.
+- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; fixed 0.00 fidelity collapses spatial rows toward Moodboard mean/mean±std style statistics.
+- **Context**: situation/relationships/action/framing context, full image; whitened Vision structure is reduced to 64 representative ordered rows.
 
 There is no public `grounding_px` or `fidelity` control. Vision Reference keeps the source pixels untouched until the Qwen tokenizer/vision processor applies its native geometry. Free-form `instruction` is applied only in Visual mode; Semantic, Style, and Context use fixed preset directives.
 
@@ -516,7 +516,7 @@ Outputs:
 - latent
 - t2i_info
 
-The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. When vision_references is connected, the positive branch uses multimodal Qwen conditioning from the Vision Reference chain while the explicit negative prompt remains text-only. `t2i_info` reports the effective prompts, resolved resolution, Vision modes/runtime modes, and the underlying Vision pipeline report.
+The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. When vision_references is connected, it uses a dedicated T2I Qwen path with the text prompt placed before direct Vision directive/image blocks. This keeps prompt tokens text-led while Vision rows provide Semantic, Visual, Style, or Context guidance. The explicit negative prompt remains text-only.
 
 ## Example Workflows
 
