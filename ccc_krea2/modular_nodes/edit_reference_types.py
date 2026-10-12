@@ -52,25 +52,23 @@ class VisualReferenceChain:
 
 
 @dataclass(frozen=True)
-class SemanticReferenceEntry:
-    """One Qwen-only semantic/style reference before vision preparation."""
+class VisionReferenceEntry:
+    """One Qwen-only Vision Reference before vision preparation."""
 
     image: torch.Tensor
     mode: str = "semantic_only"
     instruction: str = ""
-    grounding_px: int = 768
-    processing: str = "2x2"
-    fidelity: float = 1.0
+    processing: str = "full"
 
 
 @dataclass(frozen=True)
-class SemanticReferenceChain:
-    """Ordered semantic/style reference chain."""
+class VisionReferenceChain:
+    """Ordered Vision Reference chain."""
 
-    entries: Tuple[SemanticReferenceEntry, ...] = ()
+    entries: Tuple[VisionReferenceEntry, ...] = ()
 
-    def append(self, entry: SemanticReferenceEntry) -> "SemanticReferenceChain":
-        return SemanticReferenceChain(self.entries + (entry,))
+    def append(self, entry: VisionReferenceEntry) -> "VisionReferenceChain":
+        return VisionReferenceChain(self.entries + (entry,))
 
     def __len__(self) -> int:
         return len(self.entries)
