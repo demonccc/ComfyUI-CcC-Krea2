@@ -1,12 +1,14 @@
 """Runtime behavior tests for CcCKrea2TextToImage node."""
 
-from types import SimpleNamespace
-
 import pytest
 import torch
 
-from ccc_krea2.constants import VISION_PAD_TOKEN
-from ccc_krea2.t2i import CcCKrea2TextToImage, _encode_t2i_vision, calculate_t2i_resolution
+from ccc_krea2.t2i import (
+    CcCKrea2TextToImage,
+    _encode_t2i_vision,
+    _generate_t2i_vision_guidance,
+    calculate_t2i_resolution,
+)
 from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.prompt_augmentation import PromptAugmentation
 
@@ -151,33 +153,26 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
 
     captured = {}
 
-    fake_spec = SimpleNamespace(
-        vision_reference_mode="semantic",
-        semantic_extract="subject",
-        semantic_strength=0.25,
-        style_fidelity=1.0,
-        style_processing="full",
-    )
-    fake_context = SimpleNamespace(
-        pos_rows_before=100,
-        pos_rows_after=100,
-        physical_images=[image],
-        physical_image_map=[
-            {
-                "logical_vision_slot": 1,
-                "spec": fake_spec,
-            }
-        ],
-        vision_row_spans=[(10, 50)],
-        removed_row_indices=[],
-        token_stream_key="qwen3vl_4b",
-    )
-
     def fake_encode(clip, prompt, vision_references):
         captured["clip"] = clip
         captured["prompt"] = prompt
         captured["vision_references"] = vision_references
-        return ["vision_positive"], fake_context, [fake_spec], "vision prompt"
+        return (
+            ["vision_positive"],
+            [
+                {
+                    "index": 1,
+                    "mode": "semantic",
+                    "runtime_mode": "semantic_only",
+                    "processing": "full",
+                    "instruction": "Use the scene idea.",
+                    "guidance": "The same target subject is standing in a city street.",
+                    "analysis_images": 1,
+                }
+            ],
+            "A futuristic city\n\nSemantic guidance: The same target subject is standing in a city street.",
+            1,
+        )
 
     monkeypatch.setattr("ccc_krea2.t2i._encode_t2i_vision", fake_encode)
 
@@ -197,52 +192,92 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     assert negative == ["conditioning_for_tokens_for_blurry"]
     assert "samples" in latent
     assert "=== Krea2 CcC Vision Reference ===" in vision_info
-    assert "Public Mode: semantic" in vision_info
+    assert "Mode: semantic" in vision_info
+    assert "Consumer Processing: deferred to connected node" in vision_info
     assert "Vision References: 1" in info
     assert "Vision Modes: semantic" in info
-    assert "Positive Conditioning: multimodal Qwen/Vision" in info
+    assert "Positive Conditioning: text-only with Qwen Vision-derived guidance" in info
     assert "T2I Vision Pipeline:" in info
-    assert "Layout: text prompt first, Vision directive/image blocks after prompt" in info
+    assert "Final Conditioning: text-only Krea2 encode" in info
+    assert "Direct Vision Rows in Final Conditioning: 0" in info
+    assert "The same target subject is standing in a city street." in info
 
 
-def test_t2i_vision_layout_keeps_text_prompt_before_direct_reference(monkeypatch):
+def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
         mode="visual",
         instruction="Use the visible character design.",
     )
-    captured = {}
+    clip = FakeCLIP()
 
-    fake_context = SimpleNamespace(
-        conditioning=["encoded"],
-        pos_rows_before=100,
-        pos_rows_after=100,
-        physical_images=[image],
-        physical_image_map=[],
-        vision_row_spans=[],
-        removed_row_indices=[],
-        token_stream_key="qwen3vl_4b",
+    def fake_generate_guidance(clip, entry, target_prompt):
+        assert target_prompt == "Only one manga girl facing forward."
+        return "Give the same target girl long black hair and a red jacket.", 1
+
+    monkeypatch.setattr(
+        "ccc_krea2.t2i._generate_t2i_vision_guidance",
+        fake_generate_guidance,
     )
 
-    def fake_context_encoder(**kwargs):
-        captured.update(kwargs)
-        return fake_context
-
-    monkeypatch.setattr("ccc_krea2.t2i.encode_krea2_qwen_context", fake_context_encoder)
-
-    conditioning, _, specs, vision_prompt = _encode_t2i_vision(
-        clip=FakeCLIP(),
+    conditioning, guidance_items, conditioning_prompt, analysis_images = _encode_t2i_vision(
+        clip=clip,
         prompt="Only one manga girl facing forward.",
         vision_references=vision_chain,
     )
 
-    assert conditioning == ["encoded"]
-    assert len(specs) == 1
-    assert vision_prompt.startswith("Only one manga girl facing forward.")
-    assert VISION_PAD_TOKEN in vision_prompt
-    assert vision_prompt.index("Only one manga girl facing forward.") < vision_prompt.index(VISION_PAD_TOKEN)
-    assert captured["prompt"] == vision_prompt
+    assert analysis_images == 1
+    assert len(guidance_items) == 1
+    assert guidance_items[0]["mode"] == "visual"
+    assert "long black hair and a red jacket" in conditioning_prompt
+    assert clip.tokenize_calls == [(conditioning_prompt, {})]
+    assert conditioning == [f"conditioning_for_tokens_for_{conditioning_prompt}"]
+
+
+class FakeGenerativeCLIP(FakeCLIP):
+    def __init__(self, decoded_text):
+        super().__init__()
+        self.decoded_text = decoded_text
+        self.generate_calls = []
+
+    def generate(self, tokens, **kwargs):
+        self.generate_calls.append((tokens, kwargs))
+        return "generated_ids"
+
+    def decode(self, generated_ids):
+        assert generated_ids == "generated_ids"
+        return self.decoded_text
+
+
+def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="style",
+        instruction="Use manga style and girl identity.",
+        style_processing="full",
+    )
+    entry = vision_chain.entries[0]
+    clip = FakeGenerativeCLIP(
+        "Bold manga line work, flat cel shading, high-contrast black and white rendering."
+    )
+
+    guidance, image_count = _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=entry,
+        target_prompt="Only one manga girl facing forward.",
+    )
+
+    assert image_count == 1
+    assert guidance.startswith("Bold manga line work")
+    analysis_text, kwargs = clip.tokenize_calls[0]
+    assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
+    assert "VISION MODE: style" in analysis_text
+    assert "Use manga style and girl identity." in analysis_text
+    assert kwargs["images"] == [image]
+    assert "only for visual STYLE" in kwargs["system_prompt"]
+    assert clip.generate_calls[0][1]["seed"] == 0
 
 
 def test_t2i_predefined_aspect_ratios_and_orientation():
