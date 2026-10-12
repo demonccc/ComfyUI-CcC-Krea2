@@ -29,6 +29,10 @@ def test_readme_tracks_current_public_surface_and_workflows():
     assert "workflows/04_character_sheet_identity.json" in readme
     assert "workflows/05_edit_prompt_creator.json" in readme
     assert "workflows/06_text_to_image.json" in readme
+    assert "workflows/12_edit_vision_semantic.json" in readme
+    assert "workflows/13_edit_vision_visual.json" in readme
+    assert "workflows/14_edit_vision_style.json" in readme
+    assert "workflows/18_edit_vision_context.json" in readme
 
 
 def test_all_public_node_display_names_are_documented():
@@ -47,7 +51,13 @@ def test_nodes_doc_matches_current_edit_contracts():
     assert "semantic_grounding_px" in nodes
     assert "contain" in _section(nodes, "Krea2 CcC Visual Reference")
     assert "prompt_annotation" in nodes
-    assert "semantic_reference" in nodes
+    assert "Krea2 CcC Vision Reference" in nodes
+    assert "Semantic" in _section(nodes, "Krea2 CcC Vision Reference")
+    assert "Visual" in _section(nodes, "Krea2 CcC Vision Reference")
+    assert "Style" in _section(nodes, "Krea2 CcC Vision Reference")
+    assert "Context" in _section(nodes, "Krea2 CcC Vision Reference")
+    assert "grounding_px" not in _section(nodes, "Krea2 CcC Vision Reference")
+    assert "fidelity" not in _section(nodes, "Krea2 CcC Vision Reference")
     assert "create_from_image" in nodes
     assert "create_from_theme" in nodes
     assert "system_prompt" in nodes
