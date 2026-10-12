@@ -19,6 +19,7 @@ class StyleSpanOperation:
     style_fidelity: float
     indirect_style_transfer: bool
     extract: str = "style"
+    summary_rows: int = 0
 
 
 VALID_STYLE_PROCESSING_MODES = ("full", "2x2", "4x4")
@@ -76,16 +77,21 @@ def slice_style_image(image: torch.Tensor, mode: str = "2x2") -> List[torch.Tens
 def apply_statistical_style_fidelity(
     cond_tensor: torch.Tensor, spans_info: List[Union[StyleSpanOperation, Tuple[Tuple[int, int], float, bool]]]
 ) -> Tuple[torch.Tensor, bool, List[int]]:
-    """Apply semantic/style span processing and optional indirect row removal.
+    """Apply fixed Vision Reference extraction and optional span compaction.
 
-    Fidelity/strength transform: output = fidelity * orig + (1.0 - fidelity) * target.
-    extract=style uses per-reference statistics (mean, mean + std, mean - std)
-    cycled across visual rows. extract=subject whitens the reference span
-    to reduce style statistics while preserving token structure/content/composition.
-    Indirect processing removes designated vision rows after Qwen.
+    Legacy operations keep the existing fidelity transform/removal behavior when
+    summary_rows == 0. Vision Reference presets use summary_rows > 0:
+
+    - subject: whiten visual rows, then pool to a compact semantic representation.
+    - style: retain only global mean / mean+std / mean-std style statistics.
+    - context: whiten visual rows, then pool more aggressively for coarse context.
+
+    Compacting the span keeps a small extracted representation in conditioning
+    instead of either retaining hundreds of raw visual rows or removing the image
+    contribution completely.
 
     Returns:
-        (transformed_tensor, indirect_applied, removed_indices)
+        (transformed_tensor, compaction_or_indirect_applied, removed_indices)
     """
     b, seq, fused = cond_tensor.shape
     if fused % 12 != 0:
@@ -111,6 +117,7 @@ def apply_statistical_style_fidelity(
                     row_end=end,
                     style_fidelity=fidelity,
                     indirect_style_transfer=indirect,
+                    summary_rows=0,
                 )
             )
 
@@ -123,31 +130,57 @@ def apply_statistical_style_fidelity(
                 f"or exceeds sequence length ({seq})."
             )
 
-        if op.style_fidelity < 1.0:
-            span = z[:, start:end]  # (B, rows, 12, fused//12)
-            mu = span.mean(dim=1, keepdim=True)
-            sigma = span.std(dim=1, keepdim=True) + 1e-6
+        span = z[:, start:end]  # (B, rows, 12, fused//12)
+        mu = span.mean(dim=1, keepdim=True)
+        sigma = span.std(dim=1, keepdim=True) + 1e-6
 
-            if op.extract == "subject":
-                # Subject extraction removes per-reference
-                # style statistics while retaining the spatial/content token structure.
-                target = (span - mu) / sigma
-            elif op.extract == "style":
-                stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)  # (B, 3, 12, fused//12)
-                idx = torch.arange(end - start, device=span.device) % 3
-                target = stats[:, idx]
-            elif op.extract == "context":
-                target = span
+        if op.extract == "subject":
+            target = (span - mu) / sigma
+        elif op.extract == "style":
+            stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)
+            idx = torch.arange(end - start, device=span.device) % 3
+            target = stats[:, idx]
+        elif op.extract == "context":
+            # Context should keep coarse semantic/spatial information without
+            # retaining the source image's global visual/style statistics.
+            target = (span - mu) / sigma
+        else:
+            raise ValueError(
+                f"Invalid Vision extract mode '{op.extract}'. "
+                "Supported modes: 'style', 'subject', 'context'."
+            )
+
+        transformed = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
+
+        summary_rows = max(0, min(int(op.summary_rows), end - start))
+        if summary_rows > 0:
+            if op.extract == "style":
+                # Style is intentionally represented by exactly the global
+                # statistics rather than the source subject/token structure.
+                style_stats = torch.cat([mu, mu + sigma, mu - sigma], dim=1)
+                summary = style_stats[:, :summary_rows]
             else:
-                raise ValueError(
-                    f"Invalid semantic extract mode '{op.extract}'. Supported modes: 'style', 'subject'."
-                )
+                # Preserve sequence order while reducing hundreds of visual rows
+                # to a compact semantic/context representation.
+                row_count = end - start
+                pooled = []
+                for summary_index in range(summary_rows):
+                    chunk_start = (summary_index * row_count) // summary_rows
+                    chunk_end = ((summary_index + 1) * row_count) // summary_rows
+                    chunk_end = max(chunk_end, chunk_start + 1)
+                    pooled.append(transformed[:, chunk_start:chunk_end].mean(dim=1, keepdim=True))
+                summary = torch.cat(pooled, dim=1)
 
-            z[:, start:end] = op.style_fidelity * span + (1.0 - op.style_fidelity) * target
-
-        if op.indirect_style_transfer:
-            keep[start:end] = False
+            z[:, start : start + summary_rows] = summary
+            keep[start + summary_rows : end] = False
             indirect_applied = True
+        else:
+            if op.style_fidelity < 1.0:
+                z[:, start:end] = transformed
+
+            if op.indirect_style_transfer:
+                keep[start:end] = False
+                indirect_applied = True
 
     # Step 2: Remove all indirect style rows in ONE operation using single keep-mask
     z = z.reshape(b, seq, fused)
