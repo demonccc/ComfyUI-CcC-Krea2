@@ -192,6 +192,14 @@ class CcCKrea2TextToImage:
             f"Resolved Resolution: {width} x {height}",
             f"Batch Size: {batch_size}",
         ]
+        for index, entry in enumerate(vision_entries, start=1):
+            public_mode = runtime_to_public.get(entry.mode, entry.mode)
+            info_lines.append(
+                f"Vision Reference {index}: mode={public_mode}, "
+                f"runtime={entry.mode}, processing={entry.processing}, "
+                f"instruction={entry.instruction!r}"
+            )
+
         if pipeline_info:
             info_lines.extend(["", "Vision Pipeline:", str(pipeline_info)])
 
