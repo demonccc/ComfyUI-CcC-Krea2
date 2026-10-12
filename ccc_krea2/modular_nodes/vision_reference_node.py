@@ -98,13 +98,13 @@ class CcCKrea2VisionReference:
         }.get(effective_processing, 1)
 
         if runtime_mode == "semantic_only":
-            behavior = "Moodboard subject/content extraction at fixed 0.50 internal blend; Vision rows retained"
+            behavior = "subject/content extraction at fixed 0.25 internal blend; Vision rows retained"
         elif runtime_mode == "style_direct":
             behavior = "raw direct Qwen visual guidance; Vision rows retained"
         elif runtime_mode == "style_indirect":
-            behavior = "Moodboard-style indirect style guidance; direct Vision rows removed"
+            behavior = "direct style-statistics extraction at fixed 0.00 internal fidelity; Vision rows retained"
         elif runtime_mode == "context_indirect":
-            behavior = "indirect context guidance; direct Vision rows removed"
+            behavior = "whitened coarse context extraction compacted to 64 ordered Vision rows"
         else:
             behavior = "unknown/custom runtime behavior"
 
