@@ -1,6 +1,6 @@
 {
-  "last_node_id": 10,
-  "last_link_id": 11,
+  "last_node_id": 12,
+  "last_link_id": 13,
   "nodes": [
     {
       "id": 1,
@@ -150,6 +150,11 @@
           "name": "clip",
           "type": "CLIP",
           "link": 2
+        },
+        {
+          "name": "vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "link": 13
         }
       ],
       "outputs": [
@@ -417,9 +422,86 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Krea2 CcC Text-to-Image workflow.\n\nFlow:\n- UNETLoader -> CcC Krea2 - Text to Image -> ModelSamplingAuraFlow -> BlackwellAttentionFix -> KSampler.\n- CLIPLoader feeds the native Krea2 text encoder into Text to Image.\n- Text to Image returns the unchanged MODEL plus positive CONDITIONING, negative CONDITIONING, and an empty SD3-compatible LATENT.\n- KSampler consumes all four outputs.\n- VAEDecode uses qwen_image_vae.safetensors and the result is saved with SaveImage.\n\nCurrent example settings:\n- prompt: cinematic futuristic coastal city at golden hour\n- aspect_ratio: 16:9\n- megapixels: 1.0\n- batch_size: 1\n- custom_aspect_width/height: ignored because aspect_ratio is not custom\n- negative_prompt: empty\n- sampler: 8 steps, CFG 1, Euler, beta, denoise 1.0\n\nThe Text to Image node supports:\n- 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3, or custom aspect ratio\n- 0.25 to 2.0 MP\n- batch sizes from 1 to 64\n- optional negative_prompt\n- optional prompt_augmentation from CcC Krea2 - LoRA Stack\n\nWhen prompt_augmentation is connected, its prepend/append positive and negative text is applied before CLIP encoding."
+        "Krea2 CcC Text-to-Image workflow with Vision Reference.\\n\\nFlow:\\n- UNETLoader + CLIPLoader -> CcC Krea2 - Text to Image -> sampler path.\\n- Krea2 CcC Vision Reference can feed Semantic, Visual, Style, or Context guidance directly into T2I positive Qwen conditioning.\\n- This example uses Semantic mode so the reference enriches scene content/composition without adding an appearance latent.\\n- The source image is sent at tokenizer-native resolution; there is no public grounding or fidelity control.\\n- Text to Image returns the unchanged MODEL plus positive/negative CONDITIONING and an empty SD3-compatible LATENT.\\n- Negative prompt remains text-only.\\n- Vision Reference is optional; disconnect it for normal text-only T2I."
       ],
       "title": "Workflow Notes"
+    },
+    {
+      "id": 11,
+      "type": "LoadImage",
+      "pos": [
+        0,
+        620
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "t2i_vision_reference.jpg"
+      ],
+      "title": "T2I Vision Reference Image"
+    },
+    {
+      "id": 12,
+      "type": "CcCKrea2VisionReference",
+      "pos": [
+        360,
+        620
+      ],
+      "size": [
+        500,
+        300
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2VisionReference"
+      },
+      "widgets_values": [
+        "semantic",
+        "Use this image as semantic inspiration for scene content and composition.",
+        "full"
+      ],
+      "title": "Vision Reference - Semantic"
     }
   ],
   "links": [
@@ -510,6 +592,22 @@
       8,
       1,
       "VAE"
+    ],
+    [
+      12,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      12,
+      0,
+      4,
+      2,
+      "KREA2_VISION_REFERENCE_CHAIN"
     ]
   ],
   "groups": [
