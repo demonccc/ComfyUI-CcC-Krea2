@@ -36,7 +36,7 @@ def test_t2i_returns_exact_input_model_and_no_patching():
     model = FakeModel()
     clip = FakeCLIP()
 
-    out_model, pos, neg, latent = node.process(
+    out_model, pos, neg, latent, info = node.process(
         model=model,
         clip=clip,
         prompt="A serene beach at sunset",
@@ -44,6 +44,9 @@ def test_t2i_returns_exact_input_model_and_no_patching():
 
     assert out_model is model
     assert not hasattr(out_model, "patch_called")
+    assert "=== Krea2 CcC Text to Image ===" in info
+    assert "Vision References: 0" in info
+    assert "Positive Conditioning: text-only" in info
 
 
 def test_t2i_native_clip_tokenize_and_encode():
@@ -52,7 +55,7 @@ def test_t2i_native_clip_tokenize_and_encode():
     model = FakeModel()
     clip = FakeCLIP()
 
-    out_model, pos, neg, latent = node.process(
+    out_model, pos, neg, latent, info = node.process(
         model=model,
         clip=clip,
         prompt="positive text",
@@ -86,7 +89,7 @@ def test_t2i_prompt_augmentation_preserves_and_orders():
         negative_append=("app_neg",),
     )
 
-    out_model, pos, neg, latent = node.process(
+    out_model, pos, neg, latent, info = node.process(
         model=model,
         clip=clip,
         prompt=prompt_str,
@@ -137,7 +140,7 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     model = FakeModel()
     clip = FakeCLIP()
     image = torch.zeros((1, 64, 64, 3))
-    (vision_chain,) = CcCKrea2VisionReference().process(
+    vision_chain, vision_info = CcCKrea2VisionReference().process(
         image=image,
         mode="semantic",
         instruction="Use the scene idea.",
@@ -154,7 +157,7 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
         fake_orchestrator,
     )
 
-    out_model, positive, negative, latent = node.process(
+    out_model, positive, negative, latent, info = node.process(
         model=model,
         clip=clip,
         prompt="A futuristic city",
@@ -171,6 +174,12 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     assert clip.tokenize_calls == [("blurry", {})]
     assert negative == ["conditioning_for_tokens_for_blurry"]
     assert "samples" in latent
+    assert "=== Krea2 CcC Vision Reference ===" in vision_info
+    assert "Public Mode: semantic" in vision_info
+    assert "Vision References: 1" in info
+    assert "Vision Modes: semantic" in info
+    assert "Positive Conditioning: multimodal Qwen/Vision" in info
+    assert "Vision Pipeline:" in info
 
 def test_t2i_predefined_aspect_ratios_and_orientation():
     """11, 13, 14. Predefined aspect ratios produce correctly oriented aligned dimensions close to megapixels."""
@@ -214,7 +223,7 @@ def test_t2i_latent_contract_and_batch_size():
     clip = FakeCLIP()
 
     batch_size = 4
-    _, _, _, latent = node.process(
+    _, _, _, latent, info = node.process(
         model=model,
         clip=clip,
         prompt="Test prompt",
@@ -258,9 +267,10 @@ def test_t2i_determinism_and_no_cache_hooks():
     model = FakeModel()
     clip = FakeCLIP()
 
-    _, pos1, neg1, lat1 = node.process(model=model, clip=clip, prompt="det test", aspect_ratio="1:1", megapixels=1.0)
-    _, pos2, neg2, lat2 = node.process(model=model, clip=clip, prompt="det test", aspect_ratio="1:1", megapixels=1.0)
+    _, pos1, neg1, lat1, info1 = node.process(model=model, clip=clip, prompt="det test", aspect_ratio="1:1", megapixels=1.0)
+    _, pos2, neg2, lat2, info2 = node.process(model=model, clip=clip, prompt="det test", aspect_ratio="1:1", megapixels=1.0)
 
     assert pos1 == pos2
     assert neg1 == neg2
     assert torch.equal(lat1["samples"], lat2["samples"])
+    assert info1 == info2
