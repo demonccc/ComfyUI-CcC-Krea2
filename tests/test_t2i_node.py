@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from ccc_krea2.t2i import CcCKrea2TextToImage, calculate_t2i_resolution
+from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.prompt_augmentation import PromptAugmentation
 
 
@@ -123,6 +124,53 @@ def test_t2i_empty_prompt_augmentation():
     assert clip.tokenize_calls[0][0] == "original positive"
     assert clip.tokenize_calls[1][0] == "original negative"
 
+
+
+
+def test_t2i_accepts_optional_vision_references():
+    optional = CcCKrea2TextToImage.INPUT_TYPES()["optional"]
+    assert optional["vision_references"][0] == "KREA2_VISION_REFERENCE_CHAIN"
+
+
+def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
+    node = CcCKrea2TextToImage()
+    model = FakeModel()
+    clip = FakeCLIP()
+    image = torch.zeros((1, 64, 64, 3))
+    (vision_chain,) = CcCKrea2VisionReference().process(
+        image=image,
+        mode="semantic",
+        instruction="Use the scene idea.",
+    )
+
+    captured = {}
+
+    def fake_orchestrator(**kwargs):
+        captured.update(kwargs)
+        return kwargs["model"], ["vision_positive"], ["ignored_negative"], kwargs["target_latent"], "info"
+
+    monkeypatch.setattr(
+        "ccc_krea2.t2i.edit_engine_runtime.run_krea2_edit_orchestrator",
+        fake_orchestrator,
+    )
+
+    out_model, positive, negative, latent = node.process(
+        model=model,
+        clip=clip,
+        prompt="A futuristic city",
+        negative_prompt="blurry",
+        vision_references=vision_chain,
+    )
+
+    assert out_model is model
+    assert positive == ["vision_positive"]
+    assert captured["positive_prompt"] == "A futuristic city"
+    assert len(captured["references"]) == 1
+    assert captured["references"][0].appearance_reference is False
+    assert captured["references"][0].semantic_extract == "subject"
+    assert clip.tokenize_calls == [("blurry", {})]
+    assert negative == ["conditioning_for_tokens_for_blurry"]
+    assert "samples" in latent
 
 def test_t2i_predefined_aspect_ratios_and_orientation():
     """11, 13, 14. Predefined aspect ratios produce correctly oriented aligned dimensions close to megapixels."""
