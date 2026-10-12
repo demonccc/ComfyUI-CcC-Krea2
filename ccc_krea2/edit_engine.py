@@ -379,16 +379,29 @@ def run_krea2_edit_orchestrator(
             else "N/A"
         )
 
+        vision_mode = getattr(sp, "vision_reference_mode", "") or "semantic"
+        mode_label = vision_mode.capitalize()
+        original_rows = 0
+        if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans):
+            row_start, row_end = pos_qwen_context.vision_row_spans[phys_idx - 1]
+            original_rows = row_end - row_start
+        summary_rows = int(getattr(sp, "vision_summary_rows", 0) or 0)
+        retained_rows = min(summary_rows, original_rows) if summary_rows > 0 else original_rows
+
         info_lines.extend(
             [
-                f"Semantic-only Reference [Slot {sem['slot']} - {sem['role'].capitalize()}]:",
+                f"{mode_label} Vision Reference [Slot {sem['slot']} - {sem['role'].capitalize()}]:",
                 f"  Logical Vision Slot: {sem['slot']}",
                 f"  Physical Qwen Image Index: {phys_idx}",
                 f"  Actual Conditioning Row Span: {span_str}",
+                f"  Original Vision Rows: {original_rows}",
+                f"  Summary Rows Requested: {summary_rows}",
+                f"  Retained Vision Rows: {retained_rows}",
+                f"  Removed Vision Rows: {max(0, original_rows - retained_rows)}",
                 f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
                 f"  Vision Instruction Active: {'yes' if sem.get('has_instruction') else 'no'}",
                 f"  Semantic Extract: {getattr(sp, 'semantic_extract', 'none')}",
-                f"  Semantic Strength: {float(getattr(sp, 'semantic_strength', 1.0)):.2f}",
+                f"  Internal Semantic Fidelity: {float(getattr(sp, 'semantic_strength', 1.0)):.2f}",
                 "  Appearance Reference: no",
                 "  VAE Reference Frame: none",
                 "  Negative Conditioning Included: no",
@@ -413,26 +426,34 @@ def run_krea2_edit_orchestrator(
             else ("SHUFFLE_4X4" if sp.style_processing == "4x4" else "identity")
         )
         style_total_rows = sum(e - s for s, e in st_spans)
-        rows_rem = style_total_rows if sp.indirect_style_transfer else 0
+        summary_rows = int(getattr(sp, "vision_summary_rows", 0) or 0)
+        physical_count = s_end - s_start + 1
+        retained_rows = min(style_total_rows, summary_rows * physical_count) if summary_rows > 0 else (
+            0 if sp.indirect_style_transfer else style_total_rows
+        )
+        rows_rem = max(0, style_total_rows - retained_rows)
         status_str = (
-            "indirect (rows removed post-encoding)" if sp.indirect_style_transfer else "direct (rows preserved)"
+            f"compact style summary retained ({retained_rows} rows)"
+            if summary_rows > 0
+            else ("indirect (rows removed post-encoding)" if sp.indirect_style_transfer else "direct (rows preserved)")
         )
 
         info_lines.extend(
             [
-                f"Style [Slot {st['slot']}]:",
+                f"Style Vision Reference [Slot {st['slot']}]:",
                 f"  Logical Vision Slot: {st['slot']}",
                 f"  Physical Qwen Image Start: {s_start}",
                 f"  Physical Qwen Image End: {s_end}",
-                f"  Physical Qwen Image Count: {s_end - s_start + 1}",
+                f"  Physical Qwen Image Count: {physical_count}",
                 f"  Actual Conditioning Row Spans: {st_spans}",
-                f"  Total Rows for Style: {style_total_rows}",
-                f"  Rows Removed for Style: {rows_rem}",
-                f"  Direct/Indirect Status: {status_str}",
+                f"  Original Vision Rows: {style_total_rows}",
+                f"  Summary Rows per Physical Image: {summary_rows}",
+                f"  Retained Style Rows: {retained_rows}",
+                f"  Removed Vision Rows: {rows_rem}",
+                f"  Transport Status: {status_str}",
                 f"  Style Reference Processing: {sp.style_processing}",
                 f"  Crop Shuffle Order: {shuffle_str}",
-                f"  Style Fidelity: {sp.style_fidelity:.2f}",
-                f"  Indirect Style Transfer: {sp.indirect_style_transfer}",
+                f"  Internal Style Fidelity: {sp.style_fidelity:.2f}",
                 "  VAE Reference Frame: none",
                 f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
                 "",
