@@ -13,8 +13,8 @@ from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionRefe
 
 
 SEMANTIC_DIRECTIVE = (
-    "Use this reference for semantic content and structure only. Preserve relevant subjects, actions, "
-    "relationships, objects, pose, composition, and scene meaning without copying its visual appearance or style."
+    "Use this reference only for semantic content: subjects, objects, attributes, actions, pose, and scene meaning. "
+    "Do not copy its visual style, rendering, lighting, palette, or exact appearance."
 )
 
 VISUAL_DIRECTIVE = (
@@ -22,13 +22,13 @@ VISUAL_DIRECTIVE = (
 )
 
 STYLE_DIRECTIVE = (
-    "Use this reference only for visual style and aesthetic qualities. Do not copy its subjects, objects, "
-    "or composition unless the prompt explicitly requests them."
+    "Use this reference only for visual style and aesthetic qualities such as rendering, line work, shading, "
+    "palette, texture, lighting, and medium. Ignore subject identity, clothing, objects, and composition."
 )
 
 CONTEXT_DIRECTIVE = (
-    "Use this reference only to understand the situation, relationships, action, and scene context. "
-    "Do not copy its visual appearance or style."
+    "Use this reference only for situation, action, framing, spatial relationships, and scene context. "
+    "Ignore subject identity, clothing, exact appearance, and visual style."
 )
 
 
@@ -79,6 +79,8 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_instruction=_with_user_instruction(SEMANTIC_DIRECTIVE, entry.instruction),
             appearance_reference=False,
             include_in_vision=True,
+            vision_reference_mode="semantic",
+            vision_summary_rows=32,
             semantic_extract="subject",
             semantic_strength=0.0,
         )
@@ -90,6 +92,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction),
             appearance_reference=False,
             include_in_vision=True,
+            vision_reference_mode="visual",
             indirect_style_transfer=False,
         )
 
@@ -99,8 +102,10 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_instruction=_with_user_instruction(STYLE_DIRECTIVE, entry.instruction),
             appearance_reference=False,
             include_in_vision=True,
+            vision_reference_mode="style",
+            vision_summary_rows=3,
             style_processing=entry.processing,
-            style_fidelity=1.0,
+            style_fidelity=0.0,
             indirect_style_transfer=True,
         )
 
@@ -111,6 +116,9 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_instruction=_with_user_instruction(CONTEXT_DIRECTIVE, entry.instruction),
             appearance_reference=False,
             include_in_vision=True,
+            vision_reference_mode="context",
+            vision_summary_rows=16,
+            semantic_strength=0.0,
             indirect_vision_context=True,
         )
 
