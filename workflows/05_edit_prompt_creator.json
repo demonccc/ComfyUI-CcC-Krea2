@@ -382,6 +382,11 @@
           "links": [
             9
           ]
+        },
+        {
+          "name": "vision_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
