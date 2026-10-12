@@ -318,6 +318,7 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_vision_bran
     assert vision_inputs["image"]["link"] is not None
     assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
     assert vision["outputs"][0]["links"]
+    assert vision["outputs"][1] == {"name": "vision_info", "type": "STRING", "links": []}
 
 
 def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
@@ -355,13 +356,15 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
     vision = _nodes_by_type(workflow, "CcCKrea2VisionReference")[0]
     assert vision["widgets_values"][0] == "semantic"
     assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert vision["outputs"][1] == {"name": "vision_info", "type": "STRING", "links": []}
 
     outputs = {item["name"]: item for item in t2i["outputs"]}
     assert outputs["model"]["type"] == "MODEL"
     assert outputs["positive"]["type"] == "CONDITIONING"
     assert outputs["negative"]["type"] == "CONDITIONING"
     assert outputs["latent"]["type"] == "LATENT"
-    assert all(item["links"] for item in outputs.values())
+    assert outputs["t2i_info"] == {"name": "t2i_info", "type": "STRING", "links": []}
+    assert all(outputs[name]["links"] for name in ("model", "positive", "negative", "latent"))
 
     sampler_inputs = {item["name"]: item for item in sampler["inputs"]}
     assert sampler_inputs["model"]["link"] is not None
