@@ -77,16 +77,16 @@ A regional reference binds to a tagged **Attention Region** carried through Late
 
 ## Vision Reference
 
-Vision Reference is Qwen/Vision-only and never creates an appearance/VAE reference latent. The source image is passed at tokenizer-native resolution; there is no public grounding or fidelity control.
+Vision Reference declares what information a source image represents. It never creates an appearance/VAE reference latent, and it does not prescribe how a consumer must transport that information.
 
 Modes:
 
-- **Semantic** — subject/content extraction with a fixed internal 0.25 blend. Most global style statistics are removed while semantic/spatial token structure remains.
-- **Visual** — raw Qwen visual guidance. The image rows are kept unchanged; in Text to Image the text prompt is encoded before the Vision block so the reference cannot rewrite the prompt tokens.
-- **Style** — direct Moodboard-style statistical extraction at fixed internal fidelity 0.00. Spatial subject/layout structure is collapsed toward per-reference mean/mean±std style statistics while the Vision rows remain available to Krea2.
-- **Context** — removes global style statistics, then keeps 64 representative ordered rows from the whitened Vision span to preserve coarse action, framing, composition, and spatial context.
+- **Semantic** — content/meaning: subject category and attributes, pose, action, objects, composition, and spatial relationships.
+- **Visual** — visible appearance: face/hair traits, clothing, accessories, materials, colors, pose, and other direct visual details.
+- **Style** — aesthetic treatment: medium, rendering, line work, shading, palette, lighting, texture, tone, and mood.
+- **Context** — situation/context: setting, environment, framing, action, interaction, composition, and spatial relationships.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The free-form Vision `instruction` is applied only by **Visual**; the other presets use fixed scope directives so contradictory text cannot turn the reference into an extra subject.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode.
 
 ## Latent and Target Geometry
 
@@ -218,7 +218,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 **LoRA Prompt Settings** can associate prepend/append positive and negative text with those four LoRA slots. The resulting prompt_augmentation is carried by LoRA Stack. The public **Text to Image** node consumes that augmentation; **Krea2 CcC Edit does not automatically consume it**.
 
-**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT. An optional **Vision Reference** chain uses a dedicated T2I Qwen path rather than the Edit orchestrator. The text prompt is placed before direct Vision blocks, reducing reference-to-prompt leakage; the explicit negative prompt remains text-only.
+**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT. With **Vision Reference**, T2I uses Qwen multimodal generation only as an analysis step: each image is converted into mode-scoped textual guidance, then the final Krea2 conditioning is encoded from text only. Direct Vision rows never enter the final T2I conditioning, so the source image cannot overpower the prompt or appear as an extra subject. The explicit negative prompt remains text-only.
 
 ## Example Workflows
 
