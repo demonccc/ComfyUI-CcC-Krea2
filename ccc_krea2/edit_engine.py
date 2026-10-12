@@ -386,7 +386,13 @@ def run_krea2_edit_orchestrator(
             row_start, row_end = pos_qwen_context.vision_row_spans[phys_idx - 1]
             original_rows = row_end - row_start
         summary_rows = int(getattr(sp, "vision_summary_rows", 0) or 0)
-        retained_rows = min(summary_rows, original_rows) if summary_rows > 0 else original_rows
+        vision_indirect = bool(getattr(sp, "vision_indirect", False))
+        if vision_indirect:
+            retained_rows = 0
+        elif summary_rows > 0:
+            retained_rows = min(summary_rows, original_rows)
+        else:
+            retained_rows = original_rows
 
         info_lines.extend(
             [
@@ -396,6 +402,7 @@ def run_krea2_edit_orchestrator(
                 f"  Actual Conditioning Row Span: {span_str}",
                 f"  Original Vision Rows: {original_rows}",
                 f"  Summary Rows Requested: {summary_rows}",
+                f"  Indirect Vision Transport: {vision_indirect}",
                 f"  Retained Vision Rows: {retained_rows}",
                 f"  Removed Vision Rows: {max(0, original_rows - retained_rows)}",
                 f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
@@ -428,14 +435,19 @@ def run_krea2_edit_orchestrator(
         style_total_rows = sum(e - s for s, e in st_spans)
         summary_rows = int(getattr(sp, "vision_summary_rows", 0) or 0)
         physical_count = s_end - s_start + 1
+        vision_indirect = bool(getattr(sp, "vision_indirect", False))
         retained_rows = min(style_total_rows, summary_rows * physical_count) if summary_rows > 0 else (
-            0 if sp.indirect_style_transfer else style_total_rows
+            0 if (vision_indirect or sp.indirect_style_transfer) else style_total_rows
         )
         rows_rem = max(0, style_total_rows - retained_rows)
         status_str = (
             f"compact style summary retained ({retained_rows} rows)"
             if summary_rows > 0
-            else ("indirect (rows removed post-encoding)" if sp.indirect_style_transfer else "direct (rows preserved)")
+            else (
+                "indirect Qwen re-contextualization (direct rows removed)"
+                if (vision_indirect or sp.indirect_style_transfer)
+                else "direct (rows preserved)"
+            )
         )
 
         info_lines.extend(
