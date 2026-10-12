@@ -356,7 +356,7 @@
     },
     {
       "id": 9,
-      "type": "CcCKrea2SemanticReference",
+      "type": "CcCKrea2VisionReference",
       "pos": [
         420,
         1070
@@ -377,8 +377,8 @@
       ],
       "outputs": [
         {
-          "name": "semantic_references",
-          "type": "KREA2_SEMANTIC_REFERENCE_CHAIN",
+          "name": "vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
           "links": [
             9
           ]
@@ -388,13 +388,11 @@
         "Node name for S&R": "CcCKrea2SemanticReference"
       },
       "widgets_values": [
-        "semantic_reference",
+        "semantic",
         "Use the river scene, running action, water interaction, environment, framing, and spatial composition. Ignore the black dog's identity and appearance.",
-        768,
-        "full",
-        0.5
+        "full"
       ],
-      "title": "Scene Semantic Reference (DISABLED)"
+      "title": "Scene Vision Reference (DISABLED)"
     },
     {
       "id": 10,
@@ -504,8 +502,8 @@
           "link": 6
         },
         {
-          "name": "semantic_references",
-          "type": "KREA2_SEMANTIC_REFERENCE_CHAIN",
+          "name": "vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
           "link": 9
         }
       ],
@@ -774,7 +772,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Edit Prompt Creator create_from_image test.\n\n- The reference edit image is the authoritative visual blueprint used by Prompt Creator.\n- Image 1 remains the visible subject reference used by Edit.\n- Prompt Creator returns a direct description of the desired final image.\n- The reference edit image is internal to prompt creation and also supplies target dimensions.\n- The optional Semantic Reference branch is intentionally disabled.\n- thinking: enabled; max_tokens: 2048; temperature: 0.25; top_p: 0.90.\n- BodySwap LoRA is present in the stack but disabled by default."
+        "Edit Prompt Creator create_from_image test.\n\n- The reference edit image is the authoritative visual blueprint used by Prompt Creator.\n- Image 1 remains the visible subject reference used by Edit.\n- Prompt Creator returns a direct description of the desired final image.\n- The reference edit image is internal to prompt creation and also supplies target dimensions.\n- The optional Vision Reference branch is intentionally disabled.\n- thinking: enabled; max_tokens: 2048; temperature: 0.25; top_p: 0.90.\n- BodySwap LoRA is present in the stack but disabled by default."
       ],
       "title": "Workflow Notes"
     }
@@ -850,7 +848,7 @@
       0,
       11,
       6,
-      "KREA2_SEMANTIC_REFERENCE_CHAIN"
+      "KREA2_VISION_REFERENCE_CHAIN"
     ],
     [
       10,
