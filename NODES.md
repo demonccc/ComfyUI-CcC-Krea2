@@ -99,12 +99,12 @@ Outputs:
 
 Preset behavior is fixed rather than controlled by a strength slider:
 
-- **Semantic**: full image; semantic information survives through Qwen re-contextualization while direct image rows are removed.
-- **Visual**: direct Qwen visual representation, full image, pooled to 64 ordered rows to balance reference and prompt.
-- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; direct image rows are removed after Qwen so style is carried through prompt re-contextualization.
+- **Semantic**: full image; proven Moodboard subject/content extraction with fixed internal 0.50 blend. The reference is declared as the same subject/content requested by the prompt.
+- **Visual**: raw direct Qwen visual representation, full image, no row compaction.
+- **Style**: aesthetic/style influence; full, 2x2, or 4x4 processing; proven Moodboard indirect transport removes direct image rows after Qwen.
 - **Context**: situation/relationships/action/framing context, full image; direct image rows are removed after Qwen and context is carried through prompt re-contextualization.
 
-There is no public `grounding_px` or `fidelity` control. Vision Reference keeps the source pixels untouched until the Qwen tokenizer/vision processor applies its native geometry.
+There is no public `grounding_px` or `fidelity` control. Vision Reference keeps the source pixels untouched until the Qwen tokenizer/vision processor applies its native geometry. Free-form `instruction` is applied only in Visual mode; Semantic, Style, and Context use fixed preset directives.
 
 ## Krea2 CcC Size Resolver
 
