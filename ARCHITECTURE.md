@@ -128,16 +128,14 @@ Edit resolves region_tag for each regional Visual Reference:
 
 ## Vision Reference
 
-Vision References are Qwen-only and do not create appearance latents.
+Vision References declare Qwen/Vision information and do not create appearance latents. The declaration is consumer-neutral:
 
-The public presets map to fixed runtime behaviors:
+- **Semantic** -> content/meaning, pose/action, objects, composition, and spatial relationships.
+- **Visual** -> direct visible appearance and details.
+- **Style** -> aesthetic treatment; only this mode exposes full / 2x2 / 4x4 processing.
+- **Context** -> situation, environment, framing, action/interaction, composition, and spatial relationships.
 
-- **Semantic** -> subject/content extraction at fixed internal 0.25 blend; most global style statistics are removed while token structure remains.
-- **Visual** -> full-image raw Qwen visual rows retained exactly.
-- **Style** -> full, 2x2, or 4x4 processing; fixed 0.00 fidelity converts spatial Vision rows toward repeated mean/mean±std style statistics.
-- **Context** -> full-image context guidance; style statistics are whitened away and 64 representative ordered rows preserve coarse spatial structure.
-
-Vision Reference has no public grounding or fidelity control. Source pixels are left untouched until Qwen's tokenizer/vision processor owns native image geometry. Only Style exposes `style_processing`. Free-form instruction is applied only in Visual mode; Semantic, Style, and Context use fixed directives.
+Vision Reference has no public grounding or fidelity control. The consumer owns how the declared information is transformed into conditioning.
 
 ## Target Geometry
 
@@ -211,7 +209,7 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
 
-Text to Image consumes optional prompt_augmentation and optional vision_references, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT. T2I has its own Vision-conditioning layout: the text prompt is placed before direct Vision directive/image blocks, so prompt tokens are not re-contextualized by the image. The explicit negative prompt remains text-only.
+Text to Image consumes optional prompt_augmentation and optional vision_references, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT. T2I owns a separate Vision adapter: Qwen multimodal generation first converts each Vision Reference into mode-scoped textual guidance, then the final positive conditioning is a normal text-only Krea2 encode. No Vision image rows survive into final T2I conditioning. The explicit negative prompt remains text-only.
 
 The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
 
