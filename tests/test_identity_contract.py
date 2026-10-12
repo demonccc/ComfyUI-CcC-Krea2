@@ -170,8 +170,9 @@ def test_vision_reference_fixed_semantic_visual_style_context_behavior():
 
     visual_entry = node.process(image=image, mode="visual", style_processing="4x4")[0].entries[0]
     visual = build_vision_reference_spec(visual_entry)
-    assert visual.style_processing == "full"
-    assert visual.style_fidelity == 1.0
+    assert visual.reference_path == "edit"
+    assert visual.appearance_reference is False
+    assert visual.semantic_extract == "none"
     assert visual.indirect_style_transfer is False
 
     style_entry = node.process(image=image, mode="style", style_processing="4x4")[0].entries[0]
