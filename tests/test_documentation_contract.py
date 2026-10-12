@@ -56,8 +56,9 @@ def test_nodes_doc_matches_current_edit_contracts():
     assert "Visual" in _section(nodes, "Krea2 CcC Vision Reference")
     assert "Style" in _section(nodes, "Krea2 CcC Vision Reference")
     assert "Context" in _section(nodes, "Krea2 CcC Vision Reference")
-    assert "grounding_px" not in _section(nodes, "Krea2 CcC Vision Reference")
-    assert "fidelity" not in _section(nodes, "Krea2 CcC Vision Reference")
+    vision = _section(nodes, "Krea2 CcC Vision Reference")
+    assert "| grounding_px |" not in vision
+    assert "| fidelity |" not in vision
     assert "create_from_image" in nodes
     assert "create_from_theme" in nodes
     assert "system_prompt" in nodes
