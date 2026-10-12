@@ -17,12 +17,13 @@ PROMPT_THEME_WORKFLOW = Path("workflows/08_prompt_creator_create_from_theme.json
 PROMPT_CUSTOM_WORKFLOW = Path("workflows/09_prompt_creator_custom.json")
 EDIT_CROP_WORKFLOW = Path("workflows/10_edit_fit_crop.json")
 EDIT_CONTAIN_WORKFLOW = Path("workflows/11_edit_fit_contain.json")
-EDIT_SEMANTIC_WORKFLOW = Path("workflows/12_edit_semantic_only.json")
-EDIT_STYLE_DIRECT_WORKFLOW = Path("workflows/13_edit_style_direct.json")
-EDIT_STYLE_INDIRECT_WORKFLOW = Path("workflows/14_edit_style_indirect.json")
+EDIT_VISION_SEMANTIC_WORKFLOW = Path("workflows/12_edit_vision_semantic.json")
+EDIT_VISION_VISUAL_WORKFLOW = Path("workflows/13_edit_vision_visual.json")
+EDIT_VISION_STYLE_WORKFLOW = Path("workflows/14_edit_vision_style.json")
 PAINT_OUTPAINT_WORKFLOW = Path("workflows/15_paint_outpaint.json")
 PAINT_CROP_WORKFLOW = Path("workflows/16_paint_crop_restore.json")
 PAINT_NO_KV_WORKFLOW = Path("workflows/17_paint_no_kv_cache.json")
+EDIT_VISION_CONTEXT_WORKFLOW = Path("workflows/18_edit_vision_context.json")
 
 ALL_WORKFLOWS = (
     EDIT_WORKFLOW,
@@ -36,12 +37,13 @@ ALL_WORKFLOWS = (
     PROMPT_CUSTOM_WORKFLOW,
     EDIT_CROP_WORKFLOW,
     EDIT_CONTAIN_WORKFLOW,
-    EDIT_SEMANTIC_WORKFLOW,
-    EDIT_STYLE_DIRECT_WORKFLOW,
-    EDIT_STYLE_INDIRECT_WORKFLOW,
+    EDIT_VISION_SEMANTIC_WORKFLOW,
+    EDIT_VISION_VISUAL_WORKFLOW,
+    EDIT_VISION_STYLE_WORKFLOW,
     PAINT_OUTPAINT_WORKFLOW,
     PAINT_CROP_WORKFLOW,
     PAINT_NO_KV_WORKFLOW,
+    EDIT_VISION_CONTEXT_WORKFLOW,
 )
 
 
@@ -261,21 +263,21 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_generic_vie
     assert latent["widgets_values"][5] == "empty"
 
 
-def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_branch():
+def test_prompt_creator_workflow_wires_optional_creator_and_disabled_vision_branch():
     workflow = json.loads(PROMPT_CREATOR_WORKFLOW.read_text(encoding="utf-8"))
 
     creators = _nodes_by_type(workflow, "CcCKrea2EditPromptCreator")
-    semantics = _nodes_by_type(workflow, "CcCKrea2SemanticReference")
+    visions = _nodes_by_type(workflow, "CcCKrea2VisionReference")
     visuals = _nodes_by_type(workflow, "CcCKrea2VisualReference")
     edits = _nodes_by_type(workflow, "CcCKrea2Edit")
 
     assert len(creators) == 1
-    assert len(semantics) == 1
+    assert len(visions) == 1
     assert len(visuals) == 1
     assert len(edits) == 1
 
     creator = creators[0]
-    semantic = semantics[0]
+    vision = visions[0]
     edit = edits[0]
 
     assert creator["widgets_values"] == [
@@ -309,12 +311,13 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_semantic_br
     assert edit_inputs["positive_prompt"]["type"] == "STRING"
     assert edit_inputs["positive_prompt"]["link"] is not None
     assert edit_inputs["visual_references"]["link"] is not None
-    assert edit_inputs["semantic_references"]["link"] is not None
+    assert edit_inputs["vision_references"]["link"] is not None
 
-    assert semantic["mode"] == 2
-    semantic_inputs = {item["name"]: item for item in semantic["inputs"]}
-    assert semantic_inputs["image"]["link"] is not None
-    assert semantic["outputs"][0]["links"]
+    assert vision["mode"] == 2
+    vision_inputs = {item["name"]: item for item in vision["inputs"]}
+    assert vision_inputs["image"]["link"] is not None
+    assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert vision["outputs"][0]["links"]
 
 
 def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
@@ -343,9 +346,15 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
     ]
 
     t2i_inputs = {item["name"]: item for item in t2i["inputs"]}
-    assert set(t2i_inputs) == {"model", "clip"}
+    assert set(t2i_inputs) == {"model", "clip", "vision_references"}
     assert t2i_inputs["model"]["link"] is not None
     assert t2i_inputs["clip"]["link"] is not None
+    assert t2i_inputs["vision_references"]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert t2i_inputs["vision_references"]["link"] is not None
+
+    vision = _nodes_by_type(workflow, "CcCKrea2VisionReference")[0]
+    assert vision["widgets_values"][0] == "semantic"
+    assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
 
     outputs = {item["name"]: item for item in t2i["outputs"]}
     assert outputs["model"]["type"] == "MODEL"
@@ -395,22 +404,23 @@ def test_all_test_workflows_disable_body_swap_by_default():
                     assert enabled is False, f"{workflow_path} enables BodySwap by default"
 
 
-def test_edit_option_workflows_cover_fit_and_semantic_modes():
+def test_edit_option_workflows_cover_fit_and_vision_modes():
     crop = json.loads(EDIT_CROP_WORKFLOW.read_text(encoding="utf-8"))
     contain = json.loads(EDIT_CONTAIN_WORKFLOW.read_text(encoding="utf-8"))
     assert {node["widgets_values"][1] for node in _nodes_by_type(crop, "CcCKrea2VisualReference")} == {"crop"}
     assert {node["widgets_values"][1] for node in _nodes_by_type(contain, "CcCKrea2VisualReference")} == {"contain"}
 
-    semantic_cases = {
-        EDIT_SEMANTIC_WORKFLOW: ("semantic_reference", "full"),
-        EDIT_STYLE_DIRECT_WORKFLOW: ("visual_reference", "2x2"),
-        EDIT_STYLE_INDIRECT_WORKFLOW: ("style_reference", "4x4"),
+    vision_cases = {
+        EDIT_VISION_SEMANTIC_WORKFLOW: ("semantic", "full"),
+        EDIT_VISION_VISUAL_WORKFLOW: ("visual", "full"),
+        EDIT_VISION_STYLE_WORKFLOW: ("style", "4x4"),
+        EDIT_VISION_CONTEXT_WORKFLOW: ("context", "full"),
     }
-    for workflow_path, expected in semantic_cases.items():
+    for workflow_path, expected in vision_cases.items():
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-        node = _nodes_by_type(workflow, "CcCKrea2SemanticReference")[0]
+        node = _nodes_by_type(workflow, "CcCKrea2VisionReference")[0]
         assert node["mode"] == 0
-        assert (node["widgets_values"][0], node["widgets_values"][3]) == expected
+        assert (node["widgets_values"][0], node["widgets_values"][2]) == expected
         assert not _nodes_by_type(workflow, "CcCKrea2EditPromptCreator")
 
 
@@ -455,6 +465,7 @@ def test_all_workflows_use_only_current_public_ccc_nodes():
         "CcCKrea2ReferenceCacheSave",
         "CcCKrea2ReferenceCacheLoad",
         "CcCKrea2CachedVisualReference",
+        "CcCKrea2SemanticReference",
     }
 
     from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
