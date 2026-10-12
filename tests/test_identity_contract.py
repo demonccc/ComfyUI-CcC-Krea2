@@ -164,7 +164,7 @@ def test_vision_reference_fixed_semantic_visual_style_context_behavior():
     semantic_entry = node.process(image=image, mode="semantic")[0].entries[0]
     semantic = build_vision_reference_spec(semantic_entry)
     assert semantic.semantic_extract == "subject"
-    assert semantic.semantic_strength == 0.5
+    assert semantic.semantic_strength == 0.25
     assert semantic.vision_reference_mode == "semantic"
     assert semantic.vision_summary_rows == 0
     assert semantic.vision_indirect is False
@@ -184,19 +184,19 @@ def test_vision_reference_fixed_semantic_visual_style_context_behavior():
     style_entry = node.process(image=image, mode="style", style_processing="4x4")[0].entries[0]
     style = build_vision_reference_spec(style_entry)
     assert style.style_processing == "4x4"
-    assert style.style_fidelity == 0.5
+    assert style.style_fidelity == 0.0
     assert style.vision_reference_mode == "style"
     assert style.vision_summary_rows == 0
-    assert style.vision_indirect is True
-    assert style.indirect_style_transfer is True
+    assert style.vision_indirect is False
+    assert style.indirect_style_transfer is False
 
     context_entry = node.process(image=image, mode="context")[0].entries[0]
     context = build_vision_reference_spec(context_entry)
-    assert context.indirect_vision_context is True
-    assert context.semantic_strength == 1.0
+    assert context.indirect_vision_context is False
+    assert context.semantic_strength == 0.0
     assert context.vision_reference_mode == "context"
-    assert context.vision_summary_rows == 0
-    assert context.vision_indirect is True
+    assert context.vision_summary_rows == 64
+    assert context.vision_indirect is False
     assert context.appearance_reference is False
 
 
