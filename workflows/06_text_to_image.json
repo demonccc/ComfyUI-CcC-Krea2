@@ -185,6 +185,11 @@
           "links": [
             8
           ]
+        },
+        {
+          "name": "t2i_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
@@ -491,6 +496,11 @@
           "links": [
             13
           ]
+        },
+        {
+          "name": "vision_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
