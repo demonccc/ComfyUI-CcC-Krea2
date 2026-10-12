@@ -36,11 +36,31 @@ CONTEXT_DIRECTIVE = (
 )
 
 
-def _with_user_instruction(base: str, instruction: str) -> str:
+def _with_user_instruction(base: str, instruction: str, scope: str) -> str:
     user = (instruction or "").strip()
     if not user:
         return base
-    return f"{base} Additional guidance, only within this mode's scope: {user}"
+
+    guards = {
+        "semantic": (
+            "Interpret the additional guidance only as semantic/content guidance. "
+            "Ignore requests for exact visual identity or visual style."
+        ),
+        "visual": (
+            "Apply the additional guidance to the single subject/result requested by the user's prompt. "
+            "Do not introduce the reference subject as an additional subject."
+        ),
+        "style": (
+            "Interpret the additional guidance only as style guidance. Ignore any part about subject identity, "
+            "people, clothing, objects, pose, layout, or composition."
+        ),
+        "context": (
+            "Interpret the additional guidance only as situation/context guidance. Ignore any part about identity, "
+            "clothing, exact appearance, or visual style."
+        ),
+    }
+    guard = guards.get(scope, "")
+    return f"{base} {guard} Additional guidance: {user}".strip()
 
 
 def prepare_tokenizer_native_image(image: torch.Tensor) -> PreparedVisionImage:
@@ -82,25 +102,25 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
-            vision_instruction=_with_user_instruction(SEMANTIC_DIRECTIVE, entry.instruction),
+            vision_instruction=_with_user_instruction(SEMANTIC_DIRECTIVE, entry.instruction, "semantic"),
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="semantic",
             vision_summary_rows=0,
-            vision_indirect=True,
-            semantic_extract="none",
-            semantic_strength=1.0,
+            vision_indirect=False,
+            semantic_extract="subject",
+            semantic_strength=0.5,
         )
 
     if entry.mode == "style_direct":
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
-            vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction),
+            vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction, "visual"),
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="visual",
-            vision_summary_rows=64,
+            vision_summary_rows=0,
             vision_indirect=False,
             indirect_style_transfer=False,
         )
@@ -108,14 +128,14 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     if entry.mode == "style_indirect":
         return StyleReferenceSpec(
             prepared_image=prep,
-            vision_instruction=_with_user_instruction(STYLE_DIRECTIVE, entry.instruction),
+            vision_instruction=_with_user_instruction(STYLE_DIRECTIVE, entry.instruction, "style"),
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="style",
             vision_summary_rows=0,
             vision_indirect=True,
             style_processing=entry.processing,
-            style_fidelity=1.0,
+            style_fidelity=0.5,
             indirect_style_transfer=True,
         )
 
@@ -123,7 +143,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
-            vision_instruction=_with_user_instruction(CONTEXT_DIRECTIVE, entry.instruction),
+            vision_instruction=_with_user_instruction(CONTEXT_DIRECTIVE, entry.instruction, "context"),
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="context",
