@@ -98,13 +98,13 @@ class CcCKrea2VisionReference:
         }.get(effective_processing, 1)
 
         if runtime_mode == "semantic_only":
-            behavior = "semantic guidance via Qwen prompt re-contextualization; direct Vision rows removed"
+            behavior = "Moodboard subject/content extraction at fixed 0.50 internal blend; Vision rows retained"
         elif runtime_mode == "style_direct":
-            behavior = "direct Qwen visual guidance compacted to 64 ordered Vision rows"
+            behavior = "raw direct Qwen visual guidance; Vision rows retained"
         elif runtime_mode == "style_indirect":
-            behavior = "style guidance via Qwen prompt re-contextualization; direct Vision rows removed"
+            behavior = "Moodboard-style indirect style guidance; direct Vision rows removed"
         elif runtime_mode == "context_indirect":
-            behavior = "context guidance via Qwen prompt re-contextualization; direct Vision rows removed"
+            behavior = "indirect context guidance; direct Vision rows removed"
         else:
             behavior = "unknown/custom runtime behavior"
 
