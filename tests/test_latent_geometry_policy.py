@@ -3,27 +3,27 @@
 import pytest
 import torch
 
-from ccc_krea2.modular_nodes.latent_node import (
-    _fit_content_image,
-    _nearest_krea_geometry,
-    _preserve_aspect_krea_bounds,
+from ccc_krea2.krea_geometry import (
+    nearest_krea_geometry,
+    preserve_aspect_krea_bounds,
 )
+from ccc_krea2.modular_nodes.latent_node import _fit_content_image
 
 
 def test_nearest_krea_geometry_uses_known_preset_geometry():
-    assert _nearest_krea_geometry(1920, 1080) == (2048, 1152)
+    assert nearest_krea_geometry(1920, 1080) == (2048, 1152)
 
 
 def test_preserve_aspect_keeps_already_valid_geometry():
-    assert _preserve_aspect_krea_bounds(1536, 1024) == (1536, 1024)
+    assert preserve_aspect_krea_bounds(1536, 1024) == (1536, 1024)
 
 
 def test_preserve_aspect_scales_small_geometry_into_krea_bounds():
-    assert _preserve_aspect_krea_bounds(800, 1200) == (1024, 1536)
+    assert preserve_aspect_krea_bounds(800, 1200) == (1024, 1536)
 
 
 def test_preserve_aspect_scales_large_geometry_into_krea_bounds():
-    width, height = _preserve_aspect_krea_bounds(4000, 2667)
+    width, height = preserve_aspect_krea_bounds(4000, 2667)
     assert width == 2048
     assert 1024 <= height <= 2048
     assert width % 16 == 0
@@ -32,7 +32,7 @@ def test_preserve_aspect_scales_large_geometry_into_krea_bounds():
 
 def test_preserve_aspect_rejects_geometry_that_cannot_fit_bounds():
     with pytest.raises(ValueError, match="cannot fit this aspect ratio"):
-        _preserve_aspect_krea_bounds(3000, 1000)
+        preserve_aspect_krea_bounds(3000, 1000)
 
 
 def test_content_fit_crop_fills_target_without_padding():
