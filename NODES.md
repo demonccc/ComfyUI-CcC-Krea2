@@ -108,7 +108,7 @@ Vision Reference defines information semantics rather than a transport algorithm
 - **Style**: aesthetic/rendering treatment; full, 2x2, or 4x4 analysis.
 - **Context**: setting, action, framing, interaction, composition, and spatial relationships.
 
-There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference so every consumer can reuse the same guidance configuration instead of duplicating controls.
+There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are used by T2I Semantic guidance. Visual, Style, and Context use direct Qwen vision conditioning and therefore do not use those text-generation settings.
 
 ## Krea2 CcC Size Resolver
 
@@ -521,7 +521,7 @@ Outputs:
 - latent
 - t2i_info
 
-The node applies prompt augmentation and creates an empty SD3-compatible latent from the same shared Krea geometry library used by Latent. Preset mode uses the shared curated Krea sizes directly; fixed mode resolves through the shared Krea geometry policy. Without Vision Reference it uses normal text-only CLIP encoding. With Vision Reference, each reference is analyzed by Qwen multimodal generation using the guidance seed/detail/sampling configuration carried by that reference; the generated Semantic/Visual/Style/Context guidance is appended to the user's requested result and encoded as text-only Krea2 conditioning. Direct image rows are never present in final T2I conditioning. The explicit negative prompt remains text-only.
+The node applies prompt augmentation and creates an empty SD3-compatible latent from the same shared Krea geometry library used by Latent. Preset mode uses the shared curated Krea sizes directly; fixed mode resolves through the shared Krea geometry policy. Without Vision Reference it uses normal text-only CLIP encoding. With Vision Reference, transport is mode-specific: Semantic is analyzed by Qwen text generation and appended as text guidance; Visual keeps direct Qwen vision rows; Style uses the shared style-row extraction; Context uses the shared context-row extraction. The explicit negative prompt remains text-only.
 
 ## Example Workflows
 
