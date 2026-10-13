@@ -131,11 +131,11 @@ Edit resolves region_tag for each regional Visual Reference:
 Vision References declare Qwen/Vision information and do not create appearance latents. The declaration is consumer-neutral:
 
 - **Semantic** -> content/meaning, pose/action, objects, composition, and spatial relationships.
-- **Visual** -> direct visible appearance and details.
-- **Style** -> aesthetic treatment; only this mode exposes full / 2x2 / 4x4 processing.
-- **Context** -> situation, environment, framing, action/interaction, composition, and spatial relationships.
+- **Visual** -> near-copy/full visual blueprint: appearance, clothing, pose, gaze, scene, composition, lighting, colors, and style.
+- **Style** -> visual style DNA only: medium/rendering/line/shading/palette/lighting/texture/finish, without subject/content/pose/scene transfer; only this mode exposes full / 2x2 / 4x4 processing.
+- **Context** -> scene staging: environment, viewpoint/framing, pose, head orientation, gaze, gesture, action/interaction, composition, depth, and spatial relationships without copying identity, clothing, or style.
 
-Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. The consumer still owns how the declared information is transformed into conditioning.
+Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. Guidance Detail changes extraction depth, not only token ceiling, and Vision Guidance intentionally uses widely separated conservative/balanced/flexible sampling presets. The consumer still owns how the declared information is transformed into conditioning.
 
 ## Target Geometry
 
