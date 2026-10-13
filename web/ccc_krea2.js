@@ -342,14 +342,16 @@ function restoreNames(node, info) {
 function install(node) {
   if (node.__cccCompactStack) return;
   const find = (key) => node.widgets?.find((w) => w.name === key);
-  const withPrompt = node.comfyClass === "CcCKrea2LoRAStackWithPrompt" || node.type === "CcCKrea2LoRAStackWithPrompt";
-  const slots = withPrompt ? 5 : 10;
-  if (!find(`lora_${slots}_strength`)) return;
+  if (!find("lora_10_strength")) return;
   node.__cccCompactStack = true;
-  if (!withPrompt) cleanupLegacySockets(node);
-
+  cleanupLegacySockets(node);
+  // Old saved nodes may still retain obsolete input sockets.
+  for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
+    const index = node.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
+    if (index >= 0) node.removeInput(index);
+  }
   const visible = [];
-  for (let i = 1; i <= slots; i++) {
+  for (let i = 1; i <= 10; i++) {
     const name = find(`lora_${i}_name`);
     const enabled = find(`lora_${i}_enabled`);
     const strength = find(`lora_${i}_strength`);
@@ -448,37 +450,13 @@ function install(node) {
     };
     node.addCustomWidget(row);
     visible.push(row);
-    if (withPrompt) {
-      const position = find(`lora_${i}_prompt_position`);
-      const prompt = find(`lora_${i}_prompt`);
-      if (position && prompt) {
-        // Keep both original ComfyUI widgets: native dropdown and editable
-        // multiline text widget. Never hide or replace them with canvas art.
-        position.disabled = !enabled.value;
-        prompt.disabled = !enabled.value;
-        const refreshPromptState = () => {
-          position.disabled = !enabled.value;
-          prompt.disabled = !enabled.value;
-          node.setDirtyCanvas?.(true, true);
-        };
-        const oldCallback = enabled.callback;
-        enabled.callback = function (...args) {
-          const result = oldCallback?.apply(this, args);
-          refreshPromptState();
-          return result;
-        };
-        // Arrange real widgets immediately after the compact LoRA row.
-        visible.push(position, prompt);
-      }
-    }
   }
   node.widgets = [...node.widgets.filter((w) => !visible.includes(w)), ...visible];
   node.setSize?.(node.computeSize());
 }
 function ready(node, attempt = 0) {
   if (node.__cccCompactStack) return;
-  const slots = (node.comfyClass === "CcCKrea2LoRAStackWithPrompt" || node.type === "CcCKrea2LoRAStackWithPrompt") ? 5 : 10;
-  if (!node.widgets?.some((w) => w.name === `lora_${slots}_strength`)) {
+  if (!node.widgets?.some((w) => w.name === "lora_10_strength")) {
     if (attempt < 30) requestAnimationFrame(() => ready(node, attempt + 1));
     return;
   }
@@ -487,19 +465,19 @@ function ready(node, attempt = 0) {
 return {
   name: "ccc.krea2.compactLoraStack",
   nodeCreated(node) {
-    if (["CcCKrea2LoRAStack", "CcCKrea2LoRAStackWithPrompt"].includes(node.comfyClass || node.type)) ready(node);
+    if (node.comfyClass === "CcCKrea2LoRAStack" || node.type === "CcCKrea2LoRAStack") ready(node);
   },
   beforeRegisterNodeDef(nodeType, nodeData) {
-    if (!["CcCKrea2LoRAStack", "CcCKrea2LoRAStackWithPrompt"].includes(nodeData.name)) return;
+    if (nodeData.name !== "CcCKrea2LoRAStack") return;
     const configure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function (info) {
       const result = configure?.call(this, info);
-      if (nodeData.name === "CcCKrea2LoRAStack") {
-        // The old LoRA Stack no longer owns prompt sockets.
-        // Do NOT remove the augmentation input of LoRA Stack with Prompt.
-        restoreNames(this, info);
-        cleanupLegacySockets(this);
+      for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
+        const index = this.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
+        if (index >= 0) this.removeInput(index);
       }
+      restoreNames(this, info);
+      cleanupLegacySockets(this);
       return result;
     };
     const original = nodeType.prototype.onNodeCreated;
@@ -524,6 +502,31 @@ app.registerExtension({
         if (!node || !node.comfyClass) return;
         compactLoader.nodeCreated?.(node);
         compactStack.nodeCreated?.(node);
+        if (node.comfyClass === "CcCKrea2LoRAStackWithPrompt") {
+            // This node uses only built-in ComfyUI widgets for its five slots.
+            // No custom drawing, widget type rewriting, or socket migration.
+            const updatePromptSlots = () => {
+                for (let i = 1; i <= 5; i++) {
+                    const enabled = node.widgets?.find(w => w.name === `lora_${i}_enabled`)?.value === true;
+                    for (const part of ["name", "strength", "prompt_position", "prompt"]) {
+                        const widget = node.widgets?.find(w => w.name === `lora_${i}_${part}`);
+                        if (widget) widget.disabled = !enabled;
+                    }
+                }
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (let i = 1; i <= 5; i++) {
+                const toggle = node.widgets?.find(w => w.name === `lora_${i}_enabled`);
+                if (!toggle) continue;
+                const original = toggle.callback;
+                toggle.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    updatePromptSlots();
+                    return result;
+                };
+            }
+            updatePromptSlots();
+        }
 
         if (node.comfyClass === "CcCKrea2VisualReference") {
             const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
