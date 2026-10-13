@@ -77,6 +77,16 @@ app.registerExtension({
       };
       node.addCustomWidget(row);
     }
+    // Interleave visible rows; keep backing widgets hidden but serializable.
+    const modelWidget = find("model");
+    const sorted = modelWidget ? [modelWidget] : [];
+    for (let i = 1; i <= 10; i++) {
+      for (const name of [`lora_${i}_name`, `lora_${i}_controls`, `lora_${i}_enabled`, `lora_${i}_strength`]) {
+        const widget = find(name);
+        if (widget) sorted.push(widget);
+      }
+    }
+    node.widgets = [...sorted, ...node.widgets.filter((widget) => !sorted.includes(widget))];
     node.setSize(node.computeSize());
   },
 });
