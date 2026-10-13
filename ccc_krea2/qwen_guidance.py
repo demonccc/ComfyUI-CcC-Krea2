@@ -7,26 +7,9 @@ GUIDANCE_DETAIL_MODES = ("compact", "balanced", "detailed")
 VISION_GUIDANCE_MODES = ("conservative", "balanced", "flexible")
 
 GUIDANCE_DETAIL_PRESETS = {
-    "compact": {
-        "max_length": 256,
-        "instruction": (
-            "GUIDANCE DETAIL: compact. Use the smallest useful description while preserving the exact critical facts "
-            "that belong to this Vision mode. Do not replace omitted details with guesses, and do not include attributes "
-            "from another Vision mode."
-        ),
-    },
-    "balanced": {
-        "max_length": 512,
-        "instruction": "",
-    },
-    "detailed": {
-        "max_length": 1024,
-        "instruction": (
-            "GUIDANCE DETAIL: detailed. Use the larger token budget only to add more exact facts that belong to this "
-            "Vision mode. Never add attributes from another Vision mode just to make the description richer. If a detail "
-            "is outside the current mode, omit it rather than infer or transfer it."
-        ),
-    },
+    "compact": {"max_length": 256},
+    "balanced": {"max_length": 512},
+    "detailed": {"max_length": 1024},
 }
 
 VISION_GUIDANCE_PRESETS = {
@@ -34,16 +17,6 @@ VISION_GUIDANCE_PRESETS = {
     "balanced": {"temperature": 0.25, "top_p": 0.90},
     "flexible": {"temperature": 0.45, "top_p": 0.95},
 }
-
-
-def guidance_detail_instruction(guidance_detail: str = "balanced") -> str:
-    """Return the scope-safe prompt directive for a Guidance Detail preset."""
-    try:
-        return str(GUIDANCE_DETAIL_PRESETS[guidance_detail]["instruction"])
-    except KeyError as exc:
-        raise ValueError(
-            f"[Krea2 CcC] Unsupported Guidance Detail preset: {guidance_detail!r}."
-        ) from exc
 
 
 def guidance_generation_kwargs(
@@ -75,5 +48,7 @@ def guidance_generation_kwargs(
         "top_p": float(vision["top_p"]),
         "min_p": 0.05,
         "repetition_penalty": 1.05,
+        "presence_penalty": 0.0,
         "seed": int(guidance_seed),
+        "mtp": True,
     }
