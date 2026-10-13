@@ -179,29 +179,67 @@ def _generate_t2i_vision_guidance(
     )
 
     image_batch = torch.cat(analysis_images, dim=0)
+
+    # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
+    # ordinary user text rather than through the optional system_prompt input.
+    # The abliterated Qwen3-VL checkpoint used by this project can otherwise emit
+    # a bare chat-role token ("user") as the first/only generated token.
+    blueprint_prompt = f"{system_prompt}\n\n{analysis_prompt}".strip()
     tokens = clip.tokenize(
-        analysis_prompt,
+        blueprint_prompt,
         image=image_batch,
         skip_template=False,
         min_length=1,
         thinking=False,
-        system_prompt=system_prompt,
+        system_prompt="",
     )
     generated_ids = clip.generate(
         tokens,
         do_sample=True,
         max_length=512,
-        temperature=0.25,
+        temperature=0.70,
         top_k=64,
-        top_p=0.90,
+        top_p=0.95,
         min_p=0.05,
         repetition_penalty=1.05,
         presence_penalty=0.0,
         seed=0,
         mtp=True,
     )
-    guidance = _clean_generated_guidance(clip, generated_ids)
-    return guidance, len(analysis_images)
+
+    try:
+        guidance = _clean_generated_guidance(clip, generated_ids)
+        generation_strategy = "blueprint-user-prompt"
+    except RuntimeError as first_error:
+        if "chat-role token" not in str(first_error):
+            raise
+
+        # Compatibility retry using ComfyUI's explicit system-prompt path.
+        tokens = clip.tokenize(
+            analysis_prompt,
+            image=image_batch,
+            skip_template=False,
+            min_length=1,
+            thinking=False,
+            system_prompt=system_prompt,
+        )
+        generated_ids = clip.generate(
+            tokens,
+            do_sample=True,
+            max_length=512,
+            temperature=0.70,
+            top_k=64,
+            top_p=0.95,
+            min_p=0.05,
+            repetition_penalty=1.05,
+            presence_penalty=0.0,
+            seed=0,
+            mtp=True,
+        )
+        guidance = _clean_generated_guidance(clip, generated_ids)
+        generation_strategy = "system-prompt-fallback"
+
+    return guidance, len(analysis_images), generation_strategy
 
 
 def _encode_t2i_vision(
@@ -221,7 +259,7 @@ def _encode_t2i_vision(
 
     for index, entry in enumerate(vision_references.entries, start=1):
         public_mode = _public_vision_mode(entry.mode)
-        guidance, analysis_image_count = _generate_t2i_vision_guidance(
+        guidance, analysis_image_count, generation_strategy = _generate_t2i_vision_guidance(
             clip=clip,
             entry=entry,
             target_prompt=prompt,
@@ -236,6 +274,7 @@ def _encode_t2i_vision(
                 "instruction": entry.instruction,
                 "guidance": guidance,
                 "analysis_images": analysis_image_count,
+                "generation_strategy": generation_strategy,
             }
         )
 
@@ -393,6 +432,7 @@ class CcCKrea2TextToImage:
                         f"  Vision Reference {item['index']}:",
                         f"    Mode: {item['mode']}",
                         f"    Analysis Images: {item['analysis_images']}",
+                        f"    Generation Strategy: {item['generation_strategy']}",
                         f"    Guidance: {item['guidance']!r}",
                     ]
                 )
