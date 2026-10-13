@@ -7,6 +7,7 @@ from typing import Any, Dict
 import torch
 
 from ..constants import NODE_CATEGORY
+from ..prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, apply_prompt_augmentation
 from ..paint_patch import patch_krea2_paint_model
 from ..patch import _conditioning_set_values
 
@@ -62,10 +63,13 @@ class CcCKrea2Paint:
                 ),
                 "apply_krea2_paint_patch": ("BOOLEAN", {"default": True}),
                 "kv_cache": ("BOOLEAN", {"default": True}),
-            }
+            },
+            "optional": {
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
+            },
         }
 
-    def process(self, model, clip, paint_context: Dict[str, Any], positive_prompt="", apply_krea2_paint_patch=True, kv_cache=True):
+    def process(self, model, clip, paint_context: Dict[str, Any], positive_prompt="", apply_krea2_paint_patch=True, kv_cache=True, prompt_augmentation=None):
         if not isinstance(paint_context, dict):
             raise ValueError("[Krea2 CcC Paint] paint_context is invalid.")
         required = ("semantic_reference", "reference_latent", "generated_mask", "keep_mask")
@@ -76,6 +80,7 @@ class CcCKrea2Paint:
         semantic_reference = paint_context["semantic_reference"][..., :3].clamp(0.0, 1.0)
         reference_latent = paint_context["reference_latent"]
 
+        positive_prompt, _ = apply_prompt_augmentation(positive_prompt, "", prompt_augmentation)
         positive = _encode_qwen_with_reference(clip, positive_prompt, semantic_reference)
         negative = _encode_negative(clip)
         positive = _conditioning_set_values(positive, {"reference_latents": [reference_latent]})
