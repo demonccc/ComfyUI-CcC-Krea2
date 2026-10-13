@@ -5,6 +5,8 @@ import torch
 
 from ccc_krea2.t2i import (
     CcCKrea2TextToImage,
+    LEGACY_VISUAL_SYSTEM_PROMPT,
+    T2I_VISION_SYSTEM_PROMPTS,
     _encode_t2i_vision,
     _generate_t2i_vision_guidance,
 )
@@ -290,7 +292,7 @@ def test_t2i_empty_generation_fails_without_retry():
     assert len(clip.generate_calls) == 1
 
 
-def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
+def test_t2i_style_reuses_exact_legacy_visual_preset():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
@@ -309,16 +311,16 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
         target_prompt="Only one manga girl facing forward.",
     )
 
+    assert T2I_VISION_SYSTEM_PROMPTS["style"] == LEGACY_VISUAL_SYSTEM_PROMPT
     assert image_count == 1
     assert strategy == "blueprint-user-prompt-single-pass"
     assert guidance.startswith("Bold manga line work")
     analysis_text, kwargs = clip.tokenize_calls[0]
-    assert "extract only the transferable STYLE DNA" in analysis_text
-    assert "source image itself as authoritative for how the result should look" in analysis_text
-    assert "Do not transfer subject identity" in analysis_text
-    assert "camera framing, or composition" in analysis_text
+    assert LEGACY_VISUAL_SYSTEM_PROMPT in analysis_text
     assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
-    assert "VISION MODE: style" in analysis_text
+    assert "VISION MODE: visual" in analysis_text
+    assert "STYLE DNA" not in analysis_text
+    assert "DETAIL POLICY:" not in analysis_text
     assert "Use manga style and girl identity." in analysis_text
     assert torch.equal(kwargs["image"], image)
     assert kwargs["skip_template"] is False
@@ -468,6 +470,60 @@ def test_vision_reference_sampling_presets(
     assert kwargs["repetition_penalty"] == 1.05
 
 
+def test_t2i_visual_balanced_and_detailed_anchor_pose_but_flexible_can_change_it():
+    image = torch.zeros((1, 64, 64, 3))
+
+    balanced_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="visual",
+        guidance_detail="balanced",
+        vision_guidance="balanced",
+    )
+    balanced_clip = FakeGenerativeCLIP("Balanced visual guidance.")
+    _generate_t2i_vision_guidance(
+        clip=balanced_clip,
+        entry=balanced_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+    balanced_text = balanced_clip.tokenize_calls[0][0]
+    assert "VISUAL VARIATION POLICY: stable." in balanced_text
+    assert "Strongly anchor the same drawing" in balanced_text
+    assert "preserve exact body pose" in balanced_text
+
+    detailed_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="visual",
+        guidance_detail="detailed",
+        vision_guidance="conservative",
+    )
+    detailed_clip = FakeGenerativeCLIP("Detailed visual guidance.")
+    _generate_t2i_vision_guidance(
+        clip=detailed_clip,
+        entry=detailed_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+    detailed_text = detailed_clip.tokenize_calls[0][0]
+    assert "VISUAL VARIATION POLICY: locked." in detailed_text
+    assert "strict geometry and appearance blueprint" in detailed_text
+    assert "More detail means MORE anchoring, not more invention." in detailed_text
+
+    flexible_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="visual",
+        guidance_detail="detailed",
+        vision_guidance="flexible",
+    )
+    flexible_clip = FakeGenerativeCLIP("Flexible visual guidance.")
+    _generate_t2i_vision_guidance(
+        clip=flexible_clip,
+        entry=flexible_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+    flexible_text = flexible_clip.tokenize_calls[0][0]
+    assert "VISUAL VARIATION POLICY: flexible." in flexible_text
+    assert "allow pose, gaze, camera/framing, and composition to change" in flexible_text
+
+
 def test_t2i_visual_is_full_copy_blueprint():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
@@ -492,30 +548,27 @@ def test_t2i_visual_is_full_copy_blueprint():
     assert "DETAIL POLICY: balanced." in analysis_text
 
 
-def test_t2i_style_is_visual_style_only_not_content_copy():
+def test_t2i_style_conditioning_uses_legacy_visual_prefix(monkeypatch):
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
         mode="style",
         guidance_detail="balanced",
     )
-    clip = FakeGenerativeCLIP("Specific style DNA.")
+    clip = FakeCLIP()
 
-    _generate_t2i_vision_guidance(
-        clip=clip,
-        entry=vision_chain.entries[0],
-        target_prompt="A manga girl",
+    monkeypatch.setattr(
+        "ccc_krea2.t2i._generate_t2i_vision_guidance",
+        lambda clip, entry, target_prompt: ("legacy visual behavior", 1, "single"),
     )
 
-    analysis_text = clip.tokenize_calls[0][0]
-    assert "extract only the transferable STYLE DNA" in analysis_text
-    assert "line work and contour weight" in analysis_text
-    assert "texture or grain" in analysis_text
-    assert "Do not transfer subject identity" in analysis_text
-    assert "scene, background, camera framing, or composition" in analysis_text
-    assert "DETAIL POLICY: balanced." in analysis_text
+    _, _, conditioning_prompt, _ = _encode_t2i_vision(
+        clip=clip,
+        prompt="A manga girl",
+        vision_references=vision_chain,
+    )
 
-
+    assert "Use these visible attributes for the same requested subject: legacy visual behavior" in conditioning_prompt
 def test_t2i_context_balanced_requires_pose_gaze_and_staging_details():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
@@ -539,6 +592,10 @@ def test_t2i_context_balanced_requires_pose_gaze_and_staging_details():
     assert "foreground/midground/background layout" in analysis_text
     assert "do not summarize them away" in analysis_text
     assert "DETAIL POLICY: balanced." in analysis_text
+    assert "CONTEXT VARIATION POLICY: stable." in analysis_text
+    assert "CONTEXT DETAIL POLICY: balanced." in analysis_text
+    assert "shoulders, arms, hands, leg stance" in analysis_text
+    assert "camera angle, viewpoint, crop, framing" in analysis_text
 
 
 def test_t2i_uses_shared_krea_geometry_controls():
