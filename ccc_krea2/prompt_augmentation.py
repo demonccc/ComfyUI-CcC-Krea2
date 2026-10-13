@@ -42,6 +42,7 @@ def apply_prompt_augmentation(
     positive_prompt: str,
     negative_prompt: str,
     augmentation: Optional[PromptAugmentation] = None,
+    positive_separator: str = "\n\n",
 ) -> Tuple[str, str]:
     """Combine base prompts with active prompt augmentations using '\\n\\n' separators.
 
@@ -75,7 +76,7 @@ def apply_prompt_augmentation(
         if entry and entry.strip():
             pos_parts.append(entry.strip())
 
-    effective_pos = "\n\n".join(pos_parts) if pos_parts else positive_prompt
+    effective_pos = positive_separator.join(pos_parts) if pos_parts else positive_prompt
 
     # Build negative prompt parts
     neg_parts: List[str] = []
