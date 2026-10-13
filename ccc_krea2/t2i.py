@@ -16,6 +16,33 @@ from .prompt_augmentation import (
 
 MAX_GUIDANCE_SEED = 0xFFFFFFFFFFFFFFFF
 
+GUIDANCE_DETAIL_PRESETS = {
+    "compact": {
+        "max_length": 256,
+        "instruction": (
+            "Keep the guidance compact. Prioritize only the most important information "
+            "that belongs to this Vision mode."
+        ),
+    },
+    "balanced": {
+        "max_length": 512,
+        "instruction": "",
+    },
+    "detailed": {
+        "max_length": 1024,
+        "instruction": (
+            "Include all useful information that belongs to this Vision mode. Preserve relevant "
+            "details rather than compressing them unnecessarily, while avoiding unrelated content."
+        ),
+    },
+}
+
+VISION_GUIDANCE_PRESETS = {
+    "conservative": {"temperature": 0.15, "top_p": 0.85},
+    "balanced": {"temperature": 0.25, "top_p": 0.90},
+    "flexible": {"temperature": 0.45, "top_p": 0.95},
+}
+
 ASPECT_RATIO_MAP: Dict[str, Tuple[float, float]] = {
     "1:1": (1.0, 1.0),
     "4:3": (4.0, 3.0),
@@ -168,12 +195,29 @@ def _generate_t2i_vision_guidance(
     entry: VisionReferenceEntry,
     target_prompt: str,
     guidance_seed: int = 0,
+    guidance_detail: str = "balanced",
+    vision_guidance: str = "balanced",
 ):
     public_mode = _public_vision_mode(entry.mode)
     system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
     analysis_images = _t2i_analysis_images(entry)
 
+    try:
+        detail_settings = GUIDANCE_DETAIL_PRESETS[guidance_detail]
+    except KeyError as exc:
+        raise ValueError(
+            f"{LOGGER_PREFIX} Unsupported Guidance Detail preset: {guidance_detail!r}."
+        ) from exc
+
+    try:
+        sampling_settings = VISION_GUIDANCE_PRESETS[vision_guidance]
+    except KeyError as exc:
+        raise ValueError(
+            f"{LOGGER_PREFIX} Unsupported Vision Guidance preset: {vision_guidance!r}."
+        ) from exc
+
     user_instruction = str(entry.instruction or "").strip()
+    detail_instruction = str(detail_settings["instruction"]).strip()
     analysis_prompt = (
         "TARGET TEXT-TO-IMAGE PROMPT:\n"
         f"{target_prompt or '<empty>'}\n\n"
@@ -181,10 +225,23 @@ def _generate_t2i_vision_guidance(
         "Apply only information that belongs to this Vision mode. "
         "If the additional guidance asks for information outside this mode, ignore that part.\n"
         f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n\n"
+        f"{detail_instruction + chr(10) if detail_instruction else ''}"
         "Return the extracted guidance now."
     )
 
     image_batch = torch.cat(analysis_images, dim=0)
+    generation_kwargs = {
+        "do_sample": True,
+        "max_length": int(detail_settings["max_length"]),
+        "temperature": float(sampling_settings["temperature"]),
+        "top_k": 64,
+        "top_p": float(sampling_settings["top_p"]),
+        "min_p": 0.05,
+        "repetition_penalty": 1.05,
+        "presence_penalty": 0.0,
+        "seed": guidance_seed,
+        "mtp": True,
+    }
 
     # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
     # ordinary user text rather than through the optional system_prompt input.
@@ -199,19 +256,7 @@ def _generate_t2i_vision_guidance(
         thinking=False,
         system_prompt="",
     )
-    generated_ids = clip.generate(
-        tokens,
-        do_sample=True,
-        max_length=512,
-        temperature=0.70,
-        top_k=64,
-        top_p=0.95,
-        min_p=0.05,
-        repetition_penalty=1.05,
-        presence_penalty=0.0,
-        seed=guidance_seed,
-        mtp=True,
-    )
+    generated_ids = clip.generate(tokens, **generation_kwargs)
 
     try:
         guidance = _clean_generated_guidance(clip, generated_ids)
@@ -228,19 +273,7 @@ def _generate_t2i_vision_guidance(
             thinking=False,
             system_prompt=system_prompt,
         )
-        generated_ids = clip.generate(
-            tokens,
-            do_sample=True,
-            max_length=512,
-            temperature=0.70,
-            top_k=64,
-            top_p=0.95,
-            min_p=0.05,
-            repetition_penalty=1.05,
-            presence_penalty=0.0,
-            seed=guidance_seed,
-            mtp=True,
-        )
+        generated_ids = clip.generate(tokens, **generation_kwargs)
 
         try:
             guidance = _clean_generated_guidance(clip, generated_ids)
@@ -256,17 +289,7 @@ def _generate_t2i_vision_guidance(
                 thinking=False,
                 system_prompt=system_prompt,
             )
-            generated_ids = clip.generate(
-                tokens,
-                do_sample=True,
-                max_length=512,
-                temperature=0.25,
-                top_k=64,
-                top_p=0.90,
-                min_p=0.05,
-                repetition_penalty=1.05,
-                seed=guidance_seed,
-            )
+            generated_ids = clip.generate(tokens, **generation_kwargs)
             guidance = _clean_generated_guidance(clip, generated_ids)
             generation_strategy = "prompt-creator-fallback"
 
@@ -278,6 +301,8 @@ def _encode_t2i_vision(
     prompt: str,
     vision_references: VisionReferenceChain,
     guidance_seed: int = 0,
+    guidance_detail: str = "balanced",
+    vision_guidance: str = "balanced",
 ):
     """Convert Vision References into mode-scoped text guidance, then encode text-only conditioning.
 
@@ -296,6 +321,8 @@ def _encode_t2i_vision(
             entry=entry,
             target_prompt=prompt,
             guidance_seed=guidance_seed,
+            guidance_detail=guidance_detail,
+            vision_guidance=vision_guidance,
         )
         total_analysis_images += analysis_image_count
         guidance_items.append(
@@ -366,6 +393,14 @@ class CcCKrea2TextToImage:
                     "INT",
                     {"default": 0, "min": 0, "max": MAX_GUIDANCE_SEED, "step": 1},
                 ),
+                "guidance_detail": (
+                    ["compact", "balanced", "detailed"],
+                    {"default": "balanced"},
+                ),
+                "vision_guidance": (
+                    ["conservative", "balanced", "flexible"],
+                    {"default": "balanced"},
+                ),
                 "custom_aspect_width": ("INT", {"default": 1, "min": 1, "max": 32}),
                 "custom_aspect_height": ("INT", {"default": 1, "min": 1, "max": 32}),
             },
@@ -426,6 +461,8 @@ class CcCKrea2TextToImage:
         batch_size: int = 1,
         guidance_seed_mode: str = "fixed",
         guidance_seed: int = 0,
+        guidance_detail: str = "balanced",
+        vision_guidance: str = "balanced",
         custom_aspect_width: int = 1,
         custom_aspect_height: int = 1,
         negative_prompt: str = "",
@@ -468,6 +505,8 @@ class CcCKrea2TextToImage:
                 prompt=eff_pos,
                 vision_references=vision_references,
                 guidance_seed=resolved_guidance_seed,
+                guidance_detail=guidance_detail,
+                vision_guidance=vision_guidance,
             )
         else:
             pos_tokens = clip.tokenize(eff_pos)
@@ -503,6 +542,14 @@ class CcCKrea2TextToImage:
             f"Guidance Seed Mode: {guidance_seed_mode}",
             f"Guidance Seed Configured: {int(guidance_seed)}",
             f"Guidance Seed Used: {resolved_guidance_seed if resolved_guidance_seed is not None else '<not used>'}",
+            f"Guidance Detail: {guidance_detail}",
+            f"Guidance Max Tokens: {GUIDANCE_DETAIL_PRESETS[guidance_detail]['max_length']}",
+            f"Vision Guidance: {vision_guidance}",
+            f"Vision Temperature: {VISION_GUIDANCE_PRESETS[vision_guidance]['temperature']}",
+            f"Vision Top P: {VISION_GUIDANCE_PRESETS[vision_guidance]['top_p']}",
+            "Vision Top K: 64",
+            "Vision Min P: 0.05",
+            "Vision Repetition Penalty: 1.05",
         ]
         for index, entry in enumerate(vision_entries, start=1):
             public_mode = runtime_to_public.get(entry.mode, entry.mode)
