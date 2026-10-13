@@ -289,22 +289,18 @@ app.registerExtension({
             const updateVisionReferenceState = () => {
                 const mode = modeWidget?.value ?? "semantic";
                 const styleMode = mode === "style";
-                const contextMode = mode === "context";
+
                 if (processingWidget) {
                     processingWidget.disabled = !styleMode;
                     if (!styleMode) processingWidget.value = "full";
                 }
 
-                const detailWidget = node.widgets?.find((w) => w.name === "guidance_detail");
-                const visionWidget = node.widgets?.find((w) => w.name === "vision_guidance");
-                if (contextMode) {
-                    if (detailWidget) detailWidget.value = "balanced";
-                    if (visionWidget) visionWidget.value = "balanced";
-                }
-
+                // All Vision modes use Qwen guidance generation in the current
+                // T2I runtime, so these controls must stay available for
+                // Semantic, Visual, Style, and Context.
                 setWidgetDisabled(node, "guidance_seed_mode", false);
-                setWidgetDisabled(node, "guidance_detail", contextMode);
-                setWidgetDisabled(node, "vision_guidance", contextMode);
+                setWidgetDisabled(node, "guidance_detail", false);
+                setWidgetDisabled(node, "vision_guidance", false);
 
                 const seedMode = seedModeWidget?.value ?? "fixed";
                 setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
