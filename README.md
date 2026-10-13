@@ -86,7 +86,7 @@ Modes:
 - **Style** — aesthetic treatment: medium, rendering, line work, shading, palette, lighting, texture, tone, and mood.
 - **Context** — situation/context: setting, environment, framing, action, interaction, composition, and spatial relationships.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Context is intentionally locked to the Balanced generation presets because Compact/Detailed proved unstable for subject appearance.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, and Context.
 
 ## Latent and Target Geometry
 
