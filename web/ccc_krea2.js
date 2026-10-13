@@ -347,11 +347,7 @@ function install(node) {
   if (!find(`lora_${slots}_strength`)) return;
   node.__cccCompactStack = true;
   if (!withPrompt) cleanupLegacySockets(node);
-  // Old saved nodes may still retain obsolete input sockets.
-  for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
-    const index = node.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
-    if (index >= 0) node.removeInput(index);
-  }
+
   const visible = [];
   for (let i = 1; i <= slots; i++) {
     const name = find(`lora_${i}_name`);
