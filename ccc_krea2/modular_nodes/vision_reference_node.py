@@ -1,10 +1,17 @@
 """Krea2 CcC Vision Reference node."""
 
+import random
 from typing import Optional, Tuple
 
 import torch
 
 from ..constants import NODE_CATEGORY
+from ..qwen_guidance import (
+    GUIDANCE_DETAIL_MODES,
+    GUIDANCE_SEED_MODES,
+    MAX_GUIDANCE_SEED,
+    VISION_GUIDANCE_MODES,
+)
 from .edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 
 
@@ -61,11 +68,70 @@ class CcCKrea2VisionReference:
                         "tooltip": "Used only by Style. Semantic, Visual, and Context always use the full image.",
                     },
                 ),
+                "guidance_seed_mode": (
+                    GUIDANCE_SEED_MODES,
+                    {"default": "fixed"},
+                ),
+                "guidance_seed": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": MAX_GUIDANCE_SEED, "step": 1},
+                ),
+                "guidance_detail": (
+                    GUIDANCE_DETAIL_MODES,
+                    {"default": "balanced"},
+                ),
+                "vision_guidance": (
+                    VISION_GUIDANCE_MODES,
+                    {"default": "balanced"},
+                ),
             },
             "optional": {
                 "previous_references": ("KREA2_VISION_REFERENCE_CHAIN",),
             },
         }
+
+    @classmethod
+    def IS_CHANGED(
+        cls,
+        guidance_seed_mode: str = "fixed",
+        guidance_seed: int = 0,
+        guidance_detail: str = "balanced",
+        vision_guidance: str = "balanced",
+        **kwargs,
+    ):
+        if guidance_seed_mode in {"incremental", "random"}:
+            return float("nan")
+        return (
+            f"guidance-seed:{int(guidance_seed)}:"
+            f"detail:{guidance_detail}:vision:{vision_guidance}"
+        )
+
+    def _resolve_guidance_seed(self, mode: str, configured_seed: int) -> int:
+        seed = int(configured_seed)
+        if not 0 <= seed <= MAX_GUIDANCE_SEED:
+            raise ValueError(
+                f"[Krea2 CcC Vision Reference] Guidance seed must be between 0 and {MAX_GUIDANCE_SEED}."
+            )
+
+        if mode == "fixed":
+            self._guidance_seed_last_mode = mode
+            return seed
+
+        if mode == "incremental":
+            if getattr(self, "_guidance_seed_last_mode", None) != "incremental":
+                self._guidance_seed_counter = seed
+            resolved = int(self._guidance_seed_counter)
+            self._guidance_seed_counter = (resolved + 1) & MAX_GUIDANCE_SEED
+            self._guidance_seed_last_mode = mode
+            return resolved
+
+        if mode == "random":
+            self._guidance_seed_last_mode = mode
+            return random.SystemRandom().randint(0, MAX_GUIDANCE_SEED)
+
+        raise ValueError(
+            f"[Krea2 CcC Vision Reference] Unsupported guidance seed mode: {mode!r}."
+        )
 
     def process(
         self,
@@ -73,16 +139,29 @@ class CcCKrea2VisionReference:
         mode: str = "semantic",
         instruction: str = "",
         style_processing: str = "full",
+        guidance_seed_mode: str = "fixed",
+        guidance_seed: int = 0,
+        guidance_detail: str = "balanced",
+        vision_guidance: str = "balanced",
         previous_references: Optional[VisionReferenceChain] = None,
     ) -> Tuple[VisionReferenceChain, str]:
         chain = previous_references if previous_references is not None else VisionReferenceChain()
         runtime_mode = VISION_RUNTIME_MODES.get(mode, mode)
         effective_processing = style_processing if runtime_mode == "style_indirect" else "full"
+        resolved_guidance_seed = self._resolve_guidance_seed(
+            guidance_seed_mode,
+            guidance_seed,
+        )
         entry = VisionReferenceEntry(
             image=image,
             mode=runtime_mode,
             instruction=instruction.strip(),
             processing=effective_processing,
+            guidance_seed_mode=guidance_seed_mode,
+            guidance_seed_configured=int(guidance_seed),
+            guidance_seed=resolved_guidance_seed,
+            guidance_detail=guidance_detail,
+            vision_guidance=vision_guidance,
         )
         out_chain = chain.append(entry)
 
@@ -100,6 +179,11 @@ class CcCKrea2VisionReference:
                 f"Source Resolution: {source_width} x {source_height}",
                 f"Requested Style Processing: {style_processing}",
                 f"Effective Style Processing: {effective_processing}",
+                f"Guidance Seed Mode: {guidance_seed_mode}",
+                f"Guidance Seed Configured: {int(guidance_seed)}",
+                f"Guidance Seed Used: {resolved_guidance_seed}",
+                f"Guidance Detail: {guidance_detail}",
+                f"Vision Guidance: {vision_guidance}",
                 "Appearance Latent: no",
                 "Consumer Processing: deferred to connected node",
                 f"Chain Entries: {len(out_chain.entries)}",
