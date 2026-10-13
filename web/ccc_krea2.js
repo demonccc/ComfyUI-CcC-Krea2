@@ -195,7 +195,7 @@ function install(node) {
         ctx.fillStyle = "#ccc";
         ctx.textAlign = "center";
         ctx.fillText("◀", 24, cy);
-        ctx.fillText("▶", nodeWidth - 19, cy);
+        ctx.fillText("▶", nodeWidth - 30, cy);
         ctx.fillStyle = "#4b4b4b";
         ctx.fillRect(left, cy - 3, length, 6);
         ctx.fillStyle = "#809bb4";
@@ -213,7 +213,7 @@ function install(node) {
         const original = Number(strength.value) || 0;
         let next;
         if (down(event) && x <= 36) next = original - STEP;
-        else if (down(event) && x >= width - 34) next = original + STEP;
+        else if (down(event) && x >= width - 52) next = original + STEP;
         else if (x >= left && x <= right) next = -10 + (x - left) * 20 / (right - left);
         else return false;
         update(strength, Number((Math.round(clamp(next) / STEP) * STEP).toFixed(2)), n);
