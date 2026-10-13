@@ -51,12 +51,23 @@ function install(node) {
   const find = (key) => node.widgets?.find((w) => w.name === key);
   if (!find("lora_10_strength")) return;
   node.__cccCompactStack = true;
+  // Old saved nodes may still retain obsolete input sockets.
+  for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
+    const index = node.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
+    if (index >= 0) node.removeInput(index);
+  }
   const visible = [];
   for (let i = 1; i <= 10; i++) {
     const name = find(`lora_${i}_name`);
     const enabled = find(`lora_${i}_enabled`);
     const strength = find(`lora_${i}_strength`);
     if (!name || !enabled || !strength) continue;
+    // Old workflows used different widget indexes; a numeric name is invalid.
+    const choices = typeof name.options?.values === "function" ? name.options.values(name) : name.options?.values;
+    if (!Array.isArray(choices) || !choices.includes(name.value)) {
+      name.value = "None";
+    }
+    if (!Number.isFinite(Number(strength.value))) strength.value = 1.0;
     [name, enabled, strength].forEach(hide);
     const row = {
       name: `ccc_stack_${i}_row`, type: "custom", serialize: false,
@@ -103,10 +114,31 @@ function install(node) {
         if (x < w - 78) { set(strength, Number(clamp(Number(strength.value) - 0.05).toFixed(2)), n); return true; }
         if (x >= w - 34) { set(strength, Number(clamp(Number(strength.value) + 0.05).toFixed(2)), n); return true; }
         // Clicking the number allows exact manual input.
-        const answer = window.prompt("LoRA strength (-10 to 10)", String(strength.value));
-        if (answer !== null && answer.trim() !== "" && Number.isFinite(Number(answer))) {
-          set(strength, Number(clamp(Number(answer)).toFixed(2)), n);
-        }
+        // Edit in place on top of the numeric area, not a blocking prompt.
+        const canvas = app.canvas?.canvas;
+        if (!canvas) return true;
+        const editor = document.createElement("input");
+        editor.type = "number"; editor.min = "-10"; editor.max = "10"; editor.step = "0.05";
+        editor.value = String(strength.value);
+        editor.style.cssText = "position:fixed;z-index:100000;width:65px;height:24px;box-sizing:border-box;text-align:center;background:#252525;color:#eee;border:1px solid #7b9ab0;border-radius:4px;";
+        editor.style.left = Math.max(0, event.clientX - 32) + "px";
+        editor.style.top = Math.max(0, event.clientY - 12) + "px";
+        document.body.appendChild(editor);
+        let completed = false;
+        const commit = () => {
+          if (completed) return;
+          completed = true;
+          const value = Number(editor.value);
+          if (editor.value.trim() && Number.isFinite(value)) set(strength, Number(clamp(value).toFixed(2)), n);
+          editor.remove();
+        };
+        editor.addEventListener("keydown", (e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") { completed = true; editor.remove(); }
+        });
+        editor.addEventListener("blur", commit, { once: true });
+        editor.focus(); editor.select();
         return true;
       },
     };
@@ -131,6 +163,30 @@ app.registerExtension({
   },
   beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData.name !== "CcCKrea2LoRAStack") return;
+    const configure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function (info) {
+      const result = configure?.call(this, info);
+      for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
+        const index = this.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
+        if (index >= 0) this.removeInput(index);
+      }
+      // Migrate four-slot workflow values from the old global-strength layout.
+      if (Array.isArray(info?.widgets_values) && info.widgets_values.length === 14) {
+        const find = (name) => this.widgets?.find((w) => w.name === name);
+        for (let i = 1; i <= 4; i++) {
+          const base = 2 + (i - 1) * 3;
+          const enabled = find(`lora_${i}_enabled`);
+          const name = find(`lora_${i}_name`);
+          const strength = find(`lora_${i}_strength`);
+          if (enabled) enabled.value = Boolean(info.widgets_values[base]);
+          const candidate = info.widgets_values[base + 1];
+          const choices = name?.options?.values;
+          if (name && Array.isArray(choices) && choices.includes(candidate)) name.value = candidate;
+          if (strength && Number.isFinite(Number(info.widgets_values[base + 2]))) strength.value = Number(info.widgets_values[base + 2]);
+        }
+      }
+      return result;
+    };
     const original = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function (...args) {
       const result = original?.apply(this, args);
