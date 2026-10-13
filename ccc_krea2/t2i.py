@@ -503,12 +503,24 @@ class CcCKrea2TextToImage:
             for entry in vision_entries
         ]
 
+        has_direct_vision = any(mode != "semantic" for mode in vision_modes)
+        has_semantic_generation = any(mode == "semantic" for mode in vision_modes)
+
+        if has_direct_vision and has_semantic_generation:
+            positive_transport = "mixed: Semantic generated-text + direct Qwen vision"
+        elif has_direct_vision:
+            positive_transport = "direct Qwen vision"
+        elif has_semantic_generation:
+            positive_transport = "text-only with Semantic Qwen-generated guidance"
+        else:
+            positive_transport = "text-only"
+
         info_lines = [
             "=== Krea2 CcC Text to Image ===",
             f"Prompt Augmentation: {'yes' if prompt_augmentation is not None else 'no'}",
             f"Vision References: {len(vision_entries)}",
             f"Vision Modes: {', '.join(vision_modes) if vision_modes else '<none>'}",
-            f"Positive Conditioning: {'text-only with Qwen Vision-derived guidance' if vision_entries else 'text-only'}",
+            f"Positive Conditioning: {positive_transport}",
             "Negative Conditioning: text-only",
             f"Effective Positive Prompt: {eff_pos!r}",
             f"Effective Negative Prompt: {eff_neg!r}",
@@ -535,23 +547,34 @@ class CcCKrea2TextToImage:
                 [
                     "",
                     "T2I Vision Pipeline:",
-                    "  Vision Analysis: multimodal Qwen generation",
-                    "  Final Conditioning: text-only Krea2 encode",
-                    "  Direct Vision Rows in Final Conditioning: 0",
-                    f"  Vision Analysis Images: {vision_analysis_images}",
-                    f"  Conditioning Prompt: {conditioning_prompt!r}",
+                    "  Semantic Transport: Qwen image analysis -> generated text",
+                    "  Visual Transport: direct Qwen vision rows",
+                    "  Style Transport: direct Qwen vision rows + shared style extraction",
+                    "  Context Transport: direct Qwen vision rows + shared context extraction",
+                    f"  Vision Physical/Analysis Images: {vision_analysis_images}",
+                    f"  Effective Qwen/Text Prompt: {conditioning_prompt!r}",
                 ]
             )
             for item in vision_guidance_items:
-                info_lines.extend(
-                    [
-                        f"  Vision Reference {item['index']}:",
-                        f"    Mode: {item['mode']}",
-                        f"    Analysis Images: {item['analysis_images']}",
-                        f"    Generation Strategy: {item['generation_strategy']}",
-                        f"    Guidance: {item['guidance']!r}",
-                    ]
-                )
+                if item.get("transport") == "generated-text":
+                    info_lines.extend(
+                        [
+                            f"  Semantic Reference {item['index']}:",
+                            "    Transport: generated-text",
+                            f"    Analysis Images: {item['analysis_images']}",
+                            f"    Generation Strategy: {item['generation_strategy']}",
+                            f"    Guidance: {item['guidance']!r}",
+                        ]
+                    )
+                else:
+                    info_lines.extend(
+                        [
+                            f"  Direct Vision Slot {item['slot']}:",
+                            f"    Mode: {item['mode']}",
+                            f"    Processing: {item['processing']}",
+                            "    Transport: direct-qwen-vision",
+                        ]
+                    )
 
         # Return unchanged input MODEL along with conditioning, latent, and diagnostics.
         return model, positive, negative, latent, "\n".join(info_lines)
