@@ -150,7 +150,6 @@ def _generate_t2i_vision_guidance(
         "Return the extracted guidance now."
     )
 
-    image_batch = torch.cat(analysis_images, dim=0)
     effective_guidance_detail = "balanced" if public_mode == "context" else entry.guidance_detail
     effective_vision_guidance = "balanced" if public_mode == "context" else entry.vision_guidance
     generation_kwargs = guidance_generation_kwargs(
@@ -159,55 +158,53 @@ def _generate_t2i_vision_guidance(
         vision_guidance=effective_vision_guidance,
     )
 
-    # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
-    # ordinary user text rather than through the optional system_prompt input.
-    # The abliterated Qwen3-VL checkpoint used by this project can otherwise emit
-    # a bare chat-role token ("user") as the first/only generated token.
-    blueprint_prompt = f"{system_prompt}\n\n{analysis_prompt}".strip()
+    image_shapes = [tuple(image.shape) for image in analysis_images]
+    print(
+        f"{LOGGER_PREFIX} T2I Qwen guidance: "
+        f"mode={public_mode} strategy=prompt-creator-shape "
+        f"images={len(analysis_images)} shapes={image_shapes} "
+        f"seed={entry.guidance_seed} detail={effective_guidance_detail} "
+        f"vision_guidance={effective_vision_guidance} "
+        f"max_length={generation_kwargs['max_length']} "
+        f"temperature={generation_kwargs['temperature']} top_p={generation_kwargs['top_p']}",
+        flush=True,
+    )
+
+    # Use the exact multimodal call shape proven by this project's Prompt Creator.
+    # Do not use image=<batched tensor>: with Qwen3-VL that path can trigger a
+    # CUDA ScatterGather device-side assert before Python can execute a fallback.
     tokens = clip.tokenize(
-        blueprint_prompt,
-        image=image_batch,
-        skip_template=False,
+        analysis_prompt,
+        images=analysis_images,
         min_length=1,
         thinking=False,
-        system_prompt="",
+        system_prompt=system_prompt,
     )
     generated_ids = clip.generate(tokens, **generation_kwargs)
 
     try:
         guidance = _clean_generated_guidance(clip, generated_ids)
-        generation_strategy = "blueprint-user-prompt"
+        generation_strategy = "prompt-creator-shape"
     except RuntimeError:
-        # Retry 1: ComfyUI's explicit system-prompt path. This covers checkpoints
-        # that terminate immediately or emit a bare chat-role token with the
-        # blueprint-style user prompt.
+        # Safe retry: keep images=[...] and the same generation settings. Only
+        # move the system instructions into normal user text.
+        blueprint_prompt = f"{system_prompt}\n\n{analysis_prompt}".strip()
+        print(
+            f"{LOGGER_PREFIX} T2I Qwen guidance retry: "
+            f"mode={public_mode} strategy=prompt-creator-blueprint "
+            f"images={len(analysis_images)} seed={entry.guidance_seed}",
+            flush=True,
+        )
         tokens = clip.tokenize(
-            analysis_prompt,
-            image=image_batch,
-            skip_template=False,
+            blueprint_prompt,
+            images=analysis_images,
             min_length=1,
             thinking=False,
-            system_prompt=system_prompt,
+            system_prompt="",
         )
         generated_ids = clip.generate(tokens, **generation_kwargs)
-
-        try:
-            guidance = _clean_generated_guidance(clip, generated_ids)
-            generation_strategy = "system-prompt-fallback"
-        except RuntimeError:
-            # Retry 2: exact multimodal call shape already proven by this
-            # project's Prompt Creator. Some Qwen3-VL checkpoints behave more
-            # reliably with the raw image list passed through images=.
-            tokens = clip.tokenize(
-                analysis_prompt,
-                images=analysis_images,
-                min_length=1,
-                thinking=False,
-                system_prompt=system_prompt,
-            )
-            generated_ids = clip.generate(tokens, **generation_kwargs)
-            guidance = _clean_generated_guidance(clip, generated_ids)
-            generation_strategy = "prompt-creator-fallback"
+        guidance = _clean_generated_guidance(clip, generated_ids)
+        generation_strategy = "prompt-creator-blueprint"
 
     return guidance, len(analysis_images), generation_strategy
 
