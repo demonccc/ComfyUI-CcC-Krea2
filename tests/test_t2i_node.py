@@ -5,6 +5,7 @@ import torch
 
 from ccc_krea2.t2i import (
     CcCKrea2TextToImage,
+    _encode_t2i_direct_vision,
     _encode_t2i_vision,
     _generate_t2i_vision_guidance,
 )
@@ -197,14 +198,13 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     assert "Consumer Processing: deferred to connected node" in vision_info
     assert "Vision References: 1" in info
     assert "Vision Modes: semantic" in info
-    assert "Positive Conditioning: text-only with Qwen Vision-derived guidance" in info
+    assert "Positive Conditioning: text-only with Semantic Qwen-generated guidance" in info
     assert "T2I Vision Pipeline:" in info
-    assert "Final Conditioning: text-only Krea2 encode" in info
-    assert "Direct Vision Rows in Final Conditioning: 0" in info
+    assert "Semantic Transport: Qwen image analysis -> generated text" in info
     assert "The same target subject is standing in a city street." in info
 
 
-def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
+def test_t2i_visual_uses_direct_qwen_vision_transport(monkeypatch):
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
@@ -213,15 +213,18 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
     )
     clip = FakeCLIP()
 
-    def fake_generate_guidance(clip, entry, target_prompt):
-        assert target_prompt == "Only one manga girl facing forward."
-        assert entry.guidance_seed == 0
-        return "Give the same target girl long black hair and a red jacket.", 1, "blueprint-user-prompt"
+    def fake_direct(clip, prompt, entries):
+        assert prompt == "Only one manga girl facing forward."
+        assert len(entries) == 1
+        assert entries[0].mode == "style_direct"
+        return (
+            ["direct_visual_conditioning"],
+            [{"slot": 1, "mode": "visual", "processing": "full", "transport": "direct-qwen-vision"}],
+            "<vision>\nOnly one manga girl facing forward.",
+            1,
+        )
 
-    monkeypatch.setattr(
-        "ccc_krea2.t2i._generate_t2i_vision_guidance",
-        fake_generate_guidance,
-    )
+    monkeypatch.setattr("ccc_krea2.t2i._encode_t2i_direct_vision", fake_direct)
 
     conditioning, guidance_items, conditioning_prompt, analysis_images = _encode_t2i_vision(
         clip=clip,
@@ -229,12 +232,13 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
         vision_references=vision_chain,
     )
 
+    assert conditioning == ["direct_visual_conditioning"]
     assert analysis_images == 1
-    assert len(guidance_items) == 1
-    assert guidance_items[0]["mode"] == "visual"
-    assert "long black hair and a red jacket" in conditioning_prompt
-    assert clip.tokenize_calls == [(conditioning_prompt, {})]
-    assert conditioning == [f"conditioning_for_tokens_for_{conditioning_prompt}"]
+    assert guidance_items == [
+        {"slot": 1, "mode": "visual", "processing": "full", "transport": "direct-qwen-vision"}
+    ]
+    assert conditioning_prompt.startswith("<vision>")
+    assert clip.tokenize_calls == []
 
 
 class FakeGenerativeCLIP(FakeCLIP):
@@ -292,41 +296,82 @@ def test_t2i_empty_generation_retries_with_system_prompt():
     assert len(clip.generate_calls) == 2
 
 
-def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
+def test_t2i_style_and_context_are_routed_to_direct_qwen_vision(monkeypatch):
+    image = torch.zeros((1, 64, 64, 3))
+    style_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="style",
+        instruction="Use this style.",
+        style_processing="2x2",
+    )
+    context_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="context",
+        instruction="Use this scene context.",
+        previous_references=style_chain,
+    )
+    clip = FakeCLIP()
+    captured = {}
+
+    def fake_direct(clip, prompt, entries):
+        captured["prompt"] = prompt
+        captured["modes"] = [entry.mode for entry in entries]
+        return (
+            ["direct_conditioning"],
+            [
+                {"slot": 1, "mode": "context", "processing": "full", "transport": "direct-qwen-vision"},
+                {"slot": 2, "mode": "style", "processing": "2x2", "transport": "direct-qwen-vision"},
+            ],
+            "<vision><vision>\nA manga girl",
+            5,
+        )
+
+    monkeypatch.setattr("ccc_krea2.t2i._encode_t2i_direct_vision", fake_direct)
+
+    conditioning, items, prompt, image_count = _encode_t2i_vision(
+        clip=clip,
+        prompt="A manga girl",
+        vision_references=context_chain,
+    )
+
+    assert conditioning == ["direct_conditioning"]
+    assert captured["modes"] == ["style_indirect", "context_indirect"]
+    assert image_count == 5
+    assert {item["mode"] for item in items} == {"style", "context"}
+    assert prompt.startswith("<vision>")
+
+
+def test_t2i_direct_transport_does_not_use_generation_presets(monkeypatch):
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
-        mode="style",
-        instruction="Use manga style and girl identity.",
-        style_processing="full",
+        mode="context",
+        guidance_seed=999,
+        guidance_detail="detailed",
+        vision_guidance="flexible",
     )
-    entry = vision_chain.entries[0]
-    clip = FakeGenerativeCLIP(
-        "Bold manga line work, flat cel shading, high-contrast black and white rendering."
+    clip = FakeCLIP()
+
+    def fail_generate(*args, **kwargs):
+        raise AssertionError("Direct Visual/Style/Context transport must not call Qwen text generation.")
+
+    monkeypatch.setattr("ccc_krea2.t2i._generate_t2i_vision_guidance", fail_generate)
+    monkeypatch.setattr(
+        "ccc_krea2.t2i._encode_t2i_direct_vision",
+        lambda clip, prompt, entries: (
+            ["context_conditioning"],
+            [{"slot": 1, "mode": "context", "processing": "full", "transport": "direct-qwen-vision"}],
+            prompt,
+            1,
+        ),
     )
 
-    guidance, image_count, strategy = _generate_t2i_vision_guidance(
+    conditioning, _, _, _ = _encode_t2i_vision(
         clip=clip,
-        entry=entry,
-        target_prompt="Only one manga girl facing forward.",
+        prompt="A manga girl",
+        vision_references=vision_chain,
     )
-
-    assert image_count == 1
-    assert strategy == "blueprint-user-prompt"
-    assert guidance.startswith("Bold manga line work")
-    analysis_text, kwargs = clip.tokenize_calls[0]
-    assert "Analyze the supplied reference image or tiles only for visual STYLE." in analysis_text
-    assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
-    assert "VISION MODE: style" in analysis_text
-    assert "Use manga style and girl identity." in analysis_text
-    assert torch.equal(kwargs["image"], image)
-    assert kwargs["skip_template"] is False
-    assert kwargs["system_prompt"] == ""
-    assert clip.generate_calls[0][1]["seed"] == 0
-    assert clip.generate_calls[0][1]["max_length"] == 512
-    assert clip.generate_calls[0][1]["temperature"] == 0.25
-    assert clip.generate_calls[0][1]["top_p"] == 0.90
-    assert clip.generate_calls[0][1]["mtp"] is True
+    assert conditioning == ["context_conditioning"]
 
 
 def test_guidance_controls_live_on_vision_reference_not_t2i(monkeypatch):
@@ -452,58 +497,17 @@ def test_semantic_balanced_preserves_existing_dynamic_scope_prompt():
     assert "MODE SCOPE IS STRICT" not in analysis_text
 
 
-def test_visual_prompt_demands_exact_appearance_without_scene_or_style_transfer():
+def test_non_semantic_text_generation_is_rejected():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="visual")
-    clip = FakeGenerativeCLIP("Exact visible appearance guidance.")
+    clip = FakeGenerativeCLIP("unused")
 
-    _generate_t2i_vision_guidance(
-        clip=clip,
-        entry=vision_chain.entries[0],
-        target_prompt="A manga girl",
-    )
-
-    analysis_text = clip.tokenize_calls[0][0]
-    assert "VISUAL APPEARANCE guidance only" in analysis_text
-    assert "exact colors, patterns or prints, materials" in analysis_text
-    assert "Do not transfer the reference scene" in analysis_text
-    assert "rendering medium, or visual style" in analysis_text
-
-
-def test_style_prompt_demands_generation_ready_style_dna_without_content_transfer():
-    image = torch.zeros((1, 64, 64, 3))
-    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="style")
-    clip = FakeGenerativeCLIP("Exact style guidance.")
-
-    _generate_t2i_vision_guidance(
-        clip=clip,
-        entry=vision_chain.entries[0],
-        target_prompt="A manga girl",
-    )
-
-    analysis_text = clip.tokenize_calls[0][0]
-    assert "exact VISUAL STYLE DNA" in analysis_text
-    assert "generation-ready style guidance" in analysis_text
-    assert "instead of reducing the result to generic labels" in analysis_text
-    assert "Do not mention or transfer people, identities" in analysis_text
-
-
-def test_context_prompt_forbids_subject_appearance_and_clothing_transfer():
-    image = torch.zeros((1, 64, 64, 3))
-    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="context")
-    clip = FakeGenerativeCLIP("Scene context only.")
-
-    _generate_t2i_vision_guidance(
-        clip=clip,
-        entry=vision_chain.entries[0],
-        target_prompt="A manga girl in a blue dress",
-    )
-
-    analysis_text = clip.tokenize_calls[0][0]
-    assert "ALL subject appearance" in analysis_text
-    assert "clothing type, clothing color, clothing pattern" in analysis_text
-    assert "they must never define the target subject's appearance" in analysis_text
-    assert "MODE SCOPE IS STRICT" in analysis_text
+    with pytest.raises(ValueError, match="only used for Semantic"):
+        _generate_t2i_vision_guidance(
+            clip=clip,
+            entry=vision_chain.entries[0],
+            target_prompt="A manga girl",
+        )
 
 
 @pytest.mark.parametrize(
