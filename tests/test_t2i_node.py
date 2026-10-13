@@ -214,7 +214,7 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
 
     def fake_generate_guidance(clip, entry, target_prompt):
         assert target_prompt == "Only one manga girl facing forward."
-        return "Give the same target girl long black hair and a red jacket.", 1
+        return "Give the same target girl long black hair and a red jacket.", 1, "blueprint-user-prompt"
 
     monkeypatch.setattr(
         "ccc_krea2.t2i._generate_t2i_vision_guidance",
@@ -263,23 +263,27 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
         "Bold manga line work, flat cel shading, high-contrast black and white rendering."
     )
 
-    guidance, image_count = _generate_t2i_vision_guidance(
+    guidance, image_count, strategy = _generate_t2i_vision_guidance(
         clip=clip,
         entry=entry,
         target_prompt="Only one manga girl facing forward.",
     )
 
     assert image_count == 1
+    assert strategy == "blueprint-user-prompt"
     assert guidance.startswith("Bold manga line work")
     analysis_text, kwargs = clip.tokenize_calls[0]
+    assert "Analyze the supplied reference image or tiles only for visual STYLE." in analysis_text
     assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
     assert "VISION MODE: style" in analysis_text
     assert "Use manga style and girl identity." in analysis_text
     assert torch.equal(kwargs["image"], image)
     assert kwargs["skip_template"] is False
-    assert "only for visual STYLE" in kwargs["system_prompt"]
+    assert kwargs["system_prompt"] == ""
     assert clip.generate_calls[0][1]["seed"] == 0
     assert clip.generate_calls[0][1]["max_length"] == 512
+    assert clip.generate_calls[0][1]["temperature"] == 0.70
+    assert clip.generate_calls[0][1]["top_p"] == 0.95
     assert clip.generate_calls[0][1]["mtp"] is True
 
 
