@@ -135,11 +135,11 @@ Vision References declare Qwen/Vision information and do not create appearance l
 - **Style** -> aesthetic treatment; only this mode exposes full / 2x2 / 4x4 processing.
 - **Context** -> situation, environment, framing, action/interaction, composition, and spatial relationships.
 
-Vision Reference has no public grounding or fidelity control. The consumer owns how the declared information is transformed into conditioning.
+Vision Reference has no public grounding or fidelity control. It does carry reusable Qwen text-guidance generation configuration (seed mode/value, detail preset, and sampling preset) so consumers do not redeclare those controls. The consumer still owns how the declared information is transformed into conditioning.
 
 ## Target Geometry
 
-Latent owns target dimensions, /16 alignment, optional target content, target content placement, optional target semantic metadata, and transformed Attention Regions.
+Krea pixel geometry is defined in the shared `krea_geometry.py` library: curated presets, /16 alignment, bounds, and geometry policies. Latent consumes that library while owning target content, content placement, optional target semantic metadata, and transformed Attention Regions. T2I consumes the same geometry source of truth.
 
 Dimension modes are from_image, fixed, and preset.
 
@@ -209,7 +209,7 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
 
-Text to Image consumes optional prompt_augmentation and optional vision_references, calculates a /16-aligned latent from aspect ratio + megapixels, and returns the unchanged MODEL plus conditioning and LATENT. T2I owns a separate Vision adapter: Qwen multimodal generation first converts each Vision Reference into mode-scoped textual guidance, then the final positive conditioning is a normal text-only Krea2 encode. No Vision image rows survive into final T2I conditioning. The explicit negative prompt remains text-only.
+Text to Image consumes optional prompt_augmentation and optional vision_references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. T2I owns a separate Vision adapter: Qwen multimodal generation first converts each Vision Reference into mode-scoped textual guidance using the generation settings carried by that reference, then the final positive conditioning is a normal text-only Krea2 encode. No Vision image rows survive into final T2I conditioning. The explicit negative prompt remains text-only.
 
 The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
 
