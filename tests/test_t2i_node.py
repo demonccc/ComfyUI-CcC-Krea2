@@ -251,6 +251,46 @@ class FakeGenerativeCLIP(FakeCLIP):
         return self.decoded_text
 
 
+class FakeSequentialGenerativeCLIP(FakeCLIP):
+    def __init__(self, decoded_texts):
+        super().__init__()
+        self.decoded_texts = list(decoded_texts)
+        self.generate_calls = []
+        self.decode_calls = 0
+
+    def generate(self, tokens, **kwargs):
+        self.generate_calls.append((tokens, kwargs))
+        return f"generated_ids_{len(self.generate_calls)}"
+
+    def decode(self, generated_ids):
+        text = self.decoded_texts[self.decode_calls]
+        self.decode_calls += 1
+        return text
+
+
+def test_t2i_empty_generation_retries_with_system_prompt():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="semantic",
+        instruction="",
+    )
+    clip = FakeSequentialGenerativeCLIP(
+        ["", "A woman standing outdoors beside a stone wall."]
+    )
+
+    guidance, image_count, strategy = _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    assert image_count == 1
+    assert strategy == "system-prompt-fallback"
+    assert guidance == "A woman standing outdoors beside a stone wall."
+    assert len(clip.generate_calls) == 2
+
+
 def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
