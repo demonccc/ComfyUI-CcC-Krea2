@@ -42,6 +42,96 @@ const NATIVE_LORA_NODES = new Set([
     "CcCKrea2LoRAStackWithPrompt",
 ]);
 
+const T2I_LEGACY_ASPECT_RATIOS = new Set([
+    "1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "custom",
+]);
+
+const T2I_KREA_PRESETS = [
+    ["1024 x 1024 | 1:1 | ~1.05 MP", 1024, 1024],
+    ["1216 x 832 | ~3:2 | ~1.01 MP", 1216, 832],
+    ["832 x 1216 | ~2:3 | ~1.01 MP", 832, 1216],
+    ["1536 x 1024 | 3:2 | ~1.57 MP", 1536, 1024],
+    ["1024 x 1536 | 2:3 | ~1.57 MP", 1024, 1536],
+    ["1536 x 1152 | 4:3 | ~1.77 MP", 1536, 1152],
+    ["1152 x 1536 | 3:4 | ~1.77 MP", 1152, 1536],
+    ["2048 x 1536 | 4:3 | ~3.15 MP", 2048, 1536],
+    ["1536 x 2048 | 3:4 | ~3.15 MP", 1536, 2048],
+    ["2048 x 1152 | 16:9 | ~2.36 MP", 2048, 1152],
+    ["1152 x 2048 | 9:16 | ~2.36 MP", 1152, 2048],
+    ["2048 x 2048 | 1:1 | ~4.19 MP", 2048, 2048],
+];
+
+function setWidgetDisabled(node, name, disabled) {
+    const widget = node.widgets?.find((w) => w.name === name);
+    if (!widget) return;
+    widget.disabled = disabled;
+    widget.triggerDraw?.();
+}
+
+function legacyT2IRatio(values) {
+    const aspect = String(values?.[1] ?? "");
+    if (!T2I_LEGACY_ASPECT_RATIOS.has(aspect)) return null;
+    if (aspect !== "custom") {
+        const [w, h] = aspect.split(":").map(Number);
+        return w > 0 && h > 0 ? w / h : null;
+    }
+
+    // Old schemas:
+    // v1: prompt, aspect, MP, batch, custom_w, custom_h, negative
+    // v2: prompt, aspect, MP, batch, seed_mode, seed, detail, vision, custom_w, custom_h, negative
+    const customIndex = values.length >= 11 ? 8 : 4;
+    const w = Number(values[customIndex]);
+    const h = Number(values[customIndex + 1]);
+    return w > 0 && h > 0 ? w / h : 1.0;
+}
+
+function nearestT2IKreaPreset(values) {
+    const ratio = legacyT2IRatio(values) ?? 1.0;
+    const megapixels = Math.max(0.01, Number(values?.[2]) || 1.0);
+
+    return T2I_KREA_PRESETS.reduce((best, candidate) => {
+        const [, w, h] = candidate;
+        const candidateRatio = w / h;
+        const ratioError = Math.abs((candidateRatio / ratio) - 1.0);
+        const mpError = Math.abs(((w * h) / 1_000_000) - megapixels);
+        const score = [ratioError, mpError];
+
+        if (!best) return { candidate, score };
+        if (score[0] < best.score[0]) return { candidate, score };
+        if (score[0] === best.score[0] && score[1] < best.score[1]) {
+            return { candidate, score };
+        }
+        return best;
+    }, null)?.candidate ?? T2I_KREA_PRESETS[0];
+}
+
+function migrateLegacyT2IWidgets(node, values) {
+    if (!Array.isArray(values) || !T2I_LEGACY_ASPECT_RATIOS.has(String(values[1] ?? ""))) {
+        return false;
+    }
+
+    const [presetLabel, presetWidth, presetHeight] = nearestT2IKreaPreset(values);
+    const batchSize = Math.min(64, Math.max(1, Number(values[3]) || 1));
+    const negativeIndex = values.length >= 11 ? 10 : 6;
+    const negativePrompt = String(values[negativeIndex] ?? "");
+
+    const assign = (name, value) => {
+        const widget = node.widgets?.find((w) => w.name === name);
+        if (widget) widget.value = value;
+    };
+
+    assign("dimensions", "preset");
+    assign("preset_size", presetLabel);
+    assign("width", presetWidth);
+    assign("height", presetHeight);
+    assign("geometry_policy", "preserve_aspect_krea_bounds");
+    assign("batch_size", batchSize);
+    assign("negative_prompt", negativePrompt);
+
+    node.setDirtyCanvas?.(true, true);
+    return true;
+}
+
 function setupLoraDisabledState(node, attempts = 0) {
     if (node.__cccLoraDisabledInstalled) return;
     const count = node.comfyClass === "CcCKrea2LoRAStackWithPrompt" ? 5 : 10;
@@ -142,6 +232,7 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2VisionReference") {
             const modeWidget = node.widgets?.find((w) => w.name === "mode");
             const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
+            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
 
             const updateVisionReferenceState = () => {
                 const styleMode = (modeWidget?.value ?? "semantic") === "style";
@@ -149,17 +240,69 @@ app.registerExtension({
                     processingWidget.disabled = !styleMode;
                     if (!styleMode) processingWidget.value = "full";
                 }
+
+                const seedMode = seedModeWidget?.value ?? "fixed";
+                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
+                node.setDirtyCanvas?.(true, true);
             };
 
-            if (modeWidget) {
-                const originalCallback = modeWidget.callback;
-                modeWidget.callback = function () {
-                    if (originalCallback) originalCallback.apply(this, arguments);
+            for (const widget of [modeWidget, seedModeWidget]) {
+                if (!widget) continue;
+                const originalCallback = widget.callback;
+                widget.callback = function () {
+                    const result = originalCallback?.apply(this, arguments);
                     updateVisionReferenceState();
+                    return result;
                 };
             }
 
             setTimeout(updateVisionReferenceState, 20);
+        }
+
+        if (node.comfyClass === "CcCKrea2TextToImage") {
+            const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
+
+            const updateDimensionsState = () => {
+                const mode = dimensionsWidget?.value ?? "preset";
+                setWidgetDisabled(node, "preset_size", mode !== "preset");
+                setWidgetDisabled(node, "width", mode !== "fixed");
+                setWidgetDisabled(node, "height", mode !== "fixed");
+                setWidgetDisabled(node, "geometry_policy", mode !== "fixed");
+                node.setDirtyCanvas?.(true, true);
+            };
+
+            if (dimensionsWidget) {
+                const originalCallback = dimensionsWidget.callback;
+                dimensionsWidget.callback = function () {
+                    const result = originalCallback?.apply(this, arguments);
+                    updateDimensionsState();
+                    return result;
+                };
+            }
+
+            // Workflows saved before the shared Krea geometry refactor used:
+            // prompt + aspect_ratio + megapixels + ...
+            // Detect the raw legacy widget array during configure and migrate it
+            // before applying the current conditional UI state.
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (info) {
+                const legacyValues = Array.isArray(info?.widgets_values)
+                    ? [...info.widgets_values]
+                    : null;
+                const result = originalConfigure?.apply(this, arguments);
+                if (legacyValues) migrateLegacyT2IWidgets(node, legacyValues);
+                updateDimensionsState();
+                return result;
+            };
+
+            setTimeout(() => {
+                const currentMode = String(dimensionsWidget?.value ?? "");
+                if (!["preset", "fixed"].includes(currentMode)) {
+                    const syntheticLegacy = node.widgets?.map((w) => w.value) ?? [];
+                    migrateLegacyT2IWidgets(node, syntheticLegacy);
+                }
+                updateDimensionsState();
+            }, 20);
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
