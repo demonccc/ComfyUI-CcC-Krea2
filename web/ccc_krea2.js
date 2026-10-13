@@ -68,6 +68,58 @@ function setWidgetDisabled(node, name, disabled) {
     widget.triggerDraw?.();
 }
 
+function t2iPresetDimensions(label) {
+    const match = String(label ?? "").match(/^(\d+)\s*x\s*(\d+)/i);
+    if (!match) return null;
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+    return [width, height];
+}
+
+function normalizeT2ICurrentWidgets(node) {
+    const find = (name) => node.widgets?.find((w) => w.name === name);
+    const dimensions = find("dimensions");
+    const preset = find("preset_size");
+    const width = find("width");
+    const height = find("height");
+    const policy = find("geometry_policy");
+    const batch = find("batch_size");
+
+    if (dimensions && !["preset", "fixed"].includes(String(dimensions.value ?? ""))) {
+        dimensions.value = "preset";
+    }
+
+    const mode = String(dimensions?.value ?? "preset");
+    if (mode === "preset") {
+        const resolved = t2iPresetDimensions(preset?.value);
+        if (resolved) {
+            if (width) width.value = resolved[0];
+            if (height) height.value = resolved[1];
+        } else {
+            if (preset) preset.value = T2I_KREA_PRESETS[0][0];
+            if (width) width.value = T2I_KREA_PRESETS[0][1];
+            if (height) height.value = T2I_KREA_PRESETS[0][2];
+        }
+    } else {
+        if (width && (!Number.isFinite(Number(width.value)) || Number(width.value) < 16)) {
+            width.value = 1024;
+        }
+        if (height && (!Number.isFinite(Number(height.value)) || Number(height.value) < 16)) {
+            height.value = 1024;
+        }
+    }
+
+    if (policy && !["nearest_krea_aspect", "preserve_aspect_krea_bounds"].includes(String(policy.value ?? ""))) {
+        policy.value = "preserve_aspect_krea_bounds";
+    }
+
+    const batchValue = Number(batch?.value);
+    if (batch && (!Number.isFinite(batchValue) || batchValue < 1 || batchValue > 64)) {
+        batch.value = 1;
+    }
+}
+
 function legacyT2IRatio(values) {
     const aspect = String(values?.[1] ?? "");
     if (!T2I_LEGACY_ASPECT_RATIOS.has(aspect)) return null;
@@ -261,8 +313,10 @@ app.registerExtension({
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
             const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
+            const presetWidget = node.widgets?.find((w) => w.name === "preset_size");
 
             const updateDimensionsState = () => {
+                normalizeT2ICurrentWidgets(node);
                 const mode = dimensionsWidget?.value ?? "preset";
                 setWidgetDisabled(node, "preset_size", mode !== "preset");
                 setWidgetDisabled(node, "width", mode !== "fixed");
@@ -271,9 +325,10 @@ app.registerExtension({
                 node.setDirtyCanvas?.(true, true);
             };
 
-            if (dimensionsWidget) {
-                const originalCallback = dimensionsWidget.callback;
-                dimensionsWidget.callback = function () {
+            for (const widget of [dimensionsWidget, presetWidget]) {
+                if (!widget) continue;
+                const originalCallback = widget.callback;
+                widget.callback = function () {
                     const result = originalCallback?.apply(this, arguments);
                     updateDimensionsState();
                     return result;
@@ -282,8 +337,8 @@ app.registerExtension({
 
             // Workflows saved before the shared Krea geometry refactor used:
             // prompt + aspect_ratio + megapixels + ...
-            // Detect the raw legacy widget array during configure and migrate it
-            // before applying the current conditional UI state.
+            // Migrate raw legacy values when available, then always normalize
+            // the current schema because ComfyUI validates disabled widgets too.
             const originalConfigure = node.onConfigure;
             node.onConfigure = function (info) {
                 const legacyValues = Array.isArray(info?.widgets_values)
@@ -291,6 +346,7 @@ app.registerExtension({
                     : null;
                 const result = originalConfigure?.apply(this, arguments);
                 if (legacyValues) migrateLegacyT2IWidgets(node, legacyValues);
+                normalizeT2ICurrentWidgets(node);
                 updateDimensionsState();
                 return result;
             };
@@ -301,6 +357,7 @@ app.registerExtension({
                     const syntheticLegacy = node.widgets?.map((w) => w.value) ?? [];
                     migrateLegacyT2IWidgets(node, syntheticLegacy);
                 }
+                normalizeT2ICurrentWidgets(node);
                 updateDimensionsState();
             }, 20);
         }
