@@ -633,6 +633,7 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2VisionReference") {
             const modeWidget = node.widgets?.find((w) => w.name === "mode");
             const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
+            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
 
             const updateVisionReferenceState = () => {
                 const styleMode = (modeWidget?.value ?? "semantic") === "style";
@@ -640,13 +641,17 @@ app.registerExtension({
                     processingWidget.disabled = !styleMode;
                     if (!styleMode) processingWidget.value = "full";
                 }
+                const seedMode = seedModeWidget?.value ?? "fixed";
+                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
             };
 
-            if (modeWidget) {
-                const originalCallback = modeWidget.callback;
-                modeWidget.callback = function () {
-                    if (originalCallback) originalCallback.apply(this, arguments);
+            for (const widget of [modeWidget, seedModeWidget]) {
+                if (!widget) continue;
+                const originalCallback = widget.callback;
+                widget.callback = function () {
+                    const result = originalCallback?.apply(this, arguments);
                     updateVisionReferenceState();
+                    return result;
                 };
             }
 
@@ -654,13 +659,7 @@ app.registerExtension({
         }
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
-            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
             const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
-
-            const updateGuidanceSeedState = () => {
-                const mode = seedModeWidget?.value ?? "fixed";
-                setWidgetDisabled(node, "guidance_seed", mode !== "fixed");
-            };
 
             const updateDimensionsState = () => {
                 const mode = dimensionsWidget?.value ?? "preset";
@@ -670,23 +669,16 @@ app.registerExtension({
                 setWidgetDisabled(node, "geometry_policy", mode !== "fixed");
             };
 
-            for (const [widget, callback] of [
-                [seedModeWidget, updateGuidanceSeedState],
-                [dimensionsWidget, updateDimensionsState],
-            ]) {
-                if (!widget) continue;
-                const originalCallback = widget.callback;
-                widget.callback = function () {
+            if (dimensionsWidget) {
+                const originalCallback = dimensionsWidget.callback;
+                dimensionsWidget.callback = function () {
                     const result = originalCallback?.apply(this, arguments);
-                    callback();
+                    updateDimensionsState();
                     return result;
                 };
             }
 
-            setTimeout(() => {
-                updateGuidanceSeedState();
-                updateDimensionsState();
-            }, 20);
+            setTimeout(updateDimensionsState, 20);
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
