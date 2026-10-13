@@ -234,8 +234,8 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
     assert analysis_images == 1
     assert len(guidance_items) == 1
     assert guidance_items[0]["mode"] == "visual"
-    assert "authoritative visual blueprint" in conditioning_prompt
-    assert "reproduce the reference as closely as possible" in conditioning_prompt
+    assert "MANDATORY VISUAL BLUEPRINT" in conditioning_prompt
+    assert "NEVER clone, repeat, mirror, tile, panelize" in conditioning_prompt
     assert "long black hair and a red jacket" in conditioning_prompt
     assert clip.tokenize_calls == [(conditioning_prompt, {})]
     assert conditioning == [f"conditioning_for_tokens_for_{conditioning_prompt}"]
@@ -489,6 +489,8 @@ def test_t2i_visual_balanced_and_detailed_anchor_pose_but_flexible_can_change_it
     assert "VISUAL VARIATION POLICY: stable." in balanced_text
     assert "Strongly anchor the same drawing" in balanced_text
     assert "preserve exact body pose" in balanced_text
+    assert "Never clone, repeat, mirror, or multiply a subject." in balanced_text
+    assert "Describe each subject once as one coherent figure" in balanced_text
 
     detailed_chain, _ = CcCKrea2VisionReference().process(
         image=image,
@@ -506,6 +508,7 @@ def test_t2i_visual_balanced_and_detailed_anchor_pose_but_flexible_can_change_it
     assert "VISUAL VARIATION POLICY: locked." in detailed_text
     assert "strict geometry and appearance blueprint" in detailed_text
     assert "More detail means MORE anchoring, not more invention." in detailed_text
+    assert "never expand detailed observations into clones, variants, or panels" in detailed_text
 
     flexible_chain, _ = CcCKrea2VisionReference().process(
         image=image,
@@ -522,6 +525,7 @@ def test_t2i_visual_balanced_and_detailed_anchor_pose_but_flexible_can_change_it
     flexible_text = flexible_clip.tokenize_calls[0][0]
     assert "VISUAL VARIATION POLICY: flexible." in flexible_text
     assert "allow pose, gaze, camera/framing, and composition to change" in flexible_text
+    assert "Subject count is never flexible" in flexible_text
 
 
 def test_t2i_visual_is_full_copy_blueprint():
@@ -548,6 +552,21 @@ def test_t2i_visual_is_full_copy_blueprint():
     assert "DETAIL POLICY: balanced." in analysis_text
 
 
+def test_t2i_visual_system_prompt_blocks_subject_duplication():
+    prompt = T2I_VISION_SYSTEM_PROMPTS["visual"]
+    assert "subject count is authoritative" in prompt
+    assert "Never duplicate, clone, repeat, mirror, tile" in prompt
+    assert "not a contact sheet, storyboard, multi-panel layout" in prompt
+
+
+def test_t2i_context_system_prompt_treats_staging_as_constraints():
+    prompt = T2I_VISION_SYSTEM_PROMPTS["context"]
+    assert "Treat every visible staging cue as a constraint" in prompt
+    assert "pose, gaze, head angle, hands, gesture, camera, crop, framing" in prompt
+    assert "subject count" in prompt
+    assert "Never duplicate or add subjects" in prompt
+
+
 def test_t2i_style_conditioning_uses_legacy_visual_prefix(monkeypatch):
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
@@ -568,7 +587,9 @@ def test_t2i_style_conditioning_uses_legacy_visual_prefix(monkeypatch):
         vision_references=vision_chain,
     )
 
-    assert "Use these visible attributes for the same requested subject: legacy visual behavior" in conditioning_prompt
+    assert "STRONG STYLE REFERENCE" in conditioning_prompt
+    assert "dominant visual direction across the entire result" in conditioning_prompt
+    assert "legacy visual behavior" in conditioning_prompt
 def test_t2i_context_balanced_requires_pose_gaze_and_staging_details():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
@@ -593,9 +614,12 @@ def test_t2i_context_balanced_requires_pose_gaze_and_staging_details():
     assert "do not summarize them away" in analysis_text
     assert "DETAIL POLICY: balanced." in analysis_text
     assert "CONTEXT VARIATION POLICY: stable." in analysis_text
+    assert "required constraints" in analysis_text
     assert "CONTEXT DETAIL POLICY: balanced." in analysis_text
     assert "shoulders, arms, hands, leg stance" in analysis_text
     assert "camera angle, viewpoint, crop, framing" in analysis_text
+    assert "mandatory staging constraints" in analysis_text
+    assert "generic pose" in analysis_text
 
 
 def test_t2i_uses_shared_krea_geometry_controls():
