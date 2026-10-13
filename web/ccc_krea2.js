@@ -491,62 +491,37 @@ return {
 
 })();
 
-function setWidgetDisabled(node, name, disabled) {
-    const widget = node.widgets?.find((w) => w.name === name);
-    if (widget) widget.disabled = disabled;
-}
-
 app.registerExtension({
     name: "CcC.Krea2",
     async nodeCreated(node) {
         if (!node || !node.comfyClass) return;
         compactLoader.nodeCreated?.(node);
         compactStack.nodeCreated?.(node);
-        if (node.comfyClass === "CcCKrea2LoRAStackWithPrompt") {
-            // This node uses only built-in ComfyUI widgets for its five slots.
-            // No custom drawing, widget type rewriting, or socket migration.
-            const updatePromptSlots = () => {
-                for (let i = 1; i <= 5; i++) {
-                    const enabled = node.widgets?.find(w => w.name === `lora_${i}_enabled`)?.value === true;
-                    for (const part of ["name", "strength", "prompt_position", "prompt"]) {
-                        const widget = node.widgets?.find(w => w.name === `lora_${i}_${part}`);
-                        if (widget) widget.disabled = !enabled;
-                    }
-                }
-                node.setDirtyCanvas?.(true, true);
-            };
-            for (let i = 1; i <= 5; i++) {
-                const toggle = node.widgets?.find(w => w.name === `lora_${i}_enabled`);
-                if (!toggle) continue;
-                const original = toggle.callback;
-                toggle.callback = function (...args) {
-                    const result = original?.apply(this, args);
-                    updatePromptSlots();
-                    return result;
-                };
-            }
-            updatePromptSlots();
-        }
 
         if (node.comfyClass === "CcCKrea2VisualReference") {
             const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
             const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
             const fitWidget = node.widgets?.find((w) => w.name === "reference_fit");
 
+            const setDisabled = (name, disabled) => {
+                const widget = node.widgets?.find((w) => w.name === name);
+                if (widget) widget.disabled = disabled;
+            };
+
             const updateSemanticState = () => {
                 const enabled = semanticWidget?.value === true;
                 const resizeEnabled = enabled && semanticResizeWidget?.value === true;
-                setWidgetDisabled(node, "semantic_resize", !enabled);
-                setWidgetDisabled(node, "semantic_grounding_px", !resizeEnabled);
-                setWidgetDisabled(node, "semantic_resize_method", !resizeEnabled);
-                setWidgetDisabled(node, "prompt_annotation", !enabled);
+                setDisabled("semantic_resize", !enabled);
+                setDisabled("semantic_grounding_px", !resizeEnabled);
+                setDisabled("semantic_resize_method", !resizeEnabled);
+                setDisabled("prompt_annotation", !enabled);
             };
 
             const updateFitState = () => {
                 const mode = fitWidget?.value ?? "native";
                 const crop = mode === "crop";
-                setWidgetDisabled(node, "placement_grid", crop);
-                setWidgetDisabled(node, "resize_method", mode !== "resize");
+                setDisabled("placement_grid", crop);
+                setDisabled("resize_method", mode !== "resize");
                 if (crop) {
                     const placement = node.widgets?.find((w) => w.name === "placement_grid");
                     if (placement) placement.value = "inside";
@@ -575,7 +550,6 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2VisionReference") {
             const modeWidget = node.widgets?.find((w) => w.name === "mode");
             const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
-            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
 
             const updateVisionReferenceState = () => {
                 const styleMode = (modeWidget?.value ?? "semantic") === "style";
@@ -583,44 +557,17 @@ app.registerExtension({
                     processingWidget.disabled = !styleMode;
                     if (!styleMode) processingWidget.value = "full";
                 }
-                const seedMode = seedModeWidget?.value ?? "fixed";
-                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
             };
 
-            for (const widget of [modeWidget, seedModeWidget]) {
-                if (!widget) continue;
-                const originalCallback = widget.callback;
-                widget.callback = function () {
-                    const result = originalCallback?.apply(this, arguments);
+            if (modeWidget) {
+                const originalCallback = modeWidget.callback;
+                modeWidget.callback = function () {
+                    if (originalCallback) originalCallback.apply(this, arguments);
                     updateVisionReferenceState();
-                    return result;
                 };
             }
 
             setTimeout(updateVisionReferenceState, 20);
-        }
-
-        if (node.comfyClass === "CcCKrea2TextToImage") {
-            const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
-
-            const updateDimensionsState = () => {
-                const mode = dimensionsWidget?.value ?? "preset";
-                setWidgetDisabled(node, "preset_size", mode !== "preset");
-                setWidgetDisabled(node, "width", mode !== "fixed");
-                setWidgetDisabled(node, "height", mode !== "fixed");
-                setWidgetDisabled(node, "geometry_policy", mode !== "fixed");
-            };
-
-            if (dimensionsWidget) {
-                const originalCallback = dimensionsWidget.callback;
-                dimensionsWidget.callback = function () {
-                    const result = originalCallback?.apply(this, arguments);
-                    updateDimensionsState();
-                    return result;
-                };
-            }
-
-            setTimeout(updateDimensionsState, 20);
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
@@ -629,24 +576,29 @@ app.registerExtension({
             const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
             const semanticWidget = node.widgets?.find((w) => w.name === "latent_semantic");
 
+            const setDisabled = (name, disabled) => {
+                const widget = node.widgets?.find((w) => w.name === name);
+                if (widget) widget.disabled = disabled;
+            };
+
             const updateDimensionsState = () => {
                 const mode = dimensionsWidget?.value ?? "preset";
-                setWidgetDisabled(node, "width", mode !== "fixed");
-                setWidgetDisabled(node, "height", mode !== "fixed");
-                setWidgetDisabled(node, "preset_size", mode !== "preset");
-                setWidgetDisabled(node, "geometry_policy", mode === "preset");
+                setDisabled("width", mode !== "fixed");
+                setDisabled("height", mode !== "fixed");
+                setDisabled("preset_size", mode !== "preset");
+                setDisabled("geometry_policy", mode === "preset");
             };
 
             const updateContentState = () => {
                 const fromImage = contentWidget?.value === "from_image";
-                setWidgetDisabled(node, "content_fit", !fromImage);
-                setWidgetDisabled(node, "resize_method", !fromImage);
+                setDisabled("content_fit", !fromImage);
+                setDisabled("resize_method", !fromImage);
             };
 
             const updateSemanticState = () => {
                 const enabled = semanticWidget?.value === true;
-                setWidgetDisabled(node, "latent_semantic_instruction", !enabled);
-                setWidgetDisabled(node, "latent_grounding_px", !enabled);
+                setDisabled("latent_semantic_instruction", !enabled);
+                setDisabled("latent_grounding_px", !enabled);
             };
 
             for (const [widget, callback] of [
