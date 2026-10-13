@@ -7,30 +7,18 @@ import torch
 from ..attention_regions import resolve_attention_regions
 from ..constants import NODE_CATEGORY
 from ..geometry import resize_tensor
+from ..krea_geometry import (
+    DEFAULT_KREA_PRESET_SIZE,
+    GEOMETRY_POLICIES,
+    KREA_PRESET_SIZES,
+    preset_geometry,
+    resolve_krea_geometry,
+)
 from ..target_latent import TargetVisionContext, get_image_dims, normalize_vae_output
 
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
 CONTENT_MODES = ("empty", "from_image")
-GEOMETRY_POLICIES = ("nearest_krea_aspect", "preserve_aspect_krea_bounds")
-KREA_MIN_DIMENSION = 1024
-KREA_MAX_DIMENSION = 2048
-KREA_PRESET_GEOMETRIES = {
-    "1024 x 1024 | 1:1 | ~1.05 MP": (1024, 1024),
-    "1216 x 832 | ~3:2 | ~1.01 MP": (1216, 832),
-    "832 x 1216 | ~2:3 | ~1.01 MP": (832, 1216),
-    "1536 x 1024 | 3:2 | ~1.57 MP": (1536, 1024),
-    "1024 x 1536 | 2:3 | ~1.57 MP": (1024, 1536),
-    "1536 x 1152 | 4:3 | ~1.77 MP": (1536, 1152),
-    "1152 x 1536 | 3:4 | ~1.77 MP": (1152, 1536),
-    "2048 x 1536 | 4:3 | ~3.15 MP": (2048, 1536),
-    "1536 x 2048 | 3:4 | ~3.15 MP": (1536, 2048),
-    "2048 x 1152 | 16:9 | ~2.36 MP": (2048, 1152),
-    "1152 x 2048 | 9:16 | ~2.36 MP": (1152, 2048),
-    "2048 x 2048 | 1:1 | ~4.19 MP": (2048, 2048),
-}
-KREA_PRESET_SIZES = tuple(KREA_PRESET_GEOMETRIES)
-DEFAULT_KREA_PRESET_SIZE = "1024 x 1024 | 1:1 | ~1.05 MP"
 CONTENT_FIT_MODES = ("crop", "contain", "stretch")
 RESIZE_METHODS = ("auto", "nearest-exact", "bilinear", "bicubic", "area", "lanczos")
 
@@ -117,14 +105,14 @@ def _resolve_dimensions(
     geometry_policy: str,
 ) -> Tuple[int, int, str]:
     if dimensions == "preset":
-        target_w, target_h = _preset_geometry(preset_size)
+        target_w, target_h = preset_geometry(preset_size)
         return target_w, target_h, f"preset {preset_size}"
 
     if dimensions == "from_image":
         if dimensions_image is None:
             raise ValueError("[Krea2 CcC Edit] dimensions='from_image' requires dimensions_image.")
         src_h, src_w = get_image_dims(dimensions_image)
-        target_w, target_h = _resolve_krea_geometry(src_w, src_h, geometry_policy)
+        target_w, target_h = resolve_krea_geometry(src_w, src_h, geometry_policy)
         return (
             target_w,
             target_h,
@@ -135,7 +123,7 @@ def _resolve_dimensions(
         source_w, source_h = int(width), int(height)
         if source_w <= 0 or source_h <= 0:
             raise ValueError("[Krea2 CcC Edit] fixed width and height must be greater than zero.")
-        target_w, target_h = _resolve_krea_geometry(source_w, source_h, geometry_policy)
+        target_w, target_h = resolve_krea_geometry(source_w, source_h, geometry_policy)
         return (
             target_w,
             target_h,
