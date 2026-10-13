@@ -74,7 +74,7 @@ class SlotLoraLoader:
 
 
 class CcCKrea2LoRAPromptSettings:
-    """Configures prompt augmentation settings for up to 4 LoRA slots."""
+    """Configures prompt augmentation settings for up to 10 LoRA slots."""
 
     RETURN_TYPES = (CCC_KREA2_LORA_PROMPT_SETTINGS,)
     RETURN_NAMES = ("lora_prompt_settings",)
@@ -86,7 +86,7 @@ class CcCKrea2LoRAPromptSettings:
         req = {
             "enabled": ("BOOLEAN", {"default": True}),
         }
-        for i in range(1, 5):
+        for i in range(1, 11):
             req[f"lora_{i}_prompt_enabled"] = ("BOOLEAN", {"default": False})
             req[f"lora_{i}_prompt_position"] = (["append", "prepend"], {"default": "append"})
             req[f"lora_{i}_positive_prompt"] = ("STRING", {"multiline": True, "default": ""})
@@ -107,7 +107,7 @@ class CcCKrea2LoRAPromptSettings:
 
 
 class CcCKrea2LoRAStack:
-    """Loads up to four model-only LoRAs and accumulates prompt augmentations."""
+    """Loads up to ten model-only LoRAs and accumulates prompt augmentations."""
 
     RETURN_TYPES = ("MODEL", CCC_KREA2_PROMPT_AUGMENTATION)
     RETURN_NAMES = ("model", "prompt_augmentation")
@@ -115,15 +115,13 @@ class CcCKrea2LoRAStack:
     CATEGORY = NODE_CATEGORY
 
     def __init__(self):
-        self.loaders = [SlotLoraLoader(i) for i in range(1, 5)]
+        self.loaders = [SlotLoraLoader(i) for i in range(1, 11)]
 
     @classmethod
     def INPUT_TYPES(cls):
         lora_choices = get_lora_names()
         req = {
             "model": ("MODEL",),
-            "enabled": ("BOOLEAN", {"default": True}),
-            "global_strength": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05}),
         }
         for i in range(1, 5):
             req[f"lora_{i}_enabled"] = ("BOOLEAN", {"default": False})
@@ -139,17 +137,10 @@ class CcCKrea2LoRAStack:
     def apply_loras(
         self,
         model: Any,
-        enabled: bool = True,
-        global_strength: float = 1.0,
         prompt_augmentation: Optional[PromptAugmentation] = None,
         lora_prompt_settings: Optional[LoRAPromptSettings] = None,
         **kwargs,
     ) -> Tuple[Any, PromptAugmentation]:
-        # Handle disabled stack
-        if not enabled:
-            out_aug = prompt_augmentation if prompt_augmentation is not None else EMPTY_PROMPT_AUGMENTATION
-            return (model, out_aug)
-
         current_model = model
         inc_aug = prompt_augmentation if prompt_augmentation is not None else EMPTY_PROMPT_AUGMENTATION
 
@@ -166,7 +157,7 @@ class CcCKrea2LoRAStack:
             l_name = kwargs.get(f"lora_{i}_name", None)
             l_strength = float(kwargs.get(f"lora_{i}_strength", 1.0))
 
-            effective_strength = l_strength * global_strength
+            effective_strength = l_strength
 
             # Active LoRA condition
             is_active = l_enabled and l_name is not None and str(l_name) != "None" and effective_strength != 0.0
