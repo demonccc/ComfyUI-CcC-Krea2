@@ -17,24 +17,9 @@ from .prompt_augmentation import (
 MAX_GUIDANCE_SEED = 0xFFFFFFFFFFFFFFFF
 
 GUIDANCE_DETAIL_PRESETS = {
-    "compact": {
-        "max_length": 256,
-        "instruction": (
-            "Keep the guidance compact. Prioritize only the most important information "
-            "that belongs to this Vision mode."
-        ),
-    },
-    "balanced": {
-        "max_length": 512,
-        "instruction": "",
-    },
-    "detailed": {
-        "max_length": 1024,
-        "instruction": (
-            "Include all useful information that belongs to this Vision mode. Preserve relevant "
-            "details rather than compressing them unnecessarily, while avoiding unrelated content."
-        ),
-    },
+    "compact": {"max_length": 256},
+    "balanced": {"max_length": 512},
+    "detailed": {"max_length": 1024},
 }
 
 VISION_GUIDANCE_PRESETS = {
@@ -217,7 +202,6 @@ def _generate_t2i_vision_guidance(
         ) from exc
 
     user_instruction = str(entry.instruction or "").strip()
-    detail_instruction = str(detail_settings["instruction"]).strip()
     analysis_prompt = (
         "TARGET TEXT-TO-IMAGE PROMPT:\n"
         f"{target_prompt or '<empty>'}\n\n"
@@ -225,7 +209,6 @@ def _generate_t2i_vision_guidance(
         "Apply only information that belongs to this Vision mode. "
         "If the additional guidance asks for information outside this mode, ignore that part.\n"
         f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n\n"
-        f"{detail_instruction + chr(10) if detail_instruction else ''}"
         "Return the extracted guidance now."
     )
 
