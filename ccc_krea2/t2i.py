@@ -20,6 +20,7 @@ from .prompt_augmentation import (
     apply_prompt_augmentation,
 )
 
+
 def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dict[str, Any]:
     """Generate empty SD3-compatible LATENT dictionary matching EmptySD3LatentImage contract."""
     try:
