@@ -82,11 +82,11 @@ Vision Reference declares what information a source image represents. It never c
 Modes:
 
 - **Semantic** — content/meaning: subject category and attributes, pose, action, objects, composition, and spatial relationships.
-- **Visual** — visible appearance: face/hair traits, clothing, accessories, materials, colors, pose, and other direct visual details.
-- **Style** — aesthetic treatment: medium, rendering, line work, shading, palette, lighting, texture, tone, and mood.
-- **Context** — situation/context: setting, environment, framing, action, interaction, composition, and spatial relationships.
+- **Visual** — near-copy/full visual blueprint: subject appearance, clothing, pose, gaze, scene, composition, lighting, colors, and visual style are preserved as faithfully as possible unless the target prompt explicitly changes them.
+- **Style** — visual style DNA only: medium, rendering technique, line work, shading, palette behavior, lighting treatment, texture, finish, tone, and mood; scene/content/identity/pose are excluded.
+- **Context** — scene staging: setting, framing/viewpoint, pose, head orientation, gaze, gesture, interaction, composition, depth, and spatial relationships without copying identity, clothing, or visual style.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, and Context.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Detail changes the extraction policy as well as its token budget; Vision Guidance has deliberately separated conservative/balanced/flexible sampling behavior. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, and Context.
 
 ## Latent and Target Geometry
 
