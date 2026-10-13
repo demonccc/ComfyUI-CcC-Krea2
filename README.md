@@ -83,8 +83,8 @@ Modes:
 
 - **Semantic** — content/meaning: subject category and attributes, pose, action, objects, composition, and spatial relationships.
 - **Visual** — near-copy/full visual blueprint: subject appearance, clothing, pose, gaze, scene, composition, lighting, colors, and visual style are preserved as faithfully as possible unless the target prompt explicitly changes them.
-- **Style** — visual style DNA only: medium, rendering technique, line work, shading, palette behavior, lighting treatment, texture, finish, tone, and mood; scene/content/identity/pose are excluded.
-- **Context** — scene staging: setting, framing/viewpoint, pose, head orientation, gaze, gesture, interaction, composition, depth, and spatial relationships without copying identity, clothing, or visual style.
+- **Style** — reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior. Style processing may still analyze the full image or 2x2 / 4x4 tiles.
+- **Context** — strong scene staging: setting, framing/viewpoint, exact pose, head orientation, gaze, gesture, hands/limbs, interaction, composition, depth, object placement, and spatial relationships without copying identity, clothing, or visual style.
 
 Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Detail changes the extraction policy as well as its token budget; Vision Guidance has deliberately separated conservative/balanced/flexible sampling behavior. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, and Context.
 
