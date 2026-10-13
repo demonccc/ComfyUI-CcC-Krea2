@@ -494,11 +494,9 @@ return {
     const configure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function (info) {
       const result = configure?.call(this, info);
-      for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
-        const index = this.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
-        if (index >= 0) this.removeInput(index);
-      }
       if (nodeData.name === "CcCKrea2LoRAStack") {
+        // The old LoRA Stack no longer owns prompt sockets.
+        // Do NOT remove the augmentation input of LoRA Stack with Prompt.
         restoreNames(this, info);
         cleanupLegacySockets(this);
       }
