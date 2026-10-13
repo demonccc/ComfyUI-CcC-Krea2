@@ -1,12 +1,18 @@
 """Native Text-to-Image helper node for Krea2 CcC Edit."""
 
-import math
 import random
 import re
 from typing import Tuple, Dict, Any, Optional
 import torch
 
 from .constants import NODE_CATEGORY, LOGGER_PREFIX
+from .krea_geometry import (
+    DEFAULT_KREA_PRESET_SIZE,
+    GEOMETRY_POLICIES,
+    KREA_PRESET_SIZES,
+    preset_geometry,
+    resolve_krea_geometry,
+)
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 from .style_processing import slice_style_image
 from .prompt_augmentation import (
@@ -27,44 +33,6 @@ VISION_GUIDANCE_PRESETS = {
     "balanced": {"temperature": 0.25, "top_p": 0.90},
     "flexible": {"temperature": 0.45, "top_p": 0.95},
 }
-
-ASPECT_RATIO_MAP: Dict[str, Tuple[float, float]] = {
-    "1:1": (1.0, 1.0),
-    "4:3": (4.0, 3.0),
-    "3:4": (3.0, 4.0),
-    "16:9": (16.0, 9.0),
-    "9:16": (9.0, 16.0),
-    "3:2": (3.0, 2.0),
-    "2:3": (2.0, 3.0),
-}
-
-
-def calculate_t2i_resolution(
-    aspect_ratio: str,
-    megapixels: float,
-    custom_aspect_width: int = 1,
-    custom_aspect_height: int = 1,
-) -> Tuple[int, int]:
-    """Calculate 16-pixel aligned dimensions for T2I based on aspect ratio and megapixels.
-
-    Guarantees output width and height are at least 128 and multiples of 16.
-    """
-    if aspect_ratio in ASPECT_RATIO_MAP:
-        rw, rh = ASPECT_RATIO_MAP[aspect_ratio]
-    else:
-        rw = max(1.0, float(custom_aspect_width))
-        rh = max(1.0, float(custom_aspect_height))
-
-    target_pixels = megapixels * 1_000_000.0
-    ratio = rw / rh
-    w_raw = math.sqrt(target_pixels * ratio)
-    h_raw = math.sqrt(target_pixels / ratio)
-
-    out_w = max(128, int(round(w_raw / 16.0) * 16))
-    out_h = max(128, int(round(h_raw / 16.0) * 16))
-
-    return out_w, out_h
-
 
 def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dict[str, Any]:
     """Generate empty SD3-compatible LATENT dictionary matching EmptySD3LatentImage contract."""
@@ -359,13 +327,25 @@ class CcCKrea2TextToImage:
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-                "aspect_ratio": (
-                    ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "custom"],
-                    {"default": "1:1"},
+                "dimensions": (
+                    ["preset", "fixed"],
+                    {"default": "preset"},
                 ),
-                "megapixels": (
-                    "FLOAT",
-                    {"default": 1.0, "min": 0.25, "max": 2.0, "step": 0.05},
+                "preset_size": (
+                    KREA_PRESET_SIZES,
+                    {"default": DEFAULT_KREA_PRESET_SIZE},
+                ),
+                "width": (
+                    "INT",
+                    {"default": 1024, "min": 16, "max": 16384, "step": 16},
+                ),
+                "height": (
+                    "INT",
+                    {"default": 1024, "min": 16, "max": 16384, "step": 16},
+                ),
+                "geometry_policy": (
+                    GEOMETRY_POLICIES,
+                    {"default": "preserve_aspect_krea_bounds"},
                 ),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
                 "guidance_seed_mode": (
@@ -384,8 +364,7 @@ class CcCKrea2TextToImage:
                     ["conservative", "balanced", "flexible"],
                     {"default": "balanced"},
                 ),
-                "custom_aspect_width": ("INT", {"default": 1, "min": 1, "max": 32}),
-                "custom_aspect_height": ("INT", {"default": 1, "min": 1, "max": 32}),
+
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
@@ -444,15 +423,16 @@ class CcCKrea2TextToImage:
         model: Any,
         clip: Any,
         prompt: str,
-        aspect_ratio: str = "1:1",
-        megapixels: float = 1.0,
+        dimensions: str = "preset",
+        preset_size: str = DEFAULT_KREA_PRESET_SIZE,
+        width: int = 1024,
+        height: int = 1024,
+        geometry_policy: str = "preserve_aspect_krea_bounds",
         batch_size: int = 1,
         guidance_seed_mode: str = "fixed",
         guidance_seed: int = 0,
         guidance_detail: str = "balanced",
         vision_guidance: str = "balanced",
-        custom_aspect_width: int = 1,
-        custom_aspect_height: int = 1,
         negative_prompt: str = "",
         prompt_augmentation: Optional[Any] = None,
         vision_references: Optional[VisionReferenceChain] = None,
@@ -467,16 +447,30 @@ class CcCKrea2TextToImage:
             augmentation=prompt_augmentation,
         )
 
-        # T2I resolution calculation
-        width, height = calculate_t2i_resolution(
-            aspect_ratio=aspect_ratio,
-            megapixels=megapixels,
-            custom_aspect_width=custom_aspect_width,
-            custom_aspect_height=custom_aspect_height,
-        )
+        # T2I target geometry uses the same shared Krea geometry library as Latent.
+        if dimensions == "preset":
+            target_width, target_height = preset_geometry(preset_size)
+            dimensions_label = f"preset {preset_size}"
+        elif dimensions == "fixed":
+            target_width, target_height = resolve_krea_geometry(
+                int(width),
+                int(height),
+                geometry_policy,
+            )
+            dimensions_label = (
+                f"fixed {int(width)} x {int(height)} -> {geometry_policy}"
+            )
+        else:
+            raise ValueError(
+                f"{LOGGER_PREFIX} Unsupported T2I dimensions mode: {dimensions!r}."
+            )
 
         # Native empty SD3 latent creation
-        latent = create_empty_sd3_latent(width=width, height=height, batch_size=batch_size)
+        latent = create_empty_sd3_latent(
+            width=target_width,
+            height=target_height,
+            batch_size=batch_size,
+        )
 
         vision_entries = tuple((vision_references or VisionReferenceChain()).entries)
         vision_guidance = []
@@ -524,8 +518,11 @@ class CcCKrea2TextToImage:
             "Negative Conditioning: text-only",
             f"Effective Positive Prompt: {eff_pos!r}",
             f"Effective Negative Prompt: {eff_neg!r}",
-            f"Aspect Ratio: {aspect_ratio}",
-            f"Resolved Resolution: {width} x {height}",
+            f"Dimensions Mode: {dimensions}",
+            f"Dimensions Source: {dimensions_label}",
+            f"Resolved Resolution: {target_width} x {target_height}",
+            f"Target Latent Geometry: {target_width // 8} x {target_height // 8}",
+            f"Geometry Policy: {geometry_policy if dimensions == 'fixed' else '<preset>'}",
             f"Batch Size: {batch_size}",
             f"Guidance Seed Mode: {guidance_seed_mode}",
             f"Guidance Seed Configured: {int(guidance_seed)}",
