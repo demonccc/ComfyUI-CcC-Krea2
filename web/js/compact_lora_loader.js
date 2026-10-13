@@ -91,7 +91,8 @@ function install(node) {
       name: `ccc_lora_${i}_select`, type: "custom", serialize: false,
       value: "", computeSize: (width) => [width, 28],
       draw(ctx, n, width, y, height) {
-        const cy = y + height / 2, right = width - 15;
+        const nodeWidth = n.size[0];
+        const cy = y + height / 2, right = nodeWidth - 15;
         ctx.save();
         // Compact native-looking boolean toggle on the left.
         ctx.fillStyle = enabled.value ? "#5a788c" : "#454545";
@@ -107,7 +108,7 @@ function install(node) {
         ctx.fillStyle = "#232323";
         ctx.strokeStyle = "#777";
         ctx.beginPath();
-        ctx.roundRect(72, cy - 11, Math.max(20, width - 87), 22, 11);
+        ctx.roundRect(72, cy - 11, Math.max(20, nodeWidth - 87), 22, 11);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = "#ccc";
@@ -115,12 +116,20 @@ function install(node) {
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
         const value = String(name.value ?? "None");
-        const maxWidth = Math.max(20, width - 135);
+        const maxWidth = Math.max(20, nodeWidth - 135);
         let label = value;
-        while (ctx.measureText(label).width > maxWidth && label.length > 3) {
-          label = label.slice(0, -2) + "…";
+        if (ctx.measureText(label).width > maxWidth) {
+          while (label.length && ctx.measureText(label + "…").width > maxWidth) {
+            label = label.slice(0, -1);
+          }
+          label += "…";
         }
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(82, cy - 10, maxWidth, 20);
+        ctx.clip();
         ctx.fillText(label, 82, cy);
+        ctx.restore();
         ctx.textAlign = "right";
         ctx.fillText("▾", right - 9, cy);
         ctx.restore();
@@ -140,7 +149,8 @@ function install(node) {
       value: "", computeSize: (width) => [width, 26],
       draw(ctx, n, width, y, height) {
         const cy = y + height / 2;
-        const left = 42, right = width - 100;
+        const nodeWidth = n.size[0];
+        const left = 42, right = nodeWidth - 100;
         const length = Math.max(20, right - left);
         const ratio = (clamp(Number(strength.value) || 0) + 10) / 20;
         ctx.save();
@@ -150,7 +160,7 @@ function install(node) {
         ctx.fillStyle = "#ccc";
         ctx.textAlign = "center";
         ctx.fillText("◀", 24, cy);
-        ctx.fillText("▶", width - 19, cy);
+        ctx.fillText("▶", nodeWidth - 19, cy);
         ctx.fillStyle = "#4b4b4b";
         ctx.fillRect(left, cy - 3, length, 6);
         ctx.fillStyle = "#809bb4";
@@ -158,7 +168,7 @@ function install(node) {
         ctx.fillStyle = "#eee";
         ctx.fillRect(left + length * ratio - 3, cy - 8, 6, 16);
         ctx.textAlign = "right";
-        ctx.fillText(Number(strength.value).toFixed(2), width - 43, cy);
+        ctx.fillText(Number(strength.value).toFixed(2), nodeWidth - 43, cy);
         ctx.restore();
       },
       mouse(event, pos, n) {
