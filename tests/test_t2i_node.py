@@ -5,7 +5,6 @@ import torch
 
 from ccc_krea2.t2i import (
     CcCKrea2TextToImage,
-    _encode_t2i_direct_vision,
     _encode_t2i_vision,
     _generate_t2i_vision_guidance,
 )
