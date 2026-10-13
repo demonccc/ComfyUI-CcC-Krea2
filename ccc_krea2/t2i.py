@@ -13,7 +13,7 @@ from .krea_geometry import (
     resolve_krea_geometry,
 )
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
-from .qwen_guidance import guidance_generation_kwargs
+from .qwen_guidance import guidance_detail_instruction, guidance_generation_kwargs
 from .style_processing import slice_style_image
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
@@ -57,27 +57,36 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "sentence only, with no preamble and no mention of a reference image."
     ),
     "visual": (
-        "Analyze the supplied reference image for text-to-image guidance. Describe transferable visible appearance "
-        "for the SAME subject/result already requested by the target prompt: face and hair traits, clothing, accessories, "
-        "materials, colors, pose, and other useful visible details. The target prompt is authoritative. Do not introduce "
-        "the reference subject as an additional person and do not describe this as a separate image. Return one concise "
-        "English guidance sentence only, with no preamble."
+        "Analyze the supplied reference image for VISUAL APPEARANCE guidance only. Extract the exact visible attributes "
+        "that can be transferred to the SAME subject already requested by the target prompt: facial features and face shape, "
+        "hair color, length and hairstyle, clothing type and cut, layers, exact colors, patterns or prints, materials, "
+        "accessories, footwear, visible body details, and pose when relevant. Preserve concrete observable specifics instead "
+        "of replacing them with generic equivalents. For example, do not collapse an exact garment, pattern, color, or "
+        "material into a vague description. Do not invent hidden or uncertain details. Do not transfer the reference scene, "
+        "background, environment, rendering medium, or visual style. The target prompt remains authoritative for subject "
+        "count and for any explicitly stated conflicting requirement. Do not introduce the reference subject as an additional "
+        "person. Return direct English generation guidance with no preamble and no mention of a reference image."
     ),
     "style": (
-        "Analyze the supplied reference image or tiles only for visual STYLE. Faithfully extract the source image's "
-        "medium, rendering, line work, shading, palette, lighting treatment, texture, tone, and mood. Do not let style "
-        "or medium words in the target prompt bias this analysis: describe the actual source style. Do not mention or "
-        "transfer people, identities, faces, hair, clothing, objects, pose, action, layout, composition, or scene content. "
-        "Return one concise English style guidance sentence only, with no preamble and no mention of a reference image."
+        "Analyze the supplied reference image or tiles only for its exact VISUAL STYLE DNA. Produce generation-ready style "
+        "guidance from what is actually visible: medium, rendering technique, line quality and contour weight, stroke "
+        "character, shading method, color handling and palette behavior, contrast, lighting treatment, texture or grain, "
+        "detail density, edge treatment, rendering finish, tone, and mood. Preserve distinctive combinations of traits "
+        "instead of reducing the result to generic labels such as 'anime', 'manga', 'digital art', or 'cinematic'. Do not "
+        "let style or medium words in the target prompt bias the analysis. Do not mention or transfer people, identities, "
+        "faces, hair, clothing, objects, pose, action, layout, composition, or scene content. Return direct English style "
+        "guidance with no preamble and no mention of a reference image."
     ),
     "context": (
         "Analyze the supplied reference image only for scene CONTEXT that can be applied to the target prompt: setting, "
         "environment, camera/framing, action, interaction, composition, and spatial relationships. Faithfully preserve "
-        "those scene relationships from the source while the target prompt remains authoritative for subject identity and "
-        "subject count. Refer to existing people only generically as the target subject or role; do not introduce an "
-        "additional person just because one appears in the reference. Ignore identity, face, hair, clothing, exact "
-        "appearance, medium, rendering style, palette, and texture. Return one concise English context guidance sentence "
-        "only, with no preamble."
+        "those scene relationships from the source while the target prompt remains authoritative for subject identity, "
+        "subject count, and ALL subject appearance. Refer to people in the reference only generically as the target subject "
+        "or by scene role. Never mention, transfer, or infer face, hair, body traits, clothing type, clothing color, clothing "
+        "pattern, material, accessories, or footwear from the reference. Colors may describe environmental objects only when "
+        "they are important to the scene; they must never define the target subject's appearance. Do not introduce an "
+        "additional person just because one appears in the reference. Ignore visual medium, rendering style, palette treatment, "
+        "and texture. Return direct English context guidance with no preamble and no mention of a reference image."
     ),
 }
 
@@ -140,14 +149,18 @@ def _generate_t2i_vision_guidance(
     analysis_images = _t2i_analysis_images(entry)
 
     user_instruction = str(entry.instruction or "").strip()
+    detail_instruction = guidance_detail_instruction(entry.guidance_detail)
     analysis_prompt = (
         "TARGET TEXT-TO-IMAGE PROMPT:\n"
         f"{target_prompt or '<empty>'}\n\n"
         f"VISION MODE: {public_mode}\n"
-        "Apply only information that belongs to this Vision mode. "
-        "If the additional guidance asks for information outside this mode, ignore that part.\n"
-        f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n\n"
-        "Return the extracted guidance now."
+        "MODE SCOPE IS STRICT: apply only information that belongs to this Vision mode. "
+        "If any requested or observed detail belongs to another mode, omit it instead of transferring, substituting, "
+        "or inventing it. The Guidance Detail preset changes only how much information is retained inside this mode; "
+        "it never expands the mode's scope.\n"
+        f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n"
+        + (f"{detail_instruction}\n" if detail_instruction else "")
+        + "\nReturn the extracted guidance now."
     )
 
     image_batch = torch.cat(analysis_images, dim=0)
