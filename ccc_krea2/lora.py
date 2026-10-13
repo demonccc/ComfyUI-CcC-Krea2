@@ -135,9 +135,10 @@ class CcCKrea2LoRAStackWithPrompt:
                 continue
             name = kwargs.get(f"lora_{i}_name", "None")
             strength = float(kwargs.get(f"lora_{i}_strength", 1.0))
-            if not name or name == "None" or strength == 0:
-                continue
-            current_model = loader.load(current_model, str(name), strength)
+            if name and name != "None" and strength != 0:
+                current_model = loader.load(current_model, str(name), strength)
+            # The prompt trigger is controlled by this slot's ON/OFF switch,
+            # not by whether the model LoRA currently has a non-zero strength.
             prompt = str(kwargs.get(f"lora_{i}_prompt", "")).strip()
             if prompt:
                 position = kwargs.get(f"lora_{i}_prompt_position", "append")
