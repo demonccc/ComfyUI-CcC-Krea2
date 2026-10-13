@@ -19,7 +19,7 @@ from ccc_krea2.modular_nodes.character_sheet_node import (
     CcCKrea2CharacterSheet,
     _layout_rects,
 )
-from ccc_krea2.modular_nodes.latent_node import (
+from ccc_krea2.krea_geometry import (
     DEFAULT_KREA_PRESET_SIZE,
     KREA_PRESET_SIZES,
 )
@@ -77,7 +77,7 @@ def test_character_sheet_presets_match_public_contract():
     )
 
 
-def test_character_sheet_geometry_reuses_latent_krea_presets():
+def test_character_sheet_geometry_reuses_shared_krea_presets():
     required = CcCKrea2CharacterSheet.INPUT_TYPES()["required"]
     choices, options = required["sheet_geometry"]
     assert tuple(choices) == tuple(KREA_PRESET_SIZES)
