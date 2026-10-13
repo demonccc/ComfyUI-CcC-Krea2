@@ -92,8 +92,8 @@ Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
 | style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
 | guidance_seed_mode | fixed, incremental, random | fixed | Seed behavior for Qwen text guidance generation. |
 | guidance_seed | integer | 0 | Base/fixed Qwen guidance seed; editable only in fixed mode. |
-| guidance_detail | compact, balanced, detailed | balanced | Fixed max-length preset: 256 / 512 / 1024. |
-| vision_guidance | conservative, balanced, flexible | balanced | Fixed sampling preset: 0.15/0.85, 0.25/0.90, 0.45/0.95 for temperature/top_p. |
+| guidance_detail | compact, balanced, detailed | balanced | Extraction-depth policy plus max-length budget: compact keeps only highest-impact facts (256), balanced keeps major + secondary facts (512), detailed is exhaustive within the selected mode (1024). |
+| vision_guidance | conservative, balanced, flexible | balanced | Qwen sampling preset. Conservative = temp 0.05 / top_p 0.70 / top_k 32 / min_p 0.10; balanced = 0.25 / 0.90 / 64 / 0.05; flexible = 0.70 / 0.99 / 128 / 0.01. |
 | previous_references | KREA2_VISION_REFERENCE_CHAIN | optional | Previous Vision Reference chain. |
 
 Outputs:
@@ -104,9 +104,9 @@ Outputs:
 Vision Reference defines information semantics rather than a transport algorithm:
 
 - **Semantic**: content/meaning, pose, action, objects, composition, and spatial relationships.
-- **Visual**: visible appearance and direct visual details.
-- **Style**: aesthetic/rendering treatment; full, 2x2, or 4x4 analysis.
-- **Context**: setting, action, framing, interaction, composition, and spatial relationships.
+- **Visual**: near-copy/full visual blueprint. Preserve the complete visible result as faithfully as possible unless the target prompt explicitly changes something.
+- **Style**: visual style DNA only; copy rendering/medium/line/shading/palette/texture/finish while excluding subject, pose, scene, framing, and composition. Supports full, 2x2, or 4x4 analysis.
+- **Context**: scene staging including setting, viewpoint, pose, head orientation, gaze, gesture, action, interaction, composition, depth, and spatial relationships while excluding identity, clothing, and visual style.
 
 There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, and Context. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
 
