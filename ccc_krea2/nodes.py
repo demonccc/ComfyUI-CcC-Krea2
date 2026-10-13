@@ -1,6 +1,7 @@
 """ComfyUI custom node mappings for Krea2 CcC Edit."""
 
 from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
+from .lora_loader import CcCKrea2LoRALoader
 from .t2i import CcCKrea2TextToImage
 from .modular_nodes.attention_region_node import CcCKrea2AttentionRegion
 from .modular_nodes.visual_reference_node import CcCKrea2VisualReference
@@ -28,6 +29,7 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2Paint": CcCKrea2Paint,
     "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
     "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
+    "CcCKrea2LoRALoader": CcCKrea2LoRALoader,
     "CcCKrea2TextToImage": CcCKrea2TextToImage,
 }
 
@@ -46,5 +48,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2Paint": "Krea2 CcC Paint",
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
     "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
+    "CcCKrea2LoRALoader": "Krea2 CcC LoRA Loader",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
 }
