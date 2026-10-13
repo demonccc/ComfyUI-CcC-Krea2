@@ -321,7 +321,11 @@
       "widgets_values": [
         "context",
         "Use the river setting, running action, water interaction, framing, and spatial relationships as context. Do not copy the black dog's visual appearance.",
-        "full"
+        "full",
+        "fixed",
+        0,
+        "balanced",
+        "balanced"
       ],
       "title": "Vision Reference - Context"
     },
