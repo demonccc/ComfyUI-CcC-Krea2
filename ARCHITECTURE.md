@@ -135,7 +135,7 @@ Vision References declare Qwen/Vision information and do not create appearance l
 - **Style** -> aesthetic treatment; only this mode exposes full / 2x2 / 4x4 processing.
 - **Context** -> situation, environment, framing, action/interaction, composition, and spatial relationships.
 
-Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration for the T2I Semantic path. Visual, Style, and Context use direct Qwen vision conditioning instead, so those generation controls are not used for those modes. The consumer still owns how the declared information is transformed into conditioning.
+Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter. Context is locked to the Balanced generation preset in T2I after Compact/Detailed showed unstable subject-appearance leakage. The consumer still owns how the declared information is transformed into conditioning.
 
 ## Target Geometry
 
@@ -209,7 +209,7 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
 
-Text to Image consumes optional prompt_augmentation and optional vision_references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter is mode-specific: Semantic remains Qwen-generated textual guidance; Visual keeps raw Qwen vision rows; Style reuses the shared style extraction; Context reuses the shared context extraction. This aligns Visual/Style/Context transport with the proven Edit Vision runtime instead of reducing those modes to text. The explicit negative prompt remains text-only.
+Text to Image consumes optional prompt_augmentation and optional vision_references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
 
 The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
 
