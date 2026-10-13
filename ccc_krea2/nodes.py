@@ -47,7 +47,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2PaintRestore": "Krea2 CcC Paint Restore",
     "CcCKrea2Paint": "Krea2 CcC Paint",
     "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
-    "CcCKrea2LoRAStack": "CcC Krea2 - LoRA Stack",
-    "CcCKrea2LoRALoader": "Krea2 CcC LoRA Loader",
+    "CcCKrea2LoRAStack": "Krea2 CcC Lora Stack Sliders",
+    "CcCKrea2LoRALoader": "Krea2 CcC Lora Stack",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
 }
