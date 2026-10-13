@@ -1,6 +1,6 @@
 """ComfyUI custom node mappings for Krea2 CcC Edit."""
 
-from .lora import CcCKrea2LoRAPromptSettings, CcCKrea2LoRAStack
+from .lora import CcCKrea2LoRAStack, CcCKrea2LoRAStackWithPrompt
 from .lora_loader import CcCKrea2LoRALoader
 from .t2i import CcCKrea2TextToImage
 from .modular_nodes.attention_region_node import CcCKrea2AttentionRegion
@@ -27,7 +27,7 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2PaintPrepare": CcCKrea2PaintPrepare,
     "CcCKrea2PaintRestore": CcCKrea2PaintRestore,
     "CcCKrea2Paint": CcCKrea2Paint,
-    "CcCKrea2LoRAPromptSettings": CcCKrea2LoRAPromptSettings,
+    "CcCKrea2LoRAStackWithPrompt": CcCKrea2LoRAStackWithPrompt,
     "CcCKrea2LoRAStack": CcCKrea2LoRAStack,
     "CcCKrea2LoRALoader": CcCKrea2LoRALoader,
     "CcCKrea2TextToImage": CcCKrea2TextToImage,
@@ -46,7 +46,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2PaintPrepare": "Krea2 CcC Paint Prepare",
     "CcCKrea2PaintRestore": "Krea2 CcC Paint Restore",
     "CcCKrea2Paint": "Krea2 CcC Paint",
-    "CcCKrea2LoRAPromptSettings": "CcC Krea2 - LoRA Prompt Settings",
+    "CcCKrea2LoRAStackWithPrompt": "Krea2 CcC Lora Stack with Prompt",
     "CcCKrea2LoRAStack": "Krea2 CcC Lora Stack",
     "CcCKrea2LoRALoader": "Krea2 CcC Lora Stack Sliders",
     "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
