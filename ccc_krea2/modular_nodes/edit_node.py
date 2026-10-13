@@ -327,7 +327,8 @@ class CcCKrea2Edit:
     ):
         base_positive_prompt = positive_prompt
         positive_prompt, _ = apply_prompt_augmentation(
-            positive_prompt, KREA2_EDIT_NEGATIVE_PROMPT, prompt_augmentation
+            positive_prompt, KREA2_EDIT_NEGATIVE_PROMPT, prompt_augmentation,
+            positive_separator=" ",
         )
         visual_entries = (visual_references or VisualReferenceChain()).entries
         vision_entries = (vision_references or VisionReferenceChain()).entries
