@@ -131,9 +131,9 @@ Edit resolves region_tag for each regional Visual Reference:
 Vision References declare Qwen/Vision information and do not create appearance latents. The declaration is consumer-neutral:
 
 - **Semantic** -> content/meaning, pose/action, objects, composition, and spatial relationships.
-- **Visual** -> near-copy/full visual blueprint. Balanced/Detailed treat pose, gaze, framing, composition, and appearance as anchors; Flexible may adapt pose/composition.
-- **Style** -> exact legacy Visual guidance behavior, retained because that preset produced the desired style-transfer result; only this mode exposes full / 2x2 / 4x4 processing.
-- **Context** -> strong scene staging: environment, viewpoint/framing, exact pose and limb placement, head orientation, gaze target, gesture, action/interaction, object placement, composition, crop, depth, and spatial relationships without copying identity, clothing, or style.
+- **Visual** -> near-copy/full visual blueprint. Balanced/Detailed treat pose, gaze, framing, composition, appearance, and subject count as anchors; Flexible may adapt pose/composition but never duplicates or multiplies subjects.
+- **Style** -> exact legacy Visual guidance behavior, retained because that preset produced the desired style-transfer result; the resulting guidance is applied strongly as the dominant visual treatment; only this mode exposes full / 2x2 / 4x4 processing.
+- **Context** -> mandatory scene staging: environment, viewpoint/framing, exact pose and limb placement, head orientation, gaze target, gesture, action/interaction, object placement, composition, crop, depth, and spatial relationships are treated as constraints without copying identity, clothing, or style.
 
 Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. Guidance Detail changes extraction depth, not only token ceiling, and Vision Guidance intentionally uses widely separated conservative/balanced/flexible sampling presets. The consumer still owns how the declared information is transformed into conditioning.
 
