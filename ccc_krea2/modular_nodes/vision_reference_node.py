@@ -55,8 +55,9 @@ class CcCKrea2VisionReference:
                     {
                         "default": "semantic",
                         "tooltip": (
-                            "semantic = content/meaning; visual = near-copy/full visual blueprint with pose/composition anchoring; "
-                            "style = legacy Visual transfer behavior; context = strong scene staging with pose, gaze, gesture, interaction, framing, and spatial relationships."
+                            "semantic = content/meaning; visual = near-copy/full visual blueprint with strong pose/composition anchoring and no subject duplication; "
+                            "style = legacy Visual transfer behavior applied strongly as the dominant visual treatment; "
+                            "context = mandatory scene staging with pose, gaze, limbs/hands, gesture, camera/framing, interaction, and spatial relationships."
                         ),
                     },
                 ),
