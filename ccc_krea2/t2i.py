@@ -12,9 +12,14 @@ from .krea_geometry import (
     preset_geometry,
     resolve_krea_geometry,
 )
+from .conditioning import encode_krea2_qwen_context
+from .identity_contract import build_grounded_positive_user_content
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 from .qwen_guidance import guidance_detail_instruction, guidance_generation_kwargs
-from .style_processing import slice_style_image
+from .reference_slots import resolve_reference_slots_and_aliases
+from .reference_specs import ReferenceChain
+from .style_processing import expand_style_reference_spans, slice_style_image
+from .vision_reference_runtime import append_vision_references
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
     apply_prompt_augmentation,
@@ -55,38 +60,6 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "authoritative. Do not introduce an additional person or duplicate a reference subject. Ignore visual medium, "
         "rendering style, line work, lighting treatment, texture, and palette. Return one concise English guidance "
         "sentence only, with no preamble and no mention of a reference image."
-    ),
-    "visual": (
-        "Analyze the supplied reference image for VISUAL APPEARANCE guidance only. Extract the exact visible attributes "
-        "that can be transferred to the SAME subject already requested by the target prompt: facial features and face shape, "
-        "hair color, length and hairstyle, clothing type and cut, layers, exact colors, patterns or prints, materials, "
-        "accessories, footwear, visible body details, and pose when relevant. Preserve concrete observable specifics instead "
-        "of replacing them with generic equivalents. For example, do not collapse an exact garment, pattern, color, or "
-        "material into a vague description. Do not invent hidden or uncertain details. Do not transfer the reference scene, "
-        "background, environment, rendering medium, or visual style. The target prompt remains authoritative for subject "
-        "count and for any explicitly stated conflicting requirement. Do not introduce the reference subject as an additional "
-        "person. Return direct English generation guidance with no preamble and no mention of a reference image."
-    ),
-    "style": (
-        "Analyze the supplied reference image or tiles only for its exact VISUAL STYLE DNA. Produce generation-ready style "
-        "guidance from what is actually visible: medium, rendering technique, line quality and contour weight, stroke "
-        "character, shading method, color handling and palette behavior, contrast, lighting treatment, texture or grain, "
-        "detail density, edge treatment, rendering finish, tone, and mood. Preserve distinctive combinations of traits "
-        "instead of reducing the result to generic labels such as 'anime', 'manga', 'digital art', or 'cinematic'. Do not "
-        "let style or medium words in the target prompt bias the analysis. Do not mention or transfer people, identities, "
-        "faces, hair, clothing, objects, pose, action, layout, composition, or scene content. Return direct English style "
-        "guidance with no preamble and no mention of a reference image."
-    ),
-    "context": (
-        "Analyze the supplied reference image only for scene CONTEXT that can be applied to the target prompt: setting, "
-        "environment, camera/framing, action, interaction, composition, and spatial relationships. Faithfully preserve "
-        "those scene relationships from the source while the target prompt remains authoritative for subject identity, "
-        "subject count, and ALL subject appearance. Refer to people in the reference only generically as the target subject "
-        "or by scene role. Never mention, transfer, or infer face, hair, body traits, clothing type, clothing color, clothing "
-        "pattern, material, accessories, or footwear from the reference. Colors may describe environmental objects only when "
-        "they are important to the scene; they must never define the target subject's appearance. Do not introduce an "
-        "additional person just because one appears in the reference. Ignore visual medium, rendering style, palette treatment, "
-        "and texture. Return direct English context guidance with no preamble and no mention of a reference image."
     ),
 }
 
@@ -145,7 +118,11 @@ def _generate_t2i_vision_guidance(
     target_prompt: str,
 ):
     public_mode = _public_vision_mode(entry.mode)
-    system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
+    if public_mode != "semantic":
+        raise ValueError(
+            f"{LOGGER_PREFIX} Text guidance generation is only used for Semantic Vision References; got {public_mode!r}."
+        )
+    system_prompt = T2I_VISION_SYSTEM_PROMPTS["semantic"]
     analysis_images = _t2i_analysis_images(entry)
 
     user_instruction = str(entry.instruction or "").strip()
@@ -234,62 +211,172 @@ def _generate_t2i_vision_guidance(
     return guidance, len(analysis_images), generation_strategy
 
 
+def _encode_t2i_direct_vision(
+    clip: Any,
+    prompt: str,
+    entries: Tuple[VisionReferenceEntry, ...],
+):
+    """Encode Visual/Style/Context references as real Qwen vision conditioning.
+
+    This reuses the same Vision Reference runtime contract as Edit:
+    Visual keeps raw Qwen vision rows, Style uses the shared style extraction,
+    and Context uses the shared compact context representation.
+    """
+    if not entries:
+        tokens = clip.tokenize(prompt or "")
+        return clip.encode_from_tokens_scheduled(tokens), [], prompt or "", 0
+
+    direct_chain = VisionReferenceChain(entries=entries)
+    reference_chain = append_vision_references(ReferenceChain(), direct_chain)
+    resolved_refs, _ = resolve_reference_slots_and_aliases(reference_chain)
+
+    physical_images = []
+    physical_image_map = []
+    direct_items = []
+
+    for ref_item in resolved_refs:
+        spec = ref_item["spec"]
+        slot = ref_item["resolved_slot"]
+        ref_path = getattr(spec, "reference_path", spec.role.lower())
+        vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
+
+        if ref_path == "style":
+            prep_crops, _, _ = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
+            for crop_idx, crop_prep in enumerate(prep_crops):
+                physical_index = len(physical_images) + 1
+                physical_images.append(crop_prep.vision_image)
+                physical_image_map.append(
+                    {
+                        "role": "style",
+                        "slot": slot,
+                        "logical_reference_id": slot,
+                        "logical_role": "style",
+                        "logical_vision_slot": slot,
+                        "physical_qwen_image_index": physical_index,
+                        "style_group_id": slot,
+                        "crop_tile_index": crop_idx,
+                        "image": crop_prep.vision_image,
+                        "spec": spec,
+                    }
+                )
+        else:
+            if spec.prepared_image is None:
+                raise ValueError(f"{LOGGER_PREFIX} Direct Vision Reference is missing its prepared Qwen image.")
+            vis_img = spec.prepared_image.vision_image
+            physical_index = len(physical_images) + 1
+            physical_images.append(vis_img)
+            physical_image_map.append(
+                {
+                    "role": spec.role.lower(),
+                    "slot": slot,
+                    "logical_reference_id": slot,
+                    "logical_role": spec.role.lower(),
+                    "logical_vision_slot": slot,
+                    "physical_qwen_image_index": physical_index,
+                    "style_group_id": None,
+                    "crop_tile_index": None,
+                    "image": vis_img,
+                    "spec": spec,
+                }
+            )
+
+        direct_items.append(
+            {
+                "slot": slot,
+                "mode": vision_mode,
+                "processing": getattr(spec, "style_processing", "full"),
+                "transport": "direct-qwen-vision",
+            }
+        )
+
+    user_content = build_grounded_positive_user_content(
+        resolved_references=resolved_refs,
+        user_prompt=prompt or "",
+    )
+    qwen_context = encode_krea2_qwen_context(
+        clip=clip,
+        prompt=user_content,
+        physical_images=physical_images,
+        physical_image_map=physical_image_map,
+        is_positive=True,
+    )
+    return (
+        qwen_context.conditioning,
+        direct_items,
+        user_content,
+        len(physical_images),
+    )
+
+
 def _encode_t2i_vision(
     clip: Any,
     prompt: str,
     vision_references: VisionReferenceChain,
 ):
-    """Convert Vision References into mode-scoped text guidance, then encode text-only conditioning.
+    """Build mixed T2I Vision conditioning.
 
-    This is intentionally different from Edit. The image is used only during Qwen analysis;
-    no direct image rows are passed into the final Krea2 conditioning. That prevents a reference
-    person or composition from competing with the user's T2I prompt while still letting the four
-    Vision modes contribute distinct information.
+    Semantic remains image -> generated text because that path is proven for T2I.
+    Visual, Style, and Context stay as real Qwen vision conditioning, reusing
+    the same shared runtime/extraction contract as Edit.
     """
-    guidance_items = []
-    total_analysis_images = 0
+    semantic_entries = []
+    direct_entries = []
 
-    for index, entry in enumerate(vision_references.entries, start=1):
-        public_mode = _public_vision_mode(entry.mode)
+    for entry in vision_references.entries:
+        if _public_vision_mode(entry.mode) == "semantic":
+            semantic_entries.append(entry)
+        else:
+            direct_entries.append(entry)
+
+    semantic_items = []
+    total_analysis_images = 0
+    semantic_lines = []
+    for index, entry in enumerate(semantic_entries, start=1):
         guidance, analysis_image_count, generation_strategy = _generate_t2i_vision_guidance(
             clip=clip,
             entry=entry,
             target_prompt=prompt,
         )
         total_analysis_images += analysis_image_count
-        guidance_items.append(
+        semantic_items.append(
             {
                 "index": index,
-                "mode": public_mode,
+                "mode": "semantic",
                 "runtime_mode": entry.mode,
                 "processing": entry.processing,
                 "instruction": entry.instruction,
                 "guidance": guidance,
                 "analysis_images": analysis_image_count,
                 "generation_strategy": generation_strategy,
+                "transport": "generated-text",
             }
         )
+        semantic_lines.append(
+            f"Preserve this semantic content for the requested result: {guidance}"
+        )
 
-    guidance_prefix = {
-        "semantic": "Preserve this semantic content for the requested result",
-        "visual": "Use these visible attributes for the same requested subject",
-        "style": "Render the requested result in this visual style",
-        "context": "Place the requested subject in this scene/context and composition",
-    }
-    guidance_lines = [
-        f"{guidance_prefix[item['mode']]}: {item['guidance']}"
-        for item in guidance_items
-    ]
     conditioning_prompt = prompt or ""
-    if guidance_lines:
+    if semantic_lines:
         conditioning_prompt = (
             f"{conditioning_prompt}\n\n"
-            "Vision-derived guidance for the same requested result:\n"
-            + "\n".join(guidance_lines)
+            "Vision-derived semantic guidance for the same requested result:\n"
+            + "\n".join(semantic_lines)
         ).strip()
 
-    tokens = clip.tokenize(conditioning_prompt)
-    conditioning = clip.encode_from_tokens_scheduled(tokens)
+    if direct_entries:
+        conditioning, direct_items, effective_prompt, direct_image_count = _encode_t2i_direct_vision(
+            clip=clip,
+            prompt=conditioning_prompt,
+            entries=tuple(direct_entries),
+        )
+        total_analysis_images += direct_image_count
+        guidance_items = semantic_items + direct_items
+        conditioning_prompt = effective_prompt
+    else:
+        tokens = clip.tokenize(conditioning_prompt)
+        conditioning = clip.encode_from_tokens_scheduled(tokens)
+        guidance_items = semantic_items
+
     return conditioning, guidance_items, conditioning_prompt, total_analysis_images
 
 
