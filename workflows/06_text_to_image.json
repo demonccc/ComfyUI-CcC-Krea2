@@ -427,7 +427,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Krea2 CcC Text-to-Image workflow with Vision Reference.\\n\\nFlow:\\n- UNETLoader + CLIPLoader -> CcC Krea2 - Text to Image -> sampler path.\\n- Krea2 CcC Vision Reference can feed Semantic, Visual, Style, or Context guidance directly into T2I positive Qwen conditioning.\\n- This example uses Semantic mode so the reference enriches scene content/composition without adding an appearance latent.\\n- The source image is sent at tokenizer-native resolution; there is no public grounding or fidelity control.\\n- Text to Image returns the unchanged MODEL plus positive/negative CONDITIONING and an empty SD3-compatible LATENT.\\n- Negative prompt remains text-only.\\n- Vision Reference is optional; disconnect it for normal text-only T2I."
+        "Krea2 CcC Text-to-Image workflow with Vision Reference.\\n\\nFlow:\\n- UNETLoader + CLIPLoader -> CcC Krea2 - Text to Image -> sampler path.\\n- Vision Reference declares Semantic, Visual, Style, or Context information; T2I analyzes it into mode-scoped text guidance.\\n- Leave instruction empty to test the preset itself. Use instruction only for additional guidance inside the selected mode.\\n- Semantic and Visual use the full source image. Style can use full, 2x2, or 4x4 analysis.\\n- Context keeps scene/framing/action relationships, not clothing or identity.\\n- Direct Vision rows never enter final T2I conditioning. Negative prompt remains text-only.\\n- Vision Reference is optional; disconnect it for normal text-only T2I."
       ],
       "title": "Workflow Notes"
     },
@@ -508,10 +508,10 @@
       },
       "widgets_values": [
         "semantic",
-        "Use this image as semantic inspiration for scene content and composition.",
+        "",
         "full"
       ],
-      "title": "Vision Reference - Semantic"
+      "title": "Vision Reference"
     }
   ],
   "links": [
