@@ -19,6 +19,7 @@ function hide(widget) {
   // This is ComfyUI's established hidden-widget convention; do not remove
   // backend widgets, since workflow persistence depends on their values.
   widget.type = "converted-widget";
+  widget.draw = () => {};
   widget.computeSize = () => [0, -4];
   widget.computeLayoutSize = () => ({ minHeight: 0, maxHeight: 0, minWidth: 0, maxWidth: 0 });
 }
@@ -69,6 +70,16 @@ function install(node) {
   if (!find("lora_10_strength")) return;
   node.__cccTenLoraInstalled = true;
   const groups = [];
+  // Reserve a small gap after the MODEL input. On some frontend versions the
+  // first custom row otherwise overlaps the input-row selection highlight.
+  const firstRowSpacer = {
+    name: "ccc_lora_header_spacing",
+    type: "custom",
+    serialize: false,
+    computeSize: (width) => [width, 10],
+    draw() {},
+  };
+  node.addCustomWidget(firstRowSpacer);
   for (let i = 1; i <= 10; i++) {
     const name = find(`lora_${i}_name`);
     const enabled = find(`lora_${i}_enabled`);
@@ -170,7 +181,7 @@ function install(node) {
   }
   // Native hidden values first, then interleaved visible rows.
   const widgets = node.widgets;
-  const visible = groups.flatMap((g) => [g.select, g.slider]);
+  const visible = [firstRowSpacer, ...groups.flatMap((g) => [g.select, g.slider])];
   node.widgets = [...widgets.filter((w) => !visible.includes(w)), ...visible];
   node.setSize?.(node.computeSize());
 }
