@@ -86,7 +86,7 @@ Modes:
 - **Style** — aesthetic treatment: medium, rendering, line work, shading, palette, lighting, texture, tone, and mood.
 - **Context** — situation/context: setting, environment, framing, action, interaction, composition, and spatial relationships.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. Vision Reference also owns reusable Qwen guidance generation settings: seed mode/value, Guidance Detail (256/512/1024 max tokens), and Vision Guidance (conservative/balanced/flexible sampling).
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. The Qwen text-generation controls (seed mode/value, Guidance Detail, and Vision Guidance) apply to Semantic text guidance in T2I; they are disabled for Visual, Style, and Context because those modes use direct Qwen vision conditioning.
 
 ## Latent and Target Geometry
 
