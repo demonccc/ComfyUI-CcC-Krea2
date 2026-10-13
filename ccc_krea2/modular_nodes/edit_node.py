@@ -7,6 +7,7 @@ import torch
 from .. import edit_engine as edit_engine_runtime
 from ..attention_regions import resolved_regions_by_tag
 from ..constants import NODE_CATEGORY
+from ..prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, apply_prompt_augmentation
 from ..grounding import resize_grounding_image
 from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
 from ..reference_specs import (
@@ -308,6 +309,7 @@ class CcCKrea2Edit:
             "optional": {
                 "visual_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
                 "vision_references": ("KREA2_VISION_REFERENCE_CHAIN",),
+                "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
             },
         }
 
@@ -321,7 +323,11 @@ class CcCKrea2Edit:
         apply_krea2_edit_patch=True,
         visual_references=None,
         vision_references=None,
+        prompt_augmentation=None,
     ):
+        positive_prompt, _ = apply_prompt_augmentation(
+            positive_prompt, KREA2_EDIT_NEGATIVE_PROMPT, prompt_augmentation
+        )
         visual_entries = (visual_references or VisualReferenceChain()).entries
         vision_entries = (vision_references or VisionReferenceChain()).entries
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
