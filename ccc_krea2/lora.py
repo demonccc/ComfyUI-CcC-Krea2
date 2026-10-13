@@ -1,7 +1,7 @@
 """CcC Krea2 - LoRA Stack and CcC Krea2 - LoRA Prompt Settings nodes."""
 
 import logging
-from typing import Tuple, Optional, Any, List
+from typing import Any, List
 
 from .constants import NODE_CATEGORY
 from .prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, PromptAugmentation
