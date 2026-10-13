@@ -104,9 +104,9 @@ Outputs:
 Vision Reference defines information semantics rather than a transport algorithm:
 
 - **Semantic**: content/meaning, pose, action, objects, composition, and spatial relationships.
-- **Visual**: near-copy/full visual blueprint. Preserve the complete visible result as faithfully as possible unless the target prompt explicitly changes something.
-- **Style**: visual style DNA only; copy rendering/medium/line/shading/palette/texture/finish while excluding subject, pose, scene, framing, and composition. Supports full, 2x2, or 4x4 analysis.
-- **Context**: scene staging including setting, viewpoint, pose, head orientation, gaze, gesture, action, interaction, composition, depth, and spatial relationships while excluding identity, clothing, and visual style.
+- **Visual**: near-copy/full visual blueprint. Balanced/Detailed strongly anchor pose, gaze, framing, composition, and appearance; Flexible may adapt pose/composition while retaining the reference's visual identity.
+- **Style**: intentionally reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior. Supports full, 2x2, or 4x4 analysis.
+- **Context**: strong scene staging including setting, viewpoint, exact pose and limb placement, head orientation, gaze target, gesture, action, interaction, crop/framing, composition, object placement, depth, and spatial relationships while excluding identity, clothing, and visual style.
 
 There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, and Context. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
 
