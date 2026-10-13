@@ -4,14 +4,7 @@ import logging
 from typing import Tuple, Optional, Any, List
 
 from .constants import NODE_CATEGORY
-from .prompt_augmentation import (
-    CCC_KREA2_LORA_PROMPT_SETTINGS,
-    CCC_KREA2_PROMPT_AUGMENTATION,
-    LoRAPromptSlot,
-    LoRAPromptSettings,
-    PromptAugmentation,
-    EMPTY_PROMPT_AUGMENTATION,
-)
+from .prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, PromptAugmentation
 
 logger = logging.getLogger("CcCKrea2")
 
@@ -73,39 +66,6 @@ class SlotLoraLoader:
         return model_lora
 
 
-class CcCKrea2LoRAPromptSettings:
-    """Configures prompt augmentation settings for up to 4 LoRA slots."""
-
-    RETURN_TYPES = (CCC_KREA2_LORA_PROMPT_SETTINGS,)
-    RETURN_NAMES = ("lora_prompt_settings",)
-    FUNCTION = "build_settings"
-    CATEGORY = NODE_CATEGORY
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        req = {
-            "enabled": ("BOOLEAN", {"default": True}),
-        }
-        for i in range(1, 5):
-            req[f"lora_{i}_prompt_enabled"] = ("BOOLEAN", {"default": False})
-            req[f"lora_{i}_prompt_position"] = (["append", "prepend"], {"default": "append"})
-            req[f"lora_{i}_positive_prompt"] = ("STRING", {"multiline": True, "default": ""})
-            req[f"lora_{i}_negative_prompt"] = ("STRING", {"multiline": True, "default": ""})
-        return {"required": req}
-
-    def build_settings(self, enabled: bool = True, **kwargs) -> Tuple[LoRAPromptSettings]:
-        slots = []
-        for i in range(1, 5):
-            slot = LoRAPromptSlot(
-                enabled=bool(kwargs.get(f"lora_{i}_prompt_enabled", False)),
-                position=str(kwargs.get(f"lora_{i}_prompt_position", "append")),
-                positive_prompt=str(kwargs.get(f"lora_{i}_positive_prompt", "")),
-                negative_prompt=str(kwargs.get(f"lora_{i}_negative_prompt", "")),
-            )
-            slots.append(slot)
-        return (LoRAPromptSettings(enabled=bool(enabled), slots=tuple(slots)),)
-
-
 class CcCKrea2LoRAStack:
     """Apply up to ten model-only LoRAs, in order, without prompt processing."""
 
@@ -139,3 +99,51 @@ class CcCKrea2LoRAStack:
             if name and name != "None" and strength != 0:
                 current_model = loader.load(current_model, str(name), strength)
         return (current_model,)
+
+class CcCKrea2LoRAStackWithPrompt:
+    """Five model-only LoRAs with strictly positive prompt prepend/append triggers."""
+
+    CATEGORY = NODE_CATEGORY
+    FUNCTION = "apply_loras"
+    RETURN_TYPES = ("MODEL", CCC_KREA2_PROMPT_AUGMENTATION)
+    RETURN_NAMES = ("model", "prompt_augmentation")
+
+    def __init__(self):
+        self.loaders = [SlotLoraLoader(i) for i in range(1, 6)]
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        names = get_lora_names()
+        required = {"model": ("MODEL",)}
+        for i in range(1, 6):
+            required[f"lora_{i}_enabled"] = ("BOOLEAN", {"default": False})
+            required[f"lora_{i}_name"] = (names, {"default": "None"})
+            required[f"lora_{i}_strength"] = ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05})
+            required[f"lora_{i}_prompt_position"] = (["append", "prepend"], {"default": "append"})
+            required[f"lora_{i}_prompt"] = ("STRING", {"multiline": True, "default": ""})
+        return {"required": required, "optional": {
+            "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
+        }}
+
+    def apply_loras(self, model, prompt_augmentation=None, **kwargs):
+        current_model = model
+        incoming = prompt_augmentation if prompt_augmentation is not None else PromptAugmentation()
+        prepend = list(incoming.positive_prepend)
+        append = list(incoming.positive_append)
+        for i, loader in enumerate(self.loaders, 1):
+            if not kwargs.get(f"lora_{i}_enabled", False):
+                continue
+            name = kwargs.get(f"lora_{i}_name", "None")
+            strength = float(kwargs.get(f"lora_{i}_strength", 1.0))
+            if not name or name == "None" or strength == 0:
+                continue
+            current_model = loader.load(current_model, str(name), strength)
+            prompt = str(kwargs.get(f"lora_{i}_prompt", "")).strip()
+            if prompt:
+                position = kwargs.get(f"lora_{i}_prompt_position", "append")
+                (prepend if position == "prepend" else append).append(prompt)
+        return current_model, PromptAugmentation(
+            positive_prepend=tuple(prepend), positive_append=tuple(append),
+            negative_prepend=incoming.negative_prepend,
+            negative_append=incoming.negative_append,
+        )
