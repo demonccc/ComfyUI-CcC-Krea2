@@ -55,8 +55,8 @@ class CcCKrea2VisionReference:
                     {
                         "default": "semantic",
                         "tooltip": (
-                            "semantic = content/meaning; visual = near-copy/full visual blueprint; "
-                            "style = copy visual style only, not content; context = scene staging, pose, gaze, interaction, and spatial relationships."
+                            "semantic = content/meaning; visual = near-copy/full visual blueprint with pose/composition anchoring; "
+                            "style = legacy Visual transfer behavior; context = strong scene staging with pose, gaze, gesture, interaction, framing, and spatial relationships."
                         ),
                     },
                 ),
@@ -91,8 +91,8 @@ class CcCKrea2VisionReference:
                     {
                         "default": "balanced",
                         "tooltip": (
-                            "Qwen sampling behavior: conservative is strongly literal/stable; balanced is the default; "
-                            "flexible allows substantially more interpretation and variation."
+                            "Qwen sampling behavior: conservative locks closely to the reference; balanced preserves it stably; "
+                            "flexible allows pose/composition and other interpretation to move more freely where the mode permits it."
                         ),
                     },
                 ),
