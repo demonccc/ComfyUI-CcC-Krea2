@@ -94,18 +94,20 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "English guidance sentence only, with no preamble."
     ),
     "style": (
-        "Analyze the supplied reference image or tiles only for visual STYLE. Extract medium, rendering, line work, "
-        "shading, palette, lighting treatment, texture, tone, and mood. Do not mention or transfer people, identities, "
-        "faces, hair, clothing, objects, pose, action, layout, composition, or scene content. Return one concise English "
-        "style guidance sentence only, with no preamble and no mention of a reference image."
+        "Analyze the supplied reference image or tiles only for visual STYLE. Faithfully extract the source image's "
+        "medium, rendering, line work, shading, palette, lighting treatment, texture, tone, and mood. Do not let style "
+        "or medium words in the target prompt bias this analysis: describe the actual source style. Do not mention or "
+        "transfer people, identities, faces, hair, clothing, objects, pose, action, layout, composition, or scene content. "
+        "Return one concise English style guidance sentence only, with no preamble and no mention of a reference image."
     ),
     "context": (
         "Analyze the supplied reference image only for scene CONTEXT that can be applied to the target prompt: setting, "
-        "environment, camera/framing, action, interaction, composition, and spatial relationships. The target prompt is "
-        "authoritative, including requested subject count. Refer to existing people only generically as the target subject "
-        "or role; do not introduce an additional person just because one appears in the reference. Ignore identity, face, "
-        "hair, clothing, exact appearance, medium, rendering style, palette, and texture. Return one concise English "
-        "context guidance sentence only, with no preamble."
+        "environment, camera/framing, action, interaction, composition, and spatial relationships. Faithfully preserve "
+        "those scene relationships from the source while the target prompt remains authoritative for subject identity and "
+        "subject count. Refer to existing people only generically as the target subject or role; do not introduce an "
+        "additional person just because one appears in the reference. Ignore identity, face, hair, clothing, exact "
+        "appearance, medium, rendering style, palette, and texture. Return one concise English context guidance sentence "
+        "only, with no preamble."
     ),
 }
 
@@ -210,11 +212,10 @@ def _generate_t2i_vision_guidance(
     try:
         guidance = _clean_generated_guidance(clip, generated_ids)
         generation_strategy = "blueprint-user-prompt"
-    except RuntimeError as first_error:
-        if "chat-role token" not in str(first_error):
-            raise
-
-        # Compatibility retry using ComfyUI's explicit system-prompt path.
+    except RuntimeError:
+        # Retry 1: ComfyUI's explicit system-prompt path. This covers checkpoints
+        # that terminate immediately or emit a bare chat-role token with the
+        # blueprint-style user prompt.
         tokens = clip.tokenize(
             analysis_prompt,
             image=image_batch,
@@ -236,8 +237,34 @@ def _generate_t2i_vision_guidance(
             seed=0,
             mtp=True,
         )
-        guidance = _clean_generated_guidance(clip, generated_ids)
-        generation_strategy = "system-prompt-fallback"
+
+        try:
+            guidance = _clean_generated_guidance(clip, generated_ids)
+            generation_strategy = "system-prompt-fallback"
+        except RuntimeError:
+            # Retry 2: exact multimodal call shape already proven by this
+            # project's Prompt Creator. Some Qwen3-VL checkpoints behave more
+            # reliably with the raw image list passed through images=.
+            tokens = clip.tokenize(
+                analysis_prompt,
+                images=analysis_images,
+                min_length=1,
+                thinking=False,
+                system_prompt=system_prompt,
+            )
+            generated_ids = clip.generate(
+                tokens,
+                do_sample=True,
+                max_length=512,
+                temperature=0.25,
+                top_k=64,
+                top_p=0.90,
+                min_p=0.05,
+                repetition_penalty=1.05,
+                seed=0,
+            )
+            guidance = _clean_generated_guidance(clip, generated_ids)
+            generation_strategy = "prompt-creator-fallback"
 
     return guidance, len(analysis_images), generation_strategy
 
@@ -278,8 +305,14 @@ def _encode_t2i_vision(
             }
         )
 
+    guidance_prefix = {
+        "semantic": "Preserve this semantic content for the requested result",
+        "visual": "Use these visible attributes for the same requested subject",
+        "style": "Render the requested result in this visual style",
+        "context": "Place the requested subject in this scene/context and composition",
+    }
     guidance_lines = [
-        f"{item['mode'].capitalize()} guidance: {item['guidance']}"
+        f"{guidance_prefix[item['mode']]}: {item['guidance']}"
         for item in guidance_items
     ]
     conditioning_prompt = prompt or ""
