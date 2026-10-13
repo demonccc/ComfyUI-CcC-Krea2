@@ -55,8 +55,8 @@ class CcCKrea2VisionReference:
                     {
                         "default": "semantic",
                         "tooltip": (
-                            "semantic = content/structure only; visual = direct visual guidance; "
-                            "style = aesthetic influence; context = situation/relationships without visual copying."
+                            "semantic = content/meaning; visual = near-copy/full visual blueprint; "
+                            "style = copy visual style only, not content; context = scene staging, pose, gaze, interaction, and spatial relationships."
                         ),
                     },
                 ),
@@ -78,11 +78,23 @@ class CcCKrea2VisionReference:
                 ),
                 "guidance_detail": (
                     GUIDANCE_DETAIL_MODES,
-                    {"default": "balanced"},
+                    {
+                        "default": "balanced",
+                        "tooltip": (
+                            "Extraction depth: compact keeps only highest-impact facts; balanced captures all major and "
+                            "secondary facts; detailed is exhaustive within the selected Vision mode."
+                        ),
+                    },
                 ),
                 "vision_guidance": (
                     VISION_GUIDANCE_MODES,
-                    {"default": "balanced"},
+                    {
+                        "default": "balanced",
+                        "tooltip": (
+                            "Qwen sampling behavior: conservative is strongly literal/stable; balanced is the default; "
+                            "flexible allows substantially more interpretation and variation."
+                        ),
+                    },
                 ),
             },
             "optional": {
