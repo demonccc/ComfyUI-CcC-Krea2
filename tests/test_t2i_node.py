@@ -393,7 +393,7 @@ def test_vision_reference_guidance_seed_is_passed_to_all_qwen_attempts():
     ("guidance_detail", "expected_max_length"),
     [("compact", 256), ("balanced", 512), ("detailed", 1024)],
 )
-def test_vision_reference_guidance_detail_presets_only_change_token_limit(
+def test_vision_reference_guidance_detail_presets_keep_sampling_and_apply_detail_scope(
     guidance_detail,
     expected_max_length,
 ):
@@ -419,6 +419,91 @@ def test_vision_reference_guidance_detail_presets_only_change_token_limit(
     assert kwargs["top_k"] == 64
     assert kwargs["min_p"] == 0.05
     assert kwargs["repetition_penalty"] == 1.05
+
+    analysis_text = clip.tokenize_calls[0][0]
+    if guidance_detail == "balanced":
+        assert "GUIDANCE DETAIL:" not in analysis_text
+    else:
+        assert f"GUIDANCE DETAIL: {guidance_detail}." in analysis_text
+        assert "it never expands the mode's scope" in analysis_text
+
+
+def test_semantic_balanced_preserves_existing_dynamic_scope_prompt():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="semantic",
+        guidance_detail="balanced",
+        vision_guidance="balanced",
+    )
+    clip = FakeGenerativeCLIP("A useful semantic description.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert (
+        "Apply only information that belongs to this Vision mode. "
+        "If the additional guidance asks for information outside this mode, ignore that part."
+    ) in analysis_text
+    assert "MODE SCOPE IS STRICT" not in analysis_text
+
+
+def test_visual_prompt_demands_exact_appearance_without_scene_or_style_transfer():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="visual")
+    clip = FakeGenerativeCLIP("Exact visible appearance guidance.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert "VISUAL APPEARANCE guidance only" in analysis_text
+    assert "exact colors, patterns or prints, materials" in analysis_text
+    assert "Do not transfer the reference scene" in analysis_text
+    assert "rendering medium, or visual style" in analysis_text
+
+
+def test_style_prompt_demands_generation_ready_style_dna_without_content_transfer():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="style")
+    clip = FakeGenerativeCLIP("Exact style guidance.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert "exact VISUAL STYLE DNA" in analysis_text
+    assert "generation-ready style guidance" in analysis_text
+    assert "instead of reducing the result to generic labels" in analysis_text
+    assert "Do not mention or transfer people, identities" in analysis_text
+
+
+def test_context_prompt_forbids_subject_appearance_and_clothing_transfer():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="context")
+    clip = FakeGenerativeCLIP("Scene context only.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl in a blue dress",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert "ALL subject appearance" in analysis_text
+    assert "clothing type, clothing color, clothing pattern" in analysis_text
+    assert "they must never define the target subject's appearance" in analysis_text
+    assert "MODE SCOPE IS STRICT" in analysis_text
 
 
 @pytest.mark.parametrize(
