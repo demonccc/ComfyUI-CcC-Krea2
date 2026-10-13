@@ -469,7 +469,7 @@ function install(node) {
             ctx.textAlign = "left"; ctx.textBaseline = "top";
             const text = String(prompt.value || "");
             const maxChars = Math.max(8, Math.floor((w - fieldX - 28) / 7));
-            const lines = text.split("\\n").flatMap((line) => {
+            const lines = text.split("\n").flatMap((line) => {
               const result = [];
               while (line.length > maxChars) { result.push(line.slice(0, maxChars)); line = line.slice(maxChars); }
               result.push(line);
