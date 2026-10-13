@@ -157,11 +157,18 @@ def _generate_t2i_vision_guidance(
         vision_guidance=entry.vision_guidance,
     )
 
-    # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
-    # ordinary user text rather than through the optional system_prompt input.
-    # The abliterated Qwen3-VL checkpoint used by this project can otherwise emit
-    # a bare chat-role token ("user") as the first/only generated token.
+    # Keep the original first-pass path that produced the known-good Semantic results.
+    # IMPORTANT: exactly one clip.generate() call per Vision Reference. The old fallback
+    # chain could call Qwen two more times after an empty/invalid result; on this runtime
+    # those consecutive generations can trigger a CUDA ScatterGather device-side assert.
     blueprint_prompt = f"{system_prompt}\n\n{analysis_prompt}".strip()
+    print(
+        f"{LOGGER_PREFIX} T2I Qwen single-pass start: "
+        f"mode={public_mode} images={len(analysis_images)} "
+        f"shape={tuple(image_batch.shape)} seed={entry.guidance_seed} "
+        f"detail={entry.guidance_detail} vision_guidance={entry.vision_guidance}",
+        flush=True,
+    )
     tokens = clip.tokenize(
         blueprint_prompt,
         image=image_batch,
@@ -171,41 +178,14 @@ def _generate_t2i_vision_guidance(
         system_prompt="",
     )
     generated_ids = clip.generate(tokens, **generation_kwargs)
-
-    try:
-        guidance = _clean_generated_guidance(clip, generated_ids)
-        generation_strategy = "blueprint-user-prompt"
-    except RuntimeError:
-        # Retry 1: ComfyUI's explicit system-prompt path. This covers checkpoints
-        # that terminate immediately or emit a bare chat-role token with the
-        # blueprint-style user prompt.
-        tokens = clip.tokenize(
-            analysis_prompt,
-            image=image_batch,
-            skip_template=False,
-            min_length=1,
-            thinking=False,
-            system_prompt=system_prompt,
-        )
-        generated_ids = clip.generate(tokens, **generation_kwargs)
-
-        try:
-            guidance = _clean_generated_guidance(clip, generated_ids)
-            generation_strategy = "system-prompt-fallback"
-        except RuntimeError:
-            # Retry 2: exact multimodal call shape already proven by this
-            # project's Prompt Creator. Some Qwen3-VL checkpoints behave more
-            # reliably with the raw image list passed through images=.
-            tokens = clip.tokenize(
-                analysis_prompt,
-                images=analysis_images,
-                min_length=1,
-                thinking=False,
-                system_prompt=system_prompt,
-            )
-            generated_ids = clip.generate(tokens, **generation_kwargs)
-            guidance = _clean_generated_guidance(clip, generated_ids)
-            generation_strategy = "prompt-creator-fallback"
+    raw_text = str(clip.decode(generated_ids))
+    print(
+        f"{LOGGER_PREFIX} T2I Qwen single-pass result: "
+        f"mode={public_mode} decoded={raw_text!r}",
+        flush=True,
+    )
+    guidance = _clean_generated_guidance(clip, generated_ids)
+    generation_strategy = "blueprint-user-prompt-single-pass"
 
     return guidance, len(analysis_images), generation_strategy
 
