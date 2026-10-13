@@ -232,6 +232,8 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
     assert analysis_images == 1
     assert len(guidance_items) == 1
     assert guidance_items[0]["mode"] == "visual"
+    assert "authoritative visual blueprint" in conditioning_prompt
+    assert "reproduce the reference as closely as possible" in conditioning_prompt
     assert "long black hair and a red jacket" in conditioning_prompt
     assert clip.tokenize_calls == [(conditioning_prompt, {})]
     assert conditioning == [f"conditioning_for_tokens_for_{conditioning_prompt}"]
@@ -311,7 +313,10 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     assert strategy == "blueprint-user-prompt-single-pass"
     assert guidance.startswith("Bold manga line work")
     analysis_text, kwargs = clip.tokenize_calls[0]
-    assert "Analyze the supplied reference image or tiles only for visual STYLE." in analysis_text
+    assert "extract only the transferable STYLE DNA" in analysis_text
+    assert "source image itself as authoritative for how the result should look" in analysis_text
+    assert "Do not transfer subject identity" in analysis_text
+    assert "camera framing, or composition" in analysis_text
     assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
     assert "VISION MODE: style" in analysis_text
     assert "Use manga style and girl identity." in analysis_text
@@ -389,7 +394,7 @@ def test_vision_reference_guidance_seed_is_passed_to_single_qwen_attempt():
     ("guidance_detail", "expected_max_length"),
     [("compact", 256), ("balanced", 512), ("detailed", 1024)],
 )
-def test_vision_reference_guidance_detail_presets_only_change_token_limit(
+def test_vision_reference_guidance_detail_presets_change_depth_policy(
     guidance_detail,
     expected_max_length,
 ):
@@ -416,19 +421,28 @@ def test_vision_reference_guidance_detail_presets_only_change_token_limit(
     assert kwargs["min_p"] == 0.05
     assert kwargs["repetition_penalty"] == 1.05
 
+    analysis_text = clip.tokenize_calls[0][0]
+    if guidance_detail == "balanced":
+        # Keep the proven default Semantic/Balanced prompt unchanged.
+        assert "DETAIL POLICY:" not in analysis_text
+    else:
+        assert f"DETAIL POLICY: {guidance_detail}." in analysis_text
+
 
 @pytest.mark.parametrize(
-    ("vision_guidance", "temperature", "top_p"),
+    ("vision_guidance", "temperature", "top_p", "top_k", "min_p"),
     [
-        ("conservative", 0.15, 0.85),
-        ("balanced", 0.25, 0.90),
-        ("flexible", 0.45, 0.95),
+        ("conservative", 0.05, 0.70, 32, 0.10),
+        ("balanced", 0.25, 0.90, 64, 0.05),
+        ("flexible", 0.70, 0.99, 128, 0.01),
     ],
 )
 def test_vision_reference_sampling_presets(
     vision_guidance,
     temperature,
     top_p,
+    top_k,
+    min_p,
 ):
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
@@ -449,9 +463,82 @@ def test_vision_reference_sampling_presets(
     assert kwargs["max_length"] == 512
     assert kwargs["temperature"] == temperature
     assert kwargs["top_p"] == top_p
-    assert kwargs["top_k"] == 64
-    assert kwargs["min_p"] == 0.05
+    assert kwargs["top_k"] == top_k
+    assert kwargs["min_p"] == min_p
     assert kwargs["repetition_penalty"] == 1.05
+
+
+def test_t2i_visual_is_full_copy_blueprint():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="visual",
+        guidance_detail="balanced",
+    )
+    clip = FakeGenerativeCLIP("Exact visual blueprint guidance.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert "authoritative FULL VISUAL BLUEPRINT" in analysis_text
+    assert "reproduce the reference as closely as possible" in analysis_text
+    assert "exact clothing and layers" in analysis_text
+    assert "gaze, expression, objects, environment and background" in analysis_text
+    assert "rendering medium, and visual style" in analysis_text
+    assert "DETAIL POLICY: balanced." in analysis_text
+
+
+def test_t2i_style_is_visual_style_only_not_content_copy():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="style",
+        guidance_detail="balanced",
+    )
+    clip = FakeGenerativeCLIP("Specific style DNA.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert "extract only the transferable STYLE DNA" in analysis_text
+    assert "line work and contour weight" in analysis_text
+    assert "texture or grain" in analysis_text
+    assert "Do not transfer subject identity" in analysis_text
+    assert "scene, background, camera framing, or composition" in analysis_text
+    assert "DETAIL POLICY: balanced." in analysis_text
+
+
+def test_t2i_context_balanced_requires_pose_gaze_and_staging_details():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="context",
+        guidance_detail="balanced",
+    )
+    clip = FakeGenerativeCLIP("Detailed scene staging.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    analysis_text = clip.tokenize_calls[0][0]
+    assert "scene CONTEXT and staging" in analysis_text
+    assert "full-body pose and body orientation" in analysis_text
+    assert "head orientation, gaze direction" in analysis_text
+    assert "arm/hand placement, gesture" in analysis_text
+    assert "foreground/midground/background layout" in analysis_text
+    assert "do not summarize them away" in analysis_text
+    assert "DETAIL POLICY: balanced." in analysis_text
 
 
 def test_t2i_uses_shared_krea_geometry_controls():
