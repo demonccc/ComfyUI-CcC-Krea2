@@ -1,6 +1,7 @@
 """Native Text-to-Image helper node for Krea2 CcC Edit."""
 
 import math
+import random
 import re
 from typing import Tuple, Dict, Any, Optional
 import torch
@@ -12,6 +13,8 @@ from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
     apply_prompt_augmentation,
 )
+
+MAX_GUIDANCE_SEED = 0xFFFFFFFFFFFFFFFF
 
 ASPECT_RATIO_MAP: Dict[str, Tuple[float, float]] = {
     "1:1": (1.0, 1.0),
@@ -164,6 +167,7 @@ def _generate_t2i_vision_guidance(
     clip: Any,
     entry: VisionReferenceEntry,
     target_prompt: str,
+    guidance_seed: int = 0,
 ):
     public_mode = _public_vision_mode(entry.mode)
     system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
@@ -205,7 +209,7 @@ def _generate_t2i_vision_guidance(
         min_p=0.05,
         repetition_penalty=1.05,
         presence_penalty=0.0,
-        seed=0,
+        seed=guidance_seed,
         mtp=True,
     )
 
@@ -234,7 +238,7 @@ def _generate_t2i_vision_guidance(
             min_p=0.05,
             repetition_penalty=1.05,
             presence_penalty=0.0,
-            seed=0,
+            seed=guidance_seed,
             mtp=True,
         )
 
@@ -261,7 +265,7 @@ def _generate_t2i_vision_guidance(
                 top_p=0.90,
                 min_p=0.05,
                 repetition_penalty=1.05,
-                seed=0,
+                seed=guidance_seed,
             )
             guidance = _clean_generated_guidance(clip, generated_ids)
             generation_strategy = "prompt-creator-fallback"
@@ -273,6 +277,7 @@ def _encode_t2i_vision(
     clip: Any,
     prompt: str,
     vision_references: VisionReferenceChain,
+    guidance_seed: int = 0,
 ):
     """Convert Vision References into mode-scoped text guidance, then encode text-only conditioning.
 
@@ -290,6 +295,7 @@ def _encode_t2i_vision(
             clip=clip,
             entry=entry,
             target_prompt=prompt,
+            guidance_seed=guidance_seed,
         )
         total_analysis_images += analysis_image_count
         guidance_items.append(
@@ -352,6 +358,14 @@ class CcCKrea2TextToImage:
                     {"default": 1.0, "min": 0.25, "max": 2.0, "step": 0.05},
                 ),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
+                "guidance_seed_mode": (
+                    ["fixed", "incremental", "random"],
+                    {"default": "fixed"},
+                ),
+                "guidance_seed": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": MAX_GUIDANCE_SEED, "step": 1},
+                ),
                 "custom_aspect_width": ("INT", {"default": 1, "min": 1, "max": 32}),
                 "custom_aspect_height": ("INT", {"default": 1, "min": 1, "max": 32}),
             },
@@ -362,6 +376,46 @@ class CcCKrea2TextToImage:
             },
         }
 
+    @classmethod
+    def IS_CHANGED(
+        cls,
+        guidance_seed_mode: str = "fixed",
+        guidance_seed: int = 0,
+        **kwargs,
+    ):
+        """Force Qwen guidance regeneration for non-fixed seed modes."""
+        if guidance_seed_mode in {"incremental", "random"}:
+            return float("nan")
+        return f"guidance-seed:{int(guidance_seed)}"
+
+    def _resolve_guidance_seed(self, mode: str, configured_seed: int) -> int:
+        """Resolve the Qwen-only seed once per T2I execution."""
+        seed = int(configured_seed)
+        if not 0 <= seed <= MAX_GUIDANCE_SEED:
+            raise ValueError(
+                f"{LOGGER_PREFIX} Guidance seed must be between 0 and {MAX_GUIDANCE_SEED}."
+            )
+
+        if mode == "fixed":
+            self._guidance_seed_last_mode = mode
+            return seed
+
+        if mode == "incremental":
+            if getattr(self, "_guidance_seed_last_mode", None) != "incremental":
+                self._guidance_seed_counter = seed
+            resolved = int(self._guidance_seed_counter)
+            self._guidance_seed_counter = (resolved + 1) & MAX_GUIDANCE_SEED
+            self._guidance_seed_last_mode = mode
+            return resolved
+
+        if mode == "random":
+            self._guidance_seed_last_mode = mode
+            return random.SystemRandom().randint(0, MAX_GUIDANCE_SEED)
+
+        raise ValueError(
+            f"{LOGGER_PREFIX} Unsupported guidance seed mode: {mode!r}."
+        )
+
     def process(
         self,
         model: Any,
@@ -370,6 +424,8 @@ class CcCKrea2TextToImage:
         aspect_ratio: str = "1:1",
         megapixels: float = 1.0,
         batch_size: int = 1,
+        guidance_seed_mode: str = "fixed",
+        guidance_seed: int = 0,
         custom_aspect_width: int = 1,
         custom_aspect_height: int = 1,
         negative_prompt: str = "",
@@ -401,11 +457,17 @@ class CcCKrea2TextToImage:
         vision_guidance = []
         conditioning_prompt = eff_pos
         vision_analysis_images = 0
+        resolved_guidance_seed = None
         if vision_entries:
+            resolved_guidance_seed = self._resolve_guidance_seed(
+                guidance_seed_mode,
+                guidance_seed,
+            )
             positive, vision_guidance, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
                 clip=clip,
                 prompt=eff_pos,
                 vision_references=vision_references,
+                guidance_seed=resolved_guidance_seed,
             )
         else:
             pos_tokens = clip.tokenize(eff_pos)
@@ -438,6 +500,9 @@ class CcCKrea2TextToImage:
             f"Aspect Ratio: {aspect_ratio}",
             f"Resolved Resolution: {width} x {height}",
             f"Batch Size: {batch_size}",
+            f"Guidance Seed Mode: {guidance_seed_mode}",
+            f"Guidance Seed Configured: {int(guidance_seed)}",
+            f"Guidance Seed Used: {resolved_guidance_seed if resolved_guidance_seed is not None else '<not used>'}",
         ]
         for index, entry in enumerate(vision_entries, start=1):
             public_mode = runtime_to_public.get(entry.mode, entry.mode)
