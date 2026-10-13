@@ -325,6 +325,7 @@ class CcCKrea2Edit:
         vision_references=None,
         prompt_augmentation=None,
     ):
+        base_positive_prompt = positive_prompt
         positive_prompt, _ = apply_prompt_augmentation(
             positive_prompt, KREA2_EDIT_NEGATIVE_PROMPT, prompt_augmentation
         )
@@ -395,6 +396,9 @@ class CcCKrea2Edit:
             ),
             "Qwen Contract: positional visual blocks with optional Image N prompt annotations",
             "Negative Prompt: fixed empty string",
+            f"Prompt Augmentation: {'connected' if prompt_augmentation is not None else 'not connected'}",
+            f"Base Positive Prompt: {base_positive_prompt!r}",
+            f"Effective Positive Prompt: {positive_prompt!r}",
             (
                 "Edit Runtime: Krea2 CcC Edit"
                 if runtime_mode == "ccc"
