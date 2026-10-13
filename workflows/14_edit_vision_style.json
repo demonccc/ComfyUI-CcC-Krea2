@@ -321,7 +321,11 @@
       "widgets_values": [
         "style",
         "Use the visual qualities as an indirect style influence while preserving the subject identity from Image 1.",
-        "4x4"
+        "4x4",
+        "fixed",
+        0,
+        "balanced",
+        "balanced"
       ],
       "title": "Vision Reference - Style"
     },
