@@ -338,10 +338,11 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
 
     assert t2i["widgets_values"] == [
         "A cinematic photograph of a futuristic coastal city at golden hour, with reflective glass towers, elevated walkways, lush vegetation, and dramatic warm sunlight.",
-        "16:9",
-        1.0,
-        1,
-        1,
+        "preset",
+        "2048 x 1152 | 16:9 | ~2.36 MP",
+        1024,
+        1024,
+        "preserve_aspect_krea_bounds",
         1,
         "",
     ]
@@ -354,7 +355,15 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
     assert t2i_inputs["vision_references"]["link"] is not None
 
     vision = _nodes_by_type(workflow, "CcCKrea2VisionReference")[0]
-    assert vision["widgets_values"][0] == "semantic"
+    assert vision["widgets_values"] == [
+        "semantic",
+        "",
+        "full",
+        "fixed",
+        0,
+        "balanced",
+        "balanced",
+    ]
     assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
     assert vision["outputs"][1] == {"name": "vision_info", "type": "STRING", "links": []}
 
