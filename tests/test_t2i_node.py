@@ -318,6 +318,7 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     assert torch.equal(kwargs["image"], image)
     assert kwargs["skip_template"] is False
     assert kwargs["system_prompt"] == ""
+    assert "thinking" not in kwargs
     assert clip.generate_calls[0][1]["seed"] == 0
     assert clip.generate_calls[0][1]["max_length"] == 512
     assert clip.generate_calls[0][1]["temperature"] == 0.25
