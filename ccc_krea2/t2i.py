@@ -1,6 +1,5 @@
 """Native Text-to-Image helper node for Krea2 CcC Edit."""
 
-import random
 import re
 from typing import Tuple, Dict, Any, Optional
 import torch
@@ -14,25 +13,16 @@ from .krea_geometry import (
     resolve_krea_geometry,
 )
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
+from .qwen_guidance import (
+    GUIDANCE_DETAIL_PRESETS,
+    VISION_GUIDANCE_PRESETS,
+    guidance_generation_kwargs,
+)
 from .style_processing import slice_style_image
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
     apply_prompt_augmentation,
 )
-
-MAX_GUIDANCE_SEED = 0xFFFFFFFFFFFFFFFF
-
-GUIDANCE_DETAIL_PRESETS = {
-    "compact": {"max_length": 256},
-    "balanced": {"max_length": 512},
-    "detailed": {"max_length": 1024},
-}
-
-VISION_GUIDANCE_PRESETS = {
-    "conservative": {"temperature": 0.15, "top_p": 0.85},
-    "balanced": {"temperature": 0.25, "top_p": 0.90},
-    "flexible": {"temperature": 0.45, "top_p": 0.95},
-}
 
 def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dict[str, Any]:
     """Generate empty SD3-compatible LATENT dictionary matching EmptySD3LatentImage contract."""
@@ -147,27 +137,10 @@ def _generate_t2i_vision_guidance(
     clip: Any,
     entry: VisionReferenceEntry,
     target_prompt: str,
-    guidance_seed: int = 0,
-    guidance_detail: str = "balanced",
-    vision_guidance: str = "balanced",
 ):
     public_mode = _public_vision_mode(entry.mode)
     system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
     analysis_images = _t2i_analysis_images(entry)
-
-    try:
-        detail_settings = GUIDANCE_DETAIL_PRESETS[guidance_detail]
-    except KeyError as exc:
-        raise ValueError(
-            f"{LOGGER_PREFIX} Unsupported Guidance Detail preset: {guidance_detail!r}."
-        ) from exc
-
-    try:
-        sampling_settings = VISION_GUIDANCE_PRESETS[vision_guidance]
-    except KeyError as exc:
-        raise ValueError(
-            f"{LOGGER_PREFIX} Unsupported Vision Guidance preset: {vision_guidance!r}."
-        ) from exc
 
     user_instruction = str(entry.instruction or "").strip()
     analysis_prompt = (
@@ -181,18 +154,11 @@ def _generate_t2i_vision_guidance(
     )
 
     image_batch = torch.cat(analysis_images, dim=0)
-    generation_kwargs = {
-        "do_sample": True,
-        "max_length": int(detail_settings["max_length"]),
-        "temperature": float(sampling_settings["temperature"]),
-        "top_k": 64,
-        "top_p": float(sampling_settings["top_p"]),
-        "min_p": 0.05,
-        "repetition_penalty": 1.05,
-        "presence_penalty": 0.0,
-        "seed": guidance_seed,
-        "mtp": True,
-    }
+    generation_kwargs = guidance_generation_kwargs(
+        guidance_seed=entry.guidance_seed,
+        guidance_detail=entry.guidance_detail,
+        vision_guidance=entry.vision_guidance,
+    )
 
     # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
     # ordinary user text rather than through the optional system_prompt input.
@@ -251,9 +217,6 @@ def _encode_t2i_vision(
     clip: Any,
     prompt: str,
     vision_references: VisionReferenceChain,
-    guidance_seed: int = 0,
-    guidance_detail: str = "balanced",
-    vision_guidance: str = "balanced",
 ):
     """Convert Vision References into mode-scoped text guidance, then encode text-only conditioning.
 
@@ -271,9 +234,6 @@ def _encode_t2i_vision(
             clip=clip,
             entry=entry,
             target_prompt=prompt,
-            guidance_seed=guidance_seed,
-            guidance_detail=guidance_detail,
-            vision_guidance=vision_guidance,
         )
         total_analysis_images += analysis_image_count
         guidance_items.append(
@@ -348,23 +308,6 @@ class CcCKrea2TextToImage:
                     {"default": "preserve_aspect_krea_bounds"},
                 ),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
-                "guidance_seed_mode": (
-                    ["fixed", "incremental", "random"],
-                    {"default": "fixed"},
-                ),
-                "guidance_seed": (
-                    "INT",
-                    {"default": 0, "min": 0, "max": MAX_GUIDANCE_SEED, "step": 1},
-                ),
-                "guidance_detail": (
-                    ["compact", "balanced", "detailed"],
-                    {"default": "balanced"},
-                ),
-                "vision_guidance": (
-                    ["conservative", "balanced", "flexible"],
-                    {"default": "balanced"},
-                ),
-
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
@@ -372,51 +315,6 @@ class CcCKrea2TextToImage:
                 "vision_references": ("KREA2_VISION_REFERENCE_CHAIN",),
             },
         }
-
-    @classmethod
-    def IS_CHANGED(
-        cls,
-        guidance_seed_mode: str = "fixed",
-        guidance_seed: int = 0,
-        guidance_detail: str = "balanced",
-        vision_guidance: str = "balanced",
-        **kwargs,
-    ):
-        """Force Qwen guidance regeneration for non-fixed seed modes."""
-        if guidance_seed_mode in {"incremental", "random"}:
-            return float("nan")
-        return (
-            f"guidance-seed:{int(guidance_seed)}:"
-            f"detail:{guidance_detail}:vision:{vision_guidance}"
-        )
-
-    def _resolve_guidance_seed(self, mode: str, configured_seed: int) -> int:
-        """Resolve the Qwen-only seed once per T2I execution."""
-        seed = int(configured_seed)
-        if not 0 <= seed <= MAX_GUIDANCE_SEED:
-            raise ValueError(
-                f"{LOGGER_PREFIX} Guidance seed must be between 0 and {MAX_GUIDANCE_SEED}."
-            )
-
-        if mode == "fixed":
-            self._guidance_seed_last_mode = mode
-            return seed
-
-        if mode == "incremental":
-            if getattr(self, "_guidance_seed_last_mode", None) != "incremental":
-                self._guidance_seed_counter = seed
-            resolved = int(self._guidance_seed_counter)
-            self._guidance_seed_counter = (resolved + 1) & MAX_GUIDANCE_SEED
-            self._guidance_seed_last_mode = mode
-            return resolved
-
-        if mode == "random":
-            self._guidance_seed_last_mode = mode
-            return random.SystemRandom().randint(0, MAX_GUIDANCE_SEED)
-
-        raise ValueError(
-            f"{LOGGER_PREFIX} Unsupported guidance seed mode: {mode!r}."
-        )
 
     def process(
         self,
@@ -429,10 +327,6 @@ class CcCKrea2TextToImage:
         height: int = 1024,
         geometry_policy: str = "preserve_aspect_krea_bounds",
         batch_size: int = 1,
-        guidance_seed_mode: str = "fixed",
-        guidance_seed: int = 0,
-        guidance_detail: str = "balanced",
-        vision_guidance: str = "balanced",
         negative_prompt: str = "",
         prompt_augmentation: Optional[Any] = None,
         vision_references: Optional[VisionReferenceChain] = None,
@@ -473,22 +367,14 @@ class CcCKrea2TextToImage:
         )
 
         vision_entries = tuple((vision_references or VisionReferenceChain()).entries)
-        vision_guidance = []
+        vision_guidance_items = []
         conditioning_prompt = eff_pos
         vision_analysis_images = 0
-        resolved_guidance_seed = None
         if vision_entries:
-            resolved_guidance_seed = self._resolve_guidance_seed(
-                guidance_seed_mode,
-                guidance_seed,
-            )
-            positive, vision_guidance, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
+            positive, vision_guidance_items, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
                 clip=clip,
                 prompt=eff_pos,
                 vision_references=vision_references,
-                guidance_seed=resolved_guidance_seed,
-                guidance_detail=guidance_detail,
-                vision_guidance=vision_guidance,
             )
         else:
             pos_tokens = clip.tokenize(eff_pos)
@@ -524,24 +410,16 @@ class CcCKrea2TextToImage:
             f"Target Latent Geometry: {target_width // 8} x {target_height // 8}",
             f"Geometry Policy: {geometry_policy if dimensions == 'fixed' else '<preset>'}",
             f"Batch Size: {batch_size}",
-            f"Guidance Seed Mode: {guidance_seed_mode}",
-            f"Guidance Seed Configured: {int(guidance_seed)}",
-            f"Guidance Seed Used: {resolved_guidance_seed if resolved_guidance_seed is not None else '<not used>'}",
-            f"Guidance Detail: {guidance_detail}",
-            f"Guidance Max Tokens: {GUIDANCE_DETAIL_PRESETS[guidance_detail]['max_length']}",
-            f"Vision Guidance: {vision_guidance}",
-            f"Vision Temperature: {VISION_GUIDANCE_PRESETS[vision_guidance]['temperature']}",
-            f"Vision Top P: {VISION_GUIDANCE_PRESETS[vision_guidance]['top_p']}",
-            "Vision Top K: 64",
-            "Vision Min P: 0.05",
-            "Vision Repetition Penalty: 1.05",
         ]
         for index, entry in enumerate(vision_entries, start=1):
             public_mode = runtime_to_public.get(entry.mode, entry.mode)
             info_lines.append(
                 f"Vision Reference {index}: mode={public_mode}, "
                 f"runtime={entry.mode}, processing={entry.processing}, "
-                f"instruction={entry.instruction!r}"
+                f"instruction={entry.instruction!r}, "
+                f"guidance_seed={entry.guidance_seed}, "
+                f"guidance_detail={entry.guidance_detail}, "
+                f"vision_guidance={entry.vision_guidance}"
             )
 
         if vision_entries:
@@ -556,7 +434,7 @@ class CcCKrea2TextToImage:
                     f"  Conditioning Prompt: {conditioning_prompt!r}",
                 ]
             )
-            for item in vision_guidance:
+            for item in vision_guidance_items:
                 info_lines.extend(
                     [
                         f"  Vision Reference {item['index']}:",
