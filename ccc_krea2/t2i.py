@@ -98,24 +98,6 @@ def _t2i_analysis_images(entry: VisionReferenceEntry):
     return slice_style_image(image, mode=entry.processing)
 
 
-def _debug_generated_ids(generated_ids: Any):
-    """Return a log-safe representation of generated token ids."""
-    try:
-        if torch.is_tensor(generated_ids):
-            return generated_ids.detach().cpu().tolist()
-        if isinstance(generated_ids, (list, tuple)):
-            out = []
-            for item in generated_ids:
-                if torch.is_tensor(item):
-                    out.append(item.detach().cpu().tolist())
-                else:
-                    out.append(item)
-            return out
-        return repr(generated_ids)
-    except Exception as exc:
-        return f"<unavailable: {type(exc).__name__}: {exc}>"
-
-
 def _clean_generated_guidance(clip: Any, generated_ids: Any) -> str:
     text = str(clip.decode(generated_ids)).strip()
     if "</think>" in text:
@@ -168,54 +150,62 @@ def _generate_t2i_vision_guidance(
         "Return the extracted guidance now."
     )
 
-    effective_guidance_detail = "balanced" if public_mode == "context" else entry.guidance_detail
-    effective_vision_guidance = "balanced" if public_mode == "context" else entry.vision_guidance
+    image_batch = torch.cat(analysis_images, dim=0)
     generation_kwargs = guidance_generation_kwargs(
         guidance_seed=entry.guidance_seed,
-        guidance_detail=effective_guidance_detail,
-        vision_guidance=effective_vision_guidance,
+        guidance_detail=entry.guidance_detail,
+        vision_guidance=entry.vision_guidance,
     )
 
-    image_shapes = [tuple(image.shape) for image in analysis_images]
-    print(
-        f"{LOGGER_PREFIX} T2I Qwen guidance: "
-        f"mode={public_mode} strategy=prompt-creator-shape "
-        f"images={len(analysis_images)} shapes={image_shapes} "
-        f"seed={entry.guidance_seed} detail={effective_guidance_detail} "
-        f"vision_guidance={effective_vision_guidance} "
-        f"max_length={generation_kwargs['max_length']} "
-        f"temperature={generation_kwargs['temperature']} top_p={generation_kwargs['top_p']}",
-        flush=True,
-    )
-
-    # Use the exact multimodal call shape proven by this project's Prompt Creator.
-    # Do not use image=<batched tensor>: with Qwen3-VL that path can trigger a
-    # CUDA ScatterGather device-side assert before Python can execute a fallback.
+    # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
+    # ordinary user text rather than through the optional system_prompt input.
+    # The abliterated Qwen3-VL checkpoint used by this project can otherwise emit
+    # a bare chat-role token ("user") as the first/only generated token.
+    blueprint_prompt = f"{system_prompt}\n\n{analysis_prompt}".strip()
     tokens = clip.tokenize(
-        analysis_prompt,
-        images=analysis_images,
+        blueprint_prompt,
+        image=image_batch,
+        skip_template=False,
         min_length=1,
         thinking=False,
-        system_prompt=system_prompt,
+        system_prompt="",
     )
     generated_ids = clip.generate(tokens, **generation_kwargs)
 
-    raw_output = str(clip.decode(generated_ids))
-    print(
-        f"{LOGGER_PREFIX} T2I Qwen raw generation: "
-        f"mode={public_mode} seed={entry.guidance_seed} "
-        f"token_ids={_debug_generated_ids(generated_ids)!r} "
-        f"decoded={raw_output!r}",
-        flush=True,
-    )
+    try:
+        guidance = _clean_generated_guidance(clip, generated_ids)
+        generation_strategy = "blueprint-user-prompt"
+    except RuntimeError:
+        # Retry 1: ComfyUI's explicit system-prompt path. This covers checkpoints
+        # that terminate immediately or emit a bare chat-role token with the
+        # blueprint-style user prompt.
+        tokens = clip.tokenize(
+            analysis_prompt,
+            image=image_batch,
+            skip_template=False,
+            min_length=1,
+            thinking=False,
+            system_prompt=system_prompt,
+        )
+        generated_ids = clip.generate(tokens, **generation_kwargs)
 
-    # IMPORTANT: exactly one clip.generate() per Vision Reference execution.
-    # On this Qwen3-VL/ComfyUI runtime a second generate() after an empty/invalid
-    # first result can trigger a CUDA ScatterGather device-side assert and abort
-    # the whole ComfyUI process. Fail cleanly instead; changing Guidance Seed can
-    # be used to test another sample without corrupting the CUDA context.
-    guidance = _clean_generated_guidance(clip, generated_ids)
-    generation_strategy = "prompt-creator-shape-single-pass"
+        try:
+            guidance = _clean_generated_guidance(clip, generated_ids)
+            generation_strategy = "system-prompt-fallback"
+        except RuntimeError:
+            # Retry 2: exact multimodal call shape already proven by this
+            # project's Prompt Creator. Some Qwen3-VL checkpoints behave more
+            # reliably with the raw image list passed through images=.
+            tokens = clip.tokenize(
+                analysis_prompt,
+                images=analysis_images,
+                min_length=1,
+                thinking=False,
+                system_prompt=system_prompt,
+            )
+            generated_ids = clip.generate(tokens, **generation_kwargs)
+            guidance = _clean_generated_guidance(clip, generated_ids)
+            generation_strategy = "prompt-creator-fallback"
 
     return guidance, len(analysis_images), generation_strategy
 
@@ -427,11 +417,6 @@ class CcCKrea2TextToImage:
                 f"guidance_seed={entry.guidance_seed}, "
                 f"guidance_detail={entry.guidance_detail}, "
                 f"vision_guidance={entry.vision_guidance}"
-                + (
-                    ", effective_context_generation=balanced"
-                    if public_mode == "context"
-                    else ""
-                )
             )
 
         if vision_entries:
