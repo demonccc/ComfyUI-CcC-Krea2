@@ -75,7 +75,5 @@ def guidance_generation_kwargs(
         "top_p": float(vision["top_p"]),
         "min_p": 0.05,
         "repetition_penalty": 1.05,
-        "presence_penalty": 0.0,
         "seed": int(guidance_seed),
-        "mtp": True,
     }
