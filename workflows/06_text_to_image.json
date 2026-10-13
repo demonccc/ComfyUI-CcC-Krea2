@@ -134,7 +134,7 @@
         0
       ],
       "size": [
-        540,
+        560,
         430
       ],
       "flags": {},
@@ -197,10 +197,11 @@
       },
       "widgets_values": [
         "A cinematic photograph of a futuristic coastal city at golden hour, with reflective glass towers, elevated walkways, lush vegetation, and dramatic warm sunlight.",
-        "16:9",
-        1,
-        1,
-        1,
+        "preset",
+        "2048 x 1152 | 16:9 | ~2.36 MP",
+        1024,
+        1024,
+        "preserve_aspect_krea_bounds",
         1,
         ""
       ],
@@ -477,7 +478,7 @@
       ],
       "size": [
         500,
-        300
+        380
       ],
       "flags": {},
       "order": 11,
@@ -509,7 +510,11 @@
       "widgets_values": [
         "semantic",
         "",
-        "full"
+        "full",
+        "fixed",
+        0,
+        "balanced",
+        "balanced"
       ],
       "title": "Vision Reference"
     }
