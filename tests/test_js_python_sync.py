@@ -33,6 +33,23 @@ def test_latent_preset_widget_is_conditionally_disabled():
     assert 'setDisabled("aspect_ratio", mode !== "preset")' not in js
 
 
+
+def test_t2i_dimensions_widgets_are_conditionally_disabled_and_legacy_migrated():
+    js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
+    assert 'node.comfyClass === "CcCKrea2TextToImage"' in js
+    assert 'setWidgetDisabled(node, "preset_size", mode !== "preset")' in js
+    assert 'setWidgetDisabled(node, "width", mode !== "fixed")' in js
+    assert 'setWidgetDisabled(node, "height", mode !== "fixed")' in js
+    assert 'setWidgetDisabled(node, "geometry_policy", mode !== "fixed")' in js
+    assert "migrateLegacyT2IWidgets" in js
+    assert "T2I_LEGACY_ASPECT_RATIOS" in js
+
+
+def test_vision_reference_guidance_seed_is_only_editable_when_fixed():
+    js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
+    assert 'w.name === "guidance_seed_mode"' in js
+    assert 'setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed")' in js
+
 def test_prompt_creator_system_prompt_stays_visible_read_only_for_presets():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
     assert 'node.comfyClass === "CcCKrea2EditPromptCreator"' in js
