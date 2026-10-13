@@ -166,7 +166,8 @@ def _generate_t2i_vision_guidance(
         f"{LOGGER_PREFIX} T2I Qwen single-pass start: "
         f"mode={public_mode} images={len(analysis_images)} "
         f"shape={tuple(image_batch.shape)} seed={entry.guidance_seed} "
-        f"detail={entry.guidance_detail} vision_guidance={entry.vision_guidance}",
+        f"detail={entry.guidance_detail} vision_guidance={entry.vision_guidance} "
+        f"thinking=krea2-default",
         flush=True,
     )
     tokens = clip.tokenize(
@@ -174,7 +175,6 @@ def _generate_t2i_vision_guidance(
         image=image_batch,
         skip_template=False,
         min_length=1,
-        thinking=False,
         system_prompt="",
     )
     generated_ids = clip.generate(tokens, **generation_kwargs)
