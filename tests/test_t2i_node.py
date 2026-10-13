@@ -275,9 +275,12 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
     assert "VISION MODE: style" in analysis_text
     assert "Use manga style and girl identity." in analysis_text
-    assert kwargs["images"] == [image]
+    assert torch.equal(kwargs["image"], image)
+    assert kwargs["skip_template"] is False
     assert "only for visual STYLE" in kwargs["system_prompt"]
     assert clip.generate_calls[0][1]["seed"] == 0
+    assert clip.generate_calls[0][1]["max_length"] == 512
+    assert clip.generate_calls[0][1]["mtp"] is True
 
 
 def test_t2i_predefined_aspect_ratios_and_orientation():
@@ -373,3 +376,17 @@ def test_t2i_determinism_and_no_cache_hooks():
     assert neg1 == neg2
     assert torch.equal(lat1["samples"], lat2["samples"])
     assert info1 == info2
+
+
+
+def test_t2i_rejects_chat_role_only_guidance():
+    clip = FakeGenerativeCLIP("user")
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="semantic")
+
+    with pytest.raises(RuntimeError, match="chat-role token"):
+        _generate_t2i_vision_guidance(
+            clip=clip,
+            entry=vision_chain.entries[0],
+            target_prompt="A manga girl",
+        )
