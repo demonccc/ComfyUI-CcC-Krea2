@@ -48,14 +48,15 @@ def test_t2i_dimensions_widgets_are_conditionally_disabled_and_legacy_migrated()
     assert "T2I_LEGACY_ASPECT_RATIOS" in js
 
 
-def test_vision_reference_generation_controls_only_apply_to_semantic():
+def test_vision_reference_context_locks_generation_presets_to_balanced():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
     assert 'w.name === "guidance_seed_mode"' in js
-    assert 'const semanticMode = mode === "semantic"' in js
-    assert 'setWidgetDisabled(node, "guidance_seed_mode", !semanticMode)' in js
-    assert 'setWidgetDisabled(node, "guidance_detail", !semanticMode)' in js
-    assert 'setWidgetDisabled(node, "vision_guidance", !semanticMode)' in js
-    assert 'setWidgetDisabled(node, "guidance_seed", !semanticMode || seedMode !== "fixed")' in js
+    assert 'const contextMode = mode === "context"' in js
+    assert 'if (detailWidget) detailWidget.value = "balanced"' in js
+    assert 'if (visionWidget) visionWidget.value = "balanced"' in js
+    assert 'setWidgetDisabled(node, "guidance_detail", contextMode)' in js
+    assert 'setWidgetDisabled(node, "vision_guidance", contextMode)' in js
+    assert 'setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed")' in js
 
 def test_prompt_creator_system_prompt_stays_visible_read_only_for_presets():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
