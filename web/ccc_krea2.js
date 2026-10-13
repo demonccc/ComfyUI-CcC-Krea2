@@ -185,7 +185,7 @@ function install(node) {
       draw(ctx, n, width, y, height) {
         const cy = y + height / 2;
         const nodeWidth = n.size[0];
-        const left = 42, right = nodeWidth - 100;
+        const left = 42, right = nodeWidth - 124;
         const length = Math.max(20, right - left);
         const ratio = (clamp(Number(strength.value) || 0) + 10) / 20;
         ctx.save();
@@ -195,7 +195,7 @@ function install(node) {
         ctx.fillStyle = "#ccc";
         ctx.textAlign = "center";
         ctx.fillText("◀", 24, cy);
-        ctx.fillText("▶", nodeWidth - 30, cy);
+        ctx.fillText("▶", nodeWidth - 91, cy);
         ctx.fillStyle = "#4b4b4b";
         ctx.fillRect(left, cy - 3, length, 6);
         ctx.fillStyle = "#809bb4";
@@ -203,17 +203,17 @@ function install(node) {
         ctx.fillStyle = "#eee";
         ctx.fillRect(left + length * ratio - 3, cy - 8, 6, 16);
         ctx.textAlign = "right";
-        ctx.fillText(Number(strength.value).toFixed(2), nodeWidth - 43, cy);
+        ctx.fillText(Number(strength.value).toFixed(2), nodeWidth - 18, cy);
         ctx.restore();
       },
       mouse(event, pos, n) {
         if (!enabled.value || (!down(event) && !(move(event) && event.buttons === 1))) return true;
         const x = pos[0], width = n.size[0];
-        const left = 42, right = Math.max(left + 20, width - 100);
+        const left = 42, right = Math.max(left + 20, width - 124);
         const original = Number(strength.value) || 0;
         let next;
         if (down(event) && x <= 36) next = original - STEP;
-        else if (down(event) && x >= width - 52) next = original + STEP;
+        else if (down(event) && x >= width - 111 && x <= width - 73) next = original + STEP;
         else if (x >= left && x <= right) next = -10 + (x - left) * 20 / (right - left);
         else return false;
         update(strength, Number((Math.round(clamp(next) / STEP) * STEP).toFixed(2)), n);
