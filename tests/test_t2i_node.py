@@ -326,8 +326,8 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     assert kwargs["system_prompt"] == ""
     assert clip.generate_calls[0][1]["seed"] == 0
     assert clip.generate_calls[0][1]["max_length"] == 512
-    assert clip.generate_calls[0][1]["temperature"] == 0.70
-    assert clip.generate_calls[0][1]["top_p"] == 0.95
+    assert clip.generate_calls[0][1]["temperature"] == 0.25
+    assert clip.generate_calls[0][1]["top_p"] == 0.90
     assert clip.generate_calls[0][1]["mtp"] is True
 
 
@@ -336,6 +336,10 @@ def test_t2i_guidance_seed_controls_and_modes(monkeypatch):
     assert required["guidance_seed_mode"][0] == ["fixed", "incremental", "random"]
     assert required["guidance_seed_mode"][1]["default"] == "fixed"
     assert required["guidance_seed"][1]["default"] == 0
+    assert required["guidance_detail"][0] == ["compact", "balanced", "detailed"]
+    assert required["guidance_detail"][1]["default"] == "balanced"
+    assert required["vision_guidance"][0] == ["conservative", "balanced", "flexible"]
+    assert required["vision_guidance"][1]["default"] == "balanced"
 
     node = CcCKrea2TextToImage()
     assert node._resolve_guidance_seed("fixed", 7) == 7
@@ -373,6 +377,70 @@ def test_t2i_guidance_seed_is_passed_to_all_qwen_attempts():
     assert strategy == "prompt-creator-fallback"
     assert len(clip.generate_calls) == 3
     assert [call[1]["seed"] for call in clip.generate_calls] == [42, 42, 42]
+    assert clip.generate_calls[0][1] == clip.generate_calls[1][1] == clip.generate_calls[2][1]
+
+
+@pytest.mark.parametrize(
+    ("guidance_detail", "expected_max_length"),
+    [("compact", 256), ("balanced", 512), ("detailed", 1024)],
+)
+def test_t2i_guidance_detail_presets_only_change_token_limit(
+    guidance_detail,
+    expected_max_length,
+):
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="semantic")
+    clip = FakeGenerativeCLIP("A useful semantic description.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+        guidance_detail=guidance_detail,
+        vision_guidance="balanced",
+    )
+
+    kwargs = clip.generate_calls[0][1]
+    assert kwargs["max_length"] == expected_max_length
+    assert kwargs["temperature"] == 0.25
+    assert kwargs["top_p"] == 0.90
+    assert kwargs["top_k"] == 64
+    assert kwargs["min_p"] == 0.05
+    assert kwargs["repetition_penalty"] == 1.05
+
+
+@pytest.mark.parametrize(
+    ("vision_guidance", "temperature", "top_p"),
+    [
+        ("conservative", 0.15, 0.85),
+        ("balanced", 0.25, 0.90),
+        ("flexible", 0.45, 0.95),
+    ],
+)
+def test_t2i_vision_guidance_sampling_presets(
+    vision_guidance,
+    temperature,
+    top_p,
+):
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="semantic")
+    clip = FakeGenerativeCLIP("A useful semantic description.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+        guidance_detail="balanced",
+        vision_guidance=vision_guidance,
+    )
+
+    kwargs = clip.generate_calls[0][1]
+    assert kwargs["max_length"] == 512
+    assert kwargs["temperature"] == temperature
+    assert kwargs["top_p"] == top_p
+    assert kwargs["top_k"] == 64
+    assert kwargs["min_p"] == 0.05
+    assert kwargs["repetition_penalty"] == 1.05
 
 
 def test_t2i_predefined_aspect_ratios_and_orientation():
@@ -454,7 +522,15 @@ def test_t2i_determinism_and_no_cache_hooks():
 
     # Verify no IS_CHANGED or cache-invalidating attributes
     assert hasattr(CcCKrea2TextToImage, "IS_CHANGED")
-    assert node.IS_CHANGED(guidance_seed_mode="fixed", guidance_seed=0) == "guidance-seed:0"
+    assert (
+        node.IS_CHANGED(
+            guidance_seed_mode="fixed",
+            guidance_seed=0,
+            guidance_detail="balanced",
+            vision_guidance="balanced",
+        )
+        == "guidance-seed:0:detail:balanced:vision:balanced"
+    )
     assert str(node.IS_CHANGED(guidance_seed_mode="random", guidance_seed=0)).lower() == "nan"
     assert not hasattr(node, "fingerprint_inputs")
     assert not hasattr(node, "not_idempotent")
