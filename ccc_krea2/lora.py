@@ -120,7 +120,7 @@ class CcCKrea2LoRAStackWithPrompt:
             required[f"lora_{i}_name"] = (names, {"default": "None"})
             required[f"lora_{i}_strength"] = ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05})
             required[f"lora_{i}_prompt_position"] = (["append", "prepend"], {"default": "append"})
-            required[f"lora_{i}_prompt"] = ("STRING", {"multiline": True, "default": ""})
+            required[f"lora_{i}_prompt"] = ("STRING", {"multiline": True, "default": "", "rows": 2})
         return {"required": required, "optional": {
             "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
         }}
