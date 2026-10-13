@@ -622,6 +622,30 @@ app.registerExtension({
             }, 20);
         }
 
+
+        if (node.comfyClass === "CcCKrea2EditPromptCreator") {
+            // Existing prompt-creator title behavior consolidated here.
+            const modeWidget = node.widgets?.find((w) => w.name === "mode");
+            if (modeWidget) {
+                const updateTitle = () => {
+                    const mode = modeWidget.value ?? "enhance";
+                    const current = String(node.title ?? "");
+                    if (!current || current === "Krea2 CcC Edit Prompt Creator" ||
+                        current.startsWith("Prompt Creator - ")) {
+                        node.title = `Prompt Creator - ${mode}`;
+                    }
+                    node.setDirtyCanvas?.(true, true);
+                };
+                const originalCallback = modeWidget.callback;
+                modeWidget.callback = function (...args) {
+                    const result = originalCallback?.apply(this, args);
+                    updateTitle();
+                    return result;
+                };
+                setTimeout(updateTitle, 120);
+            }
+        }
+
         if (node.comfyClass === "CcCKrea2EditPromptCreator") {
             const modeWidget = node.widgets?.find((w) => w.name === "mode");
             const systemPromptWidget = node.widgets?.find((w) => w.name === "system_prompt");
