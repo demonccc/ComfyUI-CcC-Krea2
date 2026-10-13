@@ -288,6 +288,8 @@ def run_krea2_edit_orchestrator(
         "=== Krea2 CcC Edit Pipeline Report ===",
         "Reference Contract: Krea2 CcC Edit",
         "Reference Transport: CONDITIONING reference_latents",
+        f"Positive Qwen Tokenizer Input: {user_content!r}",
+        f"Negative Qwen Tokenizer Input: {neg_user_content!r}",
     ]
 
     info_lines.extend(
