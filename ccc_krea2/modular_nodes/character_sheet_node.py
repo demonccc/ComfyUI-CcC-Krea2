@@ -8,7 +8,7 @@ import torch
 
 from ..constants import NODE_CATEGORY
 from ..geometry import resize_tensor
-from .latent_node import (
+from ..krea_geometry import (
     DEFAULT_KREA_PRESET_SIZE,
     KREA_PRESET_GEOMETRIES,
     KREA_PRESET_SIZES,
