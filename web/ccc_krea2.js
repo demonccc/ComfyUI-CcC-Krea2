@@ -342,16 +342,18 @@ function restoreNames(node, info) {
 function install(node) {
   if (node.__cccCompactStack) return;
   const find = (key) => node.widgets?.find((w) => w.name === key);
-  if (!find("lora_10_strength")) return;
+  const withPrompt = node.comfyClass === "CcCKrea2LoRAStackWithPrompt" || node.type === "CcCKrea2LoRAStackWithPrompt";
+  const slots = withPrompt ? 5 : 10;
+  if (!find(`lora_${slots}_strength`)) return;
   node.__cccCompactStack = true;
-  cleanupLegacySockets(node);
+  if (!withPrompt) cleanupLegacySockets(node);
   // Old saved nodes may still retain obsolete input sockets.
   for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
     const index = node.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
     if (index >= 0) node.removeInput(index);
   }
   const visible = [];
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= slots; i++) {
     const name = find(`lora_${i}_name`);
     const enabled = find(`lora_${i}_enabled`);
     const strength = find(`lora_${i}_strength`);
@@ -450,13 +452,96 @@ function install(node) {
     };
     node.addCustomWidget(row);
     visible.push(row);
+    if (withPrompt) {
+      const position = find(`lora_${i}_prompt_position`);
+      const prompt = find(`lora_${i}_prompt`);
+      if (position && prompt) {
+        [position, prompt].forEach(hide);
+        const promptRow = {
+          name: `ccc_stack_${i}_prompt_row`, type: "custom", serialize: false,
+          computeSize: (width) => [width, 76],
+          draw(ctx, n, width, y, height) {
+            const w = n.size[0], left = 14, comboWidth = 86, fieldX = 106;
+            ctx.save();
+            ctx.globalAlpha = enabled.value ? 1 : 0.3;
+            ctx.fillStyle = "#252525"; ctx.strokeStyle = "#737373";
+            ctx.beginPath(); ctx.roundRect(left, y + 3, comboWidth, 24, 6); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.roundRect(fieldX, y + 3, Math.max(60, w - fieldX - 14), 69, 5); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "#ddd"; ctx.textBaseline = "middle"; ctx.font = "12px Arial";
+            ctx.textAlign = "left"; ctx.fillText(String(position.value || "append"), left + 8, y + 15);
+            ctx.textAlign = "right"; ctx.fillText("▾", left + comboWidth - 8, y + 15);
+            ctx.textAlign = "left"; ctx.textBaseline = "top";
+            const text = String(prompt.value || "");
+            const maxChars = Math.max(8, Math.floor((w - fieldX - 28) / 7));
+            const lines = text.split("\\n").flatMap((line) => {
+              const result = [];
+              while (line.length > maxChars) { result.push(line.slice(0, maxChars)); line = line.slice(maxChars); }
+              result.push(line);
+              return result;
+            });
+            (lines.length ? lines : ["Prompt / trigger…"]).slice(0, 3).forEach((line, index) => {
+              ctx.fillStyle = text ? "#ddd" : "#888";
+              ctx.fillText(line, fieldX + 8, y + 10 + index * 20);
+            });
+            ctx.restore();
+          },
+          mouse(event, pos, n) {
+            if (!press(event)) return false;
+            if (!enabled.value) return true;
+            const canvas = app.canvas?.canvas;
+            if (!canvas) return true;
+            const element = pos[0] < 104 ? document.createElement("select") : document.createElement("textarea");
+            const editingPosition = pos[0] < 104;
+            if (editingPosition) {
+              for (const value of ["append", "prepend"]) {
+                const option = document.createElement("option");
+                option.value = value; option.textContent = value; element.appendChild(option);
+              }
+              element.value = position.value;
+            } else {
+              element.value = String(prompt.value || "");
+              element.rows = 3;
+              element.placeholder = "Positive prompt / trigger";
+            }
+            const rect = canvas.getBoundingClientRect();
+            const clientX = Number.isFinite(event.clientX) ? event.clientX : rect.left + 120;
+            const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top + 120;
+            element.style.cssText = "position:fixed;z-index:100000;box-sizing:border-box;background:#252525;color:#eee;border:1px solid #7895af;border-radius:4px;padding:5px;font:12px Arial;";
+            element.style.left = Math.max(0, clientX - (editingPosition ? 40 : 60)) + "px";
+            element.style.top = Math.max(0, clientY - 10) + "px";
+            element.style.width = editingPosition ? "105px" : Math.max(130, n.size[0] - 125) + "px";
+            if (!editingPosition) element.style.height = "70px";
+            document.body.appendChild(element);
+            let finished = false;
+            const commit = () => {
+              if (finished) return;
+              finished = true;
+              set(editingPosition ? position : prompt, element.value, n);
+              element.remove();
+            };
+            element.addEventListener("change", () => { if (editingPosition) commit(); });
+            element.addEventListener("keydown", (e) => {
+              e.stopPropagation();
+              if (e.key === "Escape") { finished = true; element.remove(); }
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) commit();
+            });
+            element.addEventListener("blur", commit, { once: true });
+            element.focus();
+            return true;
+          },
+        };
+        node.addCustomWidget(promptRow);
+        visible.push(promptRow);
+      }
+    }
   }
   node.widgets = [...node.widgets.filter((w) => !visible.includes(w)), ...visible];
   node.setSize?.(node.computeSize());
 }
 function ready(node, attempt = 0) {
   if (node.__cccCompactStack) return;
-  if (!node.widgets?.some((w) => w.name === "lora_10_strength")) {
+  const slots = (node.comfyClass === "CcCKrea2LoRAStackWithPrompt" || node.type === "CcCKrea2LoRAStackWithPrompt") ? 5 : 10;
+  if (!node.widgets?.some((w) => w.name === `lora_${slots}_strength`)) {
     if (attempt < 30) requestAnimationFrame(() => ready(node, attempt + 1));
     return;
   }
@@ -465,10 +550,10 @@ function ready(node, attempt = 0) {
 return {
   name: "ccc.krea2.compactLoraStack",
   nodeCreated(node) {
-    if (node.comfyClass === "CcCKrea2LoRAStack" || node.type === "CcCKrea2LoRAStack") ready(node);
+    if (["CcCKrea2LoRAStack", "CcCKrea2LoRAStackWithPrompt"].includes(node.comfyClass || node.type)) ready(node);
   },
   beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData.name !== "CcCKrea2LoRAStack") return;
+    if (!["CcCKrea2LoRAStack", "CcCKrea2LoRAStackWithPrompt"].includes(nodeData.name)) return;
     const configure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function (info) {
       const result = configure?.call(this, info);
@@ -476,8 +561,10 @@ return {
         const index = this.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
         if (index >= 0) this.removeInput(index);
       }
-      restoreNames(this, info);
-      cleanupLegacySockets(this);
+      if (nodeData.name === "CcCKrea2LoRAStack") {
+        restoreNames(this, info);
+        cleanupLegacySockets(this);
+      }
       return result;
     };
     const original = nodeType.prototype.onNodeCreated;
