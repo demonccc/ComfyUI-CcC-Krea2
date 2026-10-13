@@ -86,11 +86,11 @@ Modes:
 - **Style** — aesthetic treatment: medium, rendering, line work, shading, palette, lighting, texture, tone, and mood.
 - **Context** — situation/context: setting, environment, framing, action, interaction, composition, and spatial relationships.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. Vision Reference also owns reusable Qwen guidance generation settings: seed mode/value, Guidance Detail (256/512/1024 max tokens), and Vision Guidance (conservative/balanced/flexible sampling).
 
 ## Latent and Target Geometry
 
-Krea2 CcC Latent owns final target geometry.
+Krea pixel geometry is shared by the suite through one library of curated presets and resolution policies. Krea2 CcC Latent and Text to Image both consume that same source of truth.
 
 Dimension modes:
 
@@ -218,7 +218,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 **LoRA Prompt Settings** can associate prepend/append positive and negative text with those four LoRA slots. The resulting prompt_augmentation is carried by LoRA Stack. The public **Text to Image** node consumes that augmentation; **Krea2 CcC Edit does not automatically consume it**.
 
-**Text to Image** encodes positive/negative text with the supplied CLIP, resolves a /16-aligned latent from aspect ratio + megapixels, and returns MODEL / positive / negative / LATENT. With **Vision Reference**, T2I uses Qwen multimodal generation only as an analysis step: each image is converted into mode-scoped textual guidance, then the final Krea2 conditioning is encoded from text only. Direct Vision rows never enter the final T2I conditioning, so the source image cannot overpower the prompt or appear as an extra subject. The explicit negative prompt remains text-only.
+**Text to Image** encodes positive/negative text with the supplied CLIP, creates its empty latent from the shared Krea geometry presets/policies, and returns MODEL / positive / negative / LATENT. Qwen guidance controls do not live on T2I: they travel with **Vision Reference**. With a Vision Reference, T2I uses Qwen multimodal generation only as an analysis step, then encodes the resulting mode-scoped guidance as text-only Krea2 conditioning. Direct Vision rows never enter the final T2I conditioning, so the source image cannot overpower the prompt or appear as an extra subject. The explicit negative prompt remains text-only.
 
 ## Example Workflows
 
