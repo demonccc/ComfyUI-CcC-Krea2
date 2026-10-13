@@ -135,7 +135,7 @@ Vision References declare Qwen/Vision information and do not create appearance l
 - **Style** -> aesthetic treatment; only this mode exposes full / 2x2 / 4x4 processing.
 - **Context** -> situation, environment, framing, action/interaction, composition, and spatial relationships.
 
-Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter. Context is locked to the Balanced generation preset in T2I after Compact/Detailed showed unstable subject-appearance leakage. The consumer still owns how the declared information is transformed into conditioning.
+Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. The consumer still owns how the declared information is transformed into conditioning.
 
 ## Target Geometry
 
