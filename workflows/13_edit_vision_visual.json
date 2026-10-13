@@ -321,7 +321,11 @@
       "widgets_values": [
         "visual",
         "Use the visible appearance, clothing, pose, and scene details directly while preserving the subject identity from Image 1.",
-        "full"
+        "full",
+        "fixed",
+        0,
+        "balanced",
+        "balanced"
       ],
       "title": "Vision Reference - Visual"
     },
