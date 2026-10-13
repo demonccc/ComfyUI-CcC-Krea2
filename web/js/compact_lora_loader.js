@@ -1,184 +1,202 @@
 import { app } from "../../scripts/app.js";
 
-// The original ComfyUI widgets remain the serializable source of truth. This
-// extension only changes their presentation (two visible rows per LoRA).
+// Two canvas-rendered rows per LoRA. All original widgets remain serializable.
 const STEP = 0.05;
-const MIN = -10;
-const MAX = 10;
-const ROW_HEIGHT = 26;
+const clamp = (v) => Math.min(10, Math.max(-10, v));
+const down = (e) => e.type === "pointerdown" || e.type === "mousedown";
+const move = (e) => e.type === "pointermove" || e.type === "mousemove";
 
-const clamp = (v) => Math.max(MIN, Math.min(MAX, v));
-const setStrength = (widget, value, node) => {
-  const next = Number(clamp(Math.round(value / STEP) * STEP).toFixed(2));
-  widget.value = next;
-  widget.callback?.(next);
-  node.setDirtyCanvas?.(true, true);
+function update(widget, value, node) {
+  const previous = widget.value;
+  if (previous === value) return;
+  widget.value = value;
+  widget.callback?.(value);
+  node.onWidgetChanged?.(widget.name, value, previous, widget);
   app.graph?.setDirtyCanvas?.(true, true);
-};
-const isDown = (e) => ["pointerdown", "mousedown"].includes(e.type);
-const isMove = (e) => ["pointermove", "mousemove"].includes(e.type);
+}
+
+function hide(widget) {
+  // This is ComfyUI's established hidden-widget convention; do not remove
+  // backend widgets, since workflow persistence depends on their values.
+  widget.type = "converted-widget";
+  widget.computeSize = () => [0, -4];
+  widget.computeLayoutSize = () => ({ minHeight: 0, maxHeight: 0, minWidth: 0, maxWidth: 0 });
+}
+
+function optionsFor(widget) {
+  const values = typeof widget.options?.values === "function"
+    ? widget.options.values(widget) : widget.options?.values;
+  return Array.isArray(values) ? values : Object.values(values || {});
+}
+
+function chooseLora(event, node, widget) {
+  const choices = optionsFor(widget);
+  const litegraph = globalThis.LiteGraph;
+  if (litegraph?.ContextMenu) {
+    new litegraph.ContextMenu(choices, {
+      event,
+      title: "Select LoRA",
+      callback: (choice) => {
+        const value = typeof choice === "object" ? (choice?.value ?? choice?.content) : choice;
+        if (value != null) update(widget, String(value), node);
+      },
+    });
+    return;
+  }
+  // Fallback for frontends that don't expose LiteGraph globally.
+  // Use a native HTML select rather than an unresponsive custom control.
+  const select = document.createElement("select");
+  for (const choice of choices) {
+    const option = document.createElement("option");
+    option.value = String(choice);
+    option.textContent = String(choice);
+    select.appendChild(option);
+  }
+  select.value = String(widget.value);
+  select.style.cssText = "position:fixed;z-index:99999;max-width:500px;background:#292929;color:#eee;padding:8px";
+  select.style.left = Math.max(0, event.clientX || 100) + "px";
+  select.style.top = Math.max(0, event.clientY || 100) + "px";
+  document.body.appendChild(select);
+  const finish = () => { update(widget, select.value, node); select.remove(); };
+  select.addEventListener("change", finish, { once: true });
+  select.addEventListener("blur", () => select.remove(), { once: true });
+  select.focus();
+}
 
 function install(node) {
-  if (node.__cccLoraCompactInstalled) return;
+  if (node.__cccTenLoraInstalled) return;
   const find = (name) => node.widgets?.find((w) => w.name === name);
-  if (!find("lora_1_name") || !find("lora_1_enabled")) return;
-  node.__cccLoraCompactInstalled = true;
-
+  if (!find("lora_10_strength")) return;
+  node.__cccTenLoraInstalled = true;
+  const groups = [];
   for (let i = 1; i <= 10; i++) {
-    const nameWidget = find(`lora_${i}_name`);
+    const name = find(`lora_${i}_name`);
     const enabled = find(`lora_${i}_enabled`);
     const strength = find(`lora_${i}_strength`);
-    if (!nameWidget || !enabled || !strength) continue;
+    if (!name || !enabled || !strength) continue;
+    [name, enabled, strength].forEach(hide);
 
-    // Keep the native LoRA selector. Paint a compact ON/OFF switch over its
-    // left edge and intercept clicks there; everywhere else it acts normally.
-    const originalDraw = nameWidget.draw?.bind(nameWidget);
-    nameWidget.draw = function (ctx, n, width, y, height) {
-      ctx.save();
-      if (!enabled.value) ctx.globalAlpha = 0.35;
-      originalDraw?.(ctx, n, width, y, height);
-      ctx.restore();
-
-      const cy = y + height / 2;
-      const sx = 18;
-      ctx.save();
-      ctx.fillStyle = enabled.value ? "#426b57" : "#444";
-      ctx.beginPath();
-      ctx.roundRect(sx, cy - 10, 57, 20, 10);
-      ctx.fill();
-      ctx.fillStyle = enabled.value ? "#d8ffe4" : "#aaa";
-      ctx.font = "11px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(enabled.value ? "ON" : "OFF", sx + 28, cy);
-      ctx.restore();
-
-      // Mask the inactive selector, but never its switch.
-      if (!enabled.value) {
-        ctx.save();
-        ctx.fillStyle = "rgba(25,25,25,0.32)";
-        ctx.fillRect(79, y + 2, Math.max(0, width - 95), height - 4);
-        ctx.restore();
-      }
-    };
-
-    const originalMouse = nameWidget.mouse?.bind(nameWidget);
-    nameWidget.mouse = function (event, pos, n) {
-      if (isDown(event) && pos[0] >= 12 && pos[0] <= 80) {
-        enabled.value = !enabled.value;
-        enabled.callback?.(enabled.value);
-        n.setDirtyCanvas?.(true, true);
-        app.graph?.setDirtyCanvas?.(true, true);
-        return true;
-      }
-      if (!enabled.value) return true; // No dropdown interaction while OFF.
-      return originalMouse?.(event, pos, n) ?? false;
-    };
-
-    // Remove the original enabled/strength rows without losing serialization.
-    for (const widget of [enabled, strength]) {
-      widget.type = "converted-widget";
-      widget.computeSize = () => [0, -4];
-      widget.draw = () => {};
-    }
-
-    node.addCustomWidget({
-      name: `lora_${i}_compact_strength`,
-      type: "ccc_lora_strength",
-      serialize: false,
-      computeSize: (width) => [width, ROW_HEIGHT],
+    const select = {
+      name: `ccc_lora_${i}_select`, type: "custom", serialize: false,
+      value: "", computeSize: (width) => [width, 28],
       draw(ctx, n, width, y, height) {
-        const cy = y + height / 2;
-        const leftArrow = 19;
-        const rightArrow = width - 22;
-        const trackStart = 43;
-        const trackEnd = width - 99;
-        const trackWidth = Math.max(20, trackEnd - trackStart);
-        const ratio = (clamp(Number(strength.value) || 0) - MIN) / (MAX - MIN);
+        const cy = y + height / 2, right = width - 15;
         ctx.save();
-        ctx.globalAlpha = enabled.value ? 1 : 0.3;
-        ctx.fillStyle = "#aaa";
-        ctx.font = "13px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("◀", leftArrow, cy);
-        ctx.fillText("▶", rightArrow, cy);
-        ctx.fillStyle = "#505050";
-        ctx.fillRect(trackStart, cy - 3, trackWidth, 6);
-        ctx.fillStyle = "#849aad";
-        ctx.fillRect(trackStart, cy - 3, ratio * trackWidth, 6);
-        ctx.fillStyle = "#eee";
-        ctx.fillRect(trackStart + ratio * trackWidth - 3, cy - 8, 6, 16);
+        // Compact native-looking boolean toggle on the left.
+        ctx.fillStyle = enabled.value ? "#5a788c" : "#454545";
+        ctx.beginPath();
+        ctx.roundRect(16, cy - 10, 48, 20, 10);
+        ctx.fill();
+        ctx.fillStyle = enabled.value ? "#e6f4ff" : "#aaa";
+        ctx.beginPath();
+        ctx.arc(enabled.value ? 53 : 27, cy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        // LoRA dropdown on the same row, dimmed and locked when disabled.
+        ctx.globalAlpha = enabled.value ? 1 : 0.32;
+        ctx.fillStyle = "#232323";
+        ctx.strokeStyle = "#777";
+        ctx.beginPath();
+        ctx.roundRect(72, cy - 11, Math.max(20, width - 87), 22, 11);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#ccc";
         ctx.font = "12px Arial";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "left";
+        const value = String(name.value ?? "None");
+        const maxWidth = Math.max(20, width - 135);
+        let label = value;
+        while (ctx.measureText(label).width > maxWidth && label.length > 3) {
+          label = label.slice(0, -2) + "…";
+        }
+        ctx.fillText(label, 82, cy);
         ctx.textAlign = "right";
-        ctx.fillText(Number(strength.value).toFixed(2), width - 39, cy);
+        ctx.fillText("▾", right - 9, cy);
         ctx.restore();
       },
       mouse(event, pos, n) {
-        if (!enabled.value) return true;
-        if (!isDown(event) && !(isMove(event) && event.buttons === 1)) return false;
-        const x = pos[0];
-        const width = n.size[0];
-        const start = 43;
-        const end = Math.max(start + 20, width - 99);
-        if (isDown(event) && x <= 37) {
-          setStrength(strength, Number(strength.value) - STEP, n);
-        } else if (isDown(event) && x >= width - 34) {
-          setStrength(strength, Number(strength.value) + STEP, n);
-        } else if (x >= start && x <= end) {
-          setStrength(strength, MIN + ((x - start) / (end - start)) * (MAX - MIN), n);
-        } else {
-          return false;
+        if (!down(event)) return false;
+        if (pos[0] <= 68) {
+          update(enabled, !enabled.value, n);
+        } else if (enabled.value) {
+          chooseLora(event, n, name);
         }
         return true;
       },
-    });
+    };
+    const slider = {
+      name: `ccc_lora_${i}_slider`, type: "custom", serialize: false,
+      value: "", computeSize: (width) => [width, 26],
+      draw(ctx, n, width, y, height) {
+        const cy = y + height / 2;
+        const left = 42, right = width - 100;
+        const length = Math.max(20, right - left);
+        const ratio = (clamp(Number(strength.value) || 0) + 10) / 20;
+        ctx.save();
+        ctx.globalAlpha = enabled.value ? 1 : 0.27;
+        ctx.font = "12px Arial";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ccc";
+        ctx.textAlign = "center";
+        ctx.fillText("◀", 24, cy);
+        ctx.fillText("▶", width - 19, cy);
+        ctx.fillStyle = "#4b4b4b";
+        ctx.fillRect(left, cy - 3, length, 6);
+        ctx.fillStyle = "#809bb4";
+        ctx.fillRect(left, cy - 3, length * ratio, 6);
+        ctx.fillStyle = "#eee";
+        ctx.fillRect(left + length * ratio - 3, cy - 8, 6, 16);
+        ctx.textAlign = "right";
+        ctx.fillText(Number(strength.value).toFixed(2), width - 43, cy);
+        ctx.restore();
+      },
+      mouse(event, pos, n) {
+        if (!enabled.value || (!down(event) && !(move(event) && event.buttons === 1))) return true;
+        const x = pos[0], width = n.size[0];
+        const left = 42, right = Math.max(left + 20, width - 100);
+        const original = Number(strength.value) || 0;
+        let next;
+        if (down(event) && x <= 36) next = original - STEP;
+        else if (down(event) && x >= width - 34) next = original + STEP;
+        else if (x >= left && x <= right) next = -10 + (x - left) * 20 / (right - left);
+        else return false;
+        update(strength, Number((Math.round(clamp(next) / STEP) * STEP).toFixed(2)), n);
+        return true;
+      },
+    };
+    node.addCustomWidget(select);
+    node.addCustomWidget(slider);
+    groups.push({ name, enabled, strength, select, slider });
   }
-
-  // Render the selector and arrow-slider together for every LoRA.
-  const order = [];
-  for (let i = 1; i <= 10; i++) {
-    for (const suffix of ["name", "compact_strength", "enabled", "strength"]) {
-      const widget = find(`lora_${i}_${suffix}`);
-      if (widget) order.push(widget);
-    }
-  }
-  node.widgets = [
-    ...node.widgets.filter((w) => !order.includes(w)),
-    ...order,
-  ];
+  // Native hidden values first, then interleaved visible rows.
+  const widgets = node.widgets;
+  const visible = groups.flatMap((g) => [g.select, g.slider]);
+  node.widgets = [...widgets.filter((w) => !visible.includes(w)), ...visible];
   node.setSize?.(node.computeSize());
 }
 
-// ComfyUI can create the node before all Python-declared widgets are attached.
-// Recheck on the next animation frame instead of permanently skipping setup.
-function installWhenReady(node, attempts = 0) {
-  if (node.__cccLoraCompactInstalled) return;
+function ready(node, tries = 0) {
+  if (node.__cccTenLoraInstalled) return;
   if (!node.widgets?.some((w) => w.name === "lora_10_strength")) {
-    if (attempts < 12) requestAnimationFrame(() => installWhenReady(node, attempts + 1));
+    if (tries < 30) requestAnimationFrame(() => ready(node, tries + 1));
     return;
   }
-  try {
-    install(node);
-  } catch (error) {
-    console.error("[CcC Krea2] Compact LoRA controls failed:", error);
-  }
+  try { install(node); }
+  catch (error) { console.error("[CcC Krea2] LoRA UI:", error); }
 }
 
 app.registerExtension({
-  name: "ccc.krea2.compactLoraLoader",
+  name: "ccc.krea2.tenLoraControls",
   nodeCreated(node) {
-    if (node.comfyClass === "CcCKrea2LoRALoader" || node.type === "CcCKrea2LoRALoader") {
-      installWhenReady(node);
-    }
+    if (node.comfyClass === "CcCKrea2LoRALoader" || node.type === "CcCKrea2LoRALoader")
+      ready(node);
   },
   beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData.name !== "CcCKrea2LoRALoader" && nodeData.name !== "Krea2 CcC LoRA Loader") return;
+    if (nodeData.name !== "CcCKrea2LoRALoader") return;
     const original = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function (...args) {
       const result = original?.apply(this, args);
-      // Widgets exist after onNodeCreated; fallback for ComfyUI frontend versions.
-      installWhenReady(this);
+      ready(this);
       return result;
     };
   },
