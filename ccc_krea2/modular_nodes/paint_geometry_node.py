@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 import torch
 
 from ..constants import NODE_CATEGORY
-from .latent_node import KREA_PRESET_GEOMETRIES
+from ..krea_geometry import KREA_PRESET_GEOMETRIES
 
 
 GEOMETRY_MODES = ("pad", "crop")
