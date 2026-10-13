@@ -7,8 +7,8 @@ from ccc_krea2.t2i import (
     CcCKrea2TextToImage,
     _encode_t2i_vision,
     _generate_t2i_vision_guidance,
-    calculate_t2i_resolution,
 )
+from ccc_krea2.krea_geometry import DEFAULT_KREA_PRESET_SIZE, KREA_PRESET_SIZES
 from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.prompt_augmentation import PromptAugmentation
 
@@ -443,39 +443,16 @@ def test_t2i_vision_guidance_sampling_presets(
     assert kwargs["repetition_penalty"] == 1.05
 
 
-def test_t2i_predefined_aspect_ratios_and_orientation():
-    """11, 13, 14. Predefined aspect ratios produce correctly oriented aligned dimensions close to megapixels."""
-    ratios = {
-        "1:1": (992, 992),  # ~0.984 MP
-        "4:3": (1152, 864),  # ~0.995 MP (W > H)
-        "3:4": (864, 1152),  # ~0.995 MP (H > W)
-        "16:9": (1328, 752),  # ~0.998 MP (W > H)
-        "9:16": (752, 1328),  # ~0.998 MP (H > W)
-        "3:2": (1232, 816),  # ~1.005 MP (W > H)
-        "2:3": (816, 1232),  # ~1.005 MP (H > W)
-    }
-
-    for ratio_str, expected_wh in ratios.items():
-        w, h = calculate_t2i_resolution(aspect_ratio=ratio_str, megapixels=1.0)
-        assert (w, h) == expected_wh, f"Ratio {ratio_str} mismatch: got ({w}, {h}), expected {expected_wh}"
-        assert w % 16 == 0 and h % 16 == 0
-        assert w >= 128 and h >= 128
-        area = w * h
-        assert abs(area - 1_000_000) < 50_000
-
-
-def test_t2i_custom_aspect_ratio():
-    """12. Custom aspect ratio calculation."""
-    w, h = calculate_t2i_resolution(
-        aspect_ratio="custom",
-        megapixels=1.0,
-        custom_aspect_width=21,
-        custom_aspect_height=9,
-    )
-    assert w > h
-    assert w % 16 == 0 and h % 16 == 0
-    assert w >= 128 and h >= 128
-    assert abs(w * h - 1_000_000) < 50_000
+def test_t2i_uses_shared_krea_geometry_controls():
+    required = CcCKrea2TextToImage.INPUT_TYPES()["required"]
+    assert required["dimensions"][0] == ["preset", "fixed"]
+    assert required["dimensions"][1]["default"] == "preset"
+    assert required["preset_size"][0] == KREA_PRESET_SIZES
+    assert required["preset_size"][1]["default"] == DEFAULT_KREA_PRESET_SIZE
+    assert "aspect_ratio" not in required
+    assert "megapixels" not in required
+    assert "custom_aspect_width" not in required
+    assert "custom_aspect_height" not in required
 
 
 def test_t2i_latent_contract_and_batch_size():
@@ -489,8 +466,8 @@ def test_t2i_latent_contract_and_batch_size():
         model=model,
         clip=clip,
         prompt="Test prompt",
-        aspect_ratio="16:9",
-        megapixels=1.0,
+        dimensions="preset",
+        preset_size="2048 x 1152 | 16:9 | ~2.36 MP",
         batch_size=batch_size,
     )
 
@@ -498,12 +475,11 @@ def test_t2i_latent_contract_and_batch_size():
     assert "samples" in latent
     samples = latent["samples"]
 
-    # 16 channels, downscale by 8
-    # 16:9 at 1.0 MP gives w=1328, h=752 -> samples [4, 16, 94, 166]
+    # 16 channels, downscale by 8 from the shared 2048x1152 Krea preset.
     assert samples.shape[0] == batch_size
     assert samples.shape[1] == 16
-    assert samples.shape[2] == 752 // 8
-    assert samples.shape[3] == 1328 // 8
+    assert samples.shape[2] == 1152 // 8
+    assert samples.shape[3] == 2048 // 8
     assert samples.dtype == torch.float32
 
 
@@ -538,8 +514,8 @@ def test_t2i_determinism_and_no_cache_hooks():
     model = FakeModel()
     clip = FakeCLIP()
 
-    _, pos1, neg1, lat1, info1 = node.process(model=model, clip=clip, prompt="det test", aspect_ratio="1:1", megapixels=1.0)
-    _, pos2, neg2, lat2, info2 = node.process(model=model, clip=clip, prompt="det test", aspect_ratio="1:1", megapixels=1.0)
+    _, pos1, neg1, lat1, info1 = node.process(model=model, clip=clip, prompt="det test")
+    _, pos2, neg2, lat2, info2 = node.process(model=model, clip=clip, prompt="det test")
 
     assert pos1 == pos2
     assert neg1 == neg2
