@@ -168,6 +168,7 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
                     "instruction": "Use the scene idea.",
                     "guidance": "The same target subject is standing in a city street.",
                     "analysis_images": 1,
+                    "generation_strategy": "blueprint-user-prompt",
                 }
             ],
             "A futuristic city\n\nSemantic guidance: The same target subject is standing in a city street.",
