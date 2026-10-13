@@ -150,14 +150,25 @@ def _generate_t2i_vision_guidance(
 
     user_instruction = str(entry.instruction or "").strip()
     detail_instruction = guidance_detail_instruction(entry.guidance_detail)
+    preserve_semantic_balanced = public_mode == "semantic" and entry.guidance_detail == "balanced"
+    if preserve_semantic_balanced:
+        scope_instruction = (
+            "Apply only information that belongs to this Vision mode. "
+            "If the additional guidance asks for information outside this mode, ignore that part."
+        )
+    else:
+        scope_instruction = (
+            "MODE SCOPE IS STRICT: apply only information that belongs to this Vision mode. "
+            "If any requested or observed detail belongs to another mode, omit it instead of transferring, substituting, "
+            "or inventing it. The Guidance Detail preset changes only how much information is retained inside this mode; "
+            "it never expands the mode's scope."
+        )
+
     analysis_prompt = (
         "TARGET TEXT-TO-IMAGE PROMPT:\n"
         f"{target_prompt or '<empty>'}\n\n"
         f"VISION MODE: {public_mode}\n"
-        "MODE SCOPE IS STRICT: apply only information that belongs to this Vision mode. "
-        "If any requested or observed detail belongs to another mode, omit it instead of transferring, substituting, "
-        "or inventing it. The Guidance Detail preset changes only how much information is retained inside this mode; "
-        "it never expands the mode's scope.\n"
+        f"{scope_instruction}\n"
         f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n"
         + (f"{detail_instruction}\n" if detail_instruction else "")
         + "\nReturn the extracted guidance now."
