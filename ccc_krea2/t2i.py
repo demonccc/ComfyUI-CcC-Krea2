@@ -13,11 +13,7 @@ from .krea_geometry import (
     resolve_krea_geometry,
 )
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
-from .qwen_guidance import (
-    GUIDANCE_DETAIL_PRESETS,
-    VISION_GUIDANCE_PRESETS,
-    guidance_generation_kwargs,
-)
+from .qwen_guidance import guidance_generation_kwargs
 from .style_processing import slice_style_image
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
