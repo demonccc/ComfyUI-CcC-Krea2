@@ -421,6 +421,28 @@ def test_vision_reference_guidance_detail_presets_only_change_token_limit(
     assert kwargs["repetition_penalty"] == 1.05
 
 
+def test_t2i_context_forces_balanced_generation_settings():
+    image = torch.zeros((1, 64, 64, 3))
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="context",
+        guidance_detail="detailed",
+        vision_guidance="flexible",
+    )
+    clip = FakeGenerativeCLIP("A useful scene context.")
+
+    _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
+
+    kwargs = clip.generate_calls[0][1]
+    assert kwargs["max_length"] == 512
+    assert kwargs["temperature"] == 0.25
+    assert kwargs["top_p"] == 0.90
+
+
 @pytest.mark.parametrize(
     ("vision_guidance", "temperature", "top_p"),
     [
