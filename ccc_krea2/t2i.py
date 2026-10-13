@@ -148,6 +148,13 @@ def _clean_generated_guidance(clip: Any, generated_ids: Any) -> str:
 
     if not text:
         raise RuntimeError("[Krea2 CcC T2I] Qwen returned empty Vision guidance.")
+
+    if text.strip().lower() in {"user", "assistant", "system", "user:", "assistant:", "system:"}:
+        raise RuntimeError(
+            "[Krea2 CcC T2I] Qwen Vision analysis returned a chat-role token instead of usable guidance. "
+            "The Vision reference was not applied to final conditioning."
+        )
+
     return text
 
 
@@ -171,9 +178,11 @@ def _generate_t2i_vision_guidance(
         "Return the extracted guidance now."
     )
 
+    image_batch = torch.cat(analysis_images, dim=0)
     tokens = clip.tokenize(
         analysis_prompt,
-        images=analysis_images,
+        image=image_batch,
+        skip_template=False,
         min_length=1,
         thinking=False,
         system_prompt=system_prompt,
@@ -181,13 +190,15 @@ def _generate_t2i_vision_guidance(
     generated_ids = clip.generate(
         tokens,
         do_sample=True,
-        max_length=256,
-        temperature=0.15,
+        max_length=512,
+        temperature=0.25,
         top_k=64,
         top_p=0.90,
         min_p=0.05,
         repetition_penalty=1.05,
+        presence_penalty=0.0,
         seed=0,
+        mtp=True,
     )
     guidance = _clean_generated_guidance(clip, generated_ids)
     return guidance, len(analysis_images)
