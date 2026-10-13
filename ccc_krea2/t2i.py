@@ -399,12 +399,17 @@ class CcCKrea2TextToImage:
         cls,
         guidance_seed_mode: str = "fixed",
         guidance_seed: int = 0,
+        guidance_detail: str = "balanced",
+        vision_guidance: str = "balanced",
         **kwargs,
     ):
         """Force Qwen guidance regeneration for non-fixed seed modes."""
         if guidance_seed_mode in {"incremental", "random"}:
             return float("nan")
-        return f"guidance-seed:{int(guidance_seed)}"
+        return (
+            f"guidance-seed:{int(guidance_seed)}:"
+            f"detail:{guidance_detail}:vision:{vision_guidance}"
+        )
 
     def _resolve_guidance_seed(self, mode: str, configured_seed: int) -> int:
         """Resolve the Qwen-only seed once per T2I execution."""
