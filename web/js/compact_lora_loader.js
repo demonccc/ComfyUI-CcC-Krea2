@@ -150,20 +150,35 @@ function install(node) {
   node.setSize?.(node.computeSize());
 }
 
+// ComfyUI can create the node before all Python-declared widgets are attached.
+// Recheck on the next animation frame instead of permanently skipping setup.
+function installWhenReady(node, attempts = 0) {
+  if (node.__cccLoraCompactInstalled) return;
+  if (!node.widgets?.some((w) => w.name === "lora_10_strength")) {
+    if (attempts < 12) requestAnimationFrame(() => installWhenReady(node, attempts + 1));
+    return;
+  }
+  try {
+    install(node);
+  } catch (error) {
+    console.error("[CcC Krea2] Compact LoRA controls failed:", error);
+  }
+}
+
 app.registerExtension({
   name: "ccc.krea2.compactLoraLoader",
   nodeCreated(node) {
     if (node.comfyClass === "CcCKrea2LoRALoader" || node.type === "CcCKrea2LoRALoader") {
-      install(node);
+      installWhenReady(node);
     }
   },
   beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData.name !== "CcCKrea2LoRALoader") return;
+    if (nodeData.name !== "CcCKrea2LoRALoader" && nodeData.name !== "Krea2 CcC LoRA Loader") return;
     const original = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function (...args) {
       const result = original?.apply(this, args);
       // Widgets exist after onNodeCreated; fallback for ComfyUI frontend versions.
-      install(this);
+      installWhenReady(this);
       return result;
     };
   },
