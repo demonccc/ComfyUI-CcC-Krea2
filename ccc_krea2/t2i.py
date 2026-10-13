@@ -47,6 +47,15 @@ def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dic
     return {"samples": samples}
 
 
+LEGACY_VISUAL_SYSTEM_PROMPT = (
+    "Analyze the supplied reference image for text-to-image guidance. Describe transferable visible appearance "
+    "for the SAME subject/result already requested by the target prompt: face and hair traits, clothing, accessories, "
+    "materials, colors, pose, and other useful visible details. The target prompt is authoritative. Do not introduce "
+    "the reference subject as an additional person and do not describe this as a separate image. Return one concise "
+    "English guidance sentence only, with no preamble."
+)
+
+
 T2I_VISION_SYSTEM_PROMPTS = {
     "semantic": (
         "Analyze the supplied reference image for text-to-image guidance. Extract only semantic/content information "
@@ -67,16 +76,7 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "Do not introduce extra subjects. Return direct English generation guidance with no preamble and no mention of a "
         "reference image."
     ),
-    "style": (
-        "Analyze the supplied reference image or tiles visually and extract only the transferable STYLE DNA. Treat the "
-        "source image itself as authoritative for how the result should look, while ignoring what the image depicts. "
-        "Describe the exact medium, rendering technique, line work and contour weight, mark/brush character, shading "
-        "method, color treatment and palette behavior, saturation and contrast, lighting treatment, texture or grain, "
-        "detail density, edge treatment, finish, tone, and mood. Preserve distinctive style combinations instead of "
-        "reducing them to generic labels such as anime, manga, digital art, or cinematic. Do not transfer subject identity, "
-        "face, hair, body, clothing, accessories, pose, gaze, objects, scene, background, camera framing, or composition. "
-        "Return direct English style guidance with no preamble and no mention of a reference image."
-    ),
+    "style": LEGACY_VISUAL_SYSTEM_PROMPT,
     "context": (
         "Analyze the supplied reference image only for scene CONTEXT and staging. Reproduce the situation, not the "
         "subject's visual identity. Capture setting and environment, camera/framing/viewpoint, subject count and scene "
@@ -105,6 +105,103 @@ def _t2i_analysis_images(entry: VisionReferenceEntry):
     if entry.mode != "style_indirect" or entry.processing == "full":
         return [image]
     return slice_style_image(image, mode=entry.processing)
+
+
+def _mode_guidance_policy(
+    public_mode: str,
+    guidance_detail: str,
+    vision_guidance: str,
+) -> str:
+    """Return mode-specific extraction/anchoring policy without changing Semantic."""
+
+    if public_mode == "visual":
+        if vision_guidance == "flexible":
+            variation = (
+                "VISUAL VARIATION POLICY: flexible. Preserve the reference's subject appearance, clothing, colors, "
+                "materials, accessories, rendering, and overall visual identity, but allow pose, gaze, camera/framing, "
+                "and composition to change when that produces a better result for the target prompt."
+            )
+            detail = {
+                "compact": (
+                    "VISUAL DETAIL POLICY: compact. Preserve the dominant appearance, outfit, palette, rendering, and "
+                    "overall silhouette; fine pose geometry may be simplified."
+                ),
+                "balanced": (
+                    "VISUAL DETAIL POLICY: balanced. Preserve all major appearance and drawing details faithfully while "
+                    "allowing the flexible variation policy to adapt pose and composition."
+                ),
+                "detailed": (
+                    "VISUAL DETAIL POLICY: detailed. Preserve fine appearance, clothing, color, material, line/rendering, "
+                    "lighting, and background details exhaustively while the flexible policy may still adapt pose, gaze, "
+                    "camera, and composition."
+                ),
+            }[guidance_detail]
+            return f"{variation}\n{detail}"
+
+        variation = (
+            "VISUAL VARIATION POLICY: locked. Treat pose, limb placement, hand position, head angle, gaze, expression, "
+            "camera/viewpoint, crop, framing, composition, and spatial layout as anchors. Do not change them unless the "
+            "target prompt explicitly requests that specific change."
+            if vision_guidance == "conservative"
+            else
+            "VISUAL VARIATION POLICY: stable. Preserve pose, limb placement, head angle, gaze, expression, camera/framing, "
+            "composition, and spatial layout. Adapt them only when the target prompt explicitly conflicts with the reference."
+        )
+        detail = {
+            "compact": (
+                "VISUAL DETAIL POLICY: compact. Keep the same overall drawing, silhouette, pose, gaze, framing, outfit, "
+                "palette, and rendering; omit only minor surface details."
+            ),
+            "balanced": (
+                "VISUAL DETAIL POLICY: balanced. Strongly anchor the same drawing: preserve exact body pose, limb and hand "
+                "placement, head orientation, gaze, expression, framing, crop, camera angle, composition, subject placement, "
+                "outfit, colors, and rendering characteristics."
+            ),
+            "detailed": (
+                "VISUAL DETAIL POLICY: detailed. Use the reference as a strict geometry and appearance blueprint. Preserve "
+                "exact body/limb/hand geometry, head angle, gaze target, expression, crop, camera/viewpoint, composition, "
+                "relative positions, outfit construction, colors, materials, background layout, lighting, texture, and "
+                "rendering details. More detail means MORE anchoring, not more invention."
+            ),
+        }[guidance_detail]
+        return f"{variation}\n{detail}"
+
+    if public_mode == "context":
+        variation = {
+            "conservative": (
+                "CONTEXT VARIATION POLICY: locked. Reproduce the staging literally: pose, head angle, gaze direction, "
+                "gesture, interaction, camera, crop, composition, object placement, and spatial relationships are anchors."
+            ),
+            "balanced": (
+                "CONTEXT VARIATION POLICY: stable. Preserve the observed staging, pose, gaze, gesture, framing, interaction, "
+                "and spatial layout unless the target prompt explicitly conflicts with them."
+            ),
+            "flexible": (
+                "CONTEXT VARIATION POLICY: flexible. Preserve the situation, roles, environment, and key relationships, "
+                "but allow pose, gaze, gesture, camera, crop, and composition to adapt to the target prompt."
+            ),
+        }[vision_guidance]
+        detail = {
+            "compact": (
+                "CONTEXT DETAIL POLICY: compact. Even when compact, always retain the main pose, head direction, gaze, "
+                "primary gesture/action, camera/framing, and key spatial relationship."
+            ),
+            "balanced": (
+                "CONTEXT DETAIL POLICY: balanced. Explicitly capture every visible staging cue: body orientation and pose, "
+                "head angle, gaze target, expression when relevant, shoulders, arms, hands, leg stance, gesture, interaction, "
+                "camera angle, viewpoint, crop, framing, foreground/midground/background placement, object positions, scale, "
+                "depth, and relative distances. Do not collapse these into a generic scene summary."
+            ),
+            "detailed": (
+                "CONTEXT DETAIL POLICY: detailed. Reconstruct the scene geometry exhaustively: exact pose and limb placement, "
+                "left/right relationships, head and eye direction, hand contact/gesture, weight distribution, action phase, "
+                "camera height and angle, crop boundaries, subject position in frame, overlap/occlusion, object placement, "
+                "foreground/midground/background layers, depth, distances, and all meaningful spatial relationships."
+            ),
+        }[guidance_detail]
+        return f"{variation}\n{detail}"
+
+    return ""
 
 
 def _clean_generated_guidance(clip: Any, generated_ids: Any) -> str:
@@ -149,19 +246,35 @@ def _generate_t2i_vision_guidance(
     analysis_images = _t2i_analysis_images(entry)
 
     user_instruction = str(entry.instruction or "").strip()
-    detail_instruction = guidance_detail_instruction(entry.guidance_detail)
-    # Preserve the default Semantic/Balanced prompt behavior that is already known-good.
-    if public_mode == "semantic" and entry.guidance_detail == "balanced":
-        detail_instruction = ""
 
+    # Semantic is already known-good and keeps its current behavior.
+    # Style intentionally reuses the exact legacy Visual preset/analysis behavior.
+    if public_mode in {"semantic", "style"}:
+        detail_instruction = (
+            ""
+            if (public_mode == "semantic" and entry.guidance_detail == "balanced")
+            or public_mode == "style"
+            else guidance_detail_instruction(entry.guidance_detail)
+        )
+        mode_policy = ""
+    else:
+        detail_instruction = guidance_detail_instruction(entry.guidance_detail)
+        mode_policy = _mode_guidance_policy(
+            public_mode,
+            entry.guidance_detail,
+            entry.vision_guidance,
+        )
+
+    analysis_mode_label = "visual" if public_mode == "style" else public_mode
     analysis_prompt = (
         "TARGET TEXT-TO-IMAGE PROMPT:\n"
         f"{target_prompt or '<empty>'}\n\n"
-        f"VISION MODE: {public_mode}\n"
+        f"VISION MODE: {analysis_mode_label}\n"
         "Apply only information that belongs to this Vision mode. "
         "If the additional guidance asks for information outside this mode, ignore that part.\n"
         f"ADDITIONAL GUIDANCE: {user_instruction or '<none>'}\n"
         + (f"{detail_instruction}\n" if detail_instruction else "")
+        + (f"{mode_policy}\n" if mode_policy else "")
         + "\nReturn the extracted guidance now."
     )
 
@@ -244,13 +357,14 @@ def _encode_t2i_vision(
     guidance_prefix = {
         "semantic": "Preserve this semantic content for the requested result",
         "visual": (
-            "Treat the following as an authoritative visual blueprint and reproduce the reference as closely as possible, "
-            "except for explicit target-prompt changes"
+            "Treat the following as an authoritative visual blueprint. Preserve the same drawing, pose, gaze, framing, "
+            "composition, appearance, colors, and rendering unless the guidance explicitly allows variation"
         ),
-        "style": "Match only this visual style DNA while keeping the target prompt's content",
+        "style": "Use these visible attributes for the same requested subject",
         "context": (
-            "Recreate this scene staging, pose, gaze, gesture, framing, interaction, and spatial arrangement while keeping "
-            "the target prompt's identity and appearance"
+            "Treat these context details as staging constraints: reproduce the pose, head direction, gaze, gesture, action, "
+            "framing, camera, interaction, composition, and spatial arrangement while keeping the target prompt's identity "
+            "and appearance"
         ),
     }
     guidance_lines = [
