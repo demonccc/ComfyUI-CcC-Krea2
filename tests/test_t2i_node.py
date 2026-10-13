@@ -269,26 +269,27 @@ class FakeSequentialGenerativeCLIP(FakeCLIP):
         return text
 
 
-def test_t2i_empty_generation_fails_without_retry():
+def test_t2i_empty_generation_retries_with_system_prompt():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
         mode="semantic",
         instruction="",
     )
-    clip = FakeSequentialGenerativeCLIP([""])
+    clip = FakeSequentialGenerativeCLIP(
+        ["", "A woman standing outdoors beside a stone wall."]
+    )
 
-    with pytest.raises(RuntimeError, match="Qwen returned empty Vision guidance"):
-        _generate_t2i_vision_guidance(
-            clip=clip,
-            entry=vision_chain.entries[0],
-            target_prompt="A manga girl",
-        )
+    guidance, image_count, strategy = _generate_t2i_vision_guidance(
+        clip=clip,
+        entry=vision_chain.entries[0],
+        target_prompt="A manga girl",
+    )
 
-    assert len(clip.generate_calls) == 1
-    assert len(clip.tokenize_calls) == 1
-    assert "images" in clip.tokenize_calls[0][1]
-    assert "image" not in clip.tokenize_calls[0][1]
+    assert image_count == 1
+    assert strategy == "system-prompt-fallback"
+    assert guidance == "A woman standing outdoors beside a stone wall."
+    assert len(clip.generate_calls) == 2
 
 
 def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
@@ -311,23 +312,21 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     )
 
     assert image_count == 1
-    assert strategy == "prompt-creator-shape-single-pass"
+    assert strategy == "blueprint-user-prompt"
     assert guidance.startswith("Bold manga line work")
     analysis_text, kwargs = clip.tokenize_calls[0]
+    assert "Analyze the supplied reference image or tiles only for visual STYLE." in analysis_text
     assert "TARGET TEXT-TO-IMAGE PROMPT" in analysis_text
     assert "VISION MODE: style" in analysis_text
     assert "Use manga style and girl identity." in analysis_text
-    assert len(kwargs["images"]) == 1
-    assert torch.equal(kwargs["images"][0], image)
-    assert kwargs["min_length"] == 1
-    assert kwargs["thinking"] is False
-    assert "Analyze the supplied reference image or tiles only for visual STYLE." in kwargs["system_prompt"]
+    assert torch.equal(kwargs["image"], image)
+    assert kwargs["skip_template"] is False
+    assert kwargs["system_prompt"] == ""
     assert clip.generate_calls[0][1]["seed"] == 0
     assert clip.generate_calls[0][1]["max_length"] == 512
     assert clip.generate_calls[0][1]["temperature"] == 0.25
     assert clip.generate_calls[0][1]["top_p"] == 0.90
-    assert "mtp" not in clip.generate_calls[0][1]
-    assert "presence_penalty" not in clip.generate_calls[0][1]
+    assert clip.generate_calls[0][1]["mtp"] is True
 
 
 def test_guidance_controls_live_on_vision_reference_not_t2i(monkeypatch):
@@ -364,7 +363,7 @@ def test_guidance_controls_live_on_vision_reference_not_t2i(monkeypatch):
     assert node._resolve_guidance_seed("random", 0) == 5678
 
 
-def test_vision_reference_guidance_seed_is_passed_to_single_qwen_attempt():
+def test_vision_reference_guidance_seed_is_passed_to_all_qwen_attempts():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
@@ -373,7 +372,7 @@ def test_vision_reference_guidance_seed_is_passed_to_single_qwen_attempt():
         guidance_seed=42,
     )
     clip = FakeSequentialGenerativeCLIP(
-        ["A woman standing outdoors beside a stone wall."]
+        ["", "", "A woman standing outdoors beside a stone wall."]
     )
 
     guidance, image_count, strategy = _generate_t2i_vision_guidance(
@@ -384,11 +383,10 @@ def test_vision_reference_guidance_seed_is_passed_to_single_qwen_attempt():
 
     assert guidance
     assert image_count == 1
-    assert strategy == "prompt-creator-shape-single-pass"
-    assert len(clip.generate_calls) == 1
-    assert clip.generate_calls[0][1]["seed"] == 42
-    assert "mtp" not in clip.generate_calls[0][1]
-    assert "presence_penalty" not in clip.generate_calls[0][1]
+    assert strategy == "prompt-creator-fallback"
+    assert len(clip.generate_calls) == 3
+    assert [call[1]["seed"] for call in clip.generate_calls] == [42, 42, 42]
+    assert clip.generate_calls[0][1] == clip.generate_calls[1][1] == clip.generate_calls[2][1]
 
 
 @pytest.mark.parametrize(
@@ -421,28 +419,6 @@ def test_vision_reference_guidance_detail_presets_only_change_token_limit(
     assert kwargs["top_k"] == 64
     assert kwargs["min_p"] == 0.05
     assert kwargs["repetition_penalty"] == 1.05
-
-
-def test_t2i_context_forces_balanced_generation_settings():
-    image = torch.zeros((1, 64, 64, 3))
-    vision_chain, _ = CcCKrea2VisionReference().process(
-        image=image,
-        mode="context",
-        guidance_detail="detailed",
-        vision_guidance="flexible",
-    )
-    clip = FakeGenerativeCLIP("A useful scene context.")
-
-    _generate_t2i_vision_guidance(
-        clip=clip,
-        entry=vision_chain.entries[0],
-        target_prompt="A manga girl",
-    )
-
-    kwargs = clip.generate_calls[0][1]
-    assert kwargs["max_length"] == 512
-    assert kwargs["temperature"] == 0.25
-    assert kwargs["top_p"] == 0.90
 
 
 @pytest.mark.parametrize(
