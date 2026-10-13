@@ -98,6 +98,24 @@ def _t2i_analysis_images(entry: VisionReferenceEntry):
     return slice_style_image(image, mode=entry.processing)
 
 
+def _debug_generated_ids(generated_ids: Any):
+    """Return a log-safe representation of generated token ids."""
+    try:
+        if torch.is_tensor(generated_ids):
+            return generated_ids.detach().cpu().tolist()
+        if isinstance(generated_ids, (list, tuple)):
+            out = []
+            for item in generated_ids:
+                if torch.is_tensor(item):
+                    out.append(item.detach().cpu().tolist())
+                else:
+                    out.append(item)
+            return out
+        return repr(generated_ids)
+    except Exception as exc:
+        return f"<unavailable: {type(exc).__name__}: {exc}>"
+
+
 def _clean_generated_guidance(clip: Any, generated_ids: Any) -> str:
     text = str(clip.decode(generated_ids)).strip()
     if "</think>" in text:
@@ -182,29 +200,22 @@ def _generate_t2i_vision_guidance(
     )
     generated_ids = clip.generate(tokens, **generation_kwargs)
 
-    try:
-        guidance = _clean_generated_guidance(clip, generated_ids)
-        generation_strategy = "prompt-creator-shape"
-    except RuntimeError:
-        # Safe retry: keep images=[...] and the same generation settings. Only
-        # move the system instructions into normal user text.
-        blueprint_prompt = f"{system_prompt}\n\n{analysis_prompt}".strip()
-        print(
-            f"{LOGGER_PREFIX} T2I Qwen guidance retry: "
-            f"mode={public_mode} strategy=prompt-creator-blueprint "
-            f"images={len(analysis_images)} seed={entry.guidance_seed}",
-            flush=True,
-        )
-        tokens = clip.tokenize(
-            blueprint_prompt,
-            images=analysis_images,
-            min_length=1,
-            thinking=False,
-            system_prompt="",
-        )
-        generated_ids = clip.generate(tokens, **generation_kwargs)
-        guidance = _clean_generated_guidance(clip, generated_ids)
-        generation_strategy = "prompt-creator-blueprint"
+    raw_output = str(clip.decode(generated_ids))
+    print(
+        f"{LOGGER_PREFIX} T2I Qwen raw generation: "
+        f"mode={public_mode} seed={entry.guidance_seed} "
+        f"token_ids={_debug_generated_ids(generated_ids)!r} "
+        f"decoded={raw_output!r}",
+        flush=True,
+    )
+
+    # IMPORTANT: exactly one clip.generate() per Vision Reference execution.
+    # On this Qwen3-VL/ComfyUI runtime a second generate() after an empty/invalid
+    # first result can trigger a CUDA ScatterGather device-side assert and abort
+    # the whole ComfyUI process. Fail cleanly instead; changing Guidance Seed can
+    # be used to test another sample without corrupting the CUDA context.
+    guidance = _clean_generated_guidance(clip, generated_ids)
+    generation_strategy = "prompt-creator-shape-single-pass"
 
     return guidance, len(analysis_images), generation_strategy
 
