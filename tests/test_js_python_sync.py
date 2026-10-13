@@ -42,6 +42,9 @@ def test_t2i_dimensions_widgets_are_conditionally_disabled_and_legacy_migrated()
     assert 'setWidgetDisabled(node, "height", mode !== "fixed")' in js
     assert 'setWidgetDisabled(node, "geometry_policy", mode !== "fixed")' in js
     assert "migrateLegacyT2IWidgets" in js
+    assert "normalizeT2ICurrentWidgets" in js
+    assert "t2iPresetDimensions" in js
+    assert "batch.value = 1" in js
     assert "T2I_LEGACY_ASPECT_RATIOS" in js
 
 
