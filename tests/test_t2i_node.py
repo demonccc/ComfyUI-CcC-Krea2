@@ -153,11 +153,10 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
 
     captured = {}
 
-    def fake_encode(clip, prompt, vision_references, guidance_seed=0):
+    def fake_encode(clip, prompt, vision_references):
         captured["clip"] = clip
         captured["prompt"] = prompt
         captured["vision_references"] = vision_references
-        captured["guidance_seed"] = guidance_seed
         return (
             ["vision_positive"],
             [
@@ -190,7 +189,6 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     assert positive == ["vision_positive"]
     assert captured["prompt"] == "A futuristic city"
     assert captured["vision_references"] is vision_chain
-    assert captured["guidance_seed"] == 0
     assert clip.tokenize_calls == [("blurry", {})]
     assert negative == ["conditioning_for_tokens_for_blurry"]
     assert "samples" in latent
@@ -215,9 +213,9 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
     )
     clip = FakeCLIP()
 
-    def fake_generate_guidance(clip, entry, target_prompt, guidance_seed=0):
+    def fake_generate_guidance(clip, entry, target_prompt):
         assert target_prompt == "Only one manga girl facing forward."
-        assert guidance_seed == 0
+        assert entry.guidance_seed == 0
         return "Give the same target girl long black hair and a red jacket.", 1, "blueprint-user-prompt"
 
     monkeypatch.setattr(
@@ -331,35 +329,47 @@ def test_t2i_style_analysis_uses_mode_scoped_qwen_generation():
     assert clip.generate_calls[0][1]["mtp"] is True
 
 
-def test_t2i_guidance_seed_controls_and_modes(monkeypatch):
-    required = CcCKrea2TextToImage.INPUT_TYPES()["required"]
-    assert required["guidance_seed_mode"][0] == ["fixed", "incremental", "random"]
-    assert required["guidance_seed_mode"][1]["default"] == "fixed"
-    assert required["guidance_seed"][1]["default"] == 0
-    assert required["guidance_detail"][0] == ["compact", "balanced", "detailed"]
-    assert required["guidance_detail"][1]["default"] == "balanced"
-    assert required["vision_guidance"][0] == ["conservative", "balanced", "flexible"]
-    assert required["vision_guidance"][1]["default"] == "balanced"
+def test_guidance_controls_live_on_vision_reference_not_t2i(monkeypatch):
+    t2i_required = CcCKrea2TextToImage.INPUT_TYPES()["required"]
+    for name in (
+        "guidance_seed_mode",
+        "guidance_seed",
+        "guidance_detail",
+        "vision_guidance",
+    ):
+        assert name not in t2i_required
 
-    node = CcCKrea2TextToImage()
+    ref_required = CcCKrea2VisionReference.INPUT_TYPES()["required"]
+    assert ref_required["guidance_seed_mode"][0] == ("fixed", "incremental", "random")
+    assert ref_required["guidance_seed_mode"][1]["default"] == "fixed"
+    assert ref_required["guidance_seed"][1]["default"] == 0
+    assert ref_required["guidance_detail"][0] == ("compact", "balanced", "detailed")
+    assert ref_required["guidance_detail"][1]["default"] == "balanced"
+    assert ref_required["vision_guidance"][0] == ("conservative", "balanced", "flexible")
+    assert ref_required["vision_guidance"][1]["default"] == "balanced"
+
+    node = CcCKrea2VisionReference()
     assert node._resolve_guidance_seed("fixed", 7) == 7
-
     assert node._resolve_guidance_seed("incremental", 10) == 10
     assert node._resolve_guidance_seed("incremental", 10) == 11
     assert node._resolve_guidance_seed("incremental", 10) == 12
 
     values = iter([1234, 5678])
-    monkeypatch.setattr("ccc_krea2.t2i.random.SystemRandom.randint", lambda self, a, b: next(values))
+    monkeypatch.setattr(
+        "ccc_krea2.modular_nodes.vision_reference_node.random.SystemRandom.randint",
+        lambda self, a, b: next(values),
+    )
     assert node._resolve_guidance_seed("random", 0) == 1234
     assert node._resolve_guidance_seed("random", 0) == 5678
 
 
-def test_t2i_guidance_seed_is_passed_to_all_qwen_attempts():
+def test_vision_reference_guidance_seed_is_passed_to_all_qwen_attempts():
     image = torch.zeros((1, 64, 64, 3))
     vision_chain, _ = CcCKrea2VisionReference().process(
         image=image,
         mode="semantic",
         instruction="",
+        guidance_seed=42,
     )
     clip = FakeSequentialGenerativeCLIP(
         ["", "", "A woman standing outdoors beside a stone wall."]
@@ -369,7 +379,6 @@ def test_t2i_guidance_seed_is_passed_to_all_qwen_attempts():
         clip=clip,
         entry=vision_chain.entries[0],
         target_prompt="A manga girl",
-        guidance_seed=42,
     )
 
     assert guidance
@@ -384,20 +393,23 @@ def test_t2i_guidance_seed_is_passed_to_all_qwen_attempts():
     ("guidance_detail", "expected_max_length"),
     [("compact", 256), ("balanced", 512), ("detailed", 1024)],
 )
-def test_t2i_guidance_detail_presets_only_change_token_limit(
+def test_vision_reference_guidance_detail_presets_only_change_token_limit(
     guidance_detail,
     expected_max_length,
 ):
     image = torch.zeros((1, 64, 64, 3))
-    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="semantic")
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="semantic",
+        guidance_detail=guidance_detail,
+        vision_guidance="balanced",
+    )
     clip = FakeGenerativeCLIP("A useful semantic description.")
 
     _generate_t2i_vision_guidance(
         clip=clip,
         entry=vision_chain.entries[0],
         target_prompt="A manga girl",
-        guidance_detail=guidance_detail,
-        vision_guidance="balanced",
     )
 
     kwargs = clip.generate_calls[0][1]
@@ -417,21 +429,24 @@ def test_t2i_guidance_detail_presets_only_change_token_limit(
         ("flexible", 0.45, 0.95),
     ],
 )
-def test_t2i_vision_guidance_sampling_presets(
+def test_vision_reference_sampling_presets(
     vision_guidance,
     temperature,
     top_p,
 ):
     image = torch.zeros((1, 64, 64, 3))
-    vision_chain, _ = CcCKrea2VisionReference().process(image=image, mode="semantic")
+    vision_chain, _ = CcCKrea2VisionReference().process(
+        image=image,
+        mode="semantic",
+        guidance_detail="balanced",
+        vision_guidance=vision_guidance,
+    )
     clip = FakeGenerativeCLIP("A useful semantic description.")
 
     _generate_t2i_vision_guidance(
         clip=clip,
         entry=vision_chain.entries[0],
         target_prompt="A manga girl",
-        guidance_detail="balanced",
-        vision_guidance=vision_guidance,
     )
 
     kwargs = clip.generate_calls[0][1]
@@ -496,18 +511,8 @@ def test_t2i_determinism_and_no_cache_hooks():
     """18-19. Repeated calls are deterministic and class defines no cache-invalidating hooks."""
     node = CcCKrea2TextToImage()
 
-    # Verify no IS_CHANGED or cache-invalidating attributes
-    assert hasattr(CcCKrea2TextToImage, "IS_CHANGED")
-    assert (
-        node.IS_CHANGED(
-            guidance_seed_mode="fixed",
-            guidance_seed=0,
-            guidance_detail="balanced",
-            vision_guidance="balanced",
-        )
-        == "guidance-seed:0:detail:balanced:vision:balanced"
-    )
-    assert str(node.IS_CHANGED(guidance_seed_mode="random", guidance_seed=0)).lower() == "nan"
+    # T2I no longer owns Qwen generation state; Vision Reference does.
+    assert not hasattr(CcCKrea2TextToImage, "IS_CHANGED")
     assert not hasattr(node, "fingerprint_inputs")
     assert not hasattr(node, "not_idempotent")
 
