@@ -46,11 +46,42 @@ function pick(event, node, widget) {
   selector.addEventListener("blur", () => selector.remove(), { once: true });
   selector.focus();
 }
+function cleanupLegacySockets(node) {
+  for (const key of ["prompt_augmentation", "lora_prompt_settings"]) {
+    let index;
+    while ((index = node.inputs?.findIndex((s) => s.name === key)) >= 0) node.removeInput(index);
+  }
+  let index;
+  while ((index = node.outputs?.findIndex((s) => s.name === "prompt_augmentation")) >= 0) {
+    node.removeOutput(index);
+  }
+}
+
+function restoreNames(node, info) {
+  const values = info?.widgets_values;
+  if (!Array.isArray(values)) return;
+  const find = (key) => node.widgets?.find((w) => w.name === key);
+  // Previously stored widget values had global enabled + global strength
+  // followed by 4 triples of enabled/name/strength.
+  if (values.length === 14) {
+    for (let i = 1; i <= 4; i++) {
+      const base = 2 + (i - 1) * 3;
+      const enabled = find(`lora_${i}_enabled`);
+      const name = find(`lora_${i}_name`);
+      const strength = find(`lora_${i}_strength`);
+      if (enabled) enabled.value = Boolean(values[base]);
+      if (name && typeof values[base + 1] === "string") name.value = values[base + 1];
+      if (strength && Number.isFinite(Number(values[base + 2]))) strength.value = Number(values[base + 2]);
+    }
+  }
+}
+
 function install(node) {
   if (node.__cccCompactStack) return;
   const find = (key) => node.widgets?.find((w) => w.name === key);
   if (!find("lora_10_strength")) return;
   node.__cccCompactStack = true;
+  cleanupLegacySockets(node);
   // Old saved nodes may still retain obsolete input sockets.
   for (const obsolete of ["prompt_augmentation", "lora_prompt_settings"]) {
     const index = node.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
@@ -121,8 +152,20 @@ function install(node) {
         editor.type = "number"; editor.min = "-10"; editor.max = "10"; editor.step = "0.05";
         editor.value = String(strength.value);
         editor.style.cssText = "position:fixed;z-index:100000;width:65px;height:24px;box-sizing:border-box;text-align:center;background:#252525;color:#eee;border:1px solid #7b9ab0;border-radius:4px;";
-        editor.style.left = Math.max(0, event.clientX - 32) + "px";
-        editor.style.top = Math.max(0, event.clientY - 12) + "px";
+        // LiteGraph may pass coordinates only in `pos`, without browser clientX.
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaleX = canvasRect.width / canvas.width;
+        const scaleY = canvasRect.height / canvas.height;
+        const ds = app.canvas?.ds;
+        const offset = ds?.offset || [0, 0];
+        const zoom = ds?.scale || 1;
+        const nodeX = (n.pos[0] + offset[0]) * zoom;
+        const nodeY = (n.pos[1] + offset[1]) * zoom;
+        const widgetY = pos[1];
+        const clientX = Number.isFinite(event.clientX) ? event.clientX : canvasRect.left + (nodeX + w - 59) * scaleX;
+        const clientY = Number.isFinite(event.clientY) ? event.clientY : canvasRect.top + (nodeY + widgetY) * scaleY;
+        editor.style.left = Math.max(0, clientX - 32) + "px";
+        editor.style.top = Math.max(0, clientY - 12) + "px";
         document.body.appendChild(editor);
         let completed = false;
         const commit = () => {
@@ -170,21 +213,8 @@ app.registerExtension({
         const index = this.inputs?.findIndex((input) => input.name === obsolete) ?? -1;
         if (index >= 0) this.removeInput(index);
       }
-      // Migrate four-slot workflow values from the old global-strength layout.
-      if (Array.isArray(info?.widgets_values) && info.widgets_values.length === 14) {
-        const find = (name) => this.widgets?.find((w) => w.name === name);
-        for (let i = 1; i <= 4; i++) {
-          const base = 2 + (i - 1) * 3;
-          const enabled = find(`lora_${i}_enabled`);
-          const name = find(`lora_${i}_name`);
-          const strength = find(`lora_${i}_strength`);
-          if (enabled) enabled.value = Boolean(info.widgets_values[base]);
-          const candidate = info.widgets_values[base + 1];
-          const choices = name?.options?.values;
-          if (name && Array.isArray(choices) && choices.includes(candidate)) name.value = candidate;
-          if (strength && Number.isFinite(Number(info.widgets_values[base + 2]))) strength.value = Number(info.widgets_values[base + 2]);
-        }
-      }
+      restoreNames(this, info);
+      cleanupLegacySockets(this);
       return result;
     };
     const original = nodeType.prototype.onNodeCreated;
