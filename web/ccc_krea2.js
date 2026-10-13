@@ -655,22 +655,38 @@ app.registerExtension({
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
             const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
+            const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
 
             const updateGuidanceSeedState = () => {
                 const mode = seedModeWidget?.value ?? "fixed";
                 setWidgetDisabled(node, "guidance_seed", mode !== "fixed");
             };
 
-            if (seedModeWidget) {
-                const originalCallback = seedModeWidget.callback;
-                seedModeWidget.callback = function () {
+            const updateDimensionsState = () => {
+                const mode = dimensionsWidget?.value ?? "preset";
+                setWidgetDisabled(node, "preset_size", mode !== "preset");
+                setWidgetDisabled(node, "width", mode !== "fixed");
+                setWidgetDisabled(node, "height", mode !== "fixed");
+                setWidgetDisabled(node, "geometry_policy", mode !== "fixed");
+            };
+
+            for (const [widget, callback] of [
+                [seedModeWidget, updateGuidanceSeedState],
+                [dimensionsWidget, updateDimensionsState],
+            ]) {
+                if (!widget) continue;
+                const originalCallback = widget.callback;
+                widget.callback = function () {
                     const result = originalCallback?.apply(this, arguments);
-                    updateGuidanceSeedState();
+                    callback();
                     return result;
                 };
             }
 
-            setTimeout(updateGuidanceSeedState, 20);
+            setTimeout(() => {
+                updateGuidanceSeedState();
+                updateDimensionsState();
+            }, 20);
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
