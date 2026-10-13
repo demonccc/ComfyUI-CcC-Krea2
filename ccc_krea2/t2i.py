@@ -73,8 +73,10 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "colors and patterns, pose, body/head/hand positions, gaze, expression, objects, environment and background, "
         "camera/framing/viewpoint, composition, spatial relationships, lighting, palette, texture, rendering medium, and "
         "visual style. Preserve concrete specifics; do not generalize distinctive details into vague equivalents. "
-        "Do not introduce extra subjects. Return direct English generation guidance with no preamble and no mention of a "
-        "reference image."
+        "The target prompt's subject count is authoritative. Never duplicate, clone, repeat, mirror, tile, or create "
+        "alternate versions of a subject. Produce one coherent image, not a contact sheet, storyboard, multi-panel layout, "
+        "or set of variants. Do not introduce extra subjects. Return direct English generation guidance with no preamble "
+        "and no mention of a reference image."
     ),
     "style": LEGACY_VISUAL_SYSTEM_PROMPT,
     "context": (
@@ -82,11 +84,14 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "subject's visual identity. Capture setting and environment, camera/framing/viewpoint, subject count and scene "
         "roles, full-body pose and body orientation, head orientation, gaze direction, relevant facial expression, "
         "arm/hand placement, gesture, action, interaction, object relationships, composition, foreground/midground/"
-        "background layout, scale, depth, and spatial relationships. These details are required when visibly present; "
-        "do not summarize them away. The target prompt remains authoritative for identity and appearance. Refer to people "
-        "only generically as the target subject or scene role. Do not transfer face identity, hair design, clothing design "
-        "or color, accessories, rendering medium, visual style, palette treatment, or texture. Return direct English "
-        "context guidance with no preamble and no mention of a reference image."
+        "background layout, scale, depth, and spatial relationships. Treat every visible staging cue as a constraint, not "
+        "a suggestion: pose, gaze, head angle, hands, gesture, camera, crop, framing, interaction, object placement, and "
+        "relative positions must be retained unless the target prompt explicitly conflicts with them. Do not summarize "
+        "them away. The target prompt remains authoritative for identity, appearance, and subject count. Never duplicate "
+        "or add subjects just because they appear in the context reference. Refer to people only generically as the target "
+        "subject or scene role. Do not transfer face identity, hair design, clothing design or color, accessories, rendering "
+        "medium, visual style, palette treatment, or texture. Return direct English context guidance with no preamble and "
+        "no mention of a reference image."
     ),
 }
 
@@ -119,7 +124,8 @@ def _mode_guidance_policy(
             variation = (
                 "VISUAL VARIATION POLICY: flexible. Preserve the reference's subject appearance, clothing, colors, "
                 "materials, accessories, rendering, and overall visual identity, but allow pose, gaze, camera/framing, "
-                "and composition to change when that produces a better result for the target prompt."
+                "and composition to change when that produces a better result for the target prompt. Subject count is "
+                "never flexible: do not clone, repeat, tile, mirror, or create multiple variants of the same subject."
             )
             detail = {
                 "compact": (
@@ -140,12 +146,13 @@ def _mode_guidance_policy(
 
         variation = (
             "VISUAL VARIATION POLICY: locked. Treat pose, limb placement, hand position, head angle, gaze, expression, "
-            "camera/viewpoint, crop, framing, composition, and spatial layout as anchors. Do not change them unless the "
-            "target prompt explicitly requests that specific change."
+            "camera/viewpoint, crop, framing, composition, spatial layout, and subject count as anchors. Do not change "
+            "them unless the target prompt explicitly requests that specific change. Never clone or repeat a subject."
             if vision_guidance == "conservative"
             else
             "VISUAL VARIATION POLICY: stable. Preserve pose, limb placement, head angle, gaze, expression, camera/framing, "
-            "composition, and spatial layout. Adapt them only when the target prompt explicitly conflicts with the reference."
+            "composition, spatial layout, and exact target subject count. Adapt pose/composition only when the target prompt "
+            "explicitly conflicts with the reference. Never clone, repeat, mirror, or multiply a subject."
         )
         detail = {
             "compact": (
@@ -155,13 +162,15 @@ def _mode_guidance_policy(
             "balanced": (
                 "VISUAL DETAIL POLICY: balanced. Strongly anchor the same drawing: preserve exact body pose, limb and hand "
                 "placement, head orientation, gaze, expression, framing, crop, camera angle, composition, subject placement, "
-                "outfit, colors, and rendering characteristics."
+                "outfit, colors, and rendering characteristics. Describe each subject once as one coherent figure; do not "
+                "turn different observed details into separate copies or variants."
             ),
             "detailed": (
                 "VISUAL DETAIL POLICY: detailed. Use the reference as a strict geometry and appearance blueprint. Preserve "
                 "exact body/limb/hand geometry, head angle, gaze target, expression, crop, camera/viewpoint, composition, "
                 "relative positions, outfit construction, colors, materials, background layout, lighting, texture, and "
-                "rendering details. More detail means MORE anchoring, not more invention."
+                "rendering details. More detail means MORE anchoring, not more invention. Keep each subject as one single "
+                "instance in one coherent image; never expand detailed observations into clones, variants, or panels."
             ),
         }[guidance_detail]
         return f"{variation}\n{detail}"
@@ -173,8 +182,9 @@ def _mode_guidance_policy(
                 "gesture, interaction, camera, crop, composition, object placement, and spatial relationships are anchors."
             ),
             "balanced": (
-                "CONTEXT VARIATION POLICY: stable. Preserve the observed staging, pose, gaze, gesture, framing, interaction, "
-                "and spatial layout unless the target prompt explicitly conflicts with them."
+                "CONTEXT VARIATION POLICY: stable. Treat the observed staging, pose, head angle, gaze, gesture, limb/hand "
+                "placement, framing, camera, interaction, object placement, and spatial layout as required constraints. "
+                "Change them only when the target prompt explicitly conflicts with them."
             ),
             "flexible": (
                 "CONTEXT VARIATION POLICY: flexible. Preserve the situation, roles, environment, and key relationships, "
@@ -190,13 +200,15 @@ def _mode_guidance_policy(
                 "CONTEXT DETAIL POLICY: balanced. Explicitly capture every visible staging cue: body orientation and pose, "
                 "head angle, gaze target, expression when relevant, shoulders, arms, hands, leg stance, gesture, interaction, "
                 "camera angle, viewpoint, crop, framing, foreground/midground/background placement, object positions, scale, "
-                "depth, and relative distances. Do not collapse these into a generic scene summary."
+                "depth, and relative distances. State these explicitly and preserve them as mandatory staging constraints; "
+                "do not collapse them into a generic scene summary or normalize them into a generic pose."
             ),
             "detailed": (
                 "CONTEXT DETAIL POLICY: detailed. Reconstruct the scene geometry exhaustively: exact pose and limb placement, "
                 "left/right relationships, head and eye direction, hand contact/gesture, weight distribution, action phase, "
                 "camera height and angle, crop boundaries, subject position in frame, overlap/occlusion, object placement, "
-                "foreground/midground/background layers, depth, distances, and all meaningful spatial relationships."
+                "foreground/midground/background layers, depth, distances, and all meaningful spatial relationships. "
+                "Treat every recovered staging detail as mandatory unless the target prompt explicitly changes it."
             ),
         }[guidance_detail]
         return f"{variation}\n{detail}"
@@ -357,14 +369,21 @@ def _encode_t2i_vision(
     guidance_prefix = {
         "semantic": "Preserve this semantic content for the requested result",
         "visual": (
-            "Treat the following as an authoritative visual blueprint. Preserve the same drawing, pose, gaze, framing, "
-            "composition, appearance, colors, and rendering unless the guidance explicitly allows variation"
+            "MANDATORY VISUAL BLUEPRINT: reproduce the same drawing as faithfully as possible. Preserve pose, gaze, head "
+            "angle, limb/hand placement, framing, crop, composition, appearance, outfit, colors, background layout, and "
+            "rendering. Preserve the target prompt's exact subject count and NEVER clone, repeat, mirror, tile, panelize, "
+            "or create alternate copies of a subject unless explicitly requested"
         ),
-        "style": "Use these visible attributes for the same requested subject",
+        "style": (
+            "STRONG STYLE REFERENCE: apply the following reference-derived visible treatment as the dominant visual "
+            "direction across the entire result. Prioritize its rendering, line/shading treatment, palette, lighting, "
+            "texture, finish, and overall look over generic style cues while keeping the target prompt's subject and scene"
+        ),
         "context": (
-            "Treat these context details as staging constraints: reproduce the pose, head direction, gaze, gesture, action, "
-            "framing, camera, interaction, composition, and spatial arrangement while keeping the target prompt's identity "
-            "and appearance"
+            "MANDATORY STAGING CONSTRAINTS: reproduce the pose, body orientation, head direction, gaze target, expression "
+            "when relevant, limb/hand placement, gesture, action, framing, camera/viewpoint, crop, interaction, object "
+            "placement, composition, depth, and spatial arrangement. Do not simplify these into a generic pose or scene. "
+            "Keep the target prompt's identity, appearance, and exact subject count"
         ),
     }
     guidance_lines = [
