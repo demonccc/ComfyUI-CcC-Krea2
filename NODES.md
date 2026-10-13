@@ -90,12 +90,16 @@ Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
 | mode | semantic, visual, style, context | semantic | Chooses what the reference contributes. |
 | instruction | text | empty | Optional extra instruction for this reference. |
 | style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
+| guidance_seed_mode | fixed, incremental, random | fixed | Seed behavior for Qwen text guidance generation. |
+| guidance_seed | integer | 0 | Base/fixed Qwen guidance seed; editable only in fixed mode. |
+| guidance_detail | compact, balanced, detailed | balanced | Fixed max-length preset: 256 / 512 / 1024. |
+| vision_guidance | conservative, balanced, flexible | balanced | Fixed sampling preset: 0.15/0.85, 0.25/0.90, 0.45/0.95 for temperature/top_p. |
 | previous_references | KREA2_VISION_REFERENCE_CHAIN | optional | Previous Vision Reference chain. |
 
 Outputs:
 
 - `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`)
-- `vision_info` (`STRING`) with consumer-neutral declaration metadata: mode, internal mode, instruction, source resolution, effective Style processing, and chain size.
+- `vision_info` (`STRING`) with consumer-neutral declaration metadata including mode, processing, Qwen guidance preset/seed, source resolution, and chain size.
 
 Vision Reference defines information semantics rather than a transport algorithm:
 
@@ -104,7 +108,7 @@ Vision Reference defines information semantics rather than a transport algorithm
 - **Style**: aesthetic/rendering treatment; full, 2x2, or 4x4 analysis.
 - **Context**: setting, action, framing, interaction, composition, and spatial relationships.
 
-There is no public `grounding_px` or `fidelity` control. The connected consumer owns the actual processing/transport of the declared Vision information.
+There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference so every consumer can reuse the same guidance configuration instead of duplicating controls.
 
 ## Krea2 CcC Size Resolver
 
@@ -496,11 +500,12 @@ Required inputs/controls:
 | model | MODEL | — |
 | clip | CLIP | — |
 | prompt | text | — |
-| aspect_ratio | 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3, custom | 1:1 |
-| megapixels | 0.25..2.0 | 1.0 |
+| dimensions | preset, fixed | preset |
+| preset_size | shared curated Krea geometries | 1024 x 1024 |
+| width | 16..16384, step 16 | 1024 |
+| height | 16..16384, step 16 | 1024 |
+| geometry_policy | nearest_krea_aspect, preserve_aspect_krea_bounds | preserve_aspect_krea_bounds |
 | batch_size | 1..64 | 1 |
-| custom_aspect_width | 1..32 | 1 |
-| custom_aspect_height | 1..32 | 1 |
 
 Optional inputs:
 
@@ -516,7 +521,7 @@ Outputs:
 - latent
 - t2i_info
 
-The node applies prompt augmentation, resolves width/height from aspect ratio + megapixels, rounds both axes to /16, and creates an empty SD3-compatible latent. Without Vision Reference it uses normal text-only CLIP encoding. With Vision Reference, each reference is analyzed by Qwen multimodal generation using a mode-specific system prompt; the generated Semantic/Visual/Style/Context guidance is appended to the user's requested result and encoded as text-only Krea2 conditioning. Direct image rows are never present in final T2I conditioning. The explicit negative prompt remains text-only.
+The node applies prompt augmentation and creates an empty SD3-compatible latent from the same shared Krea geometry library used by Latent. Preset mode uses the shared curated Krea sizes directly; fixed mode resolves through the shared Krea geometry policy. Without Vision Reference it uses normal text-only CLIP encoding. With Vision Reference, each reference is analyzed by Qwen multimodal generation using the guidance seed/detail/sampling configuration carried by that reference; the generated Semantic/Visual/Style/Context guidance is appended to the user's requested result and encoded as text-only Krea2 conditioning. Direct image rows are never present in final T2I conditioning. The explicit negative prompt remains text-only.
 
 ## Example Workflows
 
