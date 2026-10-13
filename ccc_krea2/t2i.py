@@ -151,10 +151,12 @@ def _generate_t2i_vision_guidance(
     )
 
     image_batch = torch.cat(analysis_images, dim=0)
+    effective_guidance_detail = "balanced" if public_mode == "context" else entry.guidance_detail
+    effective_vision_guidance = "balanced" if public_mode == "context" else entry.vision_guidance
     generation_kwargs = guidance_generation_kwargs(
         guidance_seed=entry.guidance_seed,
-        guidance_detail=entry.guidance_detail,
-        vision_guidance=entry.vision_guidance,
+        guidance_detail=effective_guidance_detail,
+        vision_guidance=effective_vision_guidance,
     )
 
     # Krea2's official ComfyUI blueprint feeds prompt-engineering instructions as
@@ -417,6 +419,11 @@ class CcCKrea2TextToImage:
                 f"guidance_seed={entry.guidance_seed}, "
                 f"guidance_detail={entry.guidance_detail}, "
                 f"vision_guidance={entry.vision_guidance}"
+                + (
+                    ", effective_context_generation=balanced"
+                    if public_mode == "context"
+                    else ""
+                )
             )
 
         if vision_entries:
