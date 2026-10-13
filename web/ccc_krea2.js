@@ -289,18 +289,25 @@ app.registerExtension({
             const updateVisionReferenceState = () => {
                 const mode = modeWidget?.value ?? "semantic";
                 const styleMode = mode === "style";
-                const semanticMode = mode === "semantic";
+                const contextMode = mode === "context";
                 if (processingWidget) {
                     processingWidget.disabled = !styleMode;
                     if (!styleMode) processingWidget.value = "full";
                 }
 
-                setWidgetDisabled(node, "guidance_seed_mode", !semanticMode);
-                setWidgetDisabled(node, "guidance_detail", !semanticMode);
-                setWidgetDisabled(node, "vision_guidance", !semanticMode);
+                const detailWidget = node.widgets?.find((w) => w.name === "guidance_detail");
+                const visionWidget = node.widgets?.find((w) => w.name === "vision_guidance");
+                if (contextMode) {
+                    if (detailWidget) detailWidget.value = "balanced";
+                    if (visionWidget) visionWidget.value = "balanced";
+                }
+
+                setWidgetDisabled(node, "guidance_seed_mode", false);
+                setWidgetDisabled(node, "guidance_detail", contextMode);
+                setWidgetDisabled(node, "vision_guidance", contextMode);
 
                 const seedMode = seedModeWidget?.value ?? "fixed";
-                setWidgetDisabled(node, "guidance_seed", !semanticMode || seedMode !== "fixed");
+                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
                 node.setDirtyCanvas?.(true, true);
             };
 
