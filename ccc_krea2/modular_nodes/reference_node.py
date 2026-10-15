@@ -1,6 +1,6 @@
 """Unified CcC reference with independent Qwen Vision and VAE appearance paths."""
 from ..constants import NODE_CATEGORY
-from .edit_reference_types import VisualReferenceChain, VisionReferenceChain
+from .edit_reference_types import VisualReferenceChain, VisionReferenceChain, VisionReferenceEntry, VisualReferenceEntry
 from .visual_reference_node import CcCKrea2VisualReference, REFERENCE_FIT
 from .vision_reference_node import CcCKrea2VisionReference, VISION_MODES
 
@@ -41,11 +41,15 @@ class CcCKrea2Reference:
             (visuals,) = CcCKrea2VisualReference().process(
                 image=image, boost=visual_boost, reference_fit=reference_fit,
                 semantic=False, previous_references=visuals)
+            last = visuals.entries[-1]
+            visuals = VisualReferenceChain(visuals.entries[:-1] + (VisualReferenceEntry(**{**last.__dict__, "reference_tag":tag, "vision_strength":float(vision_strength)}),))
         if semantic_enabled:
             visions, _ = CcCKrea2VisionReference().process(
                 image=image, mode=vision_mode,
                 instruction=vision_instruction.strip(),
                 previous_references=visions)
+            last = visions.entries[-1]
+            visions = VisionReferenceChain(visions.entries[:-1] + (VisionReferenceEntry(**{**last.__dict__, "reference_tag":tag, "vision_strength":float(vision_strength)}),))
         report = (f"@{tag}: semantic={semantic_enabled} mode={vision_mode}; "
                   f"visual={visual_enabled} visual_boost={visual_boost}; "
                   f"vision_strength={vision_strength} (pending token-weight runtime)")
