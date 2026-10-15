@@ -88,7 +88,6 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             reference_path="edit",
             **weight_kwargs,
             prepared_image=prep,
-            **weight_kwargs,
             vision_instruction=_with_user_instruction(SEMANTIC_DIRECTIVE, entry.instruction, "semantic"),
             appearance_reference=False,
             include_in_vision=True,
@@ -102,6 +101,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     if entry.mode == "style_direct":
         return ReferenceSpec(
             reference_path="edit",
+            **weight_kwargs,
             prepared_image=prep,
             vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction, "visual"),
             appearance_reference=False,
@@ -130,6 +130,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     if entry.mode == "context_indirect":
         return ReferenceSpec(
             reference_path="edit",
+            **weight_kwargs,
             prepared_image=prep,
             vision_instruction=_with_user_instruction(CONTEXT_DIRECTIVE, entry.instruction, "context"),
             appearance_reference=False,
