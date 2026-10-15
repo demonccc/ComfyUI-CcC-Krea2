@@ -4,7 +4,6 @@ from typing import Optional, Tuple
 
 import torch
 
-from ..attention_regions import REFERENCE_ATTENTION_SCOPES
 from ..constants import NODE_CATEGORY
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
@@ -89,20 +88,7 @@ class CcCKrea2VisualReference:
                         "tooltip": "Optional text appended as 'Image N: <annotation>' for this Qwen image.",
                     },
                 ),
-                "attention_scope": (
-                    REFERENCE_ATTENTION_SCOPES,
-                    {
-                        "default": "global",
-                        "tooltip": "global = current behavior; boost in region = boost only inside the tagged target box; only in region = block this reference outside the tagged target box.",
-                    },
-                ),
-                "region_tag": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "Attention Region tag used when attention_scope is not global.",
-                    },
-                ),
+
             },
             "optional": {
                 "previous_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
@@ -123,22 +109,11 @@ class CcCKrea2VisualReference:
         semantic_grounding_px: int = 768,
         semantic_resize_method: str = "lanczos",
         prompt_annotation: str = "",
-        attention_scope: str = "global",
-        region_tag: str = "",
         previous_references: Optional[VisualReferenceChain] = None,
     ) -> Tuple[VisualReferenceChain]:
         chain = previous_references if previous_references is not None else VisualReferenceChain()
 
         semantic_enabled = bool(semantic)
-        attention_scope = str(attention_scope)
-        if attention_scope not in REFERENCE_ATTENTION_SCOPES:
-            raise ValueError(f"[Krea2 CcC Visual Reference] Invalid attention_scope '{attention_scope}'.")
-        resolved_region_tag = str(region_tag or "").strip()
-        if attention_scope != "global" and not resolved_region_tag:
-            raise ValueError(
-                "[Krea2 CcC Visual Reference] regional attention requires a non-empty region_tag."
-            )
-
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
@@ -152,7 +127,5 @@ class CcCKrea2VisualReference:
             semantic_grounding_px=int(semantic_grounding_px),
             semantic_resize_method=semantic_resize_method,
             prompt_annotation=prompt_annotation.strip() if semantic_enabled else "",
-            attention_scope=attention_scope,
-            region_tag=resolved_region_tag if attention_scope != "global" else "",
         )
         return (chain.append(entry),)
