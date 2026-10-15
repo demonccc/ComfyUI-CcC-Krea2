@@ -1,6 +1,6 @@
 {
   "last_node_id": 17,
-  "last_link_id": 25,
+  "last_link_id": 26,
   "nodes": [
     {
       "id": 1,
@@ -103,7 +103,7 @@
     },
     {
       "id": 4,
-      "type": "CcCKrea2LoRAStack",
+      "type": "CcCKrea2LoRAStackWithPrompt",
       "pos": [
         350,
         0
@@ -133,28 +133,42 @@
         {
           "name": "prompt_augmentation",
           "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
+          "links": [
+            26
+          ]
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2LoRAStack"
+        "Node name for S&R": "CcCKrea2LoRAStackWithPrompt"
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
+        "append",
+        "",
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        "append",
+        "",
         false,
         "None",
         1,
+        "append",
+        "",
         false,
         "None",
-        1
-      ]
+        1,
+        "append",
+        "",
+        false,
+        "None",
+        1,
+        "append",
+        ""
+      ],
+      "title": "Krea2 CcC LoRA Stack with Prompt"
     },
     {
       "id": 5,
@@ -483,6 +497,11 @@
           "name": "vision_references",
           "type": "KREA2_VISION_REFERENCE_CHAIN",
           "link": 25
+        },
+        {
+          "name": "prompt_augmentation",
+          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
+          "link": 26
         }
       ],
       "outputs": [
@@ -916,6 +935,14 @@
       11,
       6,
       "KREA2_VISION_REFERENCE_CHAIN"
+    ],
+    [
+      26,
+      4,
+      1,
+      11,
+      7,
+      "CCC_KREA2_PROMPT_AUGMENTATION"
     ]
   ],
   "groups": [
