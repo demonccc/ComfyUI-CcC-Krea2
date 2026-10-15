@@ -2,91 +2,52 @@
 
 ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
-The public surface currently contains **14 nodes**. Reference Cache nodes and the standalone Paint Geometry node are not part of the public node registry.
+The public surface currently contains **13 nodes**. Reference Cache nodes and the standalone Paint Geometry node are not part of the public node registry.
 
 ## Public Nodes
 
-| Area | Node | Purpose |
+| Node | ID | Purpose |
 | --- | --- | --- |
-| Edit | **Krea2 CcC Visual Reference** | Ordered appearance reference with VAE fit, boost, RoPE placement, optional Qwen grounding, and optional regional attention. |
-| Edit | **Krea2 CcC Vision Reference** | Qwen/Vision-only Semantic, Visual, Style, or Context reference; no appearance latent. |
-| Edit | **Krea2 CcC Attention Region** | Tagged target box used by regional Visual Reference attention. |
-| Edit | **Krea2 CcC Size Resolver** | Resolves width/height from one image's long edge and another image's aspect ratio. |
-| Edit | **Krea2 CcC Latent** | Owns target dimensions, Krea geometry policy, optional target content, semantic target context, and attention-region transport. |
-| Edit | **Krea2 CcC Edit Prompt Creator** | Optional multimodal prompt creator using the same Krea2/Qwen3-VL CLIP as Edit. |
-| Edit | **Krea2 CcC Edit** | Final edit orchestrator and Krea2 CcC edit runtime. |
-| Utility | **Krea2 CcC Character Sheet** | Deterministically composes generic portrait/body references into one Krea-aligned image. |
-| Paint | **Krea2 CcC Paint Prepare** | Owns Paint geometry, outpaint expansion, mask processing, semantic reference, VAE preparation, and sampling latent. |
-| Paint | **Krea2 CcC Paint** | Builds AnyPaint/Krea Paint conditioning and installs the Paint runtime. |
-| Paint | **Krea2 CcC Paint Restore** | Restores decoded Paint output to the requested canvas. |
-| LoRA | **CcC Krea2 - LoRA Prompt Settings** | Defines optional prompt augmentation associated with up to four LoRA slots. |
-| LoRA | **CcC Krea2 - LoRA Stack** | Applies up to four model-only LoRAs and carries optional prompt augmentation. |
-| T2I | **Krea2 CcC Text To Image** | Native Krea2 text-to-image conditioning and empty latent helper. |
+| Krea2 CcC Reference | `CcCKrea2Reference` | Dual Qwen/VAE reference with tags and strengths |
+| Krea2 CcC Size Resolver | `CcCKrea2SizeResolver` | Resolve target image size |
+| Krea2 CcC Latent | `CcCKrea2Latent` | Prepare target latent |
+| Krea2 CcC Edit | `CcCKrea2Edit` | Encode references and configure edit runtime |
+| Krea2 CcC Edit Prompt Creator | `CcCKrea2EditPromptCreator` | Generate edit prompt from image and/or instructions |
+| Krea2 CcC Character Sheet | `CcCKrea2CharacterSheet` | Compose reference image |
+| Krea2 CcC Paint Prepare | `CcCKrea2PaintPrepare` | Prepare masked image and latent |
+| Krea2 CcC Paint | `CcCKrea2Paint` | Paint conditioning and runtime |
+| Krea2 CcC Paint Restore | `CcCKrea2PaintRestore` | Restore output |
+| Krea2 CcC Lora Stack with Prompt | `CcCKrea2LoRAStackWithPrompt` | Patch LoRAs plus prompt metadata |
+| Krea2 CcC Lora Stack | `CcCKrea2LoRAStack` | Patch LoRAs |
+| Krea2 CcC Lora Stack Sliders | `CcCKrea2LoRALoader` | Slider LoRA loader |
+| Krea2 CcC Text To Image | `CcCKrea2TextToImage` | Generate T2I conditioning and latent |
 
 ## Edit Architecture
 
-The direct edit path remains simple:
+Single Edit runtime, with separate Qwen conditioning and VAE appearance paths.
 
-~~~text
-Visual Reference(s) --------------------+
-Vision Reference(s) --------------------+--> Krea2 CcC Edit --> MODEL / CONDITIONING / LATENT
-                                        ^
-Attention Region(s) --> Latent ---------|
-Size Resolver -------> Latent ----------+
-~~~
+## Krea2 CcC Reference
 
-**Edit Prompt Creator** is optional. Existing workflows can continue connecting a prompt and Visual References directly to Edit.
+The reference node unifies the previous Visual Reference and Vision Reference interfaces.
 
-~~~text
-Krea2/Qwen3-VL CLIP ----+-------------------------------> Edit
-                        |
-                        +--> Edit Prompt Creator
-Visual References ------+--> Edit Prompt Creator --> Visual References passthrough --> Edit
-user_prompt ------------+--> Edit Prompt Creator --> created_prompt ----------------> Edit
-reference_edit_image ---> Edit Prompt Creator
-~~~
+- `tag`: reference identifier such as `subject`, `outfit` or `scene`
+- `semantic_enabled`: send the reference to Qwen Vision; use `vision_mode` (Semantic, Visual, Style, Context) and `vision_instruction`
+- `visual_enabled`: encode the appearance reference via VAE/DiT, independently
+- `vision_strength`: influence of that reference's Qwen Vision rows **only when** `vision_attention_patch` is enabled in Edit
+- `visual_boost`: independent VAE/DiT appearance reference boost, unaffected by the Qwen patch
+- `reference_fit`: crop, resize, contain, native; related RoPE and resampling controls remain available
+- `semantic_grounding_px`: controls Qwen image preparation
+- optional Style processing and Qwen generation controls are retained
 
-The Creator does not modify Visual Reference, Vision Reference, Latent, or Edit. In create_from_image, reference_edit_image is internal analysis input: the generated text must describe the observed situation explicitly instead of assuming Edit can see that image.
+The node emits separate typed visual and vision chains for compatibility with Edit, Prompt Creator and T2I. Edit merges matching tags into one logical reference to avoid duplicate Qwen vision images. Qwen-only and VAE-only operation is supported.
 
-**Character Sheet** is also a utility before Visual Reference. It creates one deterministic IMAGE; the result can then be connected to a normal Visual Reference.
+The old regional Attention Region / attention mask node and sockets are removed from the **public** workflow API. Regional attention is not replaced by the Qwen vision weighting feature.
 
-## Visual Reference
+## Vision attention patch
 
-Each Visual Reference is an ordered appearance reference with two independent representations.
+`Krea2 CcC Edit` has a `vision_attention_patch` toggle (default **OFF**). When ON, the runtime takes per-image Qwen vision token spans from the conditioning builder and applies `vision_strength` using a ComfyUI `attn1_patch` V-scaling hook. It skips unconditional CFG rows. When OFF, the existing Qwen path is unchanged. `visual_boost` remains separate and always governs appearance latents.
 
-The VAE/appearance path supports:
-
-- crop: use the target as an inside crop window over the source.
-- resize: map the source long edge to the corresponding target axis, preserve aspect ratio, then crop down only the minimum pixels required for /16 alignment.
-- contain: uniformly fit the source inside the target, preserve aspect ratio, then crop down only the minimum pixels required for /16 alignment.
-- native: keep 1:1 source pixel scale and center-crop width/height down to /16.
-
-RoPE placement is independent from pixel fit.
-
-The Qwen path is controlled by semantic. When enabled, the same image can be downscaled only when it exceeds semantic_grounding_px. prompt_annotation is identification-only and becomes Image N: <annotation>; edit instructions belong in Edit's positive prompt.
-
-Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
-
-Regional attention is optional:
-
-- global
-- boost in region
-- only in region
-
-A regional reference binds to a tagged **Attention Region** carried through Latent geometry.
-
-## Vision Reference
-
-Vision Reference declares what information a source image represents. It never creates an appearance/VAE reference latent, and it does not prescribe how a consumer must transport that information.
-
-Modes:
-
-- **Semantic** — content/meaning: subject category and attributes, pose, action, objects, composition, and spatial relationships.
-- **Visual** — near-copy/full visual blueprint: subject appearance, clothing, pose, gaze, scene, composition, lighting, colors, and visual style are preserved as faithfully as possible unless the target prompt explicitly changes them. Subject count is locked: no clones, repeated variants, panels, or duplicated subjects.
-- **Style** — reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior, then applies that guidance strongly as the dominant visual treatment. Style processing may still analyze the full image or 2x2 / 4x4 tiles.
-- **Context** — mandatory scene staging: setting, framing/viewpoint, exact pose, head orientation, gaze, gesture, hands/limbs, interaction, composition, depth, object placement, and spatial relationships are treated as constraints rather than loose description, without copying identity, clothing, or visual style.
-
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Detail changes the extraction policy as well as its token budget; Vision Guidance has deliberately separated conservative/balanced/flexible sampling behavior. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, and Context.
+This is experimental. Images with heavy Style or Context row compaction retain only their remaining Qwen rows, which are remapped before weighting. No regional attention mask is used by the public nodes.
 
 ## Latent and Target Geometry
 
@@ -222,26 +183,15 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## Example Workflows
 
-- workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
-- workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — tagged regional attention with two identity references; BodySwap disabled by default.
-- workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference; BodySwap disabled by default.
-- workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
-- workflows/06_text_to_image.json — Krea2 text-to-image path with an optional Vision Reference feeding positive multimodal conditioning.
-- workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
-- workflows/08_prompt_creator_create_from_theme.json — Prompt Creator create_from_theme preset.
-- workflows/09_prompt_creator_custom.json — Prompt Creator custom-mode contract test.
-- workflows/10_edit_fit_crop.json — Edit reference_fit=crop path.
-- workflows/11_edit_fit_contain.json — Edit reference_fit=contain path.
-- workflows/12_edit_vision_semantic.json — Edit with Vision Reference / Semantic.
-- workflows/13_edit_vision_visual.json — Edit with Vision Reference / Visual.
-- workflows/14_edit_vision_style.json — Edit with Vision Reference / Style using 4x4 style processing.
-- workflows/15_paint_outpaint.json — expansion-only outpaint path.
-- workflows/16_paint_crop_restore.json — crop geometry + reverse restore/composite path.
-- workflows/17_paint_no_kv_cache.json — Paint runtime with KV cache disabled.
-- workflows/18_edit_vision_context.json — Edit with Vision Reference / Context.
-
-See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.
+| File | Scenario |
+| --- | --- |
+| [`workflows/01_t2i_one_reference.json`](workflows/01_t2i_one_reference.json) | T2I one image reference |
+| [`workflows/02_t2i_prompt_edit.json`](workflows/02_t2i_prompt_edit.json) | T2I with prompt enhancement |
+| [`workflows/03_i2i_one_reference.json`](workflows/03_i2i_one_reference.json) | I2I one reference |
+| [`workflows/04_i2i_two_references.json`](workflows/04_i2i_two_references.json) | I2I two references |
+| [`workflows/05_i2i_three_references.json`](workflows/05_i2i_three_references.json) | I2I three references |
+| [`workflows/06_i2i_prompt_edit.json`](workflows/06_i2i_prompt_edit.json) | I2I with Edit Prompt Creator |
+| [`workflows/07_i2i_paint.json`](workflows/07_i2i_paint.json) | I2I Paint |
 
 ## Acknowledgements
 
