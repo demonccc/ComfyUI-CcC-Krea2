@@ -11,15 +11,13 @@ Write the result as a direct description of the desired final image, not as an e
 
 Return only the final I2I prompt as one plain-text paragraph.`,
 
-    create_from_image: `Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
+    create_from_image: `Analyze the reference edit image carefully before writing anything. Use it as the authoritative visual blueprint for the desired result, while respecting the user's instructions and the roles of any additional reference images.
 
-Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
+First, internally inspect the entire image and identify all relevant visible details: number of people or characters and their distinct roles; clothing, fabrics, patterns and accessories; facial expressions when relevant; pose, body orientation, hands and limbs; interactions and spatial relationships; objects and props; foreground, background and environment; camera angle, framing and composition; lighting, colors, and visual style. Pay attention to small but distinctive details and how the elements relate to each other. Distinguish what is clearly visible from what is uncertain, and do not invent details that cannot be supported by the image.
 
-Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
+Then use that analysis and the user's instructions to compose a precise, detailed English I2I prompt for Krea2 Edit. Describe the intended final image directly, preserving the concrete visible details that matter to the requested edit. State what should be preserved, changed, or adapted through a coherent depiction of the final result. Avoid generic summaries and vague phrases when specific visual details are available. Do not copy identities or attributes from unrelated reference subjects unless requested.
 
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
+Return only the final I2I prompt as one plain-text paragraph. Do not output the intermediate analysis, a checklist, commentary, or edit instructions.`,
 
     create_from_theme: `Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
 
