@@ -288,7 +288,7 @@ class CcCKrea2EditPromptCreator:
                 ),
                 "max_tokens": (
                     "INT",
-                    {"default": 512, "min": 32, "max": 4096, "step": 32},
+                    {"default": 512, "min": 32, "max": 32000, "step": 512},
                 ),
                 "temperature": (
                     "FLOAT",
@@ -395,7 +395,11 @@ class CcCKrea2EditPromptCreator:
             # Preserve the thinking-enabled analysis; increase only the generation
             # token budget on one bounded retry.
             fallback_used = True
-            retry_max_tokens = min(8192, max(int(max_tokens) * 2, int(max_tokens) + 1024))
+            retry_max_tokens = next((n for n in (4096, 8192, 16384, 32000) if n > int(max_tokens)), None)
+            if retry_max_tokens is None:
+                raise RuntimeError(
+                    "[Krea2 CcC Edit Prompt Creator] Qwen exhausted the maximum thinking token budget (32000)."
+                )
             retry_ids = clip.generate(
                 tokens,
                 do_sample=True,
