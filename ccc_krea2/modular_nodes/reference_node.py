@@ -40,7 +40,7 @@ class CcCKrea2Reference:
         if visual_enabled:
             (visuals,) = CcCKrea2VisualReference().process(
                 image=image, boost=visual_boost, reference_fit=reference_fit,
-                semantic=False, previous_references=visuals)
+                semantic=bool(semantic_enabled), prompt_annotation=f"Reference @{tag}: {vision_instruction.strip()}" if semantic_enabled else "", previous_references=visuals)
             last = visuals.entries[-1]
             visuals = VisualReferenceChain(visuals.entries[:-1] + (VisualReferenceEntry(**{**last.__dict__, "reference_tag":tag, "vision_strength":float(vision_strength)}),))
         if semantic_enabled:
