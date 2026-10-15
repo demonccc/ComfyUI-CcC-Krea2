@@ -53,6 +53,10 @@ class CcCKrea2Reference:
             raise ValueError("Reference tag cannot be empty")
         visuals = previous_visual_references or VisualReferenceChain()
         visions = previous_vision_references or VisionReferenceChain()
+        if any(getattr(item, "reference_tag", "") == tag for item in visuals.entries):
+            raise ValueError(f"Duplicate reference tag '@{tag}' in visual chain")
+        if any(getattr(item, "reference_tag", "") == tag for item in visions.entries):
+            raise ValueError(f"Duplicate reference tag '@{tag}' in Qwen chain")
         if visual_enabled:
             (visuals,) = CcCKrea2VisualReference().process(
                 image=image, boost=visual_boost, reference_fit=reference_fit,
@@ -74,5 +78,5 @@ class CcCKrea2Reference:
             visions = VisionReferenceChain(visions.entries[:-1] + (VisionReferenceEntry(**{**last.__dict__, "reference_tag":tag, "vision_strength":float(vision_strength)}),))
         report = (f"@{tag}: semantic={semantic_enabled} mode={vision_mode}; "
                   f"visual={visual_enabled} visual_boost={visual_boost}; "
-                  f"vision_strength={vision_strength} (pending token-weight runtime)")
+                  f"vision_strength={vision_strength} (applies only when Edit.vision_attention_patch is ON)")
         return visuals, visions, report
