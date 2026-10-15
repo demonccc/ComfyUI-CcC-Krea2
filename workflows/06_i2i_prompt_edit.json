@@ -281,7 +281,7 @@
         true,
         true,
         "semantic",
-        "Reference @subject. Use only the named reference role; do not duplicate people.",
+        "Focus on the subject's face, identity, facial features, hairstyle, and body proportions. Preserve these attributes. Ignore the clothing and background unless the user's prompt explicitly requests them.",
         1,
         4,
         "resize",
