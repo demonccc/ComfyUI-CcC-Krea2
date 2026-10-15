@@ -1,6 +1,6 @@
 {
   "last_node_id": 19,
-  "last_link_id": 25,
+  "last_link_id": 28,
   "nodes": [
     {
       "id": 1,
@@ -103,9 +103,9 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
+            6,
             11,
-            20,
-            6
+            20
           ]
         }
       ],
@@ -304,7 +304,9 @@
         {
           "name": "vision_references",
           "type": "KREA2_VISION_REFERENCE_CHAIN",
-          "links": []
+          "links": [
+            26
+          ]
         },
         {
           "name": "reference_info",
@@ -317,10 +319,10 @@
       },
       "widgets_values": [
         "scene",
-        false,
+        true,
         true,
         "semantic",
-        "Reference @scene. Preserve relevant details; do not duplicate subjects.",
+        "Reference @scene. Use only the named reference role; do not duplicate people.",
         1,
         1,
         "resize",
@@ -352,6 +354,11 @@
           "name": "previous_visual_references",
           "type": "KREA2_VISUAL_REFERENCE_CHAIN",
           "link": 3
+        },
+        {
+          "name": "previous_vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "link": 26
         }
       ],
       "outputs": [
@@ -365,7 +372,9 @@
         {
           "name": "vision_references",
           "type": "KREA2_VISION_REFERENCE_CHAIN",
-          "links": []
+          "links": [
+            27
+          ]
         },
         {
           "name": "reference_info",
@@ -378,10 +387,10 @@
       },
       "widgets_values": [
         "subject",
-        false,
+        true,
         true,
         "semantic",
-        "Reference @subject. Preserve relevant details; do not duplicate subjects.",
+        "Reference @subject. Use only the named reference role; do not duplicate people.",
         1,
         4,
         "resize",
@@ -540,6 +549,11 @@
           "name": "visual_references",
           "type": "KREA2_VISUAL_REFERENCE_CHAIN",
           "link": 14
+        },
+        {
+          "name": "vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "link": 28
         }
       ],
       "outputs": [
@@ -805,17 +819,17 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": null
-        },
-        {
-          "name": "image",
-          "type": "IMAGE",
           "link": 24
         },
         {
           "name": "previous_visual_references",
           "type": "KREA2_VISUAL_REFERENCE_CHAIN",
           "link": 25
+        },
+        {
+          "name": "previous_vision_references",
+          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "link": 27
         }
       ],
       "outputs": [
@@ -829,7 +843,9 @@
         {
           "name": "vision_references",
           "type": "KREA2_VISION_REFERENCE_CHAIN",
-          "links": []
+          "links": [
+            28
+          ]
         },
         {
           "name": "reference_info",
@@ -842,10 +858,10 @@
       },
       "widgets_values": [
         "outfit",
-        false,
+        true,
         true,
         "semantic",
-        "Reference @subject. Preserve relevant details; do not duplicate subjects.",
+        "Reference @outfit. Use only the named reference role; do not duplicate people.",
         1,
         2,
         "resize",
@@ -1080,7 +1096,7 @@
       19,
       0,
       18,
-      1,
+      0,
       "IMAGE"
     ],
     [
@@ -1088,8 +1104,32 @@
       8,
       0,
       18,
-      2,
+      1,
       "KREA2_VISUAL_REFERENCE_CHAIN"
+    ],
+    [
+      26,
+      7,
+      1,
+      8,
+      2,
+      "KREA2_VISION_REFERENCE_CHAIN"
+    ],
+    [
+      27,
+      8,
+      1,
+      18,
+      2,
+      "KREA2_VISION_REFERENCE_CHAIN"
+    ],
+    [
+      28,
+      18,
+      1,
+      9,
+      5,
+      "KREA2_VISION_REFERENCE_CHAIN"
     ]
   ],
   "groups": [
