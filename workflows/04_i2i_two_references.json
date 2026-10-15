@@ -326,7 +326,18 @@
         1,
         1,
         "resize",
-        768
+        768,
+        "inside",
+        "center",
+        "center",
+        "lanczos",
+        true,
+        "lanczos",
+        "full",
+        "fixed",
+        0,
+        "balanced",
+        "balanced"
       ],
       "title": "Reference @scene"
     },
@@ -394,7 +405,18 @@
         1,
         4,
         "resize",
-        768
+        768,
+        "inside",
+        "center",
+        "center",
+        "lanczos",
+        true,
+        "lanczos",
+        "full",
+        "fixed",
+        0,
+        "balanced",
+        "balanced"
       ],
       "title": "Reference @subject"
     },
