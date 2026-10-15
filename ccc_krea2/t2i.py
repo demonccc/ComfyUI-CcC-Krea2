@@ -404,7 +404,7 @@ def _encode_t2i_vision(
 
 
 class CcCKrea2TextToImage:
-    """CcC Krea2 - Text to Image native helper node."""
+    """Krea2 CcC Text To Image native helper node."""
 
     RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING")
     RETURN_NAMES = ("model", "positive", "negative", "latent", "t2i_info")
