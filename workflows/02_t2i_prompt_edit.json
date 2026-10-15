@@ -1,6 +1,6 @@
 {
-  "last_node_id": 12,
-  "last_link_id": 13,
+  "last_node_id": 13,
+  "last_link_id": 15,
   "nodes": [
     {
       "id": 1,
@@ -64,7 +64,8 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            2
+            2,
+            14
           ]
         }
       ],
@@ -150,6 +151,14 @@
           "name": "clip",
           "type": "CLIP",
           "link": 2
+        },
+        {
+          "name": "positive_prompt",
+          "type": "STRING",
+          "link": 15,
+          "widget": {
+            "name": "positive_prompt"
+          }
         }
       ],
       "outputs": [
@@ -191,7 +200,7 @@
         "Node name for S&R": "CcCKrea2TextToImage"
       },
       "widgets_values": [
-        "Cinematic architecture in a coastal city, natural lighting.",
+        "",
         "preset",
         "2048 x 1152 | 16:9 | ~2.36 MP",
         1024,
@@ -402,6 +411,66 @@
       "widgets_values": [
         "CcCKrea2_T2I"
       ]
+    },
+    {
+      "id": 13,
+      "type": "CcCKrea2EditPromptCreator",
+      "pos": [
+        340,
+        480
+      ],
+      "size": [
+        560,
+        680
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "created_prompt",
+          "type": "STRING",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "visual_references",
+          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "links": []
+        },
+        {
+          "name": "creator_info",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "thinking",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2EditPromptCreator"
+      },
+      "widgets_values": [
+        "enhance",
+        "Create a cinematic photorealistic architecture scene, precise composition and lighting.",
+        "",
+        false,
+        1024,
+        0.25,
+        0.9,
+        0
+      ],
+      "title": "T2I Prompt Edit (Enhance)"
     }
   ],
   "links": [
@@ -492,6 +561,22 @@
       8,
       1,
       "VAE"
+    ],
+    [
+      14,
+      2,
+      0,
+      13,
+      0,
+      "CLIP"
+    ],
+    [
+      15,
+      13,
+      0,
+      4,
+      2,
+      "STRING"
     ]
   ],
   "groups": [
