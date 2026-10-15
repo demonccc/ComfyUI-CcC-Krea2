@@ -1,4 +1,4 @@
-# ComfyUI-Krea2-CcC Nodes
+# ComfyUI-Krea-CcC Nodes
 
 This document describes the **14 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
 
