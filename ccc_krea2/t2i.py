@@ -201,7 +201,7 @@ def _mode_guidance_policy(
                 "head angle, gaze target, expression when relevant, shoulders, arms, hands, leg stance, gesture, interaction, "
                 "camera angle, viewpoint, crop, framing, foreground/midground/background placement, object positions, scale, "
                 "depth, and relative distances. State these explicitly and preserve them as mandatory staging constraints; "
-                "do not collapse them into a generic scene summary or normalize them into a generic pose."
+                "do not summarize them away, collapse them into a generic scene summary or normalize them into a generic pose."
             ),
             "detailed": (
                 "CONTEXT DETAIL POLICY: detailed. Reconstruct the scene geometry exhaustively: exact pose and limb placement, "
@@ -216,8 +216,8 @@ def _mode_guidance_policy(
     return ""
 
 
-def _clean_generated_guidance(clip: Any, generated_ids: Any) -> str:
-    text = str(clip.decode(generated_ids)).strip()
+def _clean_generated_guidance(clip: Any, generated_ids: Any, decoded_text: str | None = None) -> str:
+    text = str(decoded_text if decoded_text is not None else clip.decode(generated_ids)).strip()
     if "</think>" in text:
         text = text.split("</think>", 1)[1].strip()
     text = re.sub(r"(?is)^<think>.*?</think>\s*", "", text).strip()
@@ -324,7 +324,7 @@ def _generate_t2i_vision_guidance(
         f"mode={public_mode} decoded={raw_text!r}",
         flush=True,
     )
-    guidance = _clean_generated_guidance(clip, generated_ids)
+    guidance = _clean_generated_guidance(clip, generated_ids, decoded_text=raw_text)
     generation_strategy = "blueprint-user-prompt-single-pass"
 
     return guidance, len(analysis_images), generation_strategy
