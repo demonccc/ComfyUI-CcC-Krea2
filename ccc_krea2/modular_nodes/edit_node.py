@@ -1,6 +1,7 @@
 """Krea2 CcC Edit node."""
 
 from typing import Any, Optional
+from dataclasses import replace
 
 import torch
 
@@ -17,7 +18,7 @@ from ..reference_specs import (
     VisionPrepSpec,
 )
 from .edit_reference_types import VisionReferenceChain, VisualReferenceChain
-from ..vision_reference_runtime import append_vision_references
+from ..vision_reference_runtime import append_vision_references, build_vision_reference_spec
 from ..vision_attention import install_vision_attention
 from .rope_position import install_krea2_rope_positioning
 
@@ -166,12 +167,42 @@ def _combine_reference_chains(
 ) -> ReferenceChain:
     """Translate the split public nodes into the common orchestrator ReferenceChain."""
     chain = ReferenceChain()
+    all_vision = tuple((vision_references or VisionReferenceChain()).entries)
+    vision_by_tag = {
+        str(getattr(item, "reference_tag", "") or ""): item
+        for item in all_vision if getattr(item, "reference_tag", "")
+    }
+    visual_tags = {
+        str(getattr(item, "reference_tag", "") or "")
+        for item in (visual_references or VisualReferenceChain()).entries
+    }
+
+    def combine_vision_with_appearance(spec, visual_entry):
+        """Keep one physical reference when the same tagged image uses both paths."""
+        tag = str(getattr(visual_entry, "reference_tag", "") or "")
+        matching = vision_by_tag.get(tag) if tag else None
+        if matching is None or not visual_entry.semantic:
+            return spec
+        guidance = build_vision_reference_spec(matching)
+        return replace(
+            spec,
+            vision_instruction=guidance.vision_instruction,
+            vision_strength=guidance.vision_strength,
+            vision_reference_mode=guidance.vision_reference_mode,
+            vision_summary_rows=guidance.vision_summary_rows,
+            semantic_extract=guidance.semantic_extract,
+            semantic_strength=guidance.semantic_strength,
+            style_fidelity=guidance.style_fidelity,
+            style_processing=guidance.style_processing,
+            indirect_style_transfer=guidance.indirect_style_transfer,
+            indirect_vision_context=guidance.indirect_vision_context,
+        )
 
     for index, entry in enumerate((visual_references or VisualReferenceChain()).entries, start=1):
         if entry.cache is not None:
             cache = entry.cache
             chain = chain.append(
-                ReferenceSpec(
+                combine_vision_with_appearance(ReferenceSpec(
                     reference_path="edit",
                     prepared_image=None,
                     alias=str(getattr(entry, "reference_tag", "") or ""),
@@ -186,7 +217,7 @@ def _combine_reference_chains(
                     cached_appearance_latent=cache.appearance_latent,
                     cached_geometry=cache.geometry,
                     cached_qwen_visual=cache.qwen_visual,
-                )
+                ), entry)
             )
             continue
 
@@ -200,7 +231,7 @@ def _combine_reference_chains(
             resize_method=entry.semantic_resize_method,
         )
         chain = chain.append(
-            ReferenceSpec(
+            combine_vision_with_appearance(ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
                 alias=str(getattr(entry, "reference_tag", "") or ""),
@@ -212,7 +243,7 @@ def _combine_reference_chains(
                 visual_reference_fit=entry.resolved_fit_mode,
                 visual_resize_method=entry.resize_method,
                 rope_position=entry.rope_position,
-            )
+            ), entry)
         )
 
     latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
@@ -229,7 +260,13 @@ def _combine_reference_chains(
             alias="target image",
         )
 
-    chain = append_vision_references(chain, vision_references or VisionReferenceChain())
+    # Qwen-only references remain standalone; tagged references already carried
+    # by the VAE chain must not be encoded twice.
+    unmatched = VisionReferenceChain(tuple(
+        item for item in all_vision
+        if not getattr(item, "reference_tag", "") or item.reference_tag not in visual_tags
+    ))
+    chain = append_vision_references(chain, unmatched)
     return chain
 
 
