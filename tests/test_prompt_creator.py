@@ -247,9 +247,9 @@ def test_thinking_truncation_retries_with_more_tokens():
     assert prompt == "A detailed image with accurate clothing."
     assert thinking_text == "Analysis completed."
     assert clip.thinking_values == [True]
-    assert clip.budgets == [512, 1536]
+    assert clip.budgets == [512, 4096]
     assert "Automatic Token Budget Retry: yes" in info
-    assert "Retry Max Tokens: 1536" in info
+    assert "Retry Max Tokens: 4096" in info
 
 
 def test_thinking_truncation_reports_failure_after_increased_budget():
