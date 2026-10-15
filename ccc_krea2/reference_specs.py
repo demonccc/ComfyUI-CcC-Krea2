@@ -39,6 +39,7 @@ class ReferenceSpec:
     prepared_image: Optional[PreparedVisionImage] = None
     requested_vision_slot: Optional[int] = None
     alias: str = ""
+    vision_strength: float = 1.0
     parsed_aliases: Tuple[str, ...] = ()
     vision_instruction: str = ""
     include_in_vision: bool = True
