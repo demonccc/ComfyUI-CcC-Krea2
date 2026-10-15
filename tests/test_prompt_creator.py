@@ -215,20 +215,25 @@ def test_appearance_only_reference_has_no_downstream_image_number():
     assert "Vision input 2 = Image 1" in clip.tokenize_prompt
 
 
-def test_thinking_truncation_retries_without_thinking():
+def test_thinking_truncation_retries_with_more_tokens():
     class TruncatedThinkingClip(_FakeClip):
         def __init__(self):
             super().__init__()
-            self.attempts = []
+            self.budgets = []
+            self.thinking_values = []
 
         def tokenize(self, prompt, **kwargs):
-            self.attempts.append(kwargs)
+            self.thinking_values.append(kwargs["thinking"])
             return super().tokenize(prompt, **kwargs)
 
+        def generate(self, tokens, **kwargs):
+            self.budgets.append(kwargs["max_length"])
+            return super().generate(tokens, **kwargs)
+
         def decode(self, generated_ids):
-            if self.tokenize_kwargs["thinking"]:
+            if self.budgets[-1] == 512:
                 return "I am still reasoning when max tokens end."
-            return "A detailed image with natural lighting and accurate clothing."
+            return "Analysis completed.</think>A detailed image with accurate clothing."
 
     clip = TruncatedThinkingClip()
     prompt, _, info, thinking_text = CcCKrea2EditPromptCreator().create(
@@ -237,17 +242,19 @@ def test_thinking_truncation_retries_without_thinking():
         mode="enhance",
         user_prompt="Improve this edit.",
         thinking=True,
+        max_tokens=512,
     )
-    assert prompt == "A detailed image with natural lighting and accurate clothing."
-    assert thinking_text == "I am still reasoning when max tokens end."
-    assert [x["thinking"] for x in clip.attempts] == [True, False]
-    assert clip.attempts[0]["images"] is clip.attempts[1]["images"]
-    assert "Automatic Direct Retry: yes" in info
+    assert prompt == "A detailed image with accurate clothing."
+    assert thinking_text == "Analysis completed."
+    assert clip.thinking_values == [True]
+    assert clip.budgets == [512, 1536]
+    assert "Automatic Token Budget Retry: yes" in info
+    assert "Retry Max Tokens: 1536" in info
 
 
-def test_thinking_truncation_reports_failure_after_retry():
-    clip = _FakeClip("<think>I am still reasoning when max tokens end.")
-    with pytest.raises(RuntimeError, match="after an automatic retry"):
+def test_thinking_truncation_reports_failure_after_increased_budget():
+    clip = _FakeClip("I am still reasoning when max tokens end.")
+    with pytest.raises(RuntimeError, match="exhausted the increased"):
         CcCKrea2EditPromptCreator().create(
             clip=clip,
             visual_references=_chain(),
