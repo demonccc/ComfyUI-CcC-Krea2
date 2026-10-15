@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ComfyUI-Krea2-CcC"
+name = "ComfyUI-Krea-CcC"
 version = "0.1.0"
 description = "ComfyUI custom nodes for Krea 2 generation, reference-guided editing, Paint workflows, Vision guidance, LoRA utilities, and text-to-image workflows."
 readme = "README.md"
@@ -31,7 +31,7 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/demonccc/ComfyUI-Krea2-CcC"
+Repository = "https://github.com/demonccc/ComfyUI-Krea-CcC"
 
 [tool.comfy]
 PublisherId = "CcC"
