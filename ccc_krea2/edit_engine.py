@@ -283,6 +283,45 @@ def run_krea2_edit_orchestrator(
         neg_qwen_context.conditioning, vae_latents_for_transport
     )
 
+    # Transport Qwen token spans for the optional token-weight attention hook.
+    # Compacted rows have to be mapped from pre-transform to post-transform
+    # coordinates; entirely removed rows must never be weighted.
+    removed = set(pos_qwen_context.removed_row_indices or [])
+    original_length = int(pos_qwen_context.pos_rows_before)
+    current_length = int(pos_qwen_context.pos_rows_after)
+    if original_length and current_length:
+        before_to_after = {}
+        retained = 0
+        for row in range(original_length):
+            if row not in removed:
+                before_to_after[row] = retained
+                retained += 1
+        weighted_spans = []
+        for index, item in enumerate(pos_qwen_image_map):
+            if index >= len(pos_qwen_context.vision_row_spans):
+                break
+            strength = float(getattr(item.get("spec"), "vision_strength", 1.0))
+            if abs(strength - 1.0) < 1e-6:
+                continue
+            start, end = pos_qwen_context.vision_row_spans[index]
+            retained_rows = [before_to_after[row] for row in range(start, end) if row in before_to_after]
+            if retained_rows:
+                # Convert retained positions to contiguous spans.
+                first = prev = retained_rows[0]
+                for row in retained_rows[1:]:
+                    if row != prev + 1:
+                        weighted_spans.append((first, prev + 1, strength))
+                        first = row
+                    prev = row
+                weighted_spans.append((first, prev + 1, strength))
+        if weighted_spans:
+            pos_conditioning = [
+                [entry[0], {**entry[1], "ccc_vision_weight_spans": tuple(weighted_spans)}]
+                if isinstance(entry, (list, tuple)) and len(entry) > 1 and isinstance(entry[1], dict)
+                else entry
+                for entry in pos_conditioning
+            ]
+
     # Step 7: Build edit_info report
     info_lines = [
         "=== Krea2 CcC Edit Pipeline Report ===",
