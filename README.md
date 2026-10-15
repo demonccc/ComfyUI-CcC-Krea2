@@ -1,6 +1,6 @@
-# ComfyUI-Krea2-CcC
+# ComfyUI-Krea-CcC
 
-ComfyUI-Krea2-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
+ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
 The public surface currently contains **14 nodes**. Reference Cache nodes and the standalone Paint Geometry node are not part of the public node registry.
 
@@ -245,4 +245,4 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ## Acknowledgements
 
-ComfyUI-Krea2-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
+ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
