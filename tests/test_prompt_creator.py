@@ -215,11 +215,39 @@ def test_appearance_only_reference_has_no_downstream_image_number():
     assert "Vision input 2 = Image 1" in clip.tokenize_prompt
 
 
-def test_thinking_truncation_without_final_prompt_is_reported():
-    # With thinking prefilled, an unfinished generation contains reasoning text without a literal <think> prefix.
-    clip = _FakeClip("I am still reasoning when max tokens end.")
+def test_thinking_truncation_retries_without_thinking():
+    class TruncatedThinkingClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.attempts = []
 
-    with pytest.raises(RuntimeError, match="ended inside the thinking block"):
+        def tokenize(self, prompt, **kwargs):
+            self.attempts.append(kwargs)
+            return super().tokenize(prompt, **kwargs)
+
+        def decode(self, generated_ids):
+            if self.tokenize_kwargs["thinking"]:
+                return "I am still reasoning when max tokens end."
+            return "A detailed image with natural lighting and accurate clothing."
+
+    clip = TruncatedThinkingClip()
+    prompt, _, info, thinking_text = CcCKrea2EditPromptCreator().create(
+        clip=clip,
+        visual_references=_chain(),
+        mode="enhance",
+        user_prompt="Improve this edit.",
+        thinking=True,
+    )
+    assert prompt == "A detailed image with natural lighting and accurate clothing."
+    assert thinking_text == "I am still reasoning when max tokens end."
+    assert [x["thinking"] for x in clip.attempts] == [True, False]
+    assert clip.attempts[0]["images"] is clip.attempts[1]["images"]
+    assert "Automatic Direct Retry: yes" in info
+
+
+def test_thinking_truncation_reports_failure_after_retry():
+    clip = _FakeClip("I am still reasoning when max tokens end.")
+    with pytest.raises(RuntimeError, match="after an automatic retry"):
         CcCKrea2EditPromptCreator().create(
             clip=clip,
             visual_references=_chain(),
