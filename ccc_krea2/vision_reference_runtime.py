@@ -81,11 +81,14 @@ def prepare_tokenizer_native_image(image: torch.Tensor) -> PreparedVisionImage:
 def build_vision_reference_spec(entry: VisionReferenceEntry):
     """Translate one public Vision Reference entry into the proven internal reference contract."""
     prep = prepare_tokenizer_native_image(entry.image)
+    weight_kwargs = {"vision_strength": float(getattr(entry, "vision_strength", 1.0)), "alias": str(getattr(entry, "reference_tag", "") or "")}
 
     if entry.mode == "semantic_only":
         return ReferenceSpec(
             reference_path="edit",
+            **weight_kwargs,
             prepared_image=prep,
+            **weight_kwargs,
             vision_instruction=_with_user_instruction(SEMANTIC_DIRECTIVE, entry.instruction, "semantic"),
             appearance_reference=False,
             include_in_vision=True,
@@ -112,6 +115,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     if entry.mode == "style_indirect":
         return StyleReferenceSpec(
             prepared_image=prep,
+            **weight_kwargs,
             vision_instruction=_with_user_instruction(STYLE_DIRECTIVE, entry.instruction, "style"),
             appearance_reference=False,
             include_in_vision=True,
