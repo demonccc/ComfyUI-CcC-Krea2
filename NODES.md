@@ -1,4 +1,4 @@
-# Krea2 CcC Edit Nodes
+# ComfyUI-Krea2-CcC Nodes
 
 This document describes the **14 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
 
@@ -19,7 +19,7 @@ This document describes the **14 public nodes registered in ccc_krea2/nodes.py**
 | Krea2 CcC Paint Restore | CcCKrea2PaintRestore |
 | CcC Krea2 - LoRA Prompt Settings | CcCKrea2LoRAPromptSettings |
 | CcC Krea2 - LoRA Stack | CcCKrea2LoRAStack |
-| CcC Krea2 - Text to Image | CcCKrea2TextToImage |
+| Krea2 CcC Text To Image | CcCKrea2TextToImage |
 
 There are no public Reference Cache nodes and no public Krea2 CcC Paint Geometry node.
 
@@ -491,7 +491,7 @@ If LoRA Prompt Settings is connected, prompt augmentation is accumulated only fo
 
 Krea2 CcC Edit does not consume prompt_augmentation automatically.
 
-## CcC Krea2 - Text to Image
+## Krea2 CcC Text To Image
 
 Required inputs/controls:
 

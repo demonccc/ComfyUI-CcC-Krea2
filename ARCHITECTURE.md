@@ -25,7 +25,7 @@ Paint:
 LoRA / T2I:
   CcC Krea2 - LoRA Prompt Settings
   CcC Krea2 - LoRA Stack
-  CcC Krea2 - Text to Image
+  Krea2 CcC Text To Image
 ~~~
 
 There is no public Reference Cache node family and no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
@@ -218,7 +218,7 @@ Vision Reference ----+
                      |
 UNET + CLIP ---------+
                      v
-CcC Krea2 - Text to Image
+Krea2 CcC Text To Image
     +--> MODEL ---------> ModelSamplingAuraFlow -> BlackwellAttentionFix -> KSampler
     +--> positive -----------------------------------------------> KSampler
     +--> negative -----------------------------------------------> KSampler

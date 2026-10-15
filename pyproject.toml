@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ComfyUI-CcC-Krea2"
+name = "ComfyUI-Krea2-CcC"
 version = "0.1.0"
-description = "ComfyUI custom nodes for Krea 2 reference-guided editing, reusable reference caches, LoRA utilities, and text-to-image workflows."
+description = "ComfyUI custom nodes for Krea 2 generation, reference-guided editing, Paint workflows, Vision guidance, LoRA utilities, and text-to-image workflows."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -31,11 +31,11 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/demonccc/ComfyUI-CcC-Krea2"
+Repository = "https://github.com/demonccc/ComfyUI-Krea2-CcC"
 
 [tool.comfy]
 PublisherId = "CcC"
-DisplayName = "CcC Krea2"
+DisplayName = "Krea2 CcC"
 Icon = "🎨"
 
 [tool.setuptools.packages.find]

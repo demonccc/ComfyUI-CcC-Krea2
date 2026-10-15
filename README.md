@@ -1,6 +1,6 @@
-# ComfyUI-CcC-Krea2
+# ComfyUI-Krea2-CcC
 
-Krea2 CcC Edit provides ComfyUI nodes for Krea 2 generation, reference-guided editing, prompt creation, character sheets, and AnyPaint-style inpaint/outpaint.
+ComfyUI-Krea2-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
 The public surface currently contains **14 nodes**. Reference Cache nodes and the standalone Paint Geometry node are not part of the public node registry.
 
@@ -21,7 +21,7 @@ The public surface currently contains **14 nodes**. Reference Cache nodes and th
 | Paint | **Krea2 CcC Paint Restore** | Restores decoded Paint output to the requested canvas. |
 | LoRA | **CcC Krea2 - LoRA Prompt Settings** | Defines optional prompt augmentation associated with up to four LoRA slots. |
 | LoRA | **CcC Krea2 - LoRA Stack** | Applies up to four model-only LoRAs and carries optional prompt augmentation. |
-| T2I | **CcC Krea2 - Text to Image** | Native Krea2 text-to-image conditioning and empty latent helper. |
+| T2I | **Krea2 CcC Text To Image** | Native Krea2 text-to-image conditioning and empty latent helper. |
 
 ## Edit Architecture
 
@@ -245,4 +245,4 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ## Acknowledgements
 
-Krea2 CcC Edit was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
+ComfyUI-Krea2-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.

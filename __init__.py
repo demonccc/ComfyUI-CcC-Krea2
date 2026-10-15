@@ -1,4 +1,4 @@
-"""ComfyUI custom node package entrypoint for CcC Krea2."""
+"""ComfyUI custom node package entrypoint for Krea2 CcC."""
 
 if __package__:
     from .ccc_krea2.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS

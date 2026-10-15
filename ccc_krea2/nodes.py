@@ -1,4 +1,4 @@
-"""ComfyUI custom node mappings for Krea2 CcC Edit."""
+"""ComfyUI custom node mappings for Krea2 CcC."""
 
 from .lora import CcCKrea2LoRAStack, CcCKrea2LoRAStackWithPrompt
 from .lora_loader import CcCKrea2LoRALoader
@@ -49,5 +49,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2LoRAStackWithPrompt": "Krea2 CcC Lora Stack with Prompt",
     "CcCKrea2LoRAStack": "Krea2 CcC Lora Stack",
     "CcCKrea2LoRALoader": "Krea2 CcC Lora Stack Sliders",
-    "CcCKrea2TextToImage": "CcC Krea2 - Text to Image",
+    "CcCKrea2TextToImage": "Krea2 CcC Text To Image",
 }

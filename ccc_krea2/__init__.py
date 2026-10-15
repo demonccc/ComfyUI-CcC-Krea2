@@ -1,4 +1,4 @@
-"""Krea2 CcC Edit package module."""
+"""Krea2 CcC package module."""
 
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
