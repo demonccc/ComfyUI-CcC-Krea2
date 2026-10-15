@@ -1,114 +1,41 @@
 # ComfyUI-Krea-CcC Nodes
 
-This document describes the **14 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
+This document describes the **13 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
 
 ## Public Node Inventory
 
-| Display name | Node id |
-| --- | --- |
-| Krea2 CcC Attention Region | CcCKrea2AttentionRegion |
-| Krea2 CcC Visual Reference | CcCKrea2VisualReference |
-| Krea2 CcC Vision Reference | CcCKrea2VisionReference |
-| Krea2 CcC Size Resolver | CcCKrea2SizeResolver |
-| Krea2 CcC Latent | CcCKrea2Latent |
-| Krea2 CcC Edit Prompt Creator | CcCKrea2EditPromptCreator |
-| Krea2 CcC Edit | CcCKrea2Edit |
-| Krea2 CcC Character Sheet | CcCKrea2CharacterSheet |
-| Krea2 CcC Paint Prepare | CcCKrea2PaintPrepare |
-| Krea2 CcC Paint | CcCKrea2Paint |
-| Krea2 CcC Paint Restore | CcCKrea2PaintRestore |
-| CcC Krea2 - LoRA Prompt Settings | CcCKrea2LoRAPromptSettings |
-| CcC Krea2 - LoRA Stack | CcCKrea2LoRAStack |
-| Krea2 CcC Text To Image | CcCKrea2TextToImage |
+| Node | ID | Purpose |
+| --- | --- | --- |
+| Krea2 CcC Reference | `CcCKrea2Reference` | Dual Qwen/VAE reference with tags and strengths |
+| Krea2 CcC Size Resolver | `CcCKrea2SizeResolver` | Resolve target image size |
+| Krea2 CcC Latent | `CcCKrea2Latent` | Prepare target latent |
+| Krea2 CcC Edit | `CcCKrea2Edit` | Encode references and configure edit runtime |
+| Krea2 CcC Edit Prompt Creator | `CcCKrea2EditPromptCreator` | Generate edit prompt from image and/or instructions |
+| Krea2 CcC Character Sheet | `CcCKrea2CharacterSheet` | Compose reference image |
+| Krea2 CcC Paint Prepare | `CcCKrea2PaintPrepare` | Prepare masked image and latent |
+| Krea2 CcC Paint | `CcCKrea2Paint` | Paint conditioning and runtime |
+| Krea2 CcC Paint Restore | `CcCKrea2PaintRestore` | Restore output |
+| Krea2 CcC Lora Stack with Prompt | `CcCKrea2LoRAStackWithPrompt` | Patch LoRAs plus prompt metadata |
+| Krea2 CcC Lora Stack | `CcCKrea2LoRAStack` | Patch LoRAs |
+| Krea2 CcC Lora Stack Sliders | `CcCKrea2LoRALoader` | Slider LoRA loader |
+| Krea2 CcC Text To Image | `CcCKrea2TextToImage` | Generate T2I conditioning and latent |
 
-There are no public Reference Cache nodes and no public Krea2 CcC Paint Geometry node.
+## Krea2 CcC Reference
 
-## Krea2 CcC Attention Region
+The reference node unifies the previous Visual Reference and Vision Reference interfaces.
 
-Declares one tagged rectangular target region. Multiple nodes can be chained.
+- `tag`: reference identifier such as `subject`, `outfit` or `scene`
+- `semantic_enabled`: send the reference to Qwen Vision; use `vision_mode` (Semantic, Visual, Style, Context) and `vision_instruction`
+- `visual_enabled`: encode the appearance reference via VAE/DiT, independently
+- `vision_strength`: influence of that reference's Qwen Vision rows **only when** `vision_attention_patch` is enabled in Edit
+- `visual_boost`: independent VAE/DiT appearance reference boost, unaffected by the Qwen patch
+- `reference_fit`: crop, resize, contain, native; related RoPE and resampling controls remain available
+- `semantic_grounding_px`: controls Qwen image preparation
+- optional Style processing and Qwen generation controls are retained
 
-| Control | Values | Default | Meaning |
-| --- | --- | --- | --- |
-| tag | text | subject | Unique region name used by Visual Reference. |
-| x | 0..100 | 0 | Left edge as target/content percentage. |
-| y | 0..100 | 0 | Top edge as target/content percentage. |
-| width | 0.1..100 | 100 | Width as percentage. |
-| height | 0.1..100 | 100 | Height as percentage. |
-| previous_regions | KREA2_ATTENTION_REGION_CHAIN | optional | Previous region chain. |
+The node emits separate typed visual and vision chains for compatibility with Edit, Prompt Creator and T2I. Edit merges matching tags into one logical reference to avoid duplicate Qwen vision images. Qwen-only and VAE-only operation is supported.
 
-Output: attention_regions.
-
-Latent transports these boxes through target geometry. If content_fit=crop touches or removes any part of a declared region, Latent raises an error instead of clipping or relocating the box.
-
-## Krea2 CcC Visual Reference
-
-Declares one ordered appearance reference.
-
-Required controls:
-
-| Control | Values | Default | Meaning |
-| --- | --- | --- | --- |
-| image | IMAGE | — | Source reference. |
-| boost | 0..10 | 1.0 | Positive target-to-reference attention boost. |
-| reference_fit | crop, resize, contain, native | native | Appearance/VAE pixel fit. |
-| placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. |
-| grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
-| grid_vertical_position | center, up, down | center | Vertical RoPE/grid position. |
-| resize_method | lanczos, bicubic, bilinear, area | lanczos | Interpolation for resize/contain. |
-| semantic | boolean | true | Also show this image to Qwen. |
-| semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
-| semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
-| semantic_resize_method | lanczos, bicubic, bilinear, area | lanczos | Qwen-only resize interpolation. |
-| prompt_annotation | text | empty | Role-only Image N annotation. |
-| attention_scope | global, boost in region, only in region | global | Target-side reference scope. |
-| region_tag | text | empty | Attention Region tag for regional modes. |
-
-Optional input: previous_references.
-
-Output: visual_references.
-
-### Appearance fit
-
-- crop: the target acts as an inside crop window over the source.
-- resize: map the source long edge to the corresponding target axis, preserve aspect, then crop down only the minimum pixels needed for /16.
-- contain: uniformly fit inside the target, preserve aspect, then crop down only the minimum pixels needed for /16.
-- native: keep 1:1 pixel scale and center-crop width/height down to /16.
-
-Qwen preparation is independent from appearance/VAE fit.
-
-prompt_annotation is identification only, for example: This is the subject image. Edit instructions belong in Edit's positive_prompt.
-
-The positive branch uses the configured boost. The grounded negative branch uses the same appearance-image vision blocks with no role annotation text, fixed empty negative text, and neutral boost 1.0.
-
-## Krea2 CcC Vision Reference
-
-Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
-
-| Control | Values | Default | Meaning |
-| --- | --- | --- | --- |
-| image | IMAGE | — | Source image shown to Qwen Vision. |
-| mode | semantic, visual, style, context | semantic | Chooses what the reference contributes. |
-| instruction | text | empty | Optional extra instruction for this reference. |
-| style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
-| guidance_seed_mode | fixed, incremental, random | fixed | Seed behavior for Qwen text guidance generation. |
-| guidance_seed | integer | 0 | Base/fixed Qwen guidance seed; editable only in fixed mode. |
-| guidance_detail | compact, balanced, detailed | balanced | Extraction-depth policy plus max-length budget: compact keeps only highest-impact facts (256), balanced keeps major + secondary facts (512), detailed is exhaustive within the selected mode (1024). |
-| vision_guidance | conservative, balanced, flexible | balanced | Qwen sampling preset. Conservative = temp 0.05 / top_p 0.70 / top_k 32 / min_p 0.10; balanced = 0.25 / 0.90 / 64 / 0.05; flexible = 0.70 / 0.99 / 128 / 0.01. |
-| previous_references | KREA2_VISION_REFERENCE_CHAIN | optional | Previous Vision Reference chain. |
-
-Outputs:
-
-- `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`)
-- `vision_info` (`STRING`) with consumer-neutral declaration metadata including mode, processing, Qwen guidance preset/seed, source resolution, and chain size.
-
-Vision Reference defines information semantics rather than a transport algorithm:
-
-- **Semantic**: content/meaning, pose, action, objects, composition, and spatial relationships.
-- **Visual**: near-copy/full visual blueprint. Balanced/Detailed strongly anchor pose, gaze, framing, composition, and appearance; Flexible may adapt pose/composition while retaining visual identity. Subject count is always locked and must not be expanded into clones, variants, panels, or repeated subjects.
-- **Style**: intentionally reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior, and its final conditioning explicitly treats that guidance as the dominant visual treatment. Supports full, 2x2, or 4x4 analysis.
-- **Context**: mandatory scene staging including setting, viewpoint, exact pose and limb placement, head orientation, gaze target, gesture, action, interaction, crop/framing, composition, object placement, depth, and spatial relationships while excluding identity, clothing, and visual style.
-
-There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, and Context. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
+The old regional Attention Region / attention mask node and sockets are removed from the **public** workflow API. Regional attention is not replaced by the Qwen vision weighting feature.
 
 ## Krea2 CcC Size Resolver
 
@@ -253,6 +180,13 @@ created_prompt is always post-processed before it reaches Edit. Visible referenc
 The returned visual_references object is passthrough; the chain is not modified.
 
 ## Krea2 CcC Edit
+
+## Vision attention patch
+
+`Krea2 CcC Edit` has a `vision_attention_patch` toggle (default **OFF**). When ON, the runtime takes per-image Qwen vision token spans from the conditioning builder and applies `vision_strength` using a ComfyUI `attn1_patch` V-scaling hook. It skips unconditional CFG rows. When OFF, the existing Qwen path is unchanged. `visual_boost` remains separate and always governs appearance latents.
+
+This is experimental. Images with heavy Style or Context row compaction retain only their remaining Qwen rows, which are remapped before weighting. No regional attention mask is used by the public nodes.
+
 
 Main edit orchestrator.
 
@@ -525,14 +459,12 @@ The node applies prompt augmentation and creates an empty SD3-compatible latent 
 
 ## Example Workflows
 
-- workflows/01_scene_subject.json — Scene + Subject edit.
-- workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — tagged regional references.
-- workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
-- workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
-- workflows/06_text_to_image.json — T2I example with a Semantic Vision Reference enriching positive Qwen conditioning.
-
-- workflows/12_edit_vision_semantic.json — Vision Reference / Semantic.
-- workflows/13_edit_vision_visual.json — Vision Reference / Visual.
-- workflows/14_edit_vision_style.json — Vision Reference / Style.
-- workflows/18_edit_vision_context.json — Vision Reference / Context.
+| File | Scenario |
+| --- | --- |
+| [`workflows/01_t2i_one_reference.json`](workflows/01_t2i_one_reference.json) | T2I one image reference |
+| [`workflows/02_t2i_prompt_edit.json`](workflows/02_t2i_prompt_edit.json) | T2I with prompt enhancement |
+| [`workflows/03_i2i_one_reference.json`](workflows/03_i2i_one_reference.json) | I2I one reference |
+| [`workflows/04_i2i_two_references.json`](workflows/04_i2i_two_references.json) | I2I two references |
+| [`workflows/05_i2i_three_references.json`](workflows/05_i2i_three_references.json) | I2I three references |
+| [`workflows/06_i2i_prompt_edit.json`](workflows/06_i2i_prompt_edit.json) | I2I with Edit Prompt Creator |
+| [`workflows/07_i2i_paint.json`](workflows/07_i2i_paint.json) | I2I Paint |
