@@ -3,7 +3,6 @@
 from .lora import CcCKrea2LoRAStack, CcCKrea2LoRAStackWithPrompt
 from .lora_loader import CcCKrea2LoRALoader
 from .t2i import CcCKrea2TextToImage
-from .modular_nodes.visual_reference_node import CcCKrea2VisualReference
 from .modular_nodes.reference_node import CcCKrea2Reference
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
 from .modular_nodes.latent_node import CcCKrea2Latent
