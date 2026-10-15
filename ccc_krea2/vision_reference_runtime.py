@@ -37,13 +37,19 @@ CONTEXT_DIRECTIVE = (
 
 
 def _with_user_instruction(base: str, instruction: str, scope: str) -> str:
+    """Always honor user guidance, constrained to the declared reference role."""
     user = (instruction or "").strip()
-    if not user or scope != "visual":
+    if not user:
         return base
-
+    role = {
+        "semantic": "semantic content and subject attributes",
+        "visual": "visible appearance and details of the same subject",
+        "style": "rendering style only, never the subject identity",
+        "context": "scene staging and spatial context, never identity or clothing",
+    }.get(scope, scope)
     return (
-        f"{base} Apply this extra visual guidance to the SAME subject/result requested by the user's prompt; "
-        f"do not create an additional subject from the reference. Additional visual guidance: {user}"
+        f"{base} Additional reference instruction for {role}: {user} "
+        "Apply it to the intended output only; do not duplicate subjects."
     )
 
 
