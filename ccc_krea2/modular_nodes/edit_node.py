@@ -22,7 +22,6 @@ from ..vision_reference_runtime import append_vision_references, build_vision_re
 from ..vision_attention import install_vision_attention
 from .rope_position import install_krea2_rope_positioning
 
-
 # Krea2 Edit uses a grounded unconditional branch rather than a classic SD-style
 # negative prompt. Keep the negative text empty by contract; visual references remain
 # attached to both branches and negative reference boosts stay neutral at 1.0.
@@ -35,11 +34,9 @@ SEMANTIC_SUBJECT_DIRECTIVE = (
     "identity is controlled by the edit identity references."
 )
 
-
 # Visual references are positional in the Krea2 grounding contract.
 # Prompt construction is owned directly by edit_engine.py / identity_contract.py.
 install_krea2_rope_positioning()
-
 
 def _prepare_qwen_image(
     image: torch.Tensor,
@@ -95,7 +92,6 @@ def _prepare_qwen_image(
         },
     )
 
-
 def _append_semantic(
     chain: ReferenceChain,
     image: torch.Tensor,
@@ -145,7 +141,6 @@ def _append_semantic(
         )
     return chain.append(spec)
 
-
 def _runtime_latent(latent: dict) -> dict:
     runtime = {
         "samples": latent["samples"],
@@ -157,7 +152,6 @@ def _runtime_latent(latent: dict) -> dict:
     if runtime["target_vision_context"] is None:
         runtime.pop("target_vision_context")
     return runtime
-
 
 def _combine_reference_chains(
     clip: Any,
@@ -269,7 +263,6 @@ def _combine_reference_chains(
     chain = append_vision_references(chain, unmatched)
     return chain
 
-
 def _conditioning_extras(conditioning):
     if not conditioning:
         return {}
@@ -277,7 +270,6 @@ def _conditioning_extras(conditioning):
     if isinstance(first, (list, tuple)) and len(first) >= 2 and isinstance(first[1], dict):
         return first[1]
     return {}
-
 
 def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     extras = _conditioning_extras(conditioning)
@@ -291,7 +283,6 @@ def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     else:
         boosts = [float(v) for v in boosts]
     return f"refs={len(refs)} shapes={shapes}, fit={fit}, boosts={boosts}, rope={rope}"
-
 
 class CcCKrea2Edit:
     """Krea2 CcC Edit orchestrator consuming Krea2 CcC Latent and reference node outputs."""
@@ -441,7 +432,7 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: cached={'yes' if entry.cache is not None else 'no'}, "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
-                
+
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method={entry.semantic_resize_method}, prompt_annotation={annotation}"
             )
