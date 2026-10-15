@@ -3,22 +3,15 @@
 from pathlib import Path
 
 
-def test_visual_reference_semantic_widgets_are_conditionally_disabled():
+def test_unified_reference_controls_are_conditionally_disabled():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
-    assert 'node.comfyClass === "CcCKrea2VisualReference"' in js
-    assert 'w.name === "semantic"' in js
-    assert 'setDisabled("semantic_resize", !enabled)' in js
-    assert 'setDisabled("semantic_grounding_px", !resizeEnabled)' in js
-    assert 'setDisabled("semantic_resize_method", !resizeEnabled)' in js
-    assert 'setDisabled("prompt_annotation", !enabled)' in js
-
-
-def test_vision_reference_only_enables_processing_for_style():
-    js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
-    assert 'node.comfyClass === "CcCKrea2VisionReference"' in js
-    assert 'w.name === "style_processing"' in js
-    assert 'const styleMode = mode === "style"' in js
-    assert "processingWidget.disabled = !styleMode" in js
+    assert 'node.comfyClass === "CcCKrea2Reference"' in js
+    assert 'getWidget("semantic_enabled")' in js
+    assert 'getWidget("visual_enabled")' in js
+    assert 'setWidgetDisabled(node, "vision_strength", !semantic)' not in js  # handled in semantic list
+    assert '"vision_mode", "vision_instruction", "vision_strength"' in js
+    assert 'setWidgetDisabled(node, "style_processing", !semantic || visionMode !== "style")' in js
+    assert 'setWidgetDisabled(node, "placement_grid", !visual || fit === "crop")' in js
 
 
 def test_latent_preset_widget_is_conditionally_disabled():
@@ -48,14 +41,11 @@ def test_t2i_dimensions_widgets_are_conditionally_disabled_and_legacy_migrated()
     assert "T2I_LEGACY_ASPECT_RATIOS" in js
 
 
-def test_vision_reference_guidance_controls_are_available_for_all_modes():
+def test_vision_guidance_controls_remain_available_on_unified_reference():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
-    assert 'w.name === "guidance_seed_mode"' in js
-    assert 'setWidgetDisabled(node, "guidance_seed_mode", false)' in js
-    assert 'setWidgetDisabled(node, "guidance_detail", false)' in js
-    assert 'setWidgetDisabled(node, "vision_guidance", false)' in js
-    assert 'setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed")' in js
-    assert 'const contextMode = mode === "context"' not in js
+    assert '"guidance_seed_mode", "guidance_seed"' in js
+    assert 'setWidgetDisabled(node, "guidance_seed", !semantic || seedMode !== "fixed")' in js
+
 
 def test_prompt_creator_system_prompt_stays_visible_read_only_for_presets():
     js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
