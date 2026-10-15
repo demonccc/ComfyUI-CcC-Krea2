@@ -13,9 +13,10 @@ from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionRefe
 
 
 SEMANTIC_DIRECTIVE = (
-    "Use the reference image as a subject/content guide for the SAME subject requested by the user's prompt. "
-    "Preserve semantic content such as subject type, attributes, pose, action, objects, composition, and scene meaning, "
-    "while the text prompt controls visual style and rendering. Do not add the reference subject as a second subject."
+    "Use the reference image as semantic guidance for the intended output, not as an additional subject. "
+    "Identify the relevant content and attributes requested by the user. "
+    "When a reference instruction is supplied, prioritize the explicitly named attributes and exclusions; "
+    "do not copy unrelated identity, clothing, background, or other details."
 )
 
 VISUAL_DIRECTIVE = (
