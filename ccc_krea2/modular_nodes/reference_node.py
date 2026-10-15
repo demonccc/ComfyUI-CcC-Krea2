@@ -64,7 +64,7 @@ class CcCKrea2Reference:
                 grid_vertical_position=grid_vertical_position, resize_method=resize_method,
                 semantic_resize=semantic_resize, semantic_grounding_px=semantic_grounding_px,
                 semantic_resize_method=semantic_resize_method,
-                semantic=bool(semantic_enabled), prompt_annotation=vision_instruction.strip() if semantic_enabled else "", previous_references=visuals
+                semantic=bool(semantic_enabled), prompt_annotation=vision_instruction.strip() if semantic_enabled else "", previous_references=visuals)
             last = visuals.entries[-1]
             visuals = VisualReferenceChain(visuals.entries[:-1] + (VisualReferenceEntry(**{**last.__dict__, "reference_tag":tag, "vision_strength":float(vision_strength)}),))
         if semantic_enabled:
