@@ -18,6 +18,7 @@ from ..reference_specs import (
 )
 from .edit_reference_types import VisionReferenceChain, VisualReferenceChain
 from ..vision_reference_runtime import append_vision_references
+from ..vision_attention import install_vision_attention
 from .rope_position import install_krea2_rope_positioning
 
 
@@ -173,7 +174,8 @@ def _combine_reference_chains(
                 ReferenceSpec(
                     reference_path="edit",
                     prepared_image=None,
-                    alias="",
+                    alias=str(getattr(entry, "reference_tag", "") or ""),
+                    vision_strength=float(getattr(entry, "vision_strength", 1.0)),
                     vision_instruction=entry.prompt_annotation if entry.semantic else "",
                     appearance_reference=True,
                     include_in_vision=entry.semantic,
@@ -201,7 +203,8 @@ def _combine_reference_chains(
             ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
-                alias="",
+                alias=str(getattr(entry, "reference_tag", "") or ""),
+                vision_strength=float(getattr(entry, "vision_strength", 1.0)),
                 vision_instruction=entry.prompt_annotation if entry.semantic else "",
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
@@ -357,11 +360,15 @@ class CcCKrea2Edit:
             patched_model = model
             runtime_mode = "none"
 
+        weighted_rows = 0
+        if vision_attention_patch:
+            patched_model, weighted_rows = install_vision_attention(patched_model, positive)
+
         lines = [
             "=== Krea2 CcC Edit Report ===",
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
-            f"Vision Attention Patch: {'requested (not implemented)' if vision_attention_patch else 'disabled'}",
+            f"Vision Attention Patch: {'enabled' if vision_attention_patch else 'disabled'}; weighted Qwen rows={weighted_rows}",
             f"Vision References: {len(vision_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
