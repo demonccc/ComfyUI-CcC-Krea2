@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional, Tuple
 
 import torch
 
-from ..attention_regions import resolve_attention_regions
 from ..constants import NODE_CATEGORY
 from ..geometry import resize_tensor
 from ..krea_geometry import (
@@ -227,7 +226,6 @@ class CcCKrea2Latent:
             "optional": {
                 "dimensions_image": ("IMAGE",),
                 "content_image": ("IMAGE",),
-                "attention_regions": ("KREA2_ATTENTION_REGION_CHAIN",),
             },
         }
 
@@ -248,7 +246,6 @@ class CcCKrea2Latent:
         batch_size=1,
         dimensions_image=None,
         content_image=None,
-        attention_regions=None,
     ):
         target_w, target_h, dimensions_label = _resolve_dimensions(
             dimensions=dimensions,
@@ -275,14 +272,6 @@ class CcCKrea2Latent:
             batch_size=int(batch_size),
         )
 
-        resolved_attention_regions = resolve_attention_regions(
-            regions=attention_regions,
-            target_w=target_w,
-            target_h=target_h,
-            placement=placement,
-        )
-        latent["ccc_krea2_attention_regions"] = resolved_attention_regions
-
         latent["ccc_krea2_latent_semantic"] = {
             "enabled": bool(latent_semantic),
             "image": content_image if latent_semantic else None,
@@ -303,13 +292,7 @@ class CcCKrea2Latent:
             f"Content Placement: {placement}",
             f"Batch Size: {int(batch_size)}",
             f"Latent Semantic: {'enabled' if latent_semantic else 'disabled'}",
-            f"Attention Regions: {len(resolved_attention_regions)}",
         ]
-        for region in resolved_attention_regions:
-            lines.append(
-                f"Attention Region '{region.tag}': target_px={tuple(round(v, 2) for v in region.target_box_px)}, "
-                f"target_norm={tuple(round(v, 4) for v in region.target_box_normalized)}"
-            )
         if dimensions == "preset":
             lines.append(f"Preset: {preset_size}")
         if latent_semantic:
