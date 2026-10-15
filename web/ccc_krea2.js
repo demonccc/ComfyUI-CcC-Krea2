@@ -232,92 +232,53 @@ app.registerExtension({
         if (!node || !node.comfyClass) return;
         if (NATIVE_LORA_NODES.has(node.comfyClass)) setupLoraDisabledState(node);
 
-        if (node.comfyClass === "CcCKrea2VisualReference") {
-            const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
-            const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
-            const fitWidget = node.widgets?.find((w) => w.name === "reference_fit");
+        if (node.comfyClass === "CcCKrea2Reference") {
+            const names = [
+                "semantic_enabled", "visual_enabled", "vision_mode",
+                "reference_fit", "style_processing", "semantic_resize",
+                "guidance_seed_mode"
+            ];
+            const getWidget = (name) => node.widgets?.find((w) => w.name === name);
+            const updateReferenceState = () => {
+                const semantic = getWidget("semantic_enabled")?.value === true;
+                const visual = getWidget("visual_enabled")?.value === true;
+                const visionMode = getWidget("vision_mode")?.value ?? "semantic";
+                const fit = getWidget("reference_fit")?.value ?? "native";
+                const semanticResize = getWidget("semantic_resize")?.value === true;
+                const seedMode = getWidget("guidance_seed_mode")?.value ?? "fixed";
 
-            const setDisabled = (name, disabled) => {
-                const widget = node.widgets?.find((w) => w.name === name);
-                if (widget) widget.disabled = disabled;
-            };
-
-            const updateSemanticState = () => {
-                const enabled = semanticWidget?.value === true;
-                const resizeEnabled = enabled && semanticResizeWidget?.value === true;
-                setDisabled("semantic_resize", !enabled);
-                setDisabled("semantic_grounding_px", !resizeEnabled);
-                setDisabled("semantic_resize_method", !resizeEnabled);
-                setDisabled("prompt_annotation", !enabled);
-            };
-
-            const updateFitState = () => {
-                const mode = fitWidget?.value ?? "native";
-                const crop = mode === "crop";
-                setDisabled("placement_grid", crop);
-                setDisabled("resize_method", mode !== "resize");
-                if (crop) {
-                    const placement = node.widgets?.find((w) => w.name === "placement_grid");
-                    if (placement) placement.value = "inside";
+                for (const name of [
+                    "vision_mode", "vision_instruction", "vision_strength", "semantic_resize",
+                    "style_processing", "guidance_seed_mode", "guidance_seed",
+                    "guidance_detail", "vision_guidance"
+                ]) setWidgetDisabled(node, name, !semantic);
+                setWidgetDisabled(node, "semantic_grounding_px", !semantic || !semanticResize);
+                setWidgetDisabled(node, "semantic_resize_method", !semantic || !semanticResize);
+                setWidgetDisabled(node, "style_processing", !semantic || visionMode !== "style");
+                setWidgetDisabled(node, "guidance_seed", !semantic || seedMode !== "fixed");
+                for (const name of [
+                    "visual_boost", "reference_fit", "placement_grid",
+                    "grid_horizontal_position", "grid_vertical_position", "resize_method"
+                ]) setWidgetDisabled(node, name, !visual);
+                setWidgetDisabled(node, "placement_grid", !visual || fit === "crop");
+                setWidgetDisabled(node, "resize_method", !visual || (fit !== "resize" && fit !== "contain"));
+                if (visual && fit === "crop") {
+                    const w = getWidget("placement_grid");
+                    if (w) w.value = "inside";
                 }
-            };
-
-            for (const [widget, callback] of [
-                [semanticWidget, updateSemanticState],
-                [semanticResizeWidget, updateSemanticState],
-                [fitWidget, updateFitState],
-            ]) {
-                if (!widget) continue;
-                const originalCallback = widget.callback;
-                widget.callback = function () {
-                    if (originalCallback) originalCallback.apply(this, arguments);
-                    callback();
-                };
-            }
-
-            setTimeout(() => {
-                updateSemanticState();
-                updateFitState();
-            }, 20);
-        }
-
-        if (node.comfyClass === "CcCKrea2VisionReference") {
-            const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
-            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
-
-            const updateVisionReferenceState = () => {
-                const mode = modeWidget?.value ?? "semantic";
-                const styleMode = mode === "style";
-
-                if (processingWidget) {
-                    processingWidget.disabled = !styleMode;
-                    if (!styleMode) processingWidget.value = "full";
-                }
-
-                // All Vision modes use Qwen guidance generation in the current
-                // T2I runtime, so these controls must stay available for
-                // Semantic, Visual, Style, and Context.
-                setWidgetDisabled(node, "guidance_seed_mode", false);
-                setWidgetDisabled(node, "guidance_detail", false);
-                setWidgetDisabled(node, "vision_guidance", false);
-
-                const seedMode = seedModeWidget?.value ?? "fixed";
-                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
                 node.setDirtyCanvas?.(true, true);
             };
-
-            for (const widget of [modeWidget, seedModeWidget]) {
+            for (const name of names) {
+                const widget = getWidget(name);
                 if (!widget) continue;
-                const originalCallback = widget.callback;
+                const callback = widget.callback;
                 widget.callback = function () {
-                    const result = originalCallback?.apply(this, arguments);
-                    updateVisionReferenceState();
+                    const result = callback?.apply(this, arguments);
+                    updateReferenceState();
                     return result;
                 };
             }
-
-            setTimeout(updateVisionReferenceState, 20);
+            setTimeout(updateReferenceState, 20);
         }
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
