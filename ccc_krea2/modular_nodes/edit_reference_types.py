@@ -23,6 +23,8 @@ class VisualReferenceEntry:
     semantic_grounding_px: int = 768
     semantic_resize_method: str = "lanczos"
     prompt_annotation: str = ""
+    reference_tag: str = ""
+    vision_strength: float = 1.0
     attention_scope: str = "global"
     region_tag: str = ""
 
@@ -58,6 +60,8 @@ class VisionReferenceEntry:
     image: torch.Tensor
     mode: str = "semantic_only"
     instruction: str = ""
+    reference_tag: str = ""
+    vision_strength: float = 1.0
     processing: str = "full"
     guidance_seed_mode: str = "fixed"
     guidance_seed_configured: int = 0
