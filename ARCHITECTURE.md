@@ -2,171 +2,68 @@
 
 ## Public Surface
 
-The current package registers **14 public nodes**:
+13 public nodes. For the canonical inventory see [NODES.md](NODES.md).
 
-~~~text
-Edit:
-  Krea2 CcC Attention Region
-  Krea2 CcC Visual Reference
-  Krea2 CcC Vision Reference
-  Krea2 CcC Size Resolver
-  Krea2 CcC Latent
-  Krea2 CcC Edit Prompt Creator
-  Krea2 CcC Edit
-
-Utility:
-  Krea2 CcC Character Sheet
-
-Paint:
-  Krea2 CcC Paint Prepare
-  Krea2 CcC Paint
-  Krea2 CcC Paint Restore
-
-LoRA / T2I:
-  CcC Krea2 - LoRA Prompt Settings
-  CcC Krea2 - LoRA Stack
-  Krea2 CcC Text To Image
-~~~
-
-There is no public Reference Cache node family and no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
+| Node | ID | Purpose |
+| --- | --- | --- |
+| Krea2 CcC Reference | `CcCKrea2Reference` | Dual Qwen/VAE reference with tags and strengths |
+| Krea2 CcC Size Resolver | `CcCKrea2SizeResolver` | Resolve target image size |
+| Krea2 CcC Latent | `CcCKrea2Latent` | Prepare target latent |
+| Krea2 CcC Edit | `CcCKrea2Edit` | Encode references and configure edit runtime |
+| Krea2 CcC Edit Prompt Creator | `CcCKrea2EditPromptCreator` | Generate edit prompt from image and/or instructions |
+| Krea2 CcC Character Sheet | `CcCKrea2CharacterSheet` | Compose reference image |
+| Krea2 CcC Paint Prepare | `CcCKrea2PaintPrepare` | Prepare masked image and latent |
+| Krea2 CcC Paint | `CcCKrea2Paint` | Paint conditioning and runtime |
+| Krea2 CcC Paint Restore | `CcCKrea2PaintRestore` | Restore output |
+| Krea2 CcC Lora Stack with Prompt | `CcCKrea2LoRAStackWithPrompt` | Patch LoRAs plus prompt metadata |
+| Krea2 CcC Lora Stack | `CcCKrea2LoRAStack` | Patch LoRAs |
+| Krea2 CcC Lora Stack Sliders | `CcCKrea2LoRALoader` | Slider LoRA loader |
+| Krea2 CcC Text To Image | `CcCKrea2TextToImage` | Generate T2I conditioning and latent |
 
 ## Single Edit Runtime
 
-Krea2 CcC Edit has one edit execution path.
+One runtime, no alternate model edit backend. A unified Reference is tagged
+and can contribute a Qwen Vision image, an appearance VAE latent, both, or neither.
+References are chained in declared order, with matching tags merged to prevent
+duplication. Appearance latents travel through CONDITIONING with their own
+`visual_boost` and RoPE placement.
 
-~~~text
-Attention Region(s) ------------------------+
-IMAGE -> Visual Reference(s) ---------------+
-IMAGE -> Vision Reference(s) ---------------+--> Edit --> Krea2 CcC Edit runtime --> Krea2
-                                             ^
-Size Resolver -> Latent ---------------------+
-~~~
+## Krea2 CcC Reference
 
-No alternate edit runtime is selected based on other installed custom nodes.
+The reference node unifies the previous Visual Reference and Vision Reference interfaces.
 
-### Optional Prompt Creator
+- `tag`: reference identifier such as `subject`, `outfit` or `scene`
+- `semantic_enabled`: send the reference to Qwen Vision; use `vision_mode` (Semantic, Visual, Style, Context) and `vision_instruction`
+- `visual_enabled`: encode the appearance reference via VAE/DiT, independently
+- `vision_strength`: influence of that reference's Qwen Vision rows **only when** `vision_attention_patch` is enabled in Edit
+- `visual_boost`: independent VAE/DiT appearance reference boost, unaffected by the Qwen patch
+- `reference_fit`: crop, resize, contain, native; related RoPE and resampling controls remain available
+- `semantic_grounding_px`: controls Qwen image preparation
+- optional Style processing and Qwen generation controls are retained
 
-Edit Prompt Creator is an optional pre-processing layer, not another edit runtime.
+The node emits separate typed visual and vision chains for compatibility with Edit, Prompt Creator and T2I. Edit merges matching tags into one logical reference to avoid duplicate Qwen vision images. Qwen-only and VAE-only operation is supported.
 
-~~~text
-Krea2/Qwen3-VL CLIP ----------------+-----------------------> Edit
-                                    |
-Visual Reference chain ------------>+--> Prompt Creator --> Visual Reference passthrough --> Edit
-user_prompt ------------------------>+--> Prompt Creator --> created_prompt ----------------> Edit
-reference_edit_image --------------->+                    \--> thinking
-system_prompt ---------------------->+
-~~~
+The old regional Attention Region / attention mask node and sockets are removed from the **public** workflow API. Regional attention is not replaced by the Qwen vision weighting feature.
 
-The Creator uses the same multimodal CLIP generation path as ComfyUI Generate Text. It does not mutate the Visual Reference chain.
 
-Preset modes are enhance, create_from_image, and create_from_theme. Their canonical system prompts live in Python and are displayed by the frontend as read-only text. custom enables the same system_prompt field and sends that custom text to Qwen.
+## Vision attention patch
 
-thinking is passed into Qwen3-VL tokenization. When enabled, Prompt Creator supplies a Qwen3-VL chat template with the assistant turn prefilled by <think>, forcing generation to begin inside the reasoning block. Text before </think> goes to the thinking output; text after </think> goes to created_prompt. If the block never closes, execution fails instead of treating unfinished reasoning as a final prompt.
+`Krea2 CcC Edit` has a `vision_attention_patch` toggle (default **OFF**). When ON, the runtime takes per-image Qwen vision token spans from the conditioning builder and applies `vision_strength` using a ComfyUI `attn1_patch` V-scaling hook. It skips unconditional CFG rows. When OFF, the existing Qwen path is unchanged. `visual_boost` remains separate and always governs appearance latents.
 
-create_from_image treats the internal reference edit image as a detailed visual blueprint rather than an identity source. Its preset asks Qwen to reconstruct relevant pose, body position, people/interactions, objects, scene layout, framing, viewpoint, composition, and lighting while preserving explicit user identity/body constraints.
+This is experimental. Images with heavy Style or Context row compaction retain only their remaining Qwen rows, which are remapped before weighting. No regional attention mask is used by the public nodes.
 
-Visible downstream references are named Image N. The final-output sanitizer removes known meta-preamble leakage and normalizes accidental "Krea Image N" wording before created_prompt is emitted.
-
-reference_edit_image is visible to the Creator only unless the user separately wires that image into another existing path. The final prompt therefore verbalizes useful scene details instead of referring to the hidden image itself.
-
-### Character Sheet
-
-Character Sheet is a deterministic IMAGE utility before Visual Reference:
-
-~~~text
-portrait/body IMAGE inputs
-        |
-        v
-Character Sheet
-  preserve aspect
-  fit complete source
-  no crop/stretch
-        |
-        v
-normal Visual Reference
-~~~
-
-It does not run Qwen, VAE, conditioning, or latent processing.
-
-## Visual Reference: Two Independent Representations
-
-A Visual Reference can travel through two independent paths.
-
-~~~text
-source image
-   |
-   +--> Qwen path
-   |      optional semantic participation
-   |      optional downscale-only cap
-   |      optional role-only Image N annotation
-   |
-   +--> appearance path
-          crop | resize | contain | native
-          VAE encode
-          reference latent
-          boost
-          RoPE placement
-          optional target attention scope
-~~~
-
-The Qwen copy does not need to match target pixel geometry. Appearance preparation resolves against the target geometry before VAE encoding.
-
-The positive branch uses configured reference boosts. The grounded negative branch uses the same appearance-image vision blocks, fixed empty negative text, no role annotation text, and neutral boost 1.0.
-
-### Tagged Target Attention Regions
-
-Attention Region nodes form a chain of unique tags with percentage-based target/content boxes.
-
-With empty Latent content, percentages refer directly to the final target canvas. With image content, Latent transports those boxes through stretch, contain, or crop.
-
-Crop is strict: if the retained crop touches or removes any part of a declared region, Latent raises an error instead of clipping or relocating the region.
-
-Edit resolves region_tag for each regional Visual Reference:
-
-- boost in region: reference boost is applied only to target queries inside the region.
-- only in region: target queries outside the region are blocked from attending to that reference.
-
-## Vision Reference
-
-Vision References declare Qwen/Vision information and do not create appearance latents. The declaration is consumer-neutral:
-
-- **Semantic** -> content/meaning, pose/action, objects, composition, and spatial relationships.
-- **Visual** -> near-copy/full visual blueprint. Balanced/Detailed treat pose, gaze, framing, composition, appearance, and subject count as anchors; Flexible may adapt pose/composition but never duplicates or multiplies subjects.
-- **Style** -> exact legacy Visual guidance behavior, retained because that preset produced the desired style-transfer result; the resulting guidance is applied strongly as the dominant visual treatment; only this mode exposes full / 2x2 / 4x4 processing.
-- **Context** -> mandatory scene staging: environment, viewpoint/framing, exact pose and limb placement, head orientation, gaze target, gesture, action/interaction, object placement, composition, crop, depth, and spatial relationships are treated as constraints without copying identity, clothing, or style.
-
-Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. Guidance Detail changes extraction depth, not only token ceiling, and Vision Guidance intentionally uses widely separated conservative/balanced/flexible sampling presets. The consumer still owns how the declared information is transformed into conditioning.
 
 ## Target Geometry
 
-Krea pixel geometry is defined in the shared `krea_geometry.py` library: curated presets, /16 alignment, bounds, and geometry policies. Latent consumes that library while owning target content, content placement, optional target semantic metadata, and transformed Attention Regions. T2I consumes the same geometry source of truth.
+Size Resolver and Latent resolve target pixel geometry and /16 constraints.
+Visual appearance fit and Qwen grounding are independently prepared.
+The legacy regional Attention Region input and attention masks are no longer
+exposed through public nodes.
 
-Dimension modes are from_image, fixed, and preset.
+## Prompt Creator
 
-For image-derived and fixed dimensions:
-
-- nearest_krea_aspect
-- preserve_aspect_krea_bounds
-
-Preset dimensions are explicit curated width/height pairs and bypass geometry policy.
-
-When target content is enabled, content fit is independent: crop, contain, or stretch.
-
-Visual Reference fit is a separate operation and supports crop, resize, contain, and native. RoPE placement is independent from Visual Reference pixel preparation.
-
-### Semantic Grounding Cadence
-
-Visual Reference `semantic_grounding_px` and Latent `latent_grounding_px` use a step of 32. Vision Reference does not expose a grounding cap; its source image is passed to Qwen at tokenizer-native resolution.
-
-## Conditioning and Runtime Transport
-
-Appearance reference latents are attached to CONDITIONING together with reference fit, positive boost, neutral negative boost, RoPE placement, optional target region, and target attention scope.
-
-The Edit runtime executes one in-context sequence:
-
-~~~text
-[text | reference 1 | reference 2 | ... | target]
-~~~
+Edit Prompt Creator can inspect the Qwen-enabled Visual Reference chain and
+produce an enhanced or image-grounded prompt. It is optional and is not a second edit runtime.
 
 ## Paint
 
@@ -211,7 +108,7 @@ LoRA Stack patches MODEL only and can carry immutable prompt augmentation assemb
 
 Text to Image consumes optional prompt_augmentation and optional vision_references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
 
-The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
+The checked-in `workflows/01_t2i_one_reference.json` demonstrates the direct runtime path:
 
 ~~~text
 Vision Reference ----+
