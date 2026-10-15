@@ -30,8 +30,6 @@ def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
         "semantic_grounding_px",
         "semantic_resize_method",
         "prompt_annotation",
-        "attention_scope",
-        "region_tag",
     ]
     assert list(optional) == ["previous_references"]
     assert required["reference_fit"][0] == ("crop", "resize", "contain", "native")
@@ -317,7 +315,7 @@ def test_latent_surface_separates_dimensions_geometry_and_content():
     assert required["content"][0] == ("empty", "from_image")
     assert required["content_fit"][0] == ("crop", "contain", "stretch")
     assert required["latent_grounding_px"][1]["step"] == 32
-    assert list(optional) == ["dimensions_image", "content_image", "attention_regions"]
+    assert list(optional) == ["dimensions_image", "content_image"]
 
 
 def test_content_contain_keeps_complete_image_with_white_padding():
@@ -389,7 +387,7 @@ def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
     required = CcCKrea2Edit.INPUT_TYPES()["required"]
     optional = CcCKrea2Edit.INPUT_TYPES()["optional"]
     assert "latent" in required
-    assert list(optional) == ["visual_references", "vision_references"]
+    assert list(optional) == ["visual_references", "vision_references", "prompt_augmentation"]
     for moved in (
         "dimensions",
         "dimensions_image",
