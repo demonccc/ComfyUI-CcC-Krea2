@@ -493,7 +493,7 @@
         true,
         false,
         "semantic",
-        "Reference @guide. Preserve relevant details; do not duplicate subjects.",
+        "Focus on the elements explicitly requested in the prompt, including relevant subjects, objects, composition, and relationships. Do not introduce extra people or unrelated details.",
         1,
         1,
         "resize",
