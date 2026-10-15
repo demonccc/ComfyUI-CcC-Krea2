@@ -44,7 +44,7 @@ def test_create_from_theme_runs_without_visual_references():
 
 
 def test_prompt_creator_mode_title_extension_is_checked_in():
-    js = Path("web/prompt_creator_mode_title.js").read_text(encoding="utf-8")
-    assert 'node.comfyClass !== "CcCKrea2EditPromptCreator"' in js
+    js = Path("web/ccc_krea2.js").read_text(encoding="utf-8")
+    assert 'node.comfyClass === "CcCKrea2EditPromptCreator"' in js
     assert 'node.title = `Prompt Creator - ${mode}`' in js
     assert "modeWidget.callback" in js
