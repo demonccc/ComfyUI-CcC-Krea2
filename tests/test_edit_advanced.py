@@ -167,7 +167,7 @@ def test_positive_reference_boost_metadata_is_explicit_and_negative_defaults_to_
 
 def test_vision_reference_exposes_simple_public_presets():
     required = CcCKrea2VisionReference.INPUT_TYPES()["required"]
-    assert list(required) == ["image", "mode", "instruction", "style_processing"]
+    assert list(required) == ["image", "mode", "instruction", "style_processing", "guidance_seed_mode", "guidance_seed", "guidance_detail", "vision_guidance"]
     assert required["mode"][0] == ("semantic", "visual", "style", "context")
     assert required["style_processing"][0] == ("full", "2x2", "4x4")
     assert "grounding_px" not in required
