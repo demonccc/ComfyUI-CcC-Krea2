@@ -5,7 +5,6 @@ from typing import Any, Optional
 import torch
 
 from .. import edit_engine as edit_engine_runtime
-from ..attention_regions import resolved_regions_by_tag
 from ..constants import NODE_CATEGORY
 from ..prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, apply_prompt_augmentation
 from ..grounding import resize_grounding_image
@@ -240,33 +239,6 @@ def _conditioning_extras(conditioning):
     return {}
 
 
-def _resolve_reference_attention(visual_entries, latent):
-    resolved = tuple(latent.get("ccc_krea2_attention_regions") or ())
-    by_tag = resolved_regions_by_tag(resolved)
-    boxes = []
-    scopes = []
-    for index, entry in enumerate(visual_entries, start=1):
-        scope = str(getattr(entry, "attention_scope", "global") or "global")
-        tag = str(getattr(entry, "region_tag", "") or "").strip()
-        scopes.append(scope)
-        if scope == "global":
-            boxes.append(None)
-            continue
-        if not tag:
-            raise ValueError(
-                f"[Krea2 CcC Edit] Visual Reference {index} uses regional attention but has no region tag."
-            )
-        region = by_tag.get(tag)
-        if region is None:
-            available = ", ".join(sorted(by_tag)) or "<none>"
-            raise ValueError(
-                f"[Krea2 CcC Edit] Visual Reference {index} targets unknown Attention Region '{tag}'. "
-                f"Available tags: {available}."
-            )
-        boxes.append(tuple(region.target_box_normalized))
-    return boxes, scopes
-
-
 def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     extras = _conditioning_extras(conditioning)
     refs = list(extras.get("reference_latents") or [])
@@ -305,6 +277,7 @@ class CcCKrea2Edit:
                 "latent": ("LATENT",),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
+                "vision_attention_patch": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "visual_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
@@ -321,6 +294,7 @@ class CcCKrea2Edit:
         latent,
         positive_prompt="",
         apply_krea2_edit_patch=True,
+        vision_attention_patch=False,
         visual_references=None,
         vision_references=None,
         prompt_augmentation=None,
@@ -356,7 +330,7 @@ class CcCKrea2Edit:
         reference_count = len(visual_entries)
         rope_positions = [entry.rope_position for entry in visual_entries]
         positive_boosts = [float(entry.boost) for entry in visual_entries]
-        target_regions, attention_scopes = _resolve_reference_attention(visual_entries, latent)
+        target_regions, attention_scopes = [None] * reference_count, ["global"] * reference_count
 
         if reference_count:
             positive = attach_reference_runtime_to_conditioning(
@@ -387,6 +361,7 @@ class CcCKrea2Edit:
             "=== Krea2 CcC Edit Report ===",
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
+            f"Vision Attention Patch: {'requested (not implemented)' if vision_attention_patch else 'disabled'}",
             f"Vision References: {len(vision_entries)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
@@ -422,7 +397,7 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: cached={'yes' if entry.cache is not None else 'no'}, "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
-                f"attention_scope={entry.attention_scope}, region_tag={entry.region_tag or '<none>'}, "
+                
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method={entry.semantic_resize_method}, prompt_annotation={annotation}"
             )
