@@ -150,11 +150,6 @@
           "name": "clip",
           "type": "CLIP",
           "link": 2
-        },
-        {
-          "name": "vision_references",
-          "type": "KREA2_VISION_REFERENCE_CHAIN",
-          "link": 13
         }
       ],
       "outputs": [
