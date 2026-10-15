@@ -390,29 +390,16 @@ class CcCKrea2EditPromptCreator:
             thinking_prefilled=thinking_prefilled,
         )
         fallback_used = False
+        retry_max_tokens = None
         if thinking and not raw_created_prompt.strip() and thinking_text:
-            # A long Qwen reasoning block may exhaust max_tokens before </think>.
-            # Retry once with the exact same image context and user request,
-            # but request the final answer directly instead of reasoning.
+            # Preserve the thinking-enabled analysis; increase only the generation
+            # token budget on one bounded retry.
             fallback_used = True
-            fallback_prompt = _build_generation_prompt(
-                mode=str(mode),
-                user_prompt=user_prompt,
-                mapping_lines=mapping_lines,
-                has_reference_edit_image=reference_edit_image is not None,
-                thinking=False,
-            )
-            fallback_tokens = clip.tokenize(
-                fallback_prompt,
-                images=images,
-                min_length=1,
-                thinking=False,
-                system_prompt=system_prompt,
-            )
-            fallback_ids = clip.generate(
-                fallback_tokens,
+            retry_max_tokens = min(8192, max(int(max_tokens) * 2, int(max_tokens) + 1024))
+            retry_ids = clip.generate(
+                tokens,
                 do_sample=True,
-                max_length=int(max_tokens),
+                max_length=retry_max_tokens,
                 temperature=float(temperature),
                 top_k=64,
                 top_p=float(top_p),
@@ -420,14 +407,13 @@ class CcCKrea2EditPromptCreator:
                 repetition_penalty=1.05,
                 seed=int(seed),
             )
-            raw_created_prompt, fallback_thinking = _split_generated_text(
-                clip, fallback_ids, fallback_prompt, thinking_prefilled=False,
+            raw_created_prompt, thinking_text = _split_generated_text(
+                clip, retry_ids, generation_prompt, thinking_prefilled=thinking_prefilled,
             )
             if not raw_created_prompt.strip():
                 raise RuntimeError(
-                    "[Krea2 CcC Edit Prompt Creator] Qwen did not produce a final prompt "
-                    "even after an automatic retry without thinking. Increase max_tokens "
-                    "or simplify the request."
+                    "[Krea2 CcC Edit Prompt Creator] Qwen exhausted the increased "
+                    f"thinking token budget ({retry_max_tokens}) without a final prompt."
                 )
         created_prompt = _normalize_created_prompt(raw_created_prompt)
 
@@ -436,7 +422,8 @@ class CcCKrea2EditPromptCreator:
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
             f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
-            f"Automatic Direct Retry: {'yes' if fallback_used else 'no'}",
+            f"Automatic Token Budget Retry: {'yes' if fallback_used else 'no'}",
+            f"Retry Max Tokens: {retry_max_tokens if fallback_used else '<unused>'}",
             f"System Prompt Source: {'custom' if str(mode) == 'custom' else 'preset'}",
             f"Visual Reference Chain Entries: {len(visual_references.entries)}",
             f"Images Analyzed: {len(images)}",
