@@ -29,7 +29,7 @@ def test_graph_links_match_sockets():
     for path in WORKFLOW_DIR.glob("*.json"):
         graph = json.loads(path.read_text(encoding="utf-8"))
         nodes = {n["id"]: n for n in graph["nodes"]}
-        links = {l[0]: l for l in graph["links"]}
+        links = {link[0]: link for link in graph["links"]}
         assert len(links) == len(graph["links"]), path.name
         for link_id, src_id, out_idx, dst_id, in_idx, kind in graph["links"]:
             assert src_id in nodes and dst_id in nodes, (path.name, link_id)
