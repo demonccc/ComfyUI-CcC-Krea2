@@ -246,7 +246,7 @@ def test_thinking_truncation_retries_without_thinking():
 
 
 def test_thinking_truncation_reports_failure_after_retry():
-    clip = _FakeClip("I am still reasoning when max tokens end.")
+    clip = _FakeClip("<think>I am still reasoning when max tokens end.")
     with pytest.raises(RuntimeError, match="after an automatic retry"):
         CcCKrea2EditPromptCreator().create(
             clip=clip,
