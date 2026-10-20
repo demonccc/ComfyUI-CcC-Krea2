@@ -9,11 +9,10 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
-REFERENCE_FIT = ("crop", "resize", "contain", "native")
+REFERENCE_FIT = ("native", "crop", "contain", "fit")
 PLACEMENT_GRIDS = ("inside", "outside")
 GRID_HORIZONTAL = ("center", "left", "right")
 GRID_VERTICAL = ("center", "up", "down")
-RESIZE_METHODS = ("lanczos", "bicubic", "bilinear", "area")
 
 
 class CcCKrea2VisualReference:
@@ -49,13 +48,6 @@ class CcCKrea2VisualReference:
                 ),
                 "grid_horizontal_position": (GRID_HORIZONTAL, {"default": "center"}),
                 "grid_vertical_position": (GRID_VERTICAL, {"default": "center"}),
-                "resize_method": (
-                    RESIZE_METHODS,
-                    {
-                        "default": "lanczos",
-                        "tooltip": "Interpolation used when reference_fit is resize or contain.",
-                    },
-                ),
                 "semantic": (
                     "BOOLEAN",
                     {
@@ -73,13 +65,6 @@ class CcCKrea2VisualReference:
                 "semantic_grounding_px": (
                     "INT",
                     {"default": 768, "min": 32, "max": 4096, "step": 32},
-                ),
-                "semantic_resize_method": (
-                    RESIZE_METHODS,
-                    {
-                        "default": "lanczos",
-                        "tooltip": "Interpolation used only for semantic downscaling.",
-                    },
                 ),
                 "prompt_annotation": (
                     "STRING",
@@ -117,11 +102,11 @@ class CcCKrea2VisualReference:
         placement_grid: str = "inside",
         grid_horizontal_position: str = "center",
         grid_vertical_position: str = "center",
-        resize_method: str = "lanczos",
+        resize_method: str = "bicubic",
         semantic: bool = True,
         semantic_resize: bool = True,
         semantic_grounding_px: int = 768,
-        semantic_resize_method: str = "lanczos",
+        semantic_resize_method: str = "bicubic",
         prompt_annotation: str = "",
         attention_scope: str = "global",
         region_tag: str = "",
@@ -146,11 +131,11 @@ class CcCKrea2VisualReference:
             placement_grid="inside" if reference_fit == "crop" else placement_grid,
             grid_horizontal_position=grid_horizontal_position,
             grid_vertical_position=grid_vertical_position,
-            resize_method=resize_method,
+            resize_method="bicubic",
             semantic=semantic_enabled,
             semantic_resize=bool(semantic_resize) if semantic_enabled else False,
             semantic_grounding_px=int(semantic_grounding_px),
-            semantic_resize_method=semantic_resize_method,
+            semantic_resize_method="bicubic",
             prompt_annotation=prompt_annotation.strip() if semantic_enabled else "",
             attention_scope=attention_scope,
             region_tag=resolved_region_tag if attention_scope != "global" else "",
