@@ -2,7 +2,7 @@
 
 ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
-The public surface currently contains **14 nodes**. Reference Cache nodes and the standalone Paint Geometry node are not part of the public node registry.
+The public surface currently contains **15 nodes**. The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
 
 ## Public Nodes
 
@@ -19,8 +19,9 @@ The public surface currently contains **14 nodes**. Reference Cache nodes and th
 | Paint | **Krea2 CcC Paint Prepare** | Owns Paint geometry, outpaint expansion, mask processing, semantic reference, VAE preparation, and sampling latent. |
 | Paint | **Krea2 CcC Paint** | Builds AnyPaint/Krea Paint conditioning and installs the Paint runtime. |
 | Paint | **Krea2 CcC Paint Restore** | Restores decoded Paint output to the requested canvas. |
-| LoRA | **CcC Krea2 - LoRA Prompt Settings** | Defines optional prompt augmentation associated with up to four LoRA slots. |
-| LoRA | **CcC Krea2 - LoRA Stack** | Applies up to four model-only LoRAs and carries optional prompt augmentation. |
+| LoRA | **Krea2 CcC Lora Stack with Prompt** | Applies MODEL-only LoRAs with optional prompt augmentation. |
+| LoRA | **Krea2 CcC Lora Stack** | Applies MODEL-only LoRAs. |
+| LoRA | **Krea2 CcC Lora Stack Sliders** | Slider-based MODEL-only LoRA loader. |
 | T2I | **Krea2 CcC Text To Image** | Native Krea2 text-to-image conditioning and empty latent helper. |
 
 ## Edit Architecture
@@ -28,25 +29,28 @@ The public surface currently contains **14 nodes**. Reference Cache nodes and th
 The direct edit path remains simple:
 
 ~~~text
-Visual Reference(s) --------------------+
-Vision Reference(s) --------------------+--> Krea2 CcC Edit --> MODEL / CONDITIONING / LATENT
-                                        ^
-Attention Region(s) --> Latent ---------|
-Size Resolver -------> Latent ----------+
+Visual Reference --> Vision Reference --> Visual Reference
+       (each adds to the same KREA2_REFERENCE_CHAIN)
+                               |
+                               v
+                         references --> Krea2 CcC Edit
+Attention Region(s) --> Latent --------------^
+Size Resolver -------> Latent --------------^
 ~~~
 
-**Edit Prompt Creator** is optional. Existing workflows can continue connecting a prompt and Visual References directly to Edit.
+The reference nodes can be chained in any order using `previous_references`; they expose one shared `references` output. Edit accepts a single `references` input. Appearance references go through VAE and (optionally) Qwen; Vision references are Qwen-only.
+
+**Edit Prompt Creator** is optional:
 
 ~~~text
-Krea2/Qwen3-VL CLIP ----+-------------------------------> Edit
-                        |
-                        +--> Edit Prompt Creator
-Visual References ------+--> Edit Prompt Creator --> Visual References passthrough --> Edit
-user_prompt ------------+--> Edit Prompt Creator --> created_prompt ----------------> Edit
-reference_edit_image ---> Edit Prompt Creator
+references --> Edit Prompt Creator --> references --> Edit
+                     |                    ^
+CLIP ----------------+                    |
+user_prompt ---------+--> created_prompt -+--> Edit.positive_prompt
+reference_edit_image-+
 ~~~
 
-The Creator does not modify Visual Reference, Vision Reference, Latent, or Edit. In create_from_image, reference_edit_image is internal analysis input: the generated text must describe the observed situation explicitly instead of assuming Edit can see that image.
+Prompt Creator examines **only Visual Reference entries** from the mixed reference chain and passes the entire chain through unchanged. Its optional reference_edit_image is used internally for prompt analysis, not as an appearance reference.
 
 **Character Sheet** is also a utility before Visual Reference. It creates one deterministic IMAGE; the result can then be connected to a normal Visual Reference.
 
@@ -54,10 +58,10 @@ The Creator does not modify Visual Reference, Vision Reference, Latent, or Edit.
 
 Each Visual Reference is an ordered appearance reference with two independent representations.
 
-The VAE/appearance path supports:
+The VAE/appearance path supports **native, crop, contain, and fit**:
 
 - crop: use the target as an inside crop window over the source.
-- resize: map the source long edge to the corresponding target axis, preserve aspect ratio, then crop down only the minimum pixels required for /16 alignment.
+- fit: scale proportionally to cover the target, center-crop the excess, and align to /16.
 - contain: uniformly fit the source inside the target, preserve aspect ratio, then crop down only the minimum pixels required for /16 alignment.
 - native: keep 1:1 source pixel scale and center-crop width/height down to /16.
 
@@ -65,7 +69,7 @@ RoPE placement is independent from pixel fit.
 
 The Qwen path is controlled by semantic. When enabled, the same image can be downscaled only when it exceeds semantic_grounding_px. prompt_annotation is identification-only and becomes Image N: <annotation>; edit instructions belong in Edit's positive prompt.
 
-Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
+Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.\n\nPositive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
 
 Regional attention is optional:
 
