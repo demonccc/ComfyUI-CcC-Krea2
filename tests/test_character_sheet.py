@@ -5,7 +5,6 @@ import torch
 
 from ccc_krea2.modular_nodes.character_sheet_node import (
     CHARACTER_SHEET_PRESETS,
-    CHARACTER_SHEET_RESIZE_METHODS,
     PRESET_1_BODY,
     PRESET_1_PORTRAIT,
     PRESET_1_PORTRAIT_2_BODIES,
@@ -42,7 +41,6 @@ def _compose(node, sheet_type, **images):
     return node.compose(
         sheet_type=sheet_type,
         sheet_geometry=DEFAULT_KREA_PRESET_SIZE,
-        resize_method="lanczos",
         padding=8,
         outer_margin=8,
         background="white",
@@ -84,9 +82,7 @@ def test_character_sheet_geometry_reuses_shared_krea_presets():
     assert options["default"] == DEFAULT_KREA_PRESET_SIZE
     assert "resolution" not in required
     assert "slot_fit" not in required
-    resize_choices, resize_options = required["resize_method"]
-    assert tuple(resize_choices) == CHARACTER_SHEET_RESIZE_METHODS
-    assert resize_options["default"] == "lanczos"
+    assert "resize_method" not in required
 
 
 def test_two_portraits_plus_body_uses_stacked_portraits_and_full_height_body():
@@ -124,7 +120,6 @@ def test_four_portraits_plus_body_composes_selected_krea_geometry():
     (sheet,) = node.compose(
         sheet_type=PRESET_4_PORTRAITS_1_BODY,
         sheet_geometry=geometry,
-        resize_method="lanczos",
         padding=8,
         outer_margin=8,
         background="black",
@@ -156,7 +151,6 @@ def test_single_portrait_fit_keeps_complete_source_without_crop():
     (sheet,) = node.compose(
         sheet_type=PRESET_1_PORTRAIT,
         sheet_geometry=DEFAULT_KREA_PRESET_SIZE,
-        resize_method="lanczos",
         padding=8,
         outer_margin=0,
         background="white",
@@ -244,21 +238,6 @@ def test_single_portrait_fit_keeps_complete_source_without_crop():
 def test_all_presets_compose(preset, images):
     node = CcCKrea2CharacterSheet()
     (sheet,) = _compose(node, preset, **images)
-    assert tuple(sheet.shape) == (1, 1024, 1024, 3)
-
-
-@pytest.mark.parametrize("resize_method", CHARACTER_SHEET_RESIZE_METHODS)
-def test_character_sheet_accepts_all_resize_methods(resize_method):
-    node = CcCKrea2CharacterSheet()
-    (sheet,) = node.compose(
-        sheet_type=PRESET_1_PORTRAIT,
-        sheet_geometry=DEFAULT_KREA_PRESET_SIZE,
-        resize_method=resize_method,
-        padding=8,
-        outer_margin=8,
-        background="white",
-        portrait_1=_solid((0.3, 0.5, 0.7), 73, 119),
-    )
     assert tuple(sheet.shape) == (1, 1024, 1024, 3)
 
 
