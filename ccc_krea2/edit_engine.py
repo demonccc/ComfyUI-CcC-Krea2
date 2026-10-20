@@ -95,7 +95,7 @@ def run_krea2_edit_orchestrator(
         if ref_path == "edit":
             if is_appearance:
                 if spec.prepared_image is None:
-                    raise ValueError("[Krea2 CcC Edit] Visual reference is missing both image and cached appearance latent.")
+                    raise ValueError("[Krea2 CcC Edit] Visual reference is missing its image.")
                 src_img = spec.prepared_image.original_image
                 src_h, src_w = src_img.shape[1], src_img.shape[2]
                 fit_mode = getattr(spec, "visual_reference_fit", getattr(spec, "visual_fit_mode", "auto"))
