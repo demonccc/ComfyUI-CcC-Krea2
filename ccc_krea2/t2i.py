@@ -333,7 +333,7 @@ def _generate_t2i_vision_guidance(
 def _encode_t2i_vision(
     clip: Any,
     prompt: str,
-    vision_references: VisionReferenceChain,
+    references: VisionReferenceChain,
 ):
     """Convert Vision References into mode-scoped text guidance, then encode text-only conditioning.
 
@@ -345,7 +345,7 @@ def _encode_t2i_vision(
     guidance_items = []
     total_analysis_images = 0
 
-    for index, entry in enumerate((e for e in vision_references.entries if isinstance(e, VisionReferenceEntry)), start=1):
+    for index, entry in enumerate((e for e in references.entries if isinstance(e, VisionReferenceEntry)), start=1):
         public_mode = _public_vision_mode(entry.mode)
         guidance, analysis_image_count, generation_strategy = _generate_t2i_vision_guidance(
             clip=clip,
@@ -443,7 +443,7 @@ class CcCKrea2TextToImage:
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
-                "vision_references": ("KREA2_REFERENCE_CHAIN",),
+                "references": ("KREA2_REFERENCE_CHAIN",),
             },
         }
 
@@ -460,7 +460,7 @@ class CcCKrea2TextToImage:
         batch_size: int = 1,
         negative_prompt: str = "",
         prompt_augmentation: Optional[Any] = None,
-        vision_references: Optional[VisionReferenceChain] = None,
+        references: Optional[VisionReferenceChain] = None,
     ) -> Tuple[Any, Any, Any, Dict[str, Any], str]:
         if clip is None:
             raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
@@ -497,7 +497,7 @@ class CcCKrea2TextToImage:
             batch_size=batch_size,
         )
 
-        vision_entries = tuple(e for e in (vision_references or VisionReferenceChain()).entries if isinstance(e, VisionReferenceEntry))
+        vision_entries = tuple(e for e in (references or VisionReferenceChain()).entries if isinstance(e, VisionReferenceEntry))
         vision_guidance_items = []
         conditioning_prompt = eff_pos
         vision_analysis_images = 0
@@ -505,7 +505,7 @@ class CcCKrea2TextToImage:
             positive, vision_guidance_items, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
                 clip=clip,
                 prompt=eff_pos,
-                vision_references=vision_references,
+                references=references,
             )
         else:
             pos_tokens = clip.tokenize(eff_pos)
