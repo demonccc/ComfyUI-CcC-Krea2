@@ -19,8 +19,8 @@ class CcCKrea2VisualReference:
     """Declare one ordered visual reference for Krea2 Edit."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("KREA2_VISUAL_REFERENCE_CHAIN",)
-    RETURN_NAMES = ("visual_references",)
+    RETURN_TYPES = ("KREA2_REFERENCE_CHAIN",)
+    RETURN_NAMES = ("references",)
     FUNCTION = "process"
     DESCRIPTION = (
         "Visual reference geometry: native keeps its original scale, crop selects a target-sized "
