@@ -64,7 +64,6 @@ BACKGROUND_VALUES = {
     "black": 0.0,
 }
 
-CHARACTER_SHEET_RESIZE_METHODS = ("lanczos", "bicubic", "bilinear", "area")
 
 
 def _split_extent(total: int, parts: int, gap: int) -> Tuple[int, ...]:
@@ -365,13 +364,6 @@ class CcCKrea2CharacterSheet:
                         "tooltip": "Final Character Sheet geometry. Uses the same curated Krea presets as Krea2 CcC Latent.",
                     },
                 ),
-                "resize_method": (
-                    CHARACTER_SHEET_RESIZE_METHODS,
-                    {
-                        "default": "lanczos",
-                        "tooltip": "Interpolation used when fitting each source into its slot.",
-                    },
-                ),
                 "padding": (
                     "INT",
                     {
@@ -429,7 +421,6 @@ class CcCKrea2CharacterSheet:
         self,
         sheet_type: str,
         sheet_geometry: str,
-        resize_method: str,
         padding: int,
         outer_margin: int,
         background: str,
@@ -498,7 +489,7 @@ class CcCKrea2CharacterSheet:
                 target_h=slot_h,
                 target_w=slot_w,
                 background_value=float(bg),
-                resize_method=resize_method,
+                resize_method="bicubic",
             )
             canvas[:, y:y + slot_h, x:x + slot_w, :] = fitted
 
