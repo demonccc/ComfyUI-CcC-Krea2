@@ -137,9 +137,9 @@ def test_t2i_empty_prompt_augmentation():
 
 
 
-def test_t2i_accepts_optional_vision_references():
+def test_t2i_accepts_optional_references():
     optional = CcCKrea2TextToImage.INPUT_TYPES()["optional"]
-    assert optional["vision_references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert optional["references"][0] == "KREA2_REFERENCE_CHAIN"
 
 
 def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
@@ -155,10 +155,10 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
 
     captured = {}
 
-    def fake_encode(clip, prompt, vision_references):
+    def fake_encode(clip, prompt, references):
         captured["clip"] = clip
         captured["prompt"] = prompt
-        captured["vision_references"] = vision_references
+        captured["references"] = references
         return (
             ["vision_positive"],
             [
@@ -184,13 +184,13 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
         clip=clip,
         prompt="A futuristic city",
         negative_prompt="blurry",
-        vision_references=vision_chain,
+        references=vision_chain,
     )
 
     assert out_model is model
     assert positive == ["vision_positive"]
     assert captured["prompt"] == "A futuristic city"
-    assert captured["vision_references"] is vision_chain
+    assert captured["references"] is vision_chain
     assert clip.tokenize_calls == [("blurry", {})]
     assert negative == ["conditioning_for_tokens_for_blurry"]
     assert "samples" in latent
@@ -228,7 +228,7 @@ def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
     conditioning, guidance_items, conditioning_prompt, analysis_images = _encode_t2i_vision(
         clip=clip,
         prompt="Only one manga girl facing forward.",
-        vision_references=vision_chain,
+        references=vision_chain,
     )
 
     assert analysis_images == 1
@@ -584,7 +584,7 @@ def test_t2i_style_conditioning_uses_legacy_visual_prefix(monkeypatch):
     _, _, conditioning_prompt, _ = _encode_t2i_vision(
         clip=clip,
         prompt="A manga girl",
-        vision_references=vision_chain,
+        references=vision_chain,
     )
 
     assert "STRONG STYLE REFERENCE" in conditioning_prompt
