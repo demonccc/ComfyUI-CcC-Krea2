@@ -152,7 +152,7 @@
           "link": 2
         },
         {
-          "name": "vision_references",
+          "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "link": 13
         }
