@@ -176,8 +176,8 @@ class CcCKrea2CachedVisualReference:
     """Add a cached visual reference to the normal ordered reference chain."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("KREA2_VISUAL_REFERENCE_CHAIN",)
-    RETURN_NAMES = ("visual_references",)
+    RETURN_TYPES = ("KREA2_REFERENCE_CHAIN",)
+    RETURN_NAMES = ("references",)
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds a precomputed visual reference. Boost, RoPE placement, semantic enablement and prompt "
