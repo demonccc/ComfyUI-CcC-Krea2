@@ -1,6 +1,4 @@
-"""Public Prompt Creator input contract tests."""
-
-from pathlib import Path
+"""Functional Prompt Creator tests with a deterministic Qwen stand-in."""
 
 from ccc_krea2.nodes import NODE_CLASS_MAPPINGS
 from ccc_krea2.modular_nodes.edit_reference_types import VisualReferenceChain
