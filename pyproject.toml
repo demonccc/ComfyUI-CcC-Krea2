@@ -20,7 +20,6 @@ classifiers = [
 dependencies = [
     "pillow>=9.5.0",
     "einops>=0.7.0",
-    "safetensors>=0.4.0",
     "numpy>=1.24"
 ]
 
@@ -31,7 +30,7 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/demonccc/ComfyUI-Krea-CcC"
+Repository = "https://github.com/demonccc/ComfyUI-CcC-Krea2"
 
 [tool.comfy]
 PublisherId = "CcC"
