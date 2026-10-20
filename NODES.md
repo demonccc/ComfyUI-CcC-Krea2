@@ -1,6 +1,6 @@
 # ComfyUI-Krea-CcC Nodes
 
-This document describes the **14 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
+This document describes the **15 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
 
 ## Public Node Inventory
 
@@ -17,11 +17,12 @@ This document describes the **14 public nodes registered in ccc_krea2/nodes.py**
 | Krea2 CcC Paint Prepare | CcCKrea2PaintPrepare |
 | Krea2 CcC Paint | CcCKrea2Paint |
 | Krea2 CcC Paint Restore | CcCKrea2PaintRestore |
-| CcC Krea2 - LoRA Prompt Settings | CcCKrea2LoRAPromptSettings |
-| CcC Krea2 - LoRA Stack | CcCKrea2LoRAStack |
+| Krea2 CcC Lora Stack with Prompt | CcCKrea2LoRAStackWithPrompt |
+| Krea2 CcC Lora Stack | CcCKrea2LoRAStack |
+| Krea2 CcC Lora Stack Sliders | CcCKrea2LoRALoader |
 | Krea2 CcC Text To Image | CcCKrea2TextToImage |
 
-There are no public Reference Cache nodes and no public Krea2 CcC Paint Geometry node.
+The Reference Cache implementation has been removed. There are no cache nodes and no public Krea2 CcC Paint Geometry node.
 
 ## Krea2 CcC Attention Region
 
@@ -50,31 +51,29 @@ Required controls:
 | --- | --- | --- | --- |
 | image | IMAGE | — | Source reference. |
 | boost | 0..10 | 1.0 | Positive target-to-reference attention boost. |
-| reference_fit | crop, resize, contain, native | native | Appearance/VAE pixel fit. |
+| reference_fit | native, crop, contain, fit | native | Appearance/VAE pixel fit. |
 | placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. |
 | grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
 | grid_vertical_position | center, up, down | center | Vertical RoPE/grid position. |
-| resize_method | lanczos, bicubic, bilinear, area | lanczos | Interpolation for resize/contain. |
 | semantic | boolean | true | Also show this image to Qwen. |
 | semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
-| semantic_resize_method | lanczos, bicubic, bilinear, area | lanczos | Qwen-only resize interpolation. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
 | attention_scope | global, boost in region, only in region | global | Target-side reference scope. |
 | region_tag | text | empty | Attention Region tag for regional modes. |
 
 Optional input: previous_references.
 
-Output: visual_references.
+Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
 ### Appearance fit
 
 - crop: the target acts as an inside crop window over the source.
-- resize: map the source long edge to the corresponding target axis, preserve aspect, then crop down only the minimum pixels needed for /16.
+- fit: scale proportionally to cover the target and center-crop the excess; output is /16-aligned.
 - contain: uniformly fit inside the target, preserve aspect, then crop down only the minimum pixels needed for /16.
 - native: keep 1:1 pixel scale and center-crop width/height down to /16.
 
-Qwen preparation is independent from appearance/VAE fit.
+Qwen preparation is independent from appearance/VAE fit. Image resizing uses bicubic with antialiasing; native and crop do not scale.
 
 prompt_annotation is identification only, for example: This is the subject image. Edit instructions belong in Edit's positive_prompt.
 
@@ -94,11 +93,11 @@ Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
 | guidance_seed | integer | 0 | Base/fixed Qwen guidance seed; editable only in fixed mode. |
 | guidance_detail | compact, balanced, detailed | balanced | Extraction-depth policy plus max-length budget: compact keeps only highest-impact facts (256), balanced keeps major + secondary facts (512), detailed is exhaustive within the selected mode (1024). |
 | vision_guidance | conservative, balanced, flexible | balanced | Qwen sampling preset. Conservative = temp 0.05 / top_p 0.70 / top_k 32 / min_p 0.10; balanced = 0.25 / 0.90 / 64 / 0.05; flexible = 0.70 / 0.99 / 128 / 0.01. |
-| previous_references | KREA2_VISION_REFERENCE_CHAIN | optional | Previous Vision Reference chain. |
+| previous_references | KREA2_REFERENCE_CHAIN | optional | Previous mixed reference chain. |
 
 Outputs:
 
-- `vision_references` (`KREA2_VISION_REFERENCE_CHAIN`)
+- `references` (`KREA2_REFERENCE_CHAIN`)
 - `vision_info` (`STRING`) with consumer-neutral declaration metadata including mode, processing, Qwen guidance preset/seed, source resolution, and chain size.
 
 Vision Reference defines information semantics rather than a transport algorithm:
@@ -140,7 +139,6 @@ Builds the target LATENT and owns target geometry.
 | geometry_policy | nearest_krea_aspect, preserve_aspect_krea_bounds | preserve_aspect_krea_bounds |
 | content | empty, from_image | empty |
 | content_fit | crop, contain, stretch | crop |
-| resize_method | auto, nearest-exact, bilinear, bicubic, area, lanczos | auto |
 | latent_semantic | boolean | false |
 | latent_semantic_instruction | text | empty |
 | latent_grounding_px | 0..4096, step 32 | 768 |
@@ -189,7 +187,7 @@ Required inputs/controls:
 | Control | Values | Default |
 | --- | --- | --- |
 | clip | CLIP | — |
-| visual_references | KREA2_VISUAL_REFERENCE_CHAIN | — |
+| references | KREA2_REFERENCE_CHAIN | optional |
 | mode | enhance, create_from_image, create_from_theme, custom | enhance |
 | user_prompt | text | empty |
 | system_prompt | text | enhance preset |
@@ -206,7 +204,7 @@ Optional input:
 Outputs:
 
 - created_prompt
-- visual_references
+- references
 - creator_info
 - thinking
 
@@ -250,7 +248,7 @@ created_prompt is always post-processed before it reaches Edit. Visible referenc
 - "Krea Image N" is normalized to "Image N";
 - the internal reference edit image must be converted into explicit scene instructions and must not be named in the final prompt.
 
-The returned visual_references object is passthrough; the chain is not modified.
+Prompt Creator inspects only Visual Reference entries, and its `references` output passes the complete mixed chain through unchanged.
 
 ## Krea2 CcC Edit
 
@@ -267,8 +265,7 @@ Required inputs/controls:
 
 Optional inputs:
 
-- visual_references
-- vision_references
+- references (KREA2_REFERENCE_CHAIN)
 
 Outputs:
 
@@ -302,7 +299,6 @@ Required controls:
 | --- | --- | --- |
 | sheet_type | 9 layouts | 1 portrait |
 | sheet_geometry | same curated Krea presets as Latent | 1024 x 1024 |
-| resize_method | lanczos, bicubic, bilinear, area | lanczos |
 | padding | 0..128 | 8 |
 | outer_margin | 0..128 | 8 |
 | background | white, gray, black | white |
@@ -511,7 +507,7 @@ Optional inputs:
 
 - negative_prompt
 - prompt_augmentation
-- vision_references
+- references
 
 Outputs:
 
