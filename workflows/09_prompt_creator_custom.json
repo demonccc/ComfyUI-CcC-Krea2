@@ -217,8 +217,8 @@
       ],
       "outputs": [
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             3
           ]
@@ -264,7 +264,7 @@
         },
         {
           "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
         }
       ],
@@ -277,8 +277,8 @@
           ]
         },
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             6
           ]
@@ -411,8 +411,8 @@
           }
         },
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 6
         }
       ],
@@ -709,7 +709,7 @@
       0,
       8,
       1,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       4,
@@ -725,7 +725,7 @@
       1,
       11,
       5,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       7,
