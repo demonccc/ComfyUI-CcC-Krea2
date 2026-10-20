@@ -67,6 +67,6 @@ def test_prompt_creator_accepts_mixed_chain_and_passes_it_through():
     )
     assert returned is chain
     assert "Vision input 1 = Image 1" in info
-    assert "Vision input 2 = Image 2" in info
-    assert "Vision input 3 = reference chain item 3" in info
+    assert "Vision input 2 = visual reference 2" in info
+    assert "Vision input 3" not in info
     assert created
