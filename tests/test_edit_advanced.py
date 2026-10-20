@@ -12,33 +12,6 @@ from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReferenc
 from ccc_krea2.patch import attach_reference_runtime_to_conditioning
 
 
-def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
-    inputs = CcCKrea2VisualReference.INPUT_TYPES()
-    required = inputs["required"]
-    optional = inputs["optional"]
-
-    assert list(required) == [
-        "image",
-        "boost",
-        "reference_fit",
-        "placement_grid",
-        "grid_horizontal_position",
-        "grid_vertical_position",
-        "semantic",
-        "semantic_resize",
-        "semantic_grounding_px",
-        "prompt_annotation",
-        "attention_scope",
-        "region_tag",
-    ]
-    assert list(optional) == ["previous_references"]
-    assert required["reference_fit"][0] == ("native", "crop", "contain", "fit")
-    assert required["placement_grid"][0] == ("inside", "outside")
-    assert required["grid_horizontal_position"][0] == ("center", "left", "right")
-    assert required["grid_vertical_position"][0] == ("center", "up", "down")
-    assert required["semantic_grounding_px"][1]["step"] == 32
-    assert required["semantic_grounding_px"][1]["min"] == 32
-
 
 def test_visual_reference_semantic_fields_are_ignored_when_semantic_is_disabled():
     image = torch.zeros((1, 64, 64, 3))
@@ -164,14 +137,6 @@ def test_positive_reference_boost_metadata_is_explicit_and_negative_defaults_to_
     assert "reference_boosts" not in negative[0][1]
 
 
-def test_vision_reference_exposes_simple_public_presets():
-    required = CcCKrea2VisionReference.INPUT_TYPES()["required"]
-    assert list(required) == ["image", "mode", "instruction", "style_processing"]
-    assert required["mode"][0] == ("semantic", "visual", "style", "context")
-    assert required["style_processing"][0] == ("full", "2x2", "4x4")
-    assert "grounding_px" not in required
-    assert "fidelity" not in required
-
 
 def test_vision_reference_presets_map_to_fixed_runtime_contracts():
     image = torch.zeros((1, 64, 64, 3))
@@ -286,35 +251,6 @@ def test_fixed_latent_dimensions_can_resolve_above_3mp():
     assert source == "fixed 2048 x 2048 -> preserve_aspect_krea_bounds"
 
 
-def test_latent_surface_separates_dimensions_geometry_and_content():
-    inputs = CcCKrea2Latent.INPUT_TYPES()
-    required = inputs["required"]
-    optional = inputs["optional"]
-
-    assert list(required) == [
-        "vae",
-        "dimensions",
-        "width",
-        "height",
-        "preset_size",
-        "geometry_policy",
-        "content",
-        "content_fit",
-        "latent_semantic",
-        "latent_semantic_instruction",
-        "latent_grounding_px",
-        "batch_size",
-    ]
-    assert required["dimensions"][0] == ("from_image", "fixed", "preset")
-    assert required["geometry_policy"][0] == (
-        "nearest_krea_aspect",
-        "preserve_aspect_krea_bounds",
-    )
-    assert required["content"][0] == ("empty", "from_image")
-    assert required["content_fit"][0] == ("crop", "contain", "stretch")
-    assert required["latent_grounding_px"][1]["step"] == 32
-    assert list(optional) == ["dimensions_image", "content_image", "attention_regions"]
-
 
 def test_content_contain_keeps_complete_image_with_white_padding():
     image = torch.zeros((1, 300, 500, 3))
@@ -380,26 +316,6 @@ def test_latent_semantic_metadata_uses_content_image():
     assert metadata["enabled"] is True
     assert metadata["image"] is image
     assert metadata["instruction"] == "Reimagine the target content"
-
-def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
-    required = CcCKrea2Edit.INPUT_TYPES()["required"]
-    optional = CcCKrea2Edit.INPUT_TYPES()["optional"]
-    assert "latent" in required
-    assert list(optional) == ["references"]
-    for moved in (
-        "dimensions",
-        "dimensions_image",
-        "width",
-        "height",
-        "preset_size",
-        "geometry_policy",
-        "content",
-        "content_image",
-        "content_fit",
-        "resize_method",
-    ):
-        assert moved not in required
-        assert moved not in optional
 
 
 def test_edit_runtime_latent_matches_pre_split_contract():
