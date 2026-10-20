@@ -385,7 +385,7 @@ def test_edit_consumes_prebuilt_latent_and_no_longer_owns_target_controls():
     required = CcCKrea2Edit.INPUT_TYPES()["required"]
     optional = CcCKrea2Edit.INPUT_TYPES()["optional"]
     assert "latent" in required
-    assert list(optional) == ["visual_references", "vision_references"]
+    assert list(optional) == ["references"]
     for moved in (
         "dimensions",
         "dimensions_image",
