@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Tuple
 import torch
 
 from ..constants import NODE_CATEGORY
-from .edit_reference_types import VisualReferenceChain
+from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
 
 
 PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
@@ -156,7 +156,7 @@ def _collect_analysis_images(
     warnings: List[str] = []
     krea_image_index = 1
 
-    for chain_index, entry in enumerate(visual_references.entries, start=1):
+    for chain_index, entry in enumerate((e for e in visual_references.entries if isinstance(e, VisualReferenceEntry)), start=1):
         downstream_image_index: Optional[int] = None
         if entry.semantic:
             downstream_image_index = krea_image_index
@@ -244,7 +244,7 @@ class CcCKrea2EditPromptCreator:
     """Create an edit prompt with the same multimodal CLIP used by Krea2."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("STRING", "KREA2_VISUAL_REFERENCE_CHAIN", "STRING", "STRING")
+    RETURN_TYPES = ("STRING", "KREA2_REFERENCE_CHAIN", "STRING", "STRING")
     RETURN_NAMES = ("created_prompt", "visual_references", "creator_info", "thinking")
     FUNCTION = "create"
     DESCRIPTION = (
