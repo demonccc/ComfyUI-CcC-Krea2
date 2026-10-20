@@ -3,26 +3,7 @@
 from dataclasses import dataclass
 from typing import Tuple, Optional, List
 
-CCC_KREA2_LORA_PROMPT_SETTINGS = "CCC_KREA2_LORA_PROMPT_SETTINGS"
 CCC_KREA2_PROMPT_AUGMENTATION = "CCC_KREA2_PROMPT_AUGMENTATION"
-
-
-@dataclass(frozen=True)
-class LoRAPromptSlot:
-    """Immutable configuration for a single LoRA prompt slot."""
-
-    enabled: bool = False
-    position: str = "append"
-    positive_prompt: str = ""
-    negative_prompt: str = ""
-
-
-@dataclass(frozen=True)
-class LoRAPromptSettings:
-    """Immutable container for LoRA prompt slot settings."""
-
-    enabled: bool = True
-    slots: Tuple[LoRAPromptSlot, ...] = ()
 
 
 @dataclass(frozen=True)
