@@ -20,7 +20,6 @@ from ..target_latent import TargetVisionContext, get_image_dims, normalize_vae_o
 DIMENSION_MODES = ("from_image", "fixed", "preset")
 CONTENT_MODES = ("empty", "from_image")
 CONTENT_FIT_MODES = ("crop", "contain", "stretch")
-RESIZE_METHODS = ("auto", "nearest-exact", "bilinear", "bicubic", "area", "lanczos")
 
 
 def _resolve_dimensions(
@@ -161,7 +160,7 @@ def _build_target_latent(
             target_w=target_w,
             target_h=target_h,
             content_fit=content_fit,
-            resize_method=resize_method,
+            resize_method="bicubic",
         )
         samples = normalize_vae_output(vae.encode(canvas), batch_size=batch_size)
     else:
@@ -218,7 +217,6 @@ class CcCKrea2Latent:
                 "geometry_policy": (GEOMETRY_POLICIES, {"default": "preserve_aspect_krea_bounds"}),
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
-                "resize_method": (RESIZE_METHODS, {"default": "auto"}),
                 "latent_semantic": ("BOOLEAN", {"default": False}),
                 "latent_semantic_instruction": ("STRING", {"multiline": True, "default": ""}),
                 "latent_grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 32}),
@@ -241,7 +239,7 @@ class CcCKrea2Latent:
         geometry_policy="preserve_aspect_krea_bounds",
         content="empty",
         content_fit="crop",
-        resize_method="auto",
+        resize_method="bicubic",
         latent_semantic=False,
         latent_semantic_instruction="",
         latent_grounding_px=768,
