@@ -29,43 +29,25 @@ def test_public_crop_uses_positioned_inside_grid_window():
     assert meta["interpolation_method"] == "none"
 
 
-def test_public_resize_maps_reference_long_edge_to_corresponding_target_edge():
-    small = torch.rand(1, 256, 128, 3)
-    out_small, _, meta_small = resolve_visual_reference_fit(
-        small,
-        target_h=1024,
-        target_w=1024,
-        mode="resize",
-        resize_method="lanczos",
+def test_public_fit_covers_target_using_centered_crop_and_bicubic():
+    img = torch.rand(1, 300, 200, 3)
+    output, _, meta = resolve_visual_reference_fit(
+        img, target_h=160, target_w=160, mode="fit"
     )
-    assert meta_small["mode_resolved"] == "resize"
-    assert out_small.shape == (1, 1024, 512, 3)
-    assert meta_small["interpolation_method"] == "lanczos"
-
-    large = torch.rand(1, 2048, 1024, 3)
-    out_large, _, meta_large = resolve_visual_reference_fit(
-        large,
-        target_h=1024,
-        target_w=1024,
-        mode="resize",
-        resize_method="bicubic",
-    )
-    assert out_large.shape == (1, 1024, 512, 3)
-    assert meta_large["interpolation_method"] == "bicubic"
+    assert meta["mode_resolved"] == "fit"
+    assert output.shape == (1, 160, 160, 3)
+    assert meta["crop_rectangle"] == (0, 50, 200, 200)
+    assert meta["interpolation_method"] == "bicubic"
 
 
-def test_public_resize_uses_minimal_crop_to_land_on_16_grid_without_distortion():
+def test_contain_preserves_content_inside_bounds():
     img = torch.rand(1, 300, 217, 3)
-    out_img, _, meta = resolve_visual_reference_fit(
-        img,
-        target_h=192,
-        target_w=192,
-        mode="resize",
-        resize_method="bicubic",
+    output, _, meta = resolve_visual_reference_fit(
+        img, target_h=192, target_w=192, mode="contain"
     )
-    assert out_img.shape == (1, 192, 128, 3)
+    assert output.shape == (1, 192, 128, 3)
     assert meta["crop_rectangle"] == (8, 0, 200, 300)
-    assert meta["spatial_hw"] == (192, 128)
+    assert meta["interpolation_method"] == "bicubic"
 
 
 def test_public_contain_scales_to_fit_inside_target_then_crops_only_for_16_grid():
