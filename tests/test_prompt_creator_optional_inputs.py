@@ -24,7 +24,7 @@ def test_prompt_creator_visual_references_are_optional():
     schema = cls.INPUT_TYPES()
 
     assert "visual_references" not in schema["required"]
-    assert schema["optional"]["visual_references"][0] == "KREA2_VISUAL_REFERENCE_CHAIN"
+    assert schema["optional"]["visual_references"][0] == "KREA2_REFERENCE_CHAIN"
     assert schema["optional"]["reference_edit_image"][0] == "IMAGE"
 
 
@@ -48,3 +48,25 @@ def test_prompt_creator_mode_title_extension_is_checked_in():
     assert 'node.comfyClass !== "CcCKrea2EditPromptCreator"' in js
     assert 'node.title = `Prompt Creator - ${mode}`' in js
     assert "modeWidget.callback" in js
+
+
+def test_prompt_creator_accepts_mixed_chain_and_passes_it_through():
+    import torch
+    from ccc_krea2.modular_nodes.edit_reference_types import (
+        VisionReferenceEntry, VisualReferenceEntry,
+    )
+    image = torch.ones((1, 64, 64, 3))
+    chain = (VisualReferenceChain()
+             .append(VisualReferenceEntry(image=image, semantic=True))
+             .append(VisionReferenceEntry(image=image, mode="context_indirect"))
+             .append(VisualReferenceEntry(image=image, semantic=False)))
+    cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
+    created, returned, info, thinking = cls().create(
+        clip=_FakeClip(), visual_references=chain,
+        mode="create_from_theme", user_prompt="A new scene."
+    )
+    assert returned is chain
+    assert "Vision input 1 = Image 1" in info
+    assert "Vision input 2 = Image 2" in info
+    assert "Vision input 3 = reference chain item 3" in info
+    assert created
