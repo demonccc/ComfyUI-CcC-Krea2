@@ -255,8 +255,8 @@
       ],
       "outputs": [
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             3
           ]
@@ -302,7 +302,7 @@
         },
         {
           "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
         },
         {
@@ -316,12 +316,13 @@
           "name": "created_prompt",
           "type": "STRING",
           "links": [
-            7
+            7,
+            25
           ]
         },
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             6
           ]
@@ -371,12 +372,17 @@
           "name": "image",
           "type": "IMAGE",
           "link": 8
+        },
+        {
+          "name": "previous_references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 25
         }
       ],
       "outputs": [
         {
-          "name": "vision_references",
-          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             9
           ]
@@ -503,13 +509,8 @@
           }
         },
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
-          "link": 6
-        },
-        {
-          "name": "vision_references",
-          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 9
         }
       ],
@@ -806,7 +807,7 @@
       0,
       8,
       1,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       4,
@@ -823,14 +824,6 @@
       8,
       2,
       "IMAGE"
-    ],
-    [
-      6,
-      8,
-      1,
-      11,
-      5,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
     ],
     [
       7,
@@ -854,7 +847,7 @@
       0,
       11,
       6,
-      "KREA2_VISION_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       10,
@@ -975,6 +968,14 @@
       16,
       0,
       "IMAGE"
+    ],
+    [
+      25,
+      8,
+      0,
+      9,
+      1,
+      "KREA2_REFERENCE_CHAIN"
     ]
   ],
   "groups": [
