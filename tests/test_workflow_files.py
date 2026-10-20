@@ -91,7 +91,7 @@ def test_scene_subject_workflow_uses_split_nodes():
     ]
 
     previous = next(inp for inp in subject["inputs"] if inp["name"] == "previous_references")
-    assert previous["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"
+    assert previous["type"] == "KREA2_REFERENCE_CHAIN"
     assert previous["link"] is not None
 
 
@@ -294,7 +294,7 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_vision_bran
     assert creator_inputs["reference_edit_image"]["link"] is not None
     creator_outputs = {item["name"]: item for item in creator["outputs"]}
     assert creator_outputs["created_prompt"]["type"] == "STRING"
-    assert creator_outputs["visual_references"]["type"] == "KREA2_VISUAL_REFERENCE_CHAIN"
+    assert creator_outputs["visual_references"]["type"] == "KREA2_REFERENCE_CHAIN"
     assert creator_outputs["creator_info"]["type"] == "STRING"
     assert creator_outputs["thinking"]["type"] == "STRING"
 
@@ -308,13 +308,14 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_vision_bran
     edit_inputs = {item["name"]: item for item in edit["inputs"]}
     assert edit_inputs["positive_prompt"]["type"] == "STRING"
     assert edit_inputs["positive_prompt"]["link"] is not None
-    assert edit_inputs["visual_references"]["link"] is not None
-    assert edit_inputs["vision_references"]["link"] is not None
+    assert edit_inputs["references"]["link"] is not None
+    assert "visual_references" not in edit_inputs
+    assert "vision_references" not in edit_inputs
 
     assert vision["mode"] == 2
     vision_inputs = {item["name"]: item for item in vision["inputs"]}
     assert vision_inputs["image"]["link"] is not None
-    assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert vision["outputs"][0]["type"] == "KREA2_REFERENCE_CHAIN"
     assert vision["outputs"][0]["links"]
     assert vision["outputs"][1] == {"name": "vision_info", "type": "STRING", "links": []}
 
@@ -349,7 +350,7 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
     assert set(t2i_inputs) == {"model", "clip", "vision_references"}
     assert t2i_inputs["model"]["link"] is not None
     assert t2i_inputs["clip"]["link"] is not None
-    assert t2i_inputs["vision_references"]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert t2i_inputs["vision_references"]["type"] == "KREA2_REFERENCE_CHAIN"
     assert t2i_inputs["vision_references"]["link"] is not None
 
     vision = _nodes_by_type(workflow, "CcCKrea2VisionReference")[0]
@@ -362,7 +363,7 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
         "balanced",
         "balanced",
     ]
-    assert vision["outputs"][0]["type"] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert vision["outputs"][0]["type"] == "KREA2_REFERENCE_CHAIN"
     assert vision["outputs"][1] == {"name": "vision_info", "type": "STRING", "links": []}
 
     outputs = {item["name"]: item for item in t2i["outputs"]}
