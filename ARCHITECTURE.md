@@ -29,7 +29,7 @@ LoRA / T2I:
   Krea2 CcC Text To Image
 ~~~
 
-The Reference Cache implementation was removed and no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
+The Reference Cache implementation was removed. There is no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
 
 ## Single Edit Runtime
 
@@ -213,7 +213,7 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 ## LoRA and T2I
 
-LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
+LoRA Stack and LoRA Stack Sliders each apply 10 MODEL-only LoRAs. LoRA Stack with Prompt applies 5 MODEL-only LoRAs and emits optional positive prompt augmentation.
 
 Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
 
@@ -237,7 +237,7 @@ Krea2 CcC Text To Image
                                                                 SaveImage
 ~~~
 
-Krea2 CcC Edit does not consume LoRA Prompt Settings or prompt_augmentation automatically.
+Krea2 CcC Edit accepts `prompt_augmentation` as an optional explicit input, preserving its fixed-empty negative text contract.
 
 ## Ownership
 
