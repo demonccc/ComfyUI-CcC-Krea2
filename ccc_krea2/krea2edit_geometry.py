@@ -2,10 +2,9 @@
 
 Public modes:
 - crop: use the target grid as an inside crop window over the source.
-- resize: map the reference long edge to the corresponding target edge, preserve
-  aspect ratio, then center-crop only the minimum pixels required for /16.
 - contain: scale the reference to fit inside the target, preserve aspect ratio,
   then center-crop only the minimum pixels required for /16.
+- fit: preserve aspect ratio, cover the target, and crop excess content.
 - native: preserve 1:1 source scale and center-crop each edge down to /16.
 """
 
@@ -79,15 +78,6 @@ def resolve_krea2edit_geometry(
 
     # Backward-compatible aliases are internal only. Public nodes expose:
     # crop / resize / contain / native.
-    if fit_mode == "fit":
-        fit_mode = "contain"
-    elif fit_mode == "exact":
-        fit_mode = "native"
-    elif fit_mode == "stretch":
-        fit_mode = "crop"
-    elif fit_mode == "auto":
-        fit_mode = "contain"
-
     target_cap_h = _floor16(tgt_h)
     target_cap_w = _floor16(tgt_w)
     target_lat_h = tgt_h // 8
@@ -112,29 +102,6 @@ def resolve_krea2edit_geometry(
         interpolation = "none"
         resolved = "crop"
 
-    elif fit_mode == "resize":
-        # CcC resize: the long edge of the REFERENCE is mapped to the corresponding
-        # axis of the TARGET. The other edge follows proportionally. A minimal
-        # centered source crop makes that uniform scale land exactly on /16.
-        if src_h >= src_w:
-            scale = target_cap_h / float(src_h)
-            vae_h = target_cap_h
-            vae_w = _floor16(src_w * scale)
-        else:
-            scale = target_cap_w / float(src_w)
-            vae_w = target_cap_w
-            vae_h = _floor16(src_h * scale)
-
-        left, top, crop_w, crop_h = _centered_crop_for_scaled_grid(
-            src_h=src_h,
-            src_w=src_w,
-            scale=scale,
-            out_h=vae_h,
-            out_w=vae_w,
-        )
-        interpolation = "none" if (crop_w, crop_h) == (vae_w, vae_h) else resize_method
-        resolved = "resize"
-
     elif fit_mode == "contain":
         # Fit inside the target. Unlike crop, contain never chooses a target-AR crop.
         # It only trims the few source pixels needed so one uniform scale lands on /16.
@@ -150,6 +117,22 @@ def resolve_krea2edit_geometry(
         )
         interpolation = "none" if (crop_w, crop_h) == (vae_w, vae_h) else resize_method
         resolved = "contain"
+
+    elif fit_mode == "fit":
+        # Cover the target at uniform scale, crop excess source pixels, then
+        # resize once in pixel space (bicubic + antialias) before VAE encoding.
+        scale = max(target_cap_h / float(src_h), target_cap_w / float(src_w))
+        vae_h = target_cap_h
+        vae_w = target_cap_w
+        left, top, crop_w, crop_h = _centered_crop_for_scaled_grid(
+            src_h=src_h,
+            src_w=src_w,
+            scale=scale,
+            out_h=vae_h,
+            out_w=vae_w,
+        )
+        interpolation = "none" if (crop_w, crop_h) == (vae_w, vae_h) else "bicubic"
+        resolved = "fit"
 
     elif fit_mode in ("contain_no_upscale", "fit_no_upscale"):
         # Internal compatibility mode: contain, but do not enlarge a smaller source.
