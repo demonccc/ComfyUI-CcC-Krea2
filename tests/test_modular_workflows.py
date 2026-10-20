@@ -31,6 +31,10 @@ def test_reference_size_resolver_and_latent_socket_types_are_distinct():
     assert visual.RETURN_TYPES == ("KREA2_REFERENCE_CHAIN",)
     assert vision.RETURN_TYPES == ("KREA2_REFERENCE_CHAIN", "STRING")
     assert vision.RETURN_NAMES == ("references", "vision_info")
+    assert visual.INPUT_TYPES()["optional"]["previous_references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert vision.INPUT_TYPES()["optional"]["previous_references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert edit.INPUT_TYPES()["optional"]["references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert "vision_references" not in edit.INPUT_TYPES()["optional"]
     assert resolver.RETURN_TYPES == ("INT", "INT")
     assert resolver.RETURN_NAMES == ("width", "height")
     assert latent.RETURN_TYPES == ("LATENT", "STRING")
