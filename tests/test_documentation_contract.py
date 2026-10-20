@@ -91,5 +91,5 @@ def test_architecture_matches_single_edit_and_three_node_paint_paths():
     assert "[text | reference 1 | reference 2 | ... | target]" in architecture
     assert "Paint Prepare" in architecture
     assert "Paint Restore" in architecture
-    assert "no public Reference Cache node family" in architecture
+    assert "Reference Cache implementation was removed" in architecture
     assert "no public Paint Geometry node" in architecture
