@@ -74,16 +74,16 @@ def test_scene_subject_workflow_uses_split_nodes():
     subject = next(node for node in visual_nodes if node.get("title") == "Subject Visual Reference")
     edit = edit_nodes[0]
 
-    assert scene["widgets_values"][:6] == [1.0, "resize", "inside", "center", "center", "lanczos"]
-    assert subject["widgets_values"][:6] == [4.0, "resize", "inside", "center", "center", "lanczos"]
-    assert len(scene["widgets_values"]) == 13
-    assert len(subject["widgets_values"]) == 13
+    assert scene["widgets_values"][:5] == [1.0, "contain", "inside", "center", "center"]
+    assert subject["widgets_values"][:5] == [4.0, "contain", "inside", "center", "center"]
+    assert len(scene["widgets_values"]) == 11
+    assert len(subject["widgets_values"]) == 11
     assert scene["widgets_values"][-2:] == ["global", ""]
     assert subject["widgets_values"][-2:] == ["global", ""]
-    assert scene["widgets_values"][6:10] == [True, True, 768, "lanczos"]
-    assert subject["widgets_values"][6:10] == [True, True, 768, "lanczos"]
-    assert scene["widgets_values"][10] == "This is the scene image."
-    assert subject["widgets_values"][10] == "This is the subject image."
+    assert scene["widgets_values"][5:8] == [True, True, 768]
+    assert subject["widgets_values"][5:8] == [True, True, 768]
+    assert scene["widgets_values"][8] == "This is the scene image."
+    assert subject["widgets_values"][8] == "This is the subject image."
 
     assert edit["widgets_values"] == [
         "Replace the person in the scene image with the person from the subject image.",
@@ -202,7 +202,7 @@ def test_regional_attention_workflow_wires_tags_through_latent():
     assert latent_inputs["attention_regions"]["type"] == "KREA2_ATTENTION_REGION_CHAIN"
     assert latent_inputs["attention_regions"]["link"] is not None
     assert latent["widgets_values"][0] == "from_image"
-    assert latent["widgets_values"][5:8] == ["from_image", "contain", "lanczos"]
+    assert latent["widgets_values"][5:7] == ["from_image", "contain"]
 
 
 def test_character_sheet_workflow_builds_one_identity_reference_from_generic_views():
@@ -241,16 +241,15 @@ def test_character_sheet_workflow_builds_one_identity_reference_from_generic_vie
         node for node in visuals
         if node.get("title") == "Character Sheet Visual Reference"
     )
-    assert subject["widgets_values"][:6] == [
+    assert subject["widgets_values"][:5] == [
         4.0,
         "native",
         "inside",
         "center",
         "center",
-        "lanczos",
     ]
-    assert subject["widgets_values"][6:10] == [True, True, 1024, "lanczos"]
-    assert subject["widgets_values"][10] == "This is the subject image."
+    assert subject["widgets_values"][5:8] == [True, True, 1024]
+    assert subject["widgets_values"][8] == "This is the subject image."
     assert subject["widgets_values"][-2:] == ["global", ""]
 
     subject_inputs = {item["name"]: item for item in subject["inputs"]}
