@@ -291,6 +291,7 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_vision_bran
     creator_inputs = {item["name"]: item for item in creator["inputs"]}
     assert creator_inputs["clip"]["link"] is not None
     assert creator_inputs["visual_references"]["link"] is not None
+    assert creator_inputs["visual_references"]["type"] == "KREA2_REFERENCE_CHAIN"
     assert creator_inputs["reference_edit_image"]["link"] is not None
     creator_outputs = {item["name"]: item for item in creator["outputs"]}
     assert creator_outputs["created_prompt"]["type"] == "STRING"
