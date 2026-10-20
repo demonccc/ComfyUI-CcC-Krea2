@@ -23,13 +23,10 @@ class CcCKrea2VisualReference:
     RETURN_NAMES = ("visual_references",)
     FUNCTION = "process"
     DESCRIPTION = (
-        "Adds one ordered Krea2 Edit appearance reference. reference_fit controls only the pixel path sent to VAE: "
-        "crop uses the target grid as an inside crop window positioned by the grid controls; resize maps the reference "
-        "long edge to the corresponding target edge; contain scales the reference to fit inside the target; and "
-        "native keeps a 1:1 source scale. resize, contain and native use minimal centered crop-down alignment to /16 "
-        "instead of padding or distorting. semantic controls whether the same image is also shown to Qwen. prompt_annotation optionally "
-        "adds 'Image N: ...' text after the vision prefix. attention_scope can keep the reference global, "
-        "apply its boost only inside a tagged target region, or block it outside that region."
+        "Visual reference geometry: native keeps its original scale, crop selects a target-sized "
+        "window without resizing, contain scales proportionally inside target bounds, and fit "
+        "scales proportionally to cover the target then center-crops. Resizing uses bicubic "
+        "with antialiasing and /16 grid alignment. Placement is independent of VAE geometry."
     )
 
     @classmethod
