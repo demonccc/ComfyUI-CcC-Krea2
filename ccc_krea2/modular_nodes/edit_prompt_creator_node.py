@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Tuple
 import torch
 
 from ..constants import NODE_CATEGORY
-from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry, VisionReferenceEntry
+from .edit_reference_types import EditReferenceChain, VisualReferenceEntry
 
 
 PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
@@ -148,7 +148,7 @@ def _normalize_created_prompt(text: str) -> str:
 
 
 def _collect_analysis_images(
-    visual_references: VisualReferenceChain,
+    references: EditReferenceChain,
     reference_edit_image: Optional[torch.Tensor],
 ) -> Tuple[List[torch.Tensor], List[str], List[str]]:
     images: List[torch.Tensor] = []
@@ -156,45 +156,31 @@ def _collect_analysis_images(
     warnings: List[str] = []
     krea_image_index = 1
 
-    for chain_index, entry in enumerate(visual_references.entries, start=1):
-        if isinstance(entry, VisualReferenceEntry):
-            visible_to_qwen = bool(entry.semantic)
-            raw_image = entry.image
-            annotation = entry.prompt_annotation.strip()
-            kind = "Visual"
-        elif isinstance(entry, VisionReferenceEntry):
-            visible_to_qwen = True
-            raw_image = entry.image
-            annotation = (entry.instruction or "").strip()
-            kind = f"Vision ({entry.mode})"
-        else:
-            raise TypeError(
-                f"[Krea2 CcC Edit Prompt Creator] Unsupported reference entry "
-                f"{chain_index}: {type(entry).__name__}"
-            )
-
-        downstream_image_index = krea_image_index if visible_to_qwen else None
-        if visible_to_qwen:
+    visual_entries = (entry for entry in references.entries if isinstance(entry, VisualReferenceEntry))
+    for chain_index, entry in enumerate(visual_entries, start=1):
+        downstream_image_index = krea_image_index if entry.semantic else None
+        if entry.semantic:
             krea_image_index += 1
 
-        if raw_image is None:
+        if entry.image is None:
             warnings.append(
-                f"{kind} reference {chain_index} has no raw IMAGE for Prompt Creator analysis."
+                f"Visual reference {chain_index} has no raw IMAGE for Prompt Creator analysis."
             )
             continue
 
-        images.append(raw_image)
+        images.append(entry.image)
         internal_index = len(images)
+        annotation = entry.prompt_annotation.strip()
         if downstream_image_index is not None:
-            role = annotation or f"{kind} reference."
             mapping_lines.append(
-                f"Vision input {internal_index} = Image {downstream_image_index}. Role: {role}"
+                f"Vision input {internal_index} = Image {downstream_image_index}. "
+                f"Role: {annotation or 'Visual reference.'}"
             )
         else:
-            role = annotation or "Appearance-only visual reference."
             mapping_lines.append(
-                f"Vision input {internal_index} = reference chain item {chain_index}, "
-                f"but it has no downstream Image N label. Role: {role}"
+                f"Vision input {internal_index} = visual reference {chain_index}, "
+                f"but it has no downstream Image N label. "
+                f"Role: {annotation or 'Appearance-only visual reference.'}"
             )
 
     if reference_edit_image is not None:
@@ -255,7 +241,7 @@ class CcCKrea2EditPromptCreator:
 
     CATEGORY = NODE_CATEGORY
     RETURN_TYPES = ("STRING", "KREA2_REFERENCE_CHAIN", "STRING", "STRING")
-    RETURN_NAMES = ("created_prompt", "visual_references", "creator_info", "thinking")
+    RETURN_NAMES = ("created_prompt", "references", "creator_info", "thinking")
     FUNCTION = "create"
     DESCRIPTION = (
         "Optional Qwen3-VL prompt creator. Reuses the same multimodal CLIP as Krea2/Generate Text, "
@@ -268,7 +254,7 @@ class CcCKrea2EditPromptCreator:
         return {
             "required": {
                 "clip": ("CLIP",),
-                "visual_references": ("KREA2_REFERENCE_CHAIN",),
+                "references": ("KREA2_REFERENCE_CHAIN",),
                 "mode": (PROMPT_CREATOR_MODES, {"default": "enhance"}),
                 "user_prompt": (
                     "STRING",
@@ -336,7 +322,7 @@ class CcCKrea2EditPromptCreator:
     def create(
         self,
         clip: Any,
-        visual_references: VisualReferenceChain,
+        references: EditReferenceChain,
         mode: str = "enhance",
         user_prompt: str = "",
         system_prompt: str = "",
@@ -347,15 +333,15 @@ class CcCKrea2EditPromptCreator:
         seed: int = 0,
         reference_edit_image: Optional[torch.Tensor] = None,
     ):
-        if visual_references is None:
-            visual_references = VisualReferenceChain()
-        if not isinstance(visual_references, VisualReferenceChain):
+        if references is None:
+            references = EditReferenceChain()
+        if not isinstance(references, EditReferenceChain):
             raise TypeError(
-                "[Krea2 CcC Edit Prompt Creator] visual_references must be a VisualReferenceChain."
+                "[Krea2 CcC Edit Prompt Creator] references must be a EditReferenceChain."
             )
 
         images, mapping_lines, warnings = _collect_analysis_images(
-            visual_references=visual_references,
+            references=references,
             reference_edit_image=reference_edit_image,
         )
         system_prompt = _resolve_system_prompt(
@@ -414,7 +400,7 @@ class CcCKrea2EditPromptCreator:
             f"Thinking: {'enabled' if thinking else 'disabled'}",
             f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
             f"System Prompt Source: {'custom' if str(mode) == 'custom' else 'preset'}",
-            f"Visual Reference Chain Entries: {len(visual_references.entries)}",
+            f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
             f"Reference Edit Image: {'yes' if reference_edit_image is not None else 'no'}",
             f"Max Tokens: {int(max_tokens)}",
@@ -434,4 +420,4 @@ class CcCKrea2EditPromptCreator:
             info_lines.extend(["", "Thinking:", thinking_text])
         info_lines.extend(["", "Created Prompt:", created_prompt])
 
-        return created_prompt, visual_references, "\n".join(info_lines), thinking_text
+        return created_prompt, references, "\n".join(info_lines), thinking_text
