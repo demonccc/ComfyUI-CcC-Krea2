@@ -295,8 +295,8 @@
       ],
       "outputs": [
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             3
           ]
@@ -342,14 +342,14 @@
         },
         {
           "name": "previous_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
         }
       ],
       "outputs": [
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             6
           ]
@@ -409,8 +409,8 @@
           "link": 16
         },
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 7
         }
       ],
@@ -809,14 +809,14 @@
         },
         {
           "name": "previous_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 6
         }
       ],
       "outputs": [
         {
-          "name": "visual_references",
-          "type": "KREA2_VISUAL_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             7
           ]
@@ -942,7 +942,7 @@
       0,
       8,
       1,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       4,
@@ -966,7 +966,7 @@
       0,
       19,
       1,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       7,
@@ -974,7 +974,7 @@
       0,
       9,
       4,
-      "KREA2_VISUAL_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ],
     [
       8,
