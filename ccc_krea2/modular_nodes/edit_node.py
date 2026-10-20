@@ -172,29 +172,8 @@ def _combine_reference_chains(
             continue
         if not isinstance(entry, VisualReferenceEntry):
             raise TypeError(f"Unexpected edit reference type: {type(entry).__name__}")
-        if entry.cache is not None:
-            cache = entry.cache
-            chain = chain.append(
-                ReferenceSpec(
-                    reference_path="edit",
-                    prepared_image=None,
-                    alias="",
-                    vision_instruction=entry.prompt_annotation if entry.semantic else "",
-                    appearance_reference=True,
-                    include_in_vision=entry.semantic,
-                    attention_boost=float(entry.boost),
-                    visual_reference_fit=entry.resolved_fit_mode,
-                    visual_resize_method=entry.resize_method,
-                    rope_position=entry.rope_position,
-                    cached_appearance_latent=cache.appearance_latent,
-                    cached_geometry=cache.geometry,
-                    cached_qwen_visual=cache.qwen_visual,
-                )
-            )
-            continue
-
         if entry.image is None:
-            raise ValueError(f"[Krea2 CcC Edit] Visual reference {index} has neither IMAGE nor cache.")
+            raise ValueError(f"[Krea2 CcC Edit] Visual reference {index} has no IMAGE.")
         prep = _prepare_qwen_image(
             image=entry.image,
             clip=clip,
@@ -420,7 +399,7 @@ class CcCKrea2Edit:
         for index, entry in enumerate(visual_entries, start=1):
             annotation = entry.prompt_annotation if entry.prompt_annotation else "<none>"
             lines.append(
-                f"Visual Reference {index}: cached={'yes' if entry.cache is not None else 'no'}, "
+                f"Visual Reference {index}: "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
                 f"attention_scope={entry.attention_scope}, region_tag={entry.region_tag or '<none>'}, "
