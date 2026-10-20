@@ -345,7 +345,7 @@ def _encode_t2i_vision(
     guidance_items = []
     total_analysis_images = 0
 
-    for index, entry in enumerate(vision_references.entries, start=1):
+    for index, entry in enumerate((e for e in vision_references.entries if isinstance(e, VisionReferenceEntry)), start=1):
         public_mode = _public_vision_mode(entry.mode)
         guidance, analysis_image_count, generation_strategy = _generate_t2i_vision_guidance(
             clip=clip,
@@ -443,7 +443,7 @@ class CcCKrea2TextToImage:
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
-                "vision_references": ("KREA2_VISION_REFERENCE_CHAIN",),
+                "vision_references": ("KREA2_REFERENCE_CHAIN",),
             },
         }
 
@@ -497,7 +497,7 @@ class CcCKrea2TextToImage:
             batch_size=batch_size,
         )
 
-        vision_entries = tuple((vision_references or VisionReferenceChain()).entries)
+        vision_entries = tuple(e for e in (vision_references or VisionReferenceChain()).entries if isinstance(e, VisionReferenceEntry))
         vision_guidance_items = []
         conditioning_prompt = eff_pos
         vision_analysis_images = 0
