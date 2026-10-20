@@ -11,7 +11,6 @@ from .constants import (
 )
 from .style_processing import apply_statistical_style_fidelity, StyleSpanOperation
 from .vision_prep import resolve_qwen_encoder_config, calculate_native_qwen_geometry
-from .reference_cache import CachedQwenImage, use_cached_qwen_images
 
 
 @dataclass
@@ -327,11 +326,9 @@ def calculate_qwen_rows_from_embedded_image(elem: Dict[str, Any], clip: Any, tes
         raise ValueError(f"{LOGGER_PREFIX} Embedded token dictionary missing required 'data' image key.")
 
     image_data = elem["data"]
-    if isinstance(image_data, CachedQwenImage):
-        return max(1, int(image_data.cache.merged.shape[0]))
     if not isinstance(image_data, torch.Tensor):
         raise ValueError(
-            f"{LOGGER_PREFIX} Embedded image 'data' must be a torch.Tensor or cached Qwen image, "
+            f"{LOGGER_PREFIX} Embedded image 'data' must be a torch.Tensor, "
             f"got {type(image_data).__name__}."
         )
 
@@ -517,8 +514,7 @@ def encode_krea2_qwen_context(
     except Exception as e:
         raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
-    with use_cached_qwen_images(clip, physical_images):
-        conditioning = clip.encode_from_tokens_scheduled(tokens)
+    conditioning = clip.encode_from_tokens_scheduled(tokens)
 
     is_test_env = test_mode or getattr(clip, "is_test_dummy", False) or type(clip).__name__.startswith("Dummy")
 
