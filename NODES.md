@@ -438,54 +438,23 @@ crop mode composites the decoded generated crop back at its original coordinates
 
 No inverse resize is performed.
 
-## CcC Krea2 - LoRA Prompt Settings
+## Krea2 CcC Lora Stack
 
-Configures optional prompt augmentation for four LoRA slots.
+Applies up to **10 MODEL-only LoRAs**, in slot order. Each slot exposes an enabled switch, LoRA name, and strength (-10 to 10). It returns MODEL only; CLIP and text conditioning are unaffected.
 
-Required controls:
+## Krea2 CcC Lora Stack with Prompt
 
-- enabled
-- for each slot 1..4:
-  - lora_N_prompt_enabled
-  - lora_N_prompt_position: append or prepend
-  - lora_N_positive_prompt
-  - lora_N_negative_prompt
+Applies up to **5 MODEL-only LoRAs** and builds optional **positive prompt augmentation**. Each slot has its own enabled switch, LoRA name, strength (-10 to 10), prompt position (append/prepend), and prompt text.
 
-Output:
+Optional input: `prompt_augmentation`, allowing prompt triggers to accumulate across stacks.
 
-- lora_prompt_settings
+Outputs: `model`, `prompt_augmentation`.
 
-This node does not load a LoRA and does not alter prompts by itself.
+Edit and T2I accept `prompt_augmentation` on their own optional inputs. This does not alter Edit's fixed-empty grounded negative prompt.
 
-## CcC Krea2 - LoRA Stack
+## Krea2 CcC Lora Stack Sliders
 
-Applies up to four model-only LoRAs.
-
-Required controls:
-
-- model
-- enabled
-- global_strength
-- for each slot 1..4:
-  - lora_N_enabled
-  - lora_N_name
-  - lora_N_strength
-
-Optional inputs:
-
-- prompt_augmentation
-- lora_prompt_settings
-
-Outputs:
-
-- model
-- prompt_augmentation
-
-Effective per-slot LoRA strength is slot strength multiplied by global_strength.
-
-If LoRA Prompt Settings is connected, prompt augmentation is accumulated only for active LoRA slots whose prompt setting is enabled.
-
-Krea2 CcC Edit does not consume prompt_augmentation automatically.
+Applies up to **10 MODEL-only LoRAs**, each with its own enabled toggle, name, and strength (-10 to 10, slider display). Returns MODEL only.
 
 ## Krea2 CcC Text To Image
 
