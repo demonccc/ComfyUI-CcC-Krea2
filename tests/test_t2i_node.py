@@ -139,7 +139,7 @@ def test_t2i_empty_prompt_augmentation():
 
 def test_t2i_accepts_optional_vision_references():
     optional = CcCKrea2TextToImage.INPUT_TYPES()["optional"]
-    assert optional["vision_references"][0] == "KREA2_VISION_REFERENCE_CHAIN"
+    assert optional["vision_references"][0] == "KREA2_REFERENCE_CHAIN"
 
 
 def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
