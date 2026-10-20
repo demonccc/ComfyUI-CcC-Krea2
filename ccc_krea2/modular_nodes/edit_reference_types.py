@@ -39,19 +39,6 @@ class VisualReferenceEntry:
 
 
 @dataclass(frozen=True)
-class VisualReferenceChain:
-    """Ordered visual-reference chain. Order is the Krea2 Edit reference order."""
-
-    entries: Tuple[VisualReferenceEntry, ...] = ()
-
-    def append(self, entry: VisualReferenceEntry) -> "VisualReferenceChain":
-        return VisualReferenceChain(self.entries + (entry,))
-
-    def __len__(self) -> int:
-        return len(self.entries)
-
-
-@dataclass(frozen=True)
 class VisionReferenceEntry:
     """One Qwen-only Vision Reference before vision preparation."""
 
@@ -67,13 +54,18 @@ class VisionReferenceEntry:
 
 
 @dataclass(frozen=True)
-class VisionReferenceChain:
-    """Ordered Vision Reference chain."""
+class EditReferenceChain:
+    """One ordered chain containing both appearance and Qwen-only references."""
 
-    entries: Tuple[VisionReferenceEntry, ...] = ()
+    entries: Tuple[VisualReferenceEntry | VisionReferenceEntry, ...] = ()
 
-    def append(self, entry: VisionReferenceEntry) -> "VisionReferenceChain":
-        return VisionReferenceChain(self.entries + (entry,))
+    def append(self, entry: VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
+        return EditReferenceChain(self.entries + (entry,))
 
     def __len__(self) -> int:
         return len(self.entries)
+
+
+# Python-side compatibility for callers, not separate ComfyUI socket types.
+VisualReferenceChain = EditReferenceChain
+VisionReferenceChain = EditReferenceChain
