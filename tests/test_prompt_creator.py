@@ -65,7 +65,7 @@ def test_prompt_creator_public_controls_and_output_compatibility():
     # Preserve original first three output slots; thinking remains appended.
     assert CcCKrea2EditPromptCreator.RETURN_NAMES == (
         "created_prompt",
-        "visual_references",
+        "references",
         "creator_info",
         "thinking",
     )
@@ -82,7 +82,7 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
 
     created, passthrough, info, thinking = CcCKrea2EditPromptCreator().create(
         clip=clip,
-        visual_references=chain,
+        references=chain,
         mode="create_from_image",
         user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
         system_prompt="this must be ignored for preset modes",
@@ -125,7 +125,7 @@ def test_meta_instruction_leak_is_removed_and_reference_name_is_normalized():
 
     created, _, _, thinking = CcCKrea2EditPromptCreator().create(
         clip=clip,
-        visual_references=_chain(),
+        references=_chain(),
         mode="enhance",
         user_prompt="Put the woman on a white bed.",
     )
@@ -144,7 +144,7 @@ def test_meta_instruction_only_output_is_rejected():
     with pytest.raises(RuntimeError, match="meta-instructions"):
         CcCKrea2EditPromptCreator().create(
             clip=clip,
-            visual_references=_chain(),
+            references=_chain(),
             mode="enhance",
             user_prompt="Improve this edit.",
         )
@@ -156,7 +156,7 @@ def test_custom_mode_uses_exact_system_prompt():
 
     created, _, info, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
-        visual_references=_chain(),
+        references=_chain(),
         mode="custom",
         user_prompt="",
         system_prompt=custom,
@@ -171,7 +171,7 @@ def test_custom_mode_requires_system_prompt():
     with pytest.raises(ValueError, match="requires a non-empty system_prompt"):
         CcCKrea2EditPromptCreator().create(
             clip=_FakeClip(),
-            visual_references=_chain(),
+            references=_chain(),
             mode="custom",
             user_prompt="",
             system_prompt="",
@@ -181,7 +181,7 @@ def test_custom_mode_requires_system_prompt():
 def test_create_from_image_requires_reference_edit_image():
     with pytest.raises(ValueError, match="requires reference_edit_image"):
         CcCKrea2EditPromptCreator().create(
-            clip=_FakeClip(), visual_references=_chain(), mode="create_from_image", user_prompt=""
+            clip=_FakeClip(), references=_chain(), mode="create_from_image", user_prompt=""
         )
 
 
@@ -189,7 +189,7 @@ def test_enhance_and_create_from_theme_require_user_text():
     for mode in ("enhance", "create_from_theme"):
         with pytest.raises(ValueError, match="requires a non-empty user_prompt"):
             CcCKrea2EditPromptCreator().create(
-                clip=_FakeClip(), visual_references=_chain(), mode=mode, user_prompt=""
+                clip=_FakeClip(), references=_chain(), mode=mode, user_prompt=""
             )
 
 
@@ -206,7 +206,7 @@ def test_appearance_only_reference_has_no_downstream_image_number():
 
     CcCKrea2EditPromptCreator().create(
         clip=clip,
-        visual_references=chain,
+        references=chain,
         mode="enhance",
         user_prompt="Use the subject in an outdoor scene.",
     )
@@ -222,7 +222,7 @@ def test_thinking_truncation_without_final_prompt_is_reported():
     with pytest.raises(RuntimeError, match="ended inside the thinking block"):
         CcCKrea2EditPromptCreator().create(
             clip=clip,
-            visual_references=_chain(),
+            references=_chain(),
             mode="enhance",
             user_prompt="Improve this edit.",
             thinking=True,
