@@ -2,7 +2,7 @@
 
 ## Public Surface
 
-The current package registers **14 public nodes**:
+The current package registers **15 public nodes**:
 
 ~~~text
 Edit:
@@ -23,24 +23,30 @@ Paint:
   Krea2 CcC Paint Restore
 
 LoRA / T2I:
-  CcC Krea2 - LoRA Prompt Settings
-  CcC Krea2 - LoRA Stack
+  Krea2 CcC Lora Stack with Prompt
+  Krea2 CcC Lora Stack
+  Krea2 CcC Lora Stack Sliders
   Krea2 CcC Text To Image
 ~~~
 
-There is no public Reference Cache node family and no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
+The Reference Cache implementation was removed and no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
 
 ## Single Edit Runtime
 
 Krea2 CcC Edit has one edit execution path.
 
 ~~~text
-Attention Region(s) ------------------------+
-IMAGE -> Visual Reference(s) ---------------+
-IMAGE -> Vision Reference(s) ---------------+--> Edit --> Krea2 CcC Edit runtime --> Krea2
-                                             ^
-Size Resolver -> Latent ---------------------+
+IMAGE --> Visual Reference --> Vision Reference --> Visual Reference
+             |  shared KREA2_REFERENCE_CHAIN         |
+             +----------- previous_references --------+
+                                                      |
+                                                      v
+                                                Edit.references
+Attention Region(s) --> Latent -----------------> Edit.latent
+Size Resolver ---------> Latent
 ~~~
+
+Visual and Vision references may be interleaved. Each node appends its entry; Edit receives one ordered `references` chain and processes each type according to its own contract. Prompt Creator optionally reads only Visual entries and returns the complete chain without changes.
 
 No alternate edit runtime is selected based on other installed custom nodes.
 
@@ -101,7 +107,7 @@ source image
    |      optional role-only Image N annotation
    |
    +--> appearance path
-          crop | resize | contain | native
+          native | crop | contain | fit
           VAE encode
           reference latent
           boost
@@ -152,7 +158,7 @@ Preset dimensions are explicit curated width/height pairs and bypass geometry po
 
 When target content is enabled, content fit is independent: crop, contain, or stretch.
 
-Visual Reference fit is a separate operation and supports crop, resize, contain, and native. RoPE placement is independent from Visual Reference pixel preparation.
+Visual Reference fit is a separate operation and supports native, crop, contain, and fit. RoPE placement is independent from Visual Reference pixel preparation.
 
 ### Semantic Grounding Cadence
 
@@ -209,7 +215,7 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 LoRA Stack patches MODEL only and can carry immutable prompt augmentation assembled from LoRA Prompt Settings.
 
-Text to Image consumes optional prompt_augmentation and optional vision_references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
+Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
 
 The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
 
