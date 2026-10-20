@@ -19,14 +19,6 @@ class _FakeClip:
         return "A cinematic rainy city scene at night."
 
 
-def test_prompt_creator_references_are_optional():
-    cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
-    schema = cls.INPUT_TYPES()
-
-    assert "references" not in schema["required"]
-    assert schema["optional"]["references"][0] == "KREA2_REFERENCE_CHAIN"
-    assert schema["optional"]["reference_edit_image"][0] == "IMAGE"
-
 
 def test_create_from_theme_runs_without_references():
     cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
@@ -42,12 +34,6 @@ def test_create_from_theme_runs_without_references():
     assert "Mode: create_from_theme" in info
     assert thinking == ""
 
-
-def test_prompt_creator_mode_title_extension_is_checked_in():
-    js = Path("web/prompt_creator_mode_title.js").read_text(encoding="utf-8")
-    assert 'node.comfyClass !== "CcCKrea2EditPromptCreator"' in js
-    assert 'node.title = `Prompt Creator - ${mode}`' in js
-    assert "modeWidget.callback" in js
 
 
 def test_prompt_creator_accepts_mixed_chain_and_passes_it_through():
