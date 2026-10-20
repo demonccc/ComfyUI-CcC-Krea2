@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Reference-chain and geometry cleanup
+
+- Unified Visual and Vision references under the `KREA2_REFERENCE_CHAIN` socket, with `references` inputs/outputs across Edit, Prompt Creator, and T2I. `previous_references` accepts mixed chains.
+- Prompt Creator analyzes Visual entries only and passes all mixed-chain entries through unchanged; T2I consumes Vision entries only.
+- Visual Reference modes are now `native`, `crop`, `contain`, and `fit` (proportional cover + center crop). Image resizes use bicubic with antialiasing.
+- Removed reference-cache implementation and unused cache-specific tests, controls, and runtime paths. No workflow JSON changes in this documentation/cleanup pass.
+
+
 ### Added
 
 - Added `workflows/06_text_to_image.json`, a complete native T2I example wiring Krea2 CcC Text To Image into the Krea2 sampling/decode/output path.
@@ -19,9 +27,9 @@
 - Edit Prompt Creator adds a custom mode, optional Qwen thinking with a separate thinking output, stricter final-prompt-only system contracts, and Image N reference naming; leaked meta-instructions are filtered/rejected before reaching Edit.
 - Edit Prompt Creator now exposes and passes an explicit sampling seed to Qwen3-VL generation, matching ComfyUI Generate Text sampling requirements.
 - Merged the former public Paint Geometry stage into Krea2 CcC Paint Prepare. Paint Prepare now owns native image/mask geometry, outpaint expansion, pad/crop normalization, mask processing, semantic-reference preparation, VAE preparation, and returns paint_geometry for Restore.
-- Removed the four Reference Cache nodes from the public ComfyUI node registry, workflows, and current documentation. Normal Visual Reference is the single public appearance-reference path.
+- Removed the unused Reference Cache feature completely; normal Visual Reference is the appearance-reference path.
 - Updated AnyPaint example workflow to the current Paint Prepare -> Paint -> decode -> Paint Restore path.
-- Character Sheet now uses generic portrait/body inputs, nine explicit layouts, fixed no-crop fit behavior with selectable resize interpolation, and the same curated Krea geometry presets as Latent.
+- Character Sheet now uses generic portrait/body inputs, nine explicit layouts, fixed no-crop fit behavior using bicubic antialiasing, and the same curated Krea geometry presets as Latent.
 - Explicit outpaint margins keep their selected padding fill as semantic/reference context while remaining fully generable.
 - Paint runtime consumes the appearance latent prepared by Paint Prepare and no longer creates the target latent.
 - Added Krea geometry policies to Latent for fixed and image-derived dimensions: nearest curated Krea aspect or aspect-preserving Krea bounds.
@@ -31,7 +39,7 @@
 - Consolidated Edit around one Krea2 CcC runtime.
 - Removed runtime delegation to other installed custom nodes and obsolete public Subject/Scene/Outfit/Style/reference node implementations.
 - Split public editing into Visual Reference, Semantic Reference, Size Resolver, Latent, optional Edit Prompt Creator, and Edit.
-- Visual Reference keeps Qwen preparation independent from VAE geometry and exposes crop, resize, contain, and native appearance modes plus independent RoPE placement.
+- Visual Reference keeps Qwen preparation independent from VAE geometry and exposes native, crop, contain, and fit appearance modes plus independent RoPE placement.
 - Positive conditioning uses configured per-reference boosts; grounded negative uses neutral boosts and fixed empty negative text.
 - Semantic-only references remain Qwen-only and do not add VAE appearance latents.
 - Size Resolver outputs only width and height.
