@@ -206,7 +206,7 @@ class CcCKrea2CachedVisualReference:
                 "region_tag": ("STRING", {"default": ""}),
             },
             "optional": {
-                "previous_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
+                "previous_references": ("KREA2_REFERENCE_CHAIN",),
             },
         }
 
