@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Tuple
 import torch
 
 from ..constants import NODE_CATEGORY
-from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry
+from .edit_reference_types import VisualReferenceChain, VisualReferenceEntry, VisionReferenceEntry
 
 
 PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
@@ -156,34 +156,44 @@ def _collect_analysis_images(
     warnings: List[str] = []
     krea_image_index = 1
 
-    for chain_index, entry in enumerate((e for e in visual_references.entries if isinstance(e, VisualReferenceEntry)), start=1):
-        downstream_image_index: Optional[int] = None
-        if entry.semantic:
-            downstream_image_index = krea_image_index
+    for chain_index, entry in enumerate(visual_references.entries, start=1):
+        if isinstance(entry, VisualReferenceEntry):
+            visible_to_qwen = bool(entry.semantic)
+            raw_image = entry.image
+            annotation = entry.prompt_annotation.strip()
+            kind = "Visual"
+        elif isinstance(entry, VisionReferenceEntry):
+            visible_to_qwen = True
+            raw_image = entry.image
+            annotation = (entry.instruction or "").strip()
+            kind = f"Vision ({entry.mode})"
+        else:
+            raise TypeError(
+                f"[Krea2 CcC Edit Prompt Creator] Unsupported reference entry "
+                f"{chain_index}: {type(entry).__name__}"
+            )
+
+        downstream_image_index = krea_image_index if visible_to_qwen else None
+        if visible_to_qwen:
             krea_image_index += 1
 
-        if entry.image is None:
-            if entry.cache is not None:
-                warnings.append(
-                    f"Visual reference {chain_index} uses a cache and has no raw IMAGE for Prompt Creator analysis."
-                )
-            else:
-                warnings.append(f"Visual reference {chain_index} has no raw IMAGE.")
+        if raw_image is None:
+            warnings.append(
+                f"{kind} reference {chain_index} has no raw IMAGE for Prompt Creator analysis."
+            )
             continue
 
-        images.append(entry.image)
+        images.append(raw_image)
         internal_index = len(images)
-        annotation = entry.prompt_annotation.strip()
-
         if downstream_image_index is not None:
-            role = annotation or "No role annotation."
+            role = annotation or f"{kind} reference."
             mapping_lines.append(
                 f"Vision input {internal_index} = Image {downstream_image_index}. Role: {role}"
             )
         else:
             role = annotation or "Appearance-only visual reference."
             mapping_lines.append(
-                f"Vision input {internal_index} = visual reference chain item {chain_index}, "
+                f"Vision input {internal_index} = reference chain item {chain_index}, "
                 f"but it has no downstream Image N label. Role: {role}"
             )
 
@@ -249,8 +259,8 @@ class CcCKrea2EditPromptCreator:
     FUNCTION = "create"
     DESCRIPTION = (
         "Optional Qwen3-VL prompt creator. Reuses the same multimodal CLIP as Krea2/Generate Text, "
-        "reads the current Visual Reference chain, and optionally analyzes a reference_edit_image. "
-        "It only creates text and passes the Visual Reference chain through unchanged."
+        "reads the mixed Visual/Vision Reference chain, and optionally analyzes a reference_edit_image. "
+        "It only creates text and passes the full reference chain through unchanged."
     )
 
     @classmethod
@@ -258,7 +268,7 @@ class CcCKrea2EditPromptCreator:
         return {
             "required": {
                 "clip": ("CLIP",),
-                "visual_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
+                "visual_references": ("KREA2_REFERENCE_CHAIN",),
                 "mode": (PROMPT_CREATOR_MODES, {"default": "enhance"}),
                 "user_prompt": (
                     "STRING",
