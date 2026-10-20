@@ -9,7 +9,7 @@ def test_visual_reference_semantic_widgets_are_conditionally_disabled():
     assert 'w.name === "semantic"' in js
     assert 'setDisabled("semantic_resize", !enabled)' in js
     assert 'setDisabled("semantic_grounding_px", !resizeEnabled)' in js
-    assert 'setDisabled("semantic_resize_method", !resizeEnabled)' in js
+    assert 'setDisabled("semantic_resize_method", !resizeEnabled)' not in js
     assert 'setDisabled("prompt_annotation", !enabled)' in js
 
 
@@ -27,7 +27,7 @@ def test_latent_preset_widget_is_conditionally_disabled():
     assert 'setDisabled("preset_size", mode !== "preset")' in js
     assert 'setDisabled("geometry_policy", mode === "preset")' in js
     assert 'setDisabled("content_fit", !fromImage)' in js
-    assert 'setDisabled("resize_method", !fromImage)' in js
+    assert 'setDisabled("resize_method", !fromImage)' not in js
     assert 'image_fit' not in js
     assert 'setDisabled("resolution", mode !== "preset")' not in js
     assert 'setDisabled("aspect_ratio", mode !== "preset")' not in js
