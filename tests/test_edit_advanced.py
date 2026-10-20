@@ -24,21 +24,18 @@ def test_visual_reference_exposes_refactored_geometry_and_qwen_controls():
         "placement_grid",
         "grid_horizontal_position",
         "grid_vertical_position",
-        "resize_method",
         "semantic",
         "semantic_resize",
         "semantic_grounding_px",
-        "semantic_resize_method",
         "prompt_annotation",
         "attention_scope",
         "region_tag",
     ]
     assert list(optional) == ["previous_references"]
-    assert required["reference_fit"][0] == ("crop", "resize", "contain", "native")
+    assert required["reference_fit"][0] == ("native", "crop", "contain", "fit")
     assert required["placement_grid"][0] == ("inside", "outside")
     assert required["grid_horizontal_position"][0] == ("center", "left", "right")
     assert required["grid_vertical_position"][0] == ("center", "up", "down")
-    assert required["resize_method"][0] == ("lanczos", "bicubic", "bilinear", "area")
     assert required["semantic_grounding_px"][1]["step"] == 32
     assert required["semantic_grounding_px"][1]["min"] == 32
 
@@ -303,7 +300,6 @@ def test_latent_surface_separates_dimensions_geometry_and_content():
         "geometry_policy",
         "content",
         "content_fit",
-        "resize_method",
         "latent_semantic",
         "latent_semantic_instruction",
         "latent_grounding_px",
