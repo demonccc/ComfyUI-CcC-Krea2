@@ -19,16 +19,16 @@ class _FakeClip:
         return "A cinematic rainy city scene at night."
 
 
-def test_prompt_creator_visual_references_are_optional():
+def test_prompt_creator_references_are_optional():
     cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
     schema = cls.INPUT_TYPES()
 
-    assert "visual_references" not in schema["required"]
-    assert schema["optional"]["visual_references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert "references" not in schema["required"]
+    assert schema["optional"]["references"][0] == "KREA2_REFERENCE_CHAIN"
     assert schema["optional"]["reference_edit_image"][0] == "IMAGE"
 
 
-def test_create_from_theme_runs_without_visual_references():
+def test_create_from_theme_runs_without_references():
     cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
     created, references, info, thinking = cls().create(
         clip=_FakeClip(),
@@ -62,7 +62,7 @@ def test_prompt_creator_accepts_mixed_chain_and_passes_it_through():
              .append(VisualReferenceEntry(image=image, semantic=False)))
     cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
     created, returned, info, thinking = cls().create(
-        clip=_FakeClip(), visual_references=chain,
+        clip=_FakeClip(), references=chain,
         mode="create_from_theme", user_prompt="A new scene."
     )
     assert returned is chain
