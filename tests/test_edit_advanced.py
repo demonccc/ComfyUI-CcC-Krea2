@@ -417,3 +417,23 @@ def test_edit_runtime_latent_matches_pre_split_contract():
     assert set(runtime) == {"samples", "batch_index", "target_vision_context"}
     assert runtime["samples"] is samples
     assert runtime["target_vision_context"] is target_vision_context
+
+
+def test_mixed_visual_and_vision_references_keep_chain_order():
+    from ccc_krea2.modular_nodes.edit_reference_types import (
+        EditReferenceChain, VisualReferenceEntry, VisionReferenceEntry,
+    )
+    from ccc_krea2.modular_nodes.edit_node import _combine_reference_chains
+
+    image = torch.rand(1, 64, 64, 3)
+    visual_a = VisualReferenceEntry(image=image, semantic=False)
+    vision = VisionReferenceEntry(image=image, mode="semantic_only")
+    visual_b = VisualReferenceEntry(image=image, semantic=False)
+    chain = EditReferenceChain().append(visual_a).append(vision).append(visual_b)
+    assert len(chain.entries) == 3
+
+    prepared = _combine_reference_chains(
+        clip=None, references=chain, latent={},
+    )
+    assert len(prepared.references) == 3
+    assert [ref.appearance_reference for ref in prepared.references] == [True, False, True]
