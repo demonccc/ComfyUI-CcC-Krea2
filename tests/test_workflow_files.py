@@ -290,12 +290,12 @@ def test_prompt_creator_workflow_wires_optional_creator_and_disabled_vision_bran
     ]
     creator_inputs = {item["name"]: item for item in creator["inputs"]}
     assert creator_inputs["clip"]["link"] is not None
-    assert creator_inputs["visual_references"]["link"] is not None
-    assert creator_inputs["visual_references"]["type"] == "KREA2_REFERENCE_CHAIN"
+    assert creator_inputs["references"]["link"] is not None
+    assert creator_inputs["references"]["type"] == "KREA2_REFERENCE_CHAIN"
     assert creator_inputs["reference_edit_image"]["link"] is not None
     creator_outputs = {item["name"]: item for item in creator["outputs"]}
     assert creator_outputs["created_prompt"]["type"] == "STRING"
-    assert creator_outputs["visual_references"]["type"] == "KREA2_REFERENCE_CHAIN"
+    assert creator_outputs["references"]["type"] == "KREA2_REFERENCE_CHAIN"
     assert creator_outputs["creator_info"]["type"] == "STRING"
     assert creator_outputs["thinking"]["type"] == "STRING"
 
@@ -348,11 +348,11 @@ def test_text_to_image_workflow_uses_native_t2i_outputs_for_sampling():
     ]
 
     t2i_inputs = {item["name"]: item for item in t2i["inputs"]}
-    assert set(t2i_inputs) == {"model", "clip", "vision_references"}
+    assert set(t2i_inputs) == {"model", "clip", "references"}
     assert t2i_inputs["model"]["link"] is not None
     assert t2i_inputs["clip"]["link"] is not None
-    assert t2i_inputs["vision_references"]["type"] == "KREA2_REFERENCE_CHAIN"
-    assert t2i_inputs["vision_references"]["link"] is not None
+    assert t2i_inputs["references"]["type"] == "KREA2_REFERENCE_CHAIN"
+    assert t2i_inputs["references"]["link"] is not None
 
     vision = _nodes_by_type(workflow, "CcCKrea2VisionReference")[0]
     assert vision["widgets_values"] == [
