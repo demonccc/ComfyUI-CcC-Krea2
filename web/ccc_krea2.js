@@ -247,7 +247,6 @@ app.registerExtension({
                 const resizeEnabled = enabled && semanticResizeWidget?.value === true;
                 setDisabled("semantic_resize", !enabled);
                 setDisabled("semantic_grounding_px", !resizeEnabled);
-                setDisabled("semantic_resize_method", !resizeEnabled);
                 setDisabled("prompt_annotation", !enabled);
             };
 
@@ -255,7 +254,6 @@ app.registerExtension({
                 const mode = fitWidget?.value ?? "native";
                 const crop = mode === "crop";
                 setDisabled("placement_grid", crop);
-                setDisabled("resize_method", mode !== "resize");
                 if (crop) {
                     const placement = node.widgets?.find((w) => w.name === "placement_grid");
                     if (placement) placement.value = "inside";
@@ -393,7 +391,6 @@ app.registerExtension({
             const updateContentState = () => {
                 const fromImage = contentWidget?.value === "from_image";
                 setDisabled("content_fit", !fromImage);
-                setDisabled("resize_method", !fromImage);
             };
 
             const updateSemanticState = () => {
