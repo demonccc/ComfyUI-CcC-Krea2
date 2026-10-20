@@ -28,9 +28,9 @@ def test_reference_size_resolver_and_latent_socket_types_are_distinct():
     edit = NODE_CLASS_MAPPINGS["CcCKrea2Edit"]
 
     assert region.RETURN_TYPES == ("KREA2_ATTENTION_REGION_CHAIN",)
-    assert visual.RETURN_TYPES == ("KREA2_VISUAL_REFERENCE_CHAIN",)
-    assert vision.RETURN_TYPES == ("KREA2_VISION_REFERENCE_CHAIN", "STRING")
-    assert vision.RETURN_NAMES == ("vision_references", "vision_info")
+    assert visual.RETURN_TYPES == ("KREA2_REFERENCE_CHAIN",)
+    assert vision.RETURN_TYPES == ("KREA2_REFERENCE_CHAIN", "STRING")
+    assert vision.RETURN_NAMES == ("references", "vision_info")
     assert resolver.RETURN_TYPES == ("INT", "INT")
     assert resolver.RETURN_NAMES == ("width", "height")
     assert latent.RETURN_TYPES == ("LATENT", "STRING")
