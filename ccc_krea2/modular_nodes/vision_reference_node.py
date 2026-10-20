@@ -99,7 +99,7 @@ class CcCKrea2VisionReference:
                 ),
             },
             "optional": {
-                "previous_references": ("KREA2_VISION_REFERENCE_CHAIN",),
+                "previous_references": ("KREA2_REFERENCE_CHAIN",),
             },
         }
 
