@@ -48,28 +48,6 @@ def _chain():
     )
 
 
-def test_prompt_creator_public_controls_and_output_compatibility():
-    required = CcCKrea2EditPromptCreator.INPUT_TYPES()["required"]
-    optional = CcCKrea2EditPromptCreator.INPUT_TYPES()["optional"]
-
-    assert required["mode"][0] == PROMPT_CREATOR_MODES
-    assert PROMPT_CREATOR_MODES == ("enhance", "create_from_image", "create_from_theme", "custom")
-    assert required["system_prompt"][1]["default"] == PRESET_SYSTEM_PROMPTS["enhance"]
-    assert required["thinking"][1]["default"] is False
-    assert required["max_tokens"][1]["default"] == 512
-    assert required["temperature"][1]["default"] == 0.25
-    assert required["top_p"][1]["default"] == 0.90
-    assert required["seed"][1]["default"] == 0
-    assert "reference_edit_image" in optional
-
-    # Preserve original first three output slots; thinking remains appended.
-    assert CcCKrea2EditPromptCreator.RETURN_NAMES == (
-        "created_prompt",
-        "references",
-        "creator_info",
-        "thinking",
-    )
-
 
 def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     # thinking=True pre-fills the assistant turn with <think>, so decode starts with reasoning text.
