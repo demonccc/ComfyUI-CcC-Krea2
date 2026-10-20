@@ -11,7 +11,6 @@ class VisualReferenceEntry:
     """One visual edit reference before Qwen/VAE preparation."""
 
     image: Optional[torch.Tensor] = None
-    cache: Optional[Any] = None
     boost: float = 1.0
     reference_fit: str = "native"
     placement_grid: str = "inside"
