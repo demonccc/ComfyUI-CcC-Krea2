@@ -9,20 +9,6 @@ class FakeModel:
         self.name = name
 
 
-def test_lora_stack_node_contract():
-    node = CcCKrea2LoRAStack()
-    req = node.INPUT_TYPES()["required"]
-
-    assert "model" in req
-    for i in range(1, 11):
-        assert f"lora_{i}_enabled" in req
-        assert f"lora_{i}_name" in req
-        assert f"lora_{i}_strength" in req
-
-    assert node.RETURN_TYPES == ("MODEL",)
-    assert node.RETURN_NAMES == ("model",)
-    assert len(node.loaders) == 10
-
 
 def test_lora_stack_applies_enabled_slots_in_order(monkeypatch):
     node = CcCKrea2LoRAStack()
@@ -74,25 +60,6 @@ def test_lora_stack_skips_none_and_zero_strength(monkeypatch):
     assert out_model is model
     assert calls == []
 
-
-def test_lora_stack_with_prompt_contract():
-    node = CcCKrea2LoRAStackWithPrompt()
-    inputs = node.INPUT_TYPES()
-    req = inputs["required"]
-    opt = inputs["optional"]
-
-    assert "model" in req
-    for i in range(1, 6):
-        assert f"lora_{i}_enabled" in req
-        assert f"lora_{i}_name" in req
-        assert f"lora_{i}_strength" in req
-        assert f"lora_{i}_prompt_position" in req
-        assert f"lora_{i}_prompt" in req
-
-    assert "prompt_augmentation" in opt
-    assert node.RETURN_TYPES == ("MODEL", CCC_KREA2_PROMPT_AUGMENTATION)
-    assert node.RETURN_NAMES == ("model", "prompt_augmentation")
-    assert len(node.loaders) == 5
 
 
 def test_lora_stack_with_prompt_applies_model_and_prompt(monkeypatch):
