@@ -35,6 +35,16 @@ def test_reference_size_resolver_and_latent_socket_types_are_distinct():
     assert vision.INPUT_TYPES()["optional"]["previous_references"][0] == "KREA2_REFERENCE_CHAIN"
     assert edit.INPUT_TYPES()["optional"]["references"][0] == "KREA2_REFERENCE_CHAIN"
     assert "vision_references" not in edit.INPUT_TYPES()["optional"]
+
+    cached = NODE_CLASS_MAPPINGS["CcCKrea2CachedVisualReference"]
+    creator = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
+    t2i = NODE_CLASS_MAPPINGS["CcCKrea2TextToImage"]
+    assert cached.RETURN_TYPES[0] == "KREA2_REFERENCE_CHAIN"
+    assert cached.INPUT_TYPES()["optional"]["previous_references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert creator.INPUT_TYPES()["optional"]["visual_references"][0] == "KREA2_REFERENCE_CHAIN"
+    assert creator.RETURN_TYPES[1] == "KREA2_REFERENCE_CHAIN"
+    assert t2i.INPUT_TYPES()["optional"]["vision_references"][0] == "KREA2_REFERENCE_CHAIN"
+
     assert resolver.RETURN_TYPES == ("INT", "INT")
     assert resolver.RETURN_NAMES == ("width", "height")
     assert latent.RETURN_TYPES == ("LATENT", "STRING")
