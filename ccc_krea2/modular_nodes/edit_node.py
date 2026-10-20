@@ -17,8 +17,8 @@ from ..reference_specs import (
     StyleReferenceSpec,
     VisionPrepSpec,
 )
-from .edit_reference_types import VisionReferenceChain, VisualReferenceChain
-from ..vision_reference_runtime import append_vision_references
+from .edit_reference_types import EditReferenceChain, VisualReferenceEntry, VisionReferenceEntry
+from ..vision_reference_runtime import build_vision_reference_spec
 from .rope_position import install_krea2_rope_positioning
 
 
@@ -160,14 +160,18 @@ def _runtime_latent(latent: dict) -> dict:
 
 def _combine_reference_chains(
     clip: Any,
-    visual_references: Optional[VisualReferenceChain],
-    vision_references: Optional[VisionReferenceChain],
+    references: Optional[EditReferenceChain],
     latent: dict,
 ) -> ReferenceChain:
     """Translate the split public nodes into the common orchestrator ReferenceChain."""
     chain = ReferenceChain()
 
-    for index, entry in enumerate((visual_references or VisualReferenceChain()).entries, start=1):
+    for index, entry in enumerate((references or EditReferenceChain()).entries, start=1):
+        if isinstance(entry, VisionReferenceEntry):
+            chain = chain.append(build_vision_reference_spec(entry))
+            continue
+        if not isinstance(entry, VisualReferenceEntry):
+            raise TypeError(f"Unexpected edit reference type: {type(entry).__name__}")
         if entry.cache is not None:
             cache = entry.cache
             chain = chain.append(
@@ -227,7 +231,6 @@ def _combine_reference_chains(
             alias="target image",
         )
 
-    chain = append_vision_references(chain, vision_references or VisionReferenceChain())
     return chain
 
 
@@ -307,8 +310,7 @@ class CcCKrea2Edit:
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "visual_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
-                "vision_references": ("KREA2_VISION_REFERENCE_CHAIN",),
+                "references": ("KREA2_REFERENCE_CHAIN",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
             },
         }
@@ -321,8 +323,7 @@ class CcCKrea2Edit:
         latent,
         positive_prompt="",
         apply_krea2_edit_patch=True,
-        visual_references=None,
-        vision_references=None,
+        references=None,
         prompt_augmentation=None,
     ):
         base_positive_prompt = positive_prompt
@@ -330,15 +331,15 @@ class CcCKrea2Edit:
             positive_prompt, KREA2_EDIT_NEGATIVE_PROMPT, prompt_augmentation,
             positive_separator=" ",
         )
-        visual_entries = (visual_references or VisualReferenceChain()).entries
-        vision_entries = (vision_references or VisionReferenceChain()).entries
+        all_entries = (references or EditReferenceChain()).entries
+        visual_entries = tuple(e for e in all_entries if isinstance(e, VisualReferenceEntry))
+        vision_entries = tuple(e for e in all_entries if isinstance(e, VisionReferenceEntry))
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
         runtime_latent = _runtime_latent(latent)
 
         chain = _combine_reference_chains(
             clip=clip,
-            visual_references=visual_references,
-            vision_references=vision_references,
+            references=references,
             latent=latent,
         )
 
