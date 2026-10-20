@@ -263,7 +263,7 @@
           "link": 4
         },
         {
-          "name": "visual_references",
+          "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
         }
