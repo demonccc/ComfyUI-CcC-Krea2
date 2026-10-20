@@ -37,8 +37,8 @@ class CcCKrea2VisionReference:
     """Declare one Qwen/Vision-only reference without an appearance latent."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("KREA2_VISION_REFERENCE_CHAIN", "STRING")
-    RETURN_NAMES = ("vision_references", "vision_info")
+    RETURN_TYPES = ("KREA2_REFERENCE_CHAIN", "STRING")
+    RETURN_NAMES = ("references", "vision_info")
     FUNCTION = "process"
     DESCRIPTION = (
         "Adds one Vision Reference interpreted as Semantic, Visual, Style, or Context. "
