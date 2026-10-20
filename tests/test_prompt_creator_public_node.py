@@ -40,14 +40,14 @@ def _chain():
     )
 
 
-def test_create_from_image_analyzes_visual_references_and_reference_edit_image():
+def test_create_from_image_analyzes_references_and_reference_edit_image():
     clip = _FakeClip()
     chain = _chain()
     reference_edit = _image(0.9)
 
     created, passthrough, info, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
-        visual_references=chain,
+        references=chain,
         mode="create_from_image",
         user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
         reference_edit_image=reference_edit,
@@ -70,7 +70,7 @@ def test_create_from_theme_still_uses_visual_reference_pixels():
 
     _, passthrough, _, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
-        visual_references=chain,
+        references=chain,
         mode="create_from_theme",
         user_prompt="Put Image 1 in a neon city at night.",
     )
