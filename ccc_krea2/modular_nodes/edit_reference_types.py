@@ -1,7 +1,7 @@
 """Typed declarative inputs for the split Krea2 Edit nodes."""
 
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 import torch
 
