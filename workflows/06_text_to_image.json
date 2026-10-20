@@ -153,7 +153,7 @@
         },
         {
           "name": "vision_references",
-          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "type": "KREA2_REFERENCE_CHAIN",
           "link": 13
         }
       ],
@@ -492,8 +492,8 @@
       ],
       "outputs": [
         {
-          "name": "vision_references",
-          "type": "KREA2_VISION_REFERENCE_CHAIN",
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
           "links": [
             13
           ]
@@ -622,7 +622,7 @@
       0,
       4,
       2,
-      "KREA2_VISION_REFERENCE_CHAIN"
+      "KREA2_REFERENCE_CHAIN"
     ]
   ],
   "groups": [
