@@ -36,10 +36,7 @@ def resize_tensor(tensor: torch.Tensor, target_h: int, target_w: int, method: st
 
     method_key = method.lower()
     if method_key == "auto":
-        if target_h * target_w < curr_h * curr_w:
-            method_key = "area"
-        else:
-            method_key = "bicubic"
+        method_key = "bicubic"
 
     if method_key == "nearest-exact":
         out_bchw = F.interpolate(t_bchw.float(), size=(target_h, target_w), mode="nearest-exact")
