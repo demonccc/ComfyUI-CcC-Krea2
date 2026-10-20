@@ -87,7 +87,7 @@ class CcCKrea2VisualReference:
                 ),
             },
             "optional": {
-                "previous_references": ("KREA2_VISUAL_REFERENCE_CHAIN",),
+                "previous_references": ("KREA2_REFERENCE_CHAIN",),
             },
         }
 
