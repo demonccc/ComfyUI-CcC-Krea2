@@ -10,6 +10,13 @@
 - Removed the tagged Attention Region node, rectangle-percent editor, tag matching, unused legacy mask branches and obsolete post-VAE latent resize.
 - Existing example workflows were intentionally not modified in this change.
 
+### Dead-code and documentation audit
+
+- Removed legacy subject/scene/megapixel target latent construction; current Latent is the single owner of target geometry.
+- Removed disabled target-vision-context forwarding, unused Qwen grounding preset APIs and duplicate fit/sampling geometry helpers.
+- Removed obsolete Qwen encoding/role helpers, outdated constants and their retired tests; retained live reference, VAE, Qwen and Paint paths.
+- Corrected documentation against the current 14 registered nodes. Workflow `03_regional_attention.json` is legacy/incompatible and was intentionally left untouched.
+
 ### Reference-chain and geometry cleanup
 
 - Unified Visual and Vision references under the `KREA2_REFERENCE_CHAIN` socket, with `references` inputs/outputs across Edit, Prompt Creator, and T2I. `previous_references` accepts mixed chains.
@@ -42,7 +49,7 @@
 - Standardized semantic grounding controls on a 32-pixel cadence.
 - Consolidated Edit around one Krea2 CcC runtime.
 - Removed runtime delegation to other installed custom nodes and obsolete public Subject/Scene/Outfit/Style/reference node implementations.
-- Split public editing into Visual Reference, Semantic Reference, Size Resolver, Latent, optional Edit Prompt Creator, and Edit.
+- Split public editing into Visual Reference, Vision Reference, Size Resolver, Latent, optional Edit Prompt Creator, and Edit.
 - Visual Reference keeps Qwen preparation independent from VAE geometry and exposes native, crop, contain, and fit appearance modes plus independent RoPE placement.
 - Positive conditioning uses configured per-reference boosts; grounded negative uses neutral boosts and fixed empty negative text.
 - Semantic-only references remain Qwen-only and do not add VAE appearance latents.
