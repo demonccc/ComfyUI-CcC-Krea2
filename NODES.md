@@ -478,12 +478,14 @@ The node applies prompt augmentation and creates an empty SD3-compatible latent 
 
 ## Example Workflows
 
+Examples are historical fixtures and have not been migrated in this cleanup; a workflow referring to the removed Attention Region node will not load as a current graph.
+
 - workflows/01_scene_subject.json — Scene + Subject edit.
 - workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
 - workflows/03_regional_attention.json — **legacy/incompatible**: still contains the removed `CcCKrea2AttentionRegion` nodes. Intentionally unchanged; migrate its regions to per-Visual-Reference target masks before using.
 - workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
 - workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
-- workflows/06_text_to_image.json — T2I example with a Semantic Vision Reference enriching positive Qwen conditioning.
+- workflows/06_text_to_image.json — T2I example using Vision Reference analysis and text-only final conditioning.
 
 - workflows/12_edit_vision_semantic.json — Vision Reference / Semantic.
 - workflows/13_edit_vision_visual.json — Vision Reference / Visual.
