@@ -1,7 +1,7 @@
 """Core orchestrator engine for Krea2 CcC Edit."""
 
 import torch
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, List
 from .reference_specs import ReferenceChain, ReferenceSpec, StyleReferenceSpec
 from .reference_slots import resolve_reference_slots_and_aliases
 from .krea2edit_geometry import resolve_krea2edit_geometry, process_image_and_mask_geometry
@@ -14,7 +14,6 @@ from .identity_contract import (
     build_grounded_negative_user_content,
     build_grounded_positive_user_content,
 )
-from .target_latent import should_include_target_in_vision, TargetVisionContext
 from .patch import _conditioning_set_values
 
 
@@ -40,28 +39,8 @@ def run_krea2_edit_orchestrator(
     target_h = lh * 8
     target_w = lw * 8
 
-    # Target Vision Context inspection
-    target_vctx: Optional[TargetVisionContext] = target_latent.get("target_vision_context")
-
-    # Step 2: Unified slot resolution for Target Vision Context and References
-    effective_chain = references
-    if target_vctx is not None and should_include_target_in_vision(target_vctx, references):
-        if target_vctx.target_image is not None:
-            target_spec = ReferenceSpec(
-                reference_path="edit",
-                prepared_image=target_vctx.target_image,
-                requested_vision_slot=target_vctx.target_vision_slot,
-                alias=target_vctx.target_alias,
-                vision_instruction=target_vctx.target_vision_instruction,
-                appearance_reference=False,
-                _legacy_role="target",
-            )
-            if target_spec.requested_vision_slot is None or target_spec.requested_vision_slot == 0:
-                effective_chain = ReferenceChain((target_spec,) + references.references)
-            else:
-                effective_chain = effective_chain.append(target_spec)
-
-    resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(effective_chain)
+    # Step 2: Resolve current ordered Visual and Vision references.
+    resolved_refs, slot_warnings = resolve_reference_slots_and_aliases(references)
     for i in range(len(resolved_refs) - 1):
         if resolved_refs[i]["resolved_slot"] >= resolved_refs[i + 1]["resolved_slot"]:
             raise ValueError(
