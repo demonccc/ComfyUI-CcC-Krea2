@@ -501,3 +501,7 @@ The node applies prompt augmentation and creates an empty SD3-compatible latent 
 - workflows/13_edit_vision_visual.json — Vision Reference / Visual.
 - workflows/14_edit_vision_style.json — Vision Reference / Style.
 - workflows/18_edit_vision_context.json — Vision Reference / Context.
+
+### Edit RoPE annotated preview
+
+`rope_preview` returns a three-image `IMAGE` batch in fixed order: **layout**, **overlay_boxes**, **overlay_visuals**. All three share the same spatial extent and layout planner. `layout` draws the target and colored reference boxes. `overlay_boxes` draws the target's VAE-prepared image when the input Latent was created `from_image` (otherwise a neutral canvas), with translucent reference boxes. `overlay_visuals` draws the same opaque target with VAE-prepared Visual Reference images overlaid transparently. `collapsed` references are points in all three views, not image thumbnails. Qwen-only Vision References are excluded. The target image is retained in Latent metadata only for the preview; it is not decoded from latent samples.
