@@ -140,7 +140,6 @@ def _build_target_latent(
     target_w: int,
     target_h: int,
     content_fit: str,
-    resize_method: str,
     batch_size: int,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     latent_h = target_h // 8
@@ -240,7 +239,6 @@ class CcCKrea2Latent:
         geometry_policy="preserve_aspect_krea_bounds",
         content="empty",
         content_fit="crop",
-        resize_method="bicubic",
         latent_semantic=False,
         latent_semantic_instruction="",
         latent_grounding_px=768,
@@ -269,7 +267,6 @@ class CcCKrea2Latent:
             target_w=target_w,
             target_h=target_h,
             content_fit=content_fit,
-            resize_method=resize_method,
             batch_size=int(batch_size),
         )
 
@@ -289,7 +286,7 @@ class CcCKrea2Latent:
             f"Geometry Policy: {geometry_policy if dimensions != 'preset' else '<preset>'}",
             f"Content: {content}",
             f"Content Fit: {content_fit if content == 'from_image' else '<unused>'}",
-            f"Resize Method: {resize_method if content == 'from_image' else '<unused>'}",
+            f"Resize Method: {'bicubic' if content == 'from_image' else '<unused>'}",
             f"Content Placement: {placement}",
             f"Batch Size: {int(batch_size)}",
             f"Latent Semantic: {'enabled' if latent_semantic else 'disabled'}",
