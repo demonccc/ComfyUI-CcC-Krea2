@@ -213,13 +213,13 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## LoRA and Text to Image
 
-**LoRA Stack** applies up to four model-only LoRAs with per-slot strength and a global multiplier.
-
 **LoRA Stack** and **LoRA Stack Sliders** each support 10 model-only slots. **LoRA Stack with Prompt** supports 5 model-only slots with per-slot positive prepend/append triggers and outputs `prompt_augmentation`. Connect that output explicitly to either Edit or T2I to apply it; Edit always keeps its grounded negative prompt empty.
 
 **Text to Image** encodes positive/negative text with the supplied CLIP, creates its empty latent from the shared Krea geometry presets/policies, and returns MODEL / positive / negative / LATENT. Qwen guidance controls do not live on T2I: they travel with **Vision Reference**. With a Vision Reference, T2I uses Qwen multimodal generation only as an analysis step, then encodes the resulting mode-scoped guidance as text-only Krea2 conditioning. Direct Vision rows never enter the final T2I conditioning, so the source image cannot overpower the prompt or appear as an extra subject. The explicit negative prompt remains text-only.
 
 ## Example Workflows
+
+**Compatibility note:** Workflow JSON files have not been edited during the refactor. Saved workflows may contain removed node types or outdated inputs; the legacy regional-attention workflow is explicitly identified below.
 
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
 - workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
