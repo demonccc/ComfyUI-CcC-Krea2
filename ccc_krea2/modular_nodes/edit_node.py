@@ -351,7 +351,7 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=None,
-                reference_target_regions=target_regions,
+                reference_target_masks=target_masks,
                 reference_attention_scopes=attention_scopes,
             )
 
