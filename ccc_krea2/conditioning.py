@@ -2,7 +2,7 @@
 
 import torch
 from dataclasses import dataclass, field
-from typing import List, Tuple, Any, Optional, Dict
+from typing import List, Tuple, Any, Dict
 from .constants import LOGGER_PREFIX
 from .style_processing import apply_statistical_style_fidelity, StyleSpanOperation
 from .vision_prep import resolve_qwen_encoder_config, calculate_native_qwen_geometry
