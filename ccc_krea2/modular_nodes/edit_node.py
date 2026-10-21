@@ -7,7 +7,7 @@ import torch
 from .. import edit_engine as edit_engine_runtime
 from ..constants import NODE_CATEGORY
 from ..prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, apply_prompt_augmentation
-from ..grounding import resize_grounding_image
+from ..geometry import resize_tensor
 from ..patch import attach_reference_runtime_to_conditioning, patch_krea2_model
 from ..reference_specs import (
     PreparedVisionImage,
@@ -53,18 +53,14 @@ def _prepare_qwen_image(
         image = image.unsqueeze(0)
     original = image
 
-    if semantic_resize:
-        vision_input = resize_grounding_image(
-            image=image,
-            resize_mode="downscale_only",
-            grounding_px=grounding_px,
-            grounding_preset="custom",
-            resize_method=resize_method,
-        )
-        resize_applied = vision_input.shape[1:3] != image.shape[1:3]
-    else:
-        vision_input = image
-        resize_applied = False
+    vision_input = image
+    max_edge = max(int(image.shape[1]), int(image.shape[2]))
+    resize_applied = bool(semantic_resize and grounding_px > 0 and max_edge > grounding_px)
+    if resize_applied:
+        scale = grounding_px / float(max_edge)
+        new_h = max(1, int(round(image.shape[1] * scale)))
+        new_w = max(1, int(round(image.shape[2] * scale)))
+        vision_input = resize_tensor(image, target_h=new_h, target_w=new_w, method=resize_method)
 
     vision_input = vision_input[..., :3].clamp(0.0, 1.0)
     src_h, src_w = int(original.shape[1]), int(original.shape[2])
