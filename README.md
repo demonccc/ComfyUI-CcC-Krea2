@@ -250,3 +250,5 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 ## Acknowledgements
 
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
+
+**RoPE preview:** Edit emits one `IMAGE` batch containing three annotated views in order: `layout`, `overlay_boxes` and `overlay_visuals`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point, and Qwen-only Vision References are not shown.
