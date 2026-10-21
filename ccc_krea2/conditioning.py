@@ -3,12 +3,7 @@
 import torch
 from dataclasses import dataclass, field
 from typing import List, Tuple, Any, Optional, Dict
-from .constants import (
-    LOGGER_PREFIX,
-    VISION_PAD_TOKEN,
-    DEFAULT_SYSTEM_PROMPT,
-    ReferenceRole,
-)
+from .constants import LOGGER_PREFIX
 from .style_processing import apply_statistical_style_fidelity, StyleSpanOperation
 from .vision_prep import resolve_qwen_encoder_config, calculate_native_qwen_geometry
 
@@ -33,104 +28,6 @@ try:
     from comfy.text_encoders.krea2 import KREA2_TEMPLATE
 except ImportError:
     KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
-
-
-def build_krea2_user_content(
-    resolved_references: List[Dict[str, Any]],
-    user_prompt: str = "",
-) -> str:
-    """Build canonical Qwen user content in physical image order.
-
-    Layout per physical vision entry:
-    <VISION_PAD_TOKEN>[ (alias)][: instruction]
-
-    Followed directly by RAW USER POSITIVE PROMPT.
-    If alias and instruction are empty, reduces to vision blocks followed directly by user prompt.
-    """
-    blocks = []
-    for item in resolved_references:
-        spec = item.get("spec")
-        if spec is not None and not getattr(spec, "include_in_vision", True):
-            continue
-        expanded_aliases = item.get("expanded_aliases", ())
-        alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
-        instruction = getattr(spec, "vision_instruction", "") if spec else ""
-
-        ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower()) if spec else "edit"
-
-        if ref_path == "style":
-            style_proc = getattr(spec, "style_processing", "2x2")
-            num_crops = 1 if style_proc == "full" else (4 if style_proc == "2x2" else 16)
-            for c_idx in range(num_crops):
-                marker = VISION_PAD_TOKEN
-                adj = ""
-                if alias_str and instruction:
-                    adj = f" (Style Tile {c_idx + 1}, {alias_str}): {instruction}"
-                elif alias_str:
-                    adj = f" (Style Tile {c_idx + 1}, {alias_str})"
-                elif instruction:
-                    adj = f" (Style Tile {c_idx + 1}): {instruction}"
-                blocks.append(f"{marker}{adj}")
-        else:
-            marker = VISION_PAD_TOKEN
-            adj = ""
-            if alias_str and instruction:
-                adj = f" ({alias_str}): {instruction}"
-            elif alias_str:
-                adj = f" ({alias_str})"
-            elif instruction:
-                adj = f": {instruction}"
-            blocks.append(f"{marker}{adj}")
-
-    joined_blocks = "\n".join(blocks) if blocks else ""
-    if joined_blocks and user_prompt:
-        return f"{joined_blocks}\n{user_prompt}"
-    return joined_blocks or (user_prompt or "")
-
-
-def build_krea2_negative_user_content(
-    resolved_references: List[Dict[str, Any]],
-    user_negative_prompt: str = "",
-) -> str:
-    """Build canonical Qwen user content for negative prompt using ONLY non-Style appearance edit references.
-
-    Includes only references where reference_path != 'style' and appearance_reference is True.
-    Matches the exact count and order of negative Qwen appearance images.
-    """
-    blocks = []
-    for item in resolved_references:
-        spec = item.get("spec")
-        if spec is None:
-            continue
-        if not getattr(spec, "include_in_vision", True):
-            continue
-        ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
-        if ref_path == "style":
-            continue
-        is_appearance = getattr(spec, "appearance_reference", True)
-        if not is_appearance:
-            continue
-
-        expanded_aliases = item.get("expanded_aliases", ())
-        alias_str = ", ".join(expanded_aliases) if expanded_aliases else getattr(spec, "alias", "")
-        instruction = getattr(spec, "vision_instruction", "")
-
-        marker = VISION_PAD_TOKEN
-        adj = ""
-        if alias_str and instruction:
-            adj = f" ({alias_str}): {instruction}"
-        elif alias_str:
-            adj = f" ({alias_str})"
-        elif instruction:
-            adj = f": {instruction}"
-        blocks.append(f"{marker}{adj}")
-
-    formatted_refs = "\n".join(blocks) if blocks else ""
-    raw_prompt = user_negative_prompt or ""
-
-    if formatted_refs and raw_prompt:
-        return f"{formatted_refs}\n{raw_prompt}"
-    return formatted_refs or raw_prompt
 
 
 def attach_reference_latents_to_conditioning(
@@ -159,122 +56,6 @@ def attach_reference_latents_to_conditioning(
             else:
                 updated_cond.append(cond_tuple)
         return updated_cond
-
-
-def attach_reference_latents_method_to_conditioning(conditioning: List[Any], method: str) -> List[Any]:
-    """Attach reference_latents_method metadata to conditioning using node_helpers.conditioning_set_values."""
-    if not conditioning or not method:
-        return conditioning
-
-    try:
-        import node_helpers
-
-        return node_helpers.conditioning_set_values(conditioning, {"reference_latents_method": method})
-    except (ImportError, AttributeError):
-        # Fallback for isolated environments without node_helpers
-        updated_cond = []
-        for cond_tuple in conditioning:
-            if isinstance(cond_tuple, (list, tuple)) and len(cond_tuple) >= 2:
-                t, d = cond_tuple[0], dict(cond_tuple[1])
-                d["reference_latents_method"] = method
-                updated_cond.append((t, d))
-            else:
-                updated_cond.append(cond_tuple)
-        return updated_cond
-
-
-def build_annotated_user_prompt(
-    resolved_references: List[Dict[str, Any]],
-    user_prompt: str = "",
-    target_vision_context: Optional[Any] = None,
-) -> str:
-    """Build user content string with vision block annotations followed by exact user prompt.
-
-    Preserves original user prompt at the end without prepending system role directives.
-    """
-    annotations = []
-
-    for item in resolved_references:
-        slot = item.get("resolved_slot", 1)
-        spec = item.get("spec")
-        expanded_aliases = item.get("expanded_aliases", ())
-        alias_str = ", ".join(expanded_aliases) if expanded_aliases else (getattr(spec, "alias", "") if spec else "")
-        instruction = getattr(spec, "vision_instruction", "") if spec else ""
-
-        if alias_str or instruction:
-            if alias_str and instruction:
-                annotations.append(f"Image {slot} ({alias_str}): {instruction}")
-            elif alias_str:
-                annotations.append(f"Image {slot}: {alias_str}")
-            elif instruction:
-                annotations.append(f"Image {slot}: {instruction}")
-
-    if target_vision_context is not None:
-        alias_str = getattr(target_vision_context, "target_alias", "")
-        instruction = getattr(target_vision_context, "target_vision_instruction", "")
-        slot = getattr(target_vision_context, "target_vision_slot", None)
-        slot_str = f"Image {slot}" if slot is not None else "Target Image"
-        if alias_str or instruction:
-            if alias_str and instruction:
-                annotations.append(f"{slot_str} ({alias_str}): {instruction}")
-            elif alias_str:
-                annotations.append(f"{slot_str}: {alias_str}")
-            elif instruction:
-                annotations.append(f"{slot_str}: {instruction}")
-
-    annotated_header = "\n".join(annotations) if annotations else ""
-
-    if annotated_header and user_prompt:
-        return f"{annotated_header}\n\n{user_prompt}"
-    return annotated_header or (user_prompt or "")
-
-
-def build_role_instructions(role_order: List[ReferenceRole]) -> str:
-    """Build Qwen3-VL role instructions from active image order."""
-    if not role_order:
-        return ""
-
-    lines = []
-    for i, role in enumerate(role_order, start=1):
-        r_val = role.value if hasattr(role, "value") else str(role)
-        lines.append(f"Image {i} is the {r_val} image.")
-
-    role_vals = [r.value if hasattr(r, "value") else str(r) for r in role_order]
-    instructions = []
-
-    if "scene" in role_vals:
-        instructions.append("Use the scene image for composition, pose, environment, interactions and lighting.")
-
-    if "outfit" in role_vals:
-        instructions.append(
-            "Use the outfit image for the outfit and garment details.\n"
-            "Do not use the wearer of the outfit image as the subject identity."
-        )
-
-    if "subject" in role_vals:
-        instructions.append(
-            "Use the subject image for identity, facial features, hair, anatomy, body shape and body proportions."
-        )
-
-    if "source" in role_vals:
-        instructions.append("The source image is the base image being edited.")
-
-    header = "\n".join(lines)
-    body = "\n\n".join(instructions) if instructions else ""
-
-    if header and body:
-        return f"{header}\n\n{body}"
-    return header or body
-
-
-def build_krea2_qwen_template(num_images: int, system_prompt: str = DEFAULT_SYSTEM_PROMPT) -> str:
-    """Builds the Qwen3-VL template dynamically matching the exact count of vision images."""
-    vision_blocks = VISION_PAD_TOKEN * num_images
-    return (
-        f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-        f"<|im_start|>user\n{vision_blocks}{{}}<|im_end|>\n"
-        f"<|im_start|>assistant\n"
-    )
 
 
 def resolve_qwen_token_stream(tokens: Any, allow_raw_list_test_helper: bool = False) -> Tuple[List[Any], str]:
@@ -497,7 +278,6 @@ def encode_krea2_qwen_context(
     prompt: str,
     physical_images: List[Any],
     physical_image_map: List[Dict[str, Any]],
-    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
     is_positive: bool = True,
     allow_raw_list_test_helper: bool = False,
     test_mode: bool = False,
@@ -659,58 +439,3 @@ def encode_krea2_qwen_context(
     )
 
 
-def encode_krea2_conditioning(
-    clip: Any,
-    prompt: str,
-    negative_prompt: str,
-    grounding_images: List[Any],
-    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-) -> Tuple[List[Any], List[Any]]:
-    """Encode Qwen3-VL text and vision tokens for positive and negative conditioning."""
-    if clip is None:
-        raise ValueError(f"{LOGGER_PREFIX} CLIP text encoder input cannot be None.")
-
-    num_images = len(grounding_images)
-    dynamic_template = build_krea2_qwen_template(num_images=num_images, system_prompt=system_prompt)
-
-    def _encode_text(text: str) -> List[Any]:
-        try:
-            tokens = clip.tokenize(text, images=grounding_images, llama_template=dynamic_template)
-        except TypeError:
-            tokens = clip.tokenize(text, images=grounding_images)
-        except Exception as e:
-            raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
-
-        return clip.encode_from_tokens_scheduled(tokens)
-
-    pos_conditioning = _encode_text(prompt or "")
-    neg_conditioning = _encode_text(negative_prompt or "")
-
-    return pos_conditioning, neg_conditioning
-
-
-def encode_prompt_with_qwen(
-    clip: Any,
-    prompt: str,
-    images: Optional[List[Any]] = None,
-    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-) -> List[Any]:
-    """Helper to encode a single prompt with Qwen3-VL CLIP text encoder."""
-    if clip is None:
-        return []
-
-    imgs = images if images is not None else []
-    num_images = len(imgs)
-    dynamic_template = build_krea2_qwen_template(num_images=num_images, system_prompt=system_prompt)
-
-    try:
-        tokens = clip.tokenize(prompt or "", images=imgs, llama_template=dynamic_template)
-    except TypeError:
-        tokens = clip.tokenize(prompt or "", images=imgs)
-    except Exception:
-        try:
-            tokens = clip.tokenize(prompt or "")
-        except Exception:
-            return []
-
-    return clip.encode_from_tokens_scheduled(tokens)
