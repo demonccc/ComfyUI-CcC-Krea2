@@ -140,6 +140,8 @@ Vision References declare Qwen/Vision information and do not create appearance l
 
 Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. Guidance Detail changes extraction depth, not only token ceiling, and Vision Guidance intentionally uses widely separated conservative/balanced/flexible sampling presets. The consumer still owns how the declared information is transformed into conditioning.
 
+The public Latent node, not the retired legacy target builder, owns target geometry. The runtime receives only the sampling latent and current reference metadata; no disabled target-vision-context path is transported. Masks belong to individual Visual References and must be painted at the final target dimensions.
+
 ## Target Geometry
 
 Krea pixel geometry is defined in the shared `krea_geometry.py` library: curated presets, /16 alignment, bounds, and geometry policies. Latent consumes that library while owning target content, content placement, optional target semantic metadata, and a final target image for painting aligned masks. T2I consumes the same geometry source of truth.
