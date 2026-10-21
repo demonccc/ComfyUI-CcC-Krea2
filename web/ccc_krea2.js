@@ -254,6 +254,11 @@ app.registerExtension({
                 const mode = fitWidget?.value ?? "native";
                 const crop = mode === "crop";
                 setDisabled("placement_grid", crop);
+                setDisabled("rope_geometry", mode === "native");
+                if (mode === "native") {
+                    const geometry = node.widgets?.find((w) => w.name === "rope_geometry");
+                    if (geometry) geometry.value = "source";
+                }
                 if (crop) {
                     const placement = node.widgets?.find((w) => w.name === "placement_grid");
                     if (placement) placement.value = "inside";
