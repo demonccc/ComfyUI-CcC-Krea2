@@ -286,7 +286,7 @@ class CcCKrea2EditPromptCreator:
                 ),
                 "max_tokens": (
                     "INT",
-                    {"default": 512, "min": 32, "max": 4096, "step": 32},
+                    {"default": 512, "min": 32, "max": 32768, "step": 32},
                 ),
                 "temperature": (
                     "FLOAT",
