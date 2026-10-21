@@ -254,14 +254,13 @@ def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     extras = _conditioning_extras(conditioning)
     refs = list(extras.get("reference_latents") or [])
     shapes = [tuple(int(v) for v in ref.shape) for ref in refs if torch.is_tensor(ref)]
-    fit = list(extras.get("reference_fit") or [])
     rope = list(extras.get("reference_rope_positions") or [])
     boosts = extras.get("reference_boosts")
     if boosts is None:
         boosts = [1.0] * reference_count
     else:
         boosts = [float(v) for v in boosts]
-    return f"refs={len(refs)} shapes={shapes}, fit={fit}, boosts={boosts}, rope={rope}"
+    return f"refs={len(refs)} shapes={shapes}, boosts={boosts}, rope={rope}"
 
 
 class CcCKrea2Edit:
