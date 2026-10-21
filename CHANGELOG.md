@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Architecture cleanup
+
+- Removed unused role-based Subject/Scene target latent generation and inactive target-vision metadata. The active Latent node owns target geometry and VAE output.
+- Removed legacy Qwen prompt/template/conditioning adapters and fixed-role constants, while preserving the current Qwen3-VL Edit encoder and Vision guidance paths.
+- Removed obsolete pixel-fit and sampling transformations; `geometry.resize_tensor` remains the shared pixel resampler and `krea2edit_geometry` owns Visual Reference preparation.
+- Removed ignored internal resize controls and corrected diagnostics to reflect fixed bicubic behavior. Active semantic image downscaling no longer depends on a legacy grounding preset module.
+- Updated tests to exercise current geometry and target tensor behavior rather than retired helper APIs.
+- No files under `workflows/` were changed. `03_regional_attention.json` is a legacy example requiring migration.
+
 ### Attention masks and simplified Edit
 
 - Visual Reference owns two optional masks: `reference_boost_mask` on the reference image and `target_attention_mask` on the final target; masks remain aligned to their own reference entries.
@@ -55,4 +64,4 @@
 - Semantic-only references remain Qwen-only and do not add VAE appearance latents.
 - Size Resolver outputs only width and height.
 - Latent owns final target dimensions, /16 alignment, optional target content, optional target semantic metadata, and an aligned target_image mask canvas.
-- Documentation and checked-in workflows now track the current 14-node public registry.
+- Documentation describes the current 14-node public registry. Workflow JSONs are intentionally unchanged and some examples still use removed nodes.
