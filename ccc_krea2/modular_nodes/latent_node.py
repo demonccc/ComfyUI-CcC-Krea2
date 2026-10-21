@@ -13,7 +13,7 @@ from ..krea_geometry import (
     preset_geometry,
     resolve_krea_geometry,
 )
-from ..target_latent import TargetVisionContext, get_image_dims, normalize_vae_output
+from ..target_latent import get_image_dims, normalize_vae_output
 
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
@@ -174,7 +174,6 @@ def _build_target_latent(
         "samples": samples,
         "ccc_krea2_target_preview_image": preview_image,
         "batch_index": list(range(batch_size)),
-        "target_vision_context": TargetVisionContext(include_in_vision="no"),
     }, placement
 
 
