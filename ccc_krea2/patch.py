@@ -1,6 +1,6 @@
 """Krea2 CcC Edit runtime using conditioning-transported reference latents.
 
-Reference latents, fit flags, boosts and RoPE placement travel with CONDITIONING.
+Prepared reference latents, boosts and RoPE placement travel with CONDITIONING.
 """
 
 import math
@@ -39,11 +39,10 @@ def attach_reference_runtime_to_conditioning(
     reference_target_regions: Optional[List[Any]] = None,
     reference_attention_scopes: Optional[List[str]] = None,
 ) -> List[Any]:
-    """Attach fit, RoPE, boosts and target-region metadata for visual references."""
+    """Attach RoPE, boosts and target-region metadata for visual references."""
     if reference_count <= 0:
         return conditioning
     values: Dict[str, Any] = {
-        "reference_fit": [True] * reference_count,
         "reference_rope_positions": list(rope_positions or ["none"] * reference_count),
     }
     if reference_boosts is not None and any(float(v) != 1.0 for v in reference_boosts):
@@ -105,10 +104,6 @@ def install_krea2_reference_conditioning() -> None:
         ref_boosts = kwargs.get("reference_boosts")
         if ref_boosts is not None:
             out["ref_boosts"] = comfy.conds.CONDConstant(list(ref_boosts))
-
-        ref_fit = kwargs.get("reference_fit")
-        if ref_fit is not None:
-            out["ref_fit"] = comfy.conds.CONDConstant(list(ref_fit))
 
         rope_positions = kwargs.get("reference_rope_positions")
         if rope_positions is not None:
@@ -222,7 +217,7 @@ def patch_krea2_model(model: Any) -> Any:
         if dit_model is None or not ref_latents:
             fallback_kwargs = dict(kwargs)
             for key in (
-                "ref_latents", "ref_boosts", "ref_fit", "ccc_ref_rope_positions",
+                "ref_latents", "ref_boosts", "ccc_ref_rope_positions",
                 "ccc_ref_target_regions", "ccc_ref_attention_scopes",
             ):
                 fallback_kwargs.pop(key, None)
@@ -236,7 +231,6 @@ def patch_krea2_model(model: Any) -> Any:
 
         count = len(ref_latents)
         boosts = [float(v) for v in _normalize_runtime_list(kwargs.get("ref_boosts"), count, 1.0)]
-        fit_flags = [bool(v) for v in _normalize_runtime_list(kwargs.get("ref_fit"), count, False)]
         rope_positions = [
             str(v)
             for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
@@ -254,7 +248,6 @@ def patch_krea2_model(model: Any) -> Any:
             context=context,
             ref_latents=ref_latents,
             ref_boosts=boosts,
-            ref_fit=fit_flags,
             ref_rope_positions=rope_positions,
             ref_target_regions=target_regions,
             ref_attention_scopes=attention_scopes,
@@ -323,20 +316,6 @@ def _repeat_to_batch_size(tensor: torch.Tensor, target_bs: int) -> torch.Tensor:
         if tensor.shape[0] > target_bs:
             return tensor[:target_bs]
         return tensor[:1].expand(target_bs, *tensor.shape[1:])
-
-
-def _fit_latent(src: torch.Tensor, height: int, width: int) -> torch.Tensor:
-    """Crop to target aspect ratio then resize in latent space when a reference cannot keep its own grid."""
-    sh, sw = src.shape[-2:]
-    if (sh, sw) == (height, width):
-        return src
-    scale = max(height / sh, width / sw)
-    crop_h = min(sh, int(round(height / scale)))
-    crop_w = min(sw, int(round(width / scale)))
-    y0 = (sh - crop_h) // 2
-    x0 = (sw - crop_w) // 2
-    src = src[..., y0:y0 + crop_h, x0:x0 + crop_w]
-    return F.interpolate(src.float(), size=(height, width), mode="bilinear")
 
 
 def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
@@ -532,7 +511,6 @@ def krea2_dit_incontext_forward(
     ref_latents: List[torch.Tensor],
     ref_boosts: Optional[List[float]] = None,
     transformer_options: Optional[Dict[str, Any]] = None,
-    ref_fit: Optional[List[bool]] = None,
     ref_rope_positions: Optional[List[str]] = None,
     ref_target_regions: Optional[List[Any]] = None,
     ref_attention_scopes: Optional[List[str]] = None,
@@ -541,7 +519,6 @@ def krea2_dit_incontext_forward(
     transformer_options = transformer_options or {}
     n_refs = len(ref_latents)
     boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
-    fit_flags = [bool(v) for v in _normalize_runtime_list(ref_fit, n_refs, True)]
     rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
     target_regions = _normalize_runtime_list(ref_target_regions, n_refs, None)
     attention_scopes = [str(v) for v in _normalize_runtime_list(ref_attention_scopes, n_refs, "global")]
@@ -561,15 +538,12 @@ def krea2_dit_incontext_forward(
     target_gh, target_gw = height // patch_size, width // patch_size
 
     sources = []
-    for index, source in enumerate(ref_latents):
+    for source in ref_latents:
         src = source.to(device=x.device, dtype=x.dtype)
         if src.ndim == 5:
             sb, sc, st, sh, sw = src.shape
             src = src.reshape(sb * st, sc, sh, sw)
         src = _repeat_to_batch_size(src, batch)
-        keep_own_grid = fit_flags[index]
-        if src.shape[-2:] != (height, width) and not keep_own_grid:
-            src = _fit_latent(src, height, width).to(x.dtype)
         sources.append(_pad_to_patch_size(src, patch_size))
 
     context = dit_model._unpack_context(context)
