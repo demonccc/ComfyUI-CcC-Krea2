@@ -244,3 +244,7 @@ Krea2 CcC Edit accepts `prompt_augmentation` as an optional explicit input, pres
 The public architecture is implemented by the nodes registered in ccc_krea2/nodes.py. Internal helper modules may contain implementation support that is not a public ComfyUI node.
 
 External projects that influenced individual ideas or techniques are acknowledged separately in NOTICE.
+
+### Reference geometry ownership
+
+Visual Reference geometry (`native`, `crop`, `contain`, `fit`) is resolved in pixel space before VAE encoding. The Edit forward consumes those prepared reference latents **without cropping or resizing them to the target**. The old `reference_fit`/`ref_fit` runtime flag and latent-space `_fit_latent` fallback have been removed. DiT patch-size padding may still be applied when required; that is not image fit/resizing. RoPE token grids are derived from the reference tensors sent to the transformer.
