@@ -2,17 +2,16 @@
 
 ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
-The public surface currently contains **15 nodes**. The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
+The public surface currently contains **14 nodes**. The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
 
 ## Public Nodes
 
 | Area | Node | Purpose |
 | --- | --- | --- |
-| Edit | **Krea2 CcC Visual Reference** | Ordered appearance reference with VAE fit, boost, RoPE placement, optional Qwen grounding, and optional regional attention. |
+| Edit | **Krea2 CcC Visual Reference** | Ordered appearance reference with VAE fit, RoPE placement, Qwen grounding, boost and optional source/target attention masks. |
 | Edit | **Krea2 CcC Vision Reference** | Qwen/Vision-only Semantic, Visual, Style, or Context reference; no appearance latent. |
-| Edit | **Krea2 CcC Attention Region** | Tagged target box used by regional Visual Reference attention. |
 | Edit | **Krea2 CcC Size Resolver** | Resolves width/height from one image's long edge and another image's aspect ratio. |
-| Edit | **Krea2 CcC Latent** | Owns target dimensions, Krea geometry policy, optional target content, semantic target context, and attention-region transport. |
+| Edit | **Krea2 CcC Latent** | Owns target dimensions, Krea geometry policy, optional target content, semantic target context, and an aligned `target_image` output for masks. |
 | Edit | **Krea2 CcC Edit Prompt Creator** | Optional multimodal prompt creator using the same Krea2/Qwen3-VL CLIP as Edit. |
 | Edit | **Krea2 CcC Edit** | Final edit orchestrator and Krea2 CcC edit runtime. |
 | Utility | **Krea2 CcC Character Sheet** | Deterministically composes generic portrait/body references into one Krea-aligned image. |
@@ -34,9 +33,11 @@ Visual Reference --> Vision Reference --> Visual Reference
                                |
                                v
                          references --> Krea2 CcC Edit
-Attention Region(s) --> Latent --------------^
 Size Resolver -------> Latent --------------^
+Latent.target_image -> ComfyUI mask editor -> Visual Reference.target_attention_mask
 ~~~
+
+Each Visual Reference may receive `reference_boost_mask` (painted on the reference image) and `target_attention_mask` (painted on `Latent.target_image`). The first selects which reference tokens receive boost; the second controls which target tokens receive the boost or direct-attention restriction. Both travel with their reference; no tags or separate region chain exist.
 
 The reference nodes can be chained in any order using `previous_references`; they expose one shared `references` output. Edit accepts a single `references` input. Appearance references go through VAE and (optionally) Qwen; Vision references are Qwen-only.
 
