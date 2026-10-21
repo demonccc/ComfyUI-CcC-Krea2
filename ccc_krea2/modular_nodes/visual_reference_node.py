@@ -45,6 +45,9 @@ class CcCKrea2VisualReference:
                 ),
                 "grid_horizontal_position": (GRID_HORIZONTAL, {"default": "center"}),
                 "grid_vertical_position": (GRID_VERTICAL, {"default": "center"}),
+                "rope_mode": (("spatial", "collapsed"), {"default": "spatial"}),
+                "reference_stack": (("overlay", "stacked"), {"default": "overlay"}),
+                "rope_geometry": (("latent", "source"), {"default": "latent"}),
                 "semantic": (
                     "BOOLEAN",
                     {
@@ -100,6 +103,9 @@ class CcCKrea2VisualReference:
         grid_horizontal_position: str = "center",
         grid_vertical_position: str = "center",
         resize_method: str = "bicubic",
+        rope_mode: str = "spatial",
+        reference_stack: str = "overlay",
+        rope_geometry: str = "latent",
         semantic: bool = True,
         semantic_resize: bool = True,
         semantic_grounding_px: int = 768,
@@ -121,11 +127,18 @@ class CcCKrea2VisualReference:
                 "[Krea2 CcC Visual Reference] regional attention requires a non-empty region_tag."
             )
 
+        from .rope_position import parse_rope_position
+        effective_grid = "inside" if reference_fit == "crop" else placement_grid
+        effective_geometry = "source" if reference_fit == "native" else rope_geometry
+        parse_rope_position(f"{effective_grid}:{grid_horizontal_position}:{grid_vertical_position}:{reference_stack}:{rope_mode}:{effective_geometry}")
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
             reference_fit=reference_fit,
-            placement_grid="inside" if reference_fit == "crop" else placement_grid,
+            placement_grid=effective_grid,
+            rope_mode=rope_mode,
+            reference_stack=reference_stack,
+            rope_geometry=effective_geometry,
             grid_horizontal_position=grid_horizontal_position,
             grid_vertical_position=grid_vertical_position,
             resize_method="bicubic",
