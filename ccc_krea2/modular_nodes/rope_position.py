@@ -29,6 +29,8 @@ def parse_rope_position(position: str):
     parts = position.split(":")
     if len(parts) == 3:
         parts += ["overlay", "spatial", "latent"]
+    if len(parts) == 8:
+        parts = parts[:6]
     if len(parts) != 6:
         raise ValueError("RoPE position must be grid:horizontal:vertical:stack:mode:geometry")
     grid, horizontal, vertical, stack, mode, geometry = parts
@@ -69,7 +71,9 @@ def plan_rope_positions(
     for i, (rh, rw) in enumerate(ref_token_grids):
         value = ref_rope_positions[i] if ref_rope_positions and i < len(ref_rope_positions) else "none"
         grid, horizontal, vertical, stack, mode, geometry = parse_rope_position(value)
-        layout_h, layout_w = (source_token_grids[i] if geometry == "source" and source_token_grids else (rh, rw))
+        encoded = value.split(":")
+        source_dims = (float(encoded[6]), float(encoded[7])) if len(encoded) == 8 else None
+        layout_h, layout_w = (source_token_grids[i] if geometry == "source" and source_token_grids else source_dims if geometry == "source" and source_dims else (rh, rw))
         layout_h, layout_w = float(layout_h), float(layout_w)
 
         if grid == "inside":
