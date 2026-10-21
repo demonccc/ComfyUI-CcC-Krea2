@@ -146,15 +146,9 @@ def _append_semantic(
 
 
 def _runtime_latent(latent: dict) -> dict:
-    runtime = {
-        "samples": latent["samples"],
-        "batch_index": latent.get("batch_index"),
-        "target_vision_context": latent.get("target_vision_context"),
-    }
-    if runtime["batch_index"] is None:
-        runtime.pop("batch_index")
-    if runtime["target_vision_context"] is None:
-        runtime.pop("target_vision_context")
+    runtime = {"samples": latent["samples"]}
+    if latent.get("batch_index") is not None:
+        runtime["batch_index"] = latent["batch_index"]
     return runtime
 
 
