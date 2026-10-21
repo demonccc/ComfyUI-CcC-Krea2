@@ -60,6 +60,20 @@ def test_preview_is_rgb_and_draws_only_visual_entries():
     latent = {"samples": torch.zeros((1, 16, 16, 16))}
     entry = VisualReferenceEntry(image=torch.zeros((1, 256, 256, 3)))
     img = render_rope_preview([entry], latent)
-    assert img.ndim == 4 and img.shape[-1] == 3 and img.shape[0] == 1
+    assert img.ndim == 4 and img.shape[-1] == 3 and img.shape[0] == 3
     assert img.min().item() >= 0 and img.max().item() <= 1
     assert torch.unique(img).numel() > 3
+
+def test_three_views_keep_identical_canvas_and_use_processed_target_content():
+    latent = {
+        "samples": torch.zeros((1, 16, 16, 16)),
+        "ccc_krea2_target_preview_image": torch.ones((1, 128, 128, 3)),
+    }
+    reference = VisualReferenceEntry(image=torch.zeros((1, 128, 128, 3)), reference_fit="native")
+    preview = render_rope_preview([reference], latent)
+    assert preview.shape[0] == 3
+    assert preview.shape[1:] == render_rope_preview([reference], {
+        "samples": latent["samples"]
+    }).shape[1:]
+    # White source target is visible in both overlay views but not the layout.
+    assert float(preview[1].mean()) > float(preview[0].mean())
