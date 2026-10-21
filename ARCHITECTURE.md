@@ -119,18 +119,15 @@ The Qwen copy does not need to match target pixel geometry. Appearance preparati
 
 The positive branch uses configured reference boosts. The grounded negative branch uses the same appearance-image vision blocks, fixed empty negative text, no role annotation text, and neutral boost 1.0.
 
-### Tagged Target Attention Regions
+### Attention masks owned by Visual Reference
 
-Attention Region nodes form a chain of unique tags with percentage-based target/content boxes.
+- `reference_boost_mask`: optional MASK on the source reference image. It follows the exact same pixel crop/resize as the reference before VAE encoding. Its selected tokens receive the configured reference `boost`.
+- `target_attention_mask`: optional MASK on `Latent.target_image`, i.e. the final target canvas, **after** all content-fit geometry. Edit rejects wrong target dimensions instead of silently warping the mask.
+- `attention_scope=global`: boost from all target queries to selected source tokens.
+- `attention_scope=boost in mask`: boost only from target queries selected by the target mask.
+- `attention_scope=only in mask`: also deny direct target queries outside the target mask from attending to this reference.
 
-With empty Latent content, percentages refer directly to the final target canvas. With image content, Latent transports those boxes through stretch, contain, or crop.
-
-Crop is strict: if the retained crop touches or removes any part of a declared region, Latent raises an error instead of clipping or relocating the region.
-
-Edit resolves region_tag for each regional Visual Reference:
-
-- boost in region: reference boost is applied only to target queries inside the region.
-- only in region: target queries outside the region are blocked from attending to that reference.
+Each Visual Reference carries both optional masks in its own chain entry, so no independent mask ordering, separate Attention Region node or tag lookup exists. The source and target masks are downsampled to the actual reference/target DiT token grids in the attention computation; **latents are never refit after VAE**. Masks are batched independently.
 
 ## Vision Reference
 
@@ -145,7 +142,7 @@ Vision Reference has no public grounding or fidelity control. It carries Qwen te
 
 ## Target Geometry
 
-Krea pixel geometry is defined in the shared `krea_geometry.py` library: curated presets, /16 alignment, bounds, and geometry policies. Latent consumes that library while owning target content, content placement, optional target semantic metadata, and transformed Attention Regions. T2I consumes the same geometry source of truth.
+Krea pixel geometry is defined in the shared `krea_geometry.py` library: curated presets, /16 alignment, bounds, and geometry policies. Latent consumes that library while owning target content, content placement, optional target semantic metadata, and a final target image for painting aligned masks. T2I consumes the same geometry source of truth.
 
 Dimension modes are from_image, fixed, and preset.
 
