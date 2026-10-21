@@ -2,6 +2,8 @@
 
 ## Public Surface
 
+**Current code contract:** the 14 registered nodes are authoritative; old workflow JSON files have deliberately not been migrated.
+
 The current package registers **14 public nodes**:
 
 ~~~text
