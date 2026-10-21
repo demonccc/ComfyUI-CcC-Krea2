@@ -20,6 +20,7 @@ from ..reference_specs import (
 from .edit_reference_types import EditReferenceChain, VisualReferenceEntry, VisionReferenceEntry
 from ..vision_reference_runtime import build_vision_reference_spec
 from .rope_position import install_krea2_rope_positioning
+from .rope_preview import render_rope_preview
 
 
 # Krea2 Edit uses a grounded unconditional branch rather than a classic SD-style
@@ -267,8 +268,8 @@ class CcCKrea2Edit:
     """Krea2 CcC Edit orchestrator consuming Krea2 CcC Latent and reference node outputs."""
 
     CATEGORY = NODE_CATEGORY
-    RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING")
-    RETURN_NAMES = ("patched_model", "positive", "negative", "latent", "edit_info")
+    RETURN_TYPES = ("MODEL", "CONDITIONING", "CONDITIONING", "LATENT", "STRING", "IMAGE")
+    RETURN_NAMES = ("patched_model", "positive", "negative", "latent", "edit_info", "rope_preview")
     FUNCTION = "process"
     DESCRIPTION = (
         "Krea2 CcC Edit orchestrator. Krea2 CcC Edit resolves target geometry and reference preparation while "
@@ -412,4 +413,5 @@ class CcCKrea2Edit:
             lines.extend(["", str(latent_info)])
 
         lines.extend(["", pipeline_info])
-        return patched_model, positive, negative, latent_out, "\n".join(lines)
+        preview = render_rope_preview(visual_entries, runtime_latent)
+        return patched_model, positive, negative, latent_out, "\n".join(lines), preview
