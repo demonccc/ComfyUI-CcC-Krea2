@@ -21,11 +21,9 @@ class VisualReferenceEntry:
     placement_grid: str = "inside"
     grid_horizontal_position: str = "center"
     grid_vertical_position: str = "center"
-    resize_method: str = "bicubic"
     semantic: bool = True
     semantic_resize: bool = True
     semantic_grounding_px: int = 768
-    semantic_resize_method: str = "bicubic"
     prompt_annotation: str = ""
     attention_scope: str = "global"
 
