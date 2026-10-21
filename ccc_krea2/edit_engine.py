@@ -2,7 +2,7 @@
 
 import torch
 from typing import Tuple, Dict, Any, List
-from .reference_specs import ReferenceChain, ReferenceSpec, StyleReferenceSpec
+from .reference_specs import ReferenceChain, StyleReferenceSpec
 from .reference_slots import resolve_reference_slots_and_aliases
 from .krea2edit_geometry import resolve_krea2edit_geometry, process_image_and_mask_geometry
 from .style_processing import expand_style_reference_spans
