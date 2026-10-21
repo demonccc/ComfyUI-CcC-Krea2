@@ -2,7 +2,7 @@
 
 import torch
 
-from ccc_krea2.krea2edit_geometry import resolve_visual_reference_fit
+from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry, process_image_and_mask_geometry
 from ccc_krea2.reference_specs import StyleReferenceSpec
 from ccc_krea2.style_processing import (
     StyleSpanOperation,
@@ -13,9 +13,26 @@ from ccc_krea2.style_processing import (
 from ccc_krea2.vision_prep import prepare_vision_image
 
 
+def _fit(image, target_h, target_w, mode, grid_horizontal_position="center", grid_vertical_position="center", resize_method="bicubic"):
+    """Exercise the exact geometry resolver and pixel transform used by Edit."""
+    geom = resolve_krea2edit_geometry(
+        src_h=image.shape[1], src_w=image.shape[2],
+        tgt_h=target_h, tgt_w=target_w, fit_mode=mode,
+        grid_horizontal_position=grid_horizontal_position,
+        grid_vertical_position=grid_vertical_position,
+        resize_method=resize_method,
+    )
+    processed, mask = process_image_and_mask_geometry(image, None, geom)
+    return processed, mask, {
+        "mode_resolved": geom.mode_resolved,
+        "crop_rectangle": geom.crop_rectangle,
+        "interpolation_method": geom.interpolation_method,
+    }
+
+
 def test_public_crop_uses_positioned_inside_grid_window():
     img = torch.rand(1, 900, 1200, 3)
-    out_img, _, meta = resolve_visual_reference_fit(
+    out_img, _, meta = _fit(
         img,
         target_h=512,
         target_w=640,
@@ -31,7 +48,7 @@ def test_public_crop_uses_positioned_inside_grid_window():
 
 def test_public_fit_covers_target_using_centered_crop_and_bicubic():
     img = torch.rand(1, 300, 200, 3)
-    output, _, meta = resolve_visual_reference_fit(
+    output, _, meta = _fit(
         img, target_h=160, target_w=160, mode="fit"
     )
     assert meta["mode_resolved"] == "fit"
@@ -42,7 +59,7 @@ def test_public_fit_covers_target_using_centered_crop_and_bicubic():
 
 def test_contain_preserves_content_inside_bounds():
     img = torch.rand(1, 300, 217, 3)
-    output, _, meta = resolve_visual_reference_fit(
+    output, _, meta = _fit(
         img, target_h=192, target_w=192, mode="contain"
     )
     assert output.shape == (1, 192, 128, 3)
@@ -52,7 +69,7 @@ def test_contain_preserves_content_inside_bounds():
 
 def test_public_contain_scales_to_fit_inside_target_then_crops_only_for_16_grid():
     img = torch.rand(1, 200, 300, 3)
-    out_img, _, meta = resolve_visual_reference_fit(
+    out_img, _, meta = _fit(
         img,
         target_h=160,
         target_w=400,
@@ -68,7 +85,7 @@ def test_public_contain_scales_to_fit_inside_target_then_crops_only_for_16_grid(
 
 def test_public_native_preserves_1_to_1_pixels_and_crops_down_to_16():
     img = torch.rand(1, 701, 603, 3)
-    out_img, _, meta = resolve_visual_reference_fit(
+    out_img, _, meta = _fit(
         img,
         target_h=512,
         target_w=512,
