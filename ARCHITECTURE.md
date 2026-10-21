@@ -2,11 +2,10 @@
 
 ## Public Surface
 
-The current package registers **15 public nodes**:
+The current package registers **14 public nodes**:
 
 ~~~text
 Edit:
-  Krea2 CcC Attention Region
   Krea2 CcC Visual Reference
   Krea2 CcC Vision Reference
   Krea2 CcC Size Resolver
@@ -42,7 +41,8 @@ IMAGE --> Visual Reference --> Vision Reference --> Visual Reference
                                                       |
                                                       v
                                                 Edit.references
-Attention Region(s) --> Latent -----------------> Edit.latent
+Latent.target_image --> MASK editor --> Visual Reference.target_attention_mask
+Latent -------------------------------> Edit.latent
 Size Resolver ---------> Latent
 ~~~
 
