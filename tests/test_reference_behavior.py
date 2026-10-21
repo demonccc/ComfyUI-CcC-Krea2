@@ -83,11 +83,40 @@ def test_reference_chain_append_is_immutable():
     assert second.entries[0] is first.entries[0]
 
 
-def test_visual_reference_rejects_missing_region_tag():
+def test_visual_reference_masks_are_owned_by_the_correct_entry():
+    image_a = torch.zeros((1, 64, 96, 3))
+    image_b = torch.zeros((1, 80, 64, 3))
+    reference_mask = torch.zeros((1, 64, 96))
+    reference_mask[:, :32, :] = 1.0
+    target_mask = torch.ones((1, 128, 128))
     node = CcCKrea2VisualReference()
-    with pytest.raises(ValueError, match="region_tag"):
-        node.process(
-            image=torch.zeros((1, 64, 64, 3)),
-            attention_scope="only in region",
-            region_tag="",
-        )
+    chain = node.process(
+        image=image_a, boost=3.0,
+        reference_boost_mask=reference_mask,
+        target_attention_mask=target_mask,
+        attention_scope="boost in mask",
+    )[0]
+    chain = CcCKrea2VisionReference().process(
+        image=torch.zeros((1, 64, 64, 3)),
+        previous_references=chain,
+    )[0]
+    chain = node.process(
+        image=image_b, previous_references=chain,
+    )[0]
+    assert chain.entries[0].reference_boost_mask is reference_mask
+    assert chain.entries[0].target_attention_mask is target_mask
+    assert chain.entries[1].image.shape == (1, 64, 64, 3)
+    assert chain.entries[2].reference_boost_mask is None
+    assert chain.entries[2].target_attention_mask is None
+    specs = _combine_reference_chains(clip=None, references=chain, latent={})
+    assert specs.references[0].attention_mask is reference_mask
+    assert specs.references[2].attention_mask is None
+
+
+def test_visual_reference_rejects_missing_mask_and_unaligned_source_mask():
+    node = CcCKrea2VisualReference()
+    with pytest.raises(ValueError, match="target_attention_mask"):
+        node.process(image=torch.zeros((1, 64, 64, 3)), attention_scope="only in mask")
+    with pytest.raises(ValueError, match="reference_boost_mask"):
+        node.process(image=torch.zeros((1, 64, 64, 3)),
+                     reference_boost_mask=torch.zeros((1, 63, 64)))
