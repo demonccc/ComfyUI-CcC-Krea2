@@ -169,7 +169,7 @@ def _combine_reference_chains(
             clip=clip,
             grounding_px=entry.semantic_grounding_px,
             semantic_resize=entry.semantic_resize if entry.semantic else False,
-            resize_method=entry.semantic_resize_method,
+            resize_method="bicubic",
         )
         chain = chain.append(
             ReferenceSpec(
@@ -182,7 +182,7 @@ def _combine_reference_chains(
                 attention_boost=float(entry.boost),
                 attention_mask=entry.reference_boost_mask,
                 visual_reference_fit=entry.resolved_fit_mode,
-                visual_resize_method=entry.resize_method,
+                visual_resize_method="bicubic",
                 rope_position=entry.rope_position,
             )
         )
@@ -390,10 +390,10 @@ class CcCKrea2Edit:
             lines.append(
                 f"Visual Reference {index}: "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
-                f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
+                f"rope={entry.rope_position}, semantic={entry.semantic}, "
                 f"attention_scope={entry.attention_scope}, reference_boost_mask={entry.reference_boost_mask is not None}, target_attention_mask={entry.target_attention_mask is not None}, "
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
-                f"semantic_resize_method={entry.semantic_resize_method}, prompt_annotation={annotation}"
+                f"semantic_resize_method=bicubic, prompt_annotation={annotation}"
             )
 
         latent_info = latent.get("ccc_krea2_latent_info")
