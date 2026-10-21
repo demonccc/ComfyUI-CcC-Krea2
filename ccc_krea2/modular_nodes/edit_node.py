@@ -413,5 +413,5 @@ class CcCKrea2Edit:
             lines.extend(["", str(latent_info)])
 
         lines.extend(["", pipeline_info])
-        preview = render_rope_preview(visual_entries, runtime_latent)
+        preview = render_rope_preview(visual_entries, latent)
         return patched_model, positive, negative, latent_out, "\n".join(lines), preview
