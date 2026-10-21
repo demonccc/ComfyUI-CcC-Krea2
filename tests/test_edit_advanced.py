@@ -46,7 +46,7 @@ def test_visual_reference_chain_preserves_order_boost_and_grid_axes():
 
     assert len(chain.entries) == 2
     assert chain.entries[1].boost == 4.0
-    assert chain.entries[1].rope_position == "inside:left:up"
+    assert resolve_rope_axes(chain.entries[1].rope_position) == ("inside", "left", "up")
     assert chain.entries[1].prompt_annotation == "It is the subject image."
 
 
@@ -61,7 +61,7 @@ def test_visual_reference_crop_forces_inside_grid():
     )
     entry = chain.entries[0]
     assert entry.placement_grid == "inside"
-    assert entry.rope_position == "inside:right:down"
+    assert resolve_rope_axes(entry.rope_position) == ("inside", "right", "down")
 
 
 
