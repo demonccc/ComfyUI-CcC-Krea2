@@ -205,3 +205,16 @@ def test_thinking_truncation_without_final_prompt_is_reported():
             user_prompt="Improve this edit.",
             thinking=True,
         )
+
+def test_high_token_budget_is_passed_unmodified_to_qwen():
+    clip = _FakeClip("The woman from Image 1 is wearing a blue dress.")
+    created, passthrough, info, thinking = CcCKrea2EditPromptCreator().create(
+        clip=clip, references=_chain(), mode="enhance",
+        user_prompt="Describe the dress in detail.",
+        max_tokens=32768,
+    )
+    assert created
+    assert passthrough is not None
+    assert thinking == ""
+    assert clip.generate_kwargs["max_length"] == 32768
+    assert "Max Tokens: 32768" in info
