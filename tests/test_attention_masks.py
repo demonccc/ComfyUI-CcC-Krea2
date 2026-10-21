@@ -1,187 +1,112 @@
-"""Unit tests for batched reference attention masks and bias computation."""
+"""Behavioral tests for source and target masks on ordered visual references."""
 
 import math
+
+import pytest
 import torch
-from ccc_krea2.patch import _compute_ref_attention_bias_patchified, _target_region_box_mask
+
+from ccc_krea2.patch import _compute_ref_attention_bias_patchified
 
 
-def test_batch_1_mask_applies_expected_boost():
-    # 1 reference with boost 2.5 and 10x10 mask (half 1.0, half 0.0)
-    boost = 2.5
-    expected_b_val = math.log(boost)
-
-    # Spatial mask 1x10x10
-    mask = torch.zeros((1, 10, 10))
-    mask[:, :5, :] = 1.0  # Top half active
-
-    bias = _compute_ref_attention_bias_patchified(
-        boosts=[boost],
-        txt_len=10,
-        ref_token_lens=[25],  # 5x5 token grid
-        tgt_len=64,
-        ref_masks=[mask],
-        ref_token_grids=[(5, 5)],
-        mask_modes=["hard"],
+def bias_for(*, boosts, source_masks=None, target_masks=None, scopes=None, grids=None,
+             target_grid=(2, 4), batch_size=1):
+    grids = grids or [(2, 2)] * len(boosts)
+    return _compute_ref_attention_bias_patchified(
+        boosts=boosts,
+        txt_len=3,
+        ref_token_lens=[h * w for h, w in grids],
+        tgt_len=target_grid[0] * target_grid[1],
+        ref_masks=source_masks,
+        ref_token_grids=grids,
+        ref_target_masks=target_masks,
+        ref_attention_scopes=scopes,
+        target_grid=target_grid,
         device=torch.device("cpu"),
         dtype=torch.float32,
+        batch_size=batch_size,
     )
 
-    assert bias is not None
-    # Sequence layout: text (0..10), ref (10..35), target (35..99)
-    # Target tokens (35..99) attending to ref tokens (10..35)
-    tgt_to_ref_bias = bias[0, 0, 35:, 10:35]  # shape (64, 25)
 
-    # Active tokens should have expected_b_val; inactive tokens should have 0.0
-    assert torch.allclose(tgt_to_ref_bias[:, :15], torch.tensor(expected_b_val), atol=1e-4)
-    assert torch.allclose(tgt_to_ref_bias[:, 15:], torch.tensor(0.0), atol=1e-4)
-
-
-def test_batch_2_mask_is_not_silently_ignored_and_uses_first_item():
-    boost = 2.0
-    expected_b_val = math.log(boost)
-
-    # Batch of 2 masks: item 0 has top half active, item 1 has bottom half active
-    mask_b2 = torch.zeros((2, 20, 20))
-    mask_b2[0, :10, :] = 1.0
-    mask_b2[1, 10:, :] = 1.0
-
-    bias = _compute_ref_attention_bias_patchified(
-        boosts=[boost],
-        txt_len=10,
-        ref_token_lens=[100],  # 10x10 grid
-        tgt_len=64,
-        ref_masks=[mask_b2],
-        ref_token_grids=[(10, 10)],
-        mask_modes=["hard"],
-        device=torch.device("cpu"),
-        dtype=torch.float32,
+def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
+    assert bias_for(boosts=[1.0]) is None
+    bias = bias_for(boosts=[4.0])
+    # Three text tokens, four reference tokens, eight target tokens.
+    torch.testing.assert_close(
+        bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(4.0))
     )
 
-    assert bias is not None
-    # Sequence layout: text (0..10), ref (10..110), target (110..174)
-    tgt_to_ref_bias = bias[0, 0, 110:, 10:110]  # shape (64, 100)
 
-    # Must NOT be silently ignored (not all zeros)
-    assert not torch.all(tgt_to_ref_bias == 0.0)
-
-    # First mask item (top half active = first 50 tokens) must be used
-    assert torch.allclose(tgt_to_ref_bias[:, :50], torch.tensor(expected_b_val), atol=1e-4)
-    assert torch.allclose(tgt_to_ref_bias[:, 50:], torch.tensor(0.0), atol=1e-4)
-
-
-def test_hard_and_soft_mask_modes():
-    boost = 3.0
-    expected_b_val = math.log(boost)
-
-    # Soft mask with gradient values: 0.2, 0.6, 0.8
-    mask_soft = torch.tensor([[[0.2, 0.6], [0.8, 0.0]]])
-
-    # 1. Hard mode: threshold > 0.5 -> [0.0, 1.0, 1.0, 0.0]
-    bias_hard = _compute_ref_attention_bias_patchified(
-        boosts=[boost],
-        txt_len=5,
-        ref_token_lens=[4],
-        tgt_len=10,
-        ref_masks=[mask_soft],
-        ref_token_grids=[(2, 2)],
-        mask_modes=["hard"],
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-    tgt_to_ref_hard = bias_hard[0, 0, 9:, 5:9]
-    assert tgt_to_ref_hard[0, 0].item() == 0.0
-    assert abs(tgt_to_ref_hard[0, 1].item() - expected_b_val) < 1e-4
-    assert abs(tgt_to_ref_hard[0, 2].item() - expected_b_val) < 1e-4
-    assert tgt_to_ref_hard[0, 3].item() == 0.0
-
-    # 2. Soft mode: clamp(0, 1) -> [0.2 * b_val, 0.6 * b_val, 0.8 * b_val, 0.0]
-    bias_soft = _compute_ref_attention_bias_patchified(
-        boosts=[boost],
-        txt_len=5,
-        ref_token_lens=[4],
-        tgt_len=10,
-        ref_masks=[mask_soft],
-        ref_token_grids=[(2, 2)],
-        mask_modes=["soft"],
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-    tgt_to_ref_soft = bias_soft[0, 0, 9:, 5:9]
-    assert abs(tgt_to_ref_soft[0, 0].item() - (0.2 * expected_b_val)) < 1e-4
-    assert abs(tgt_to_ref_soft[0, 1].item() - (0.6 * expected_b_val)) < 1e-4
-    assert abs(tgt_to_ref_soft[0, 2].item() - (0.8 * expected_b_val)) < 1e-4
-    assert tgt_to_ref_soft[0, 3].item() == 0.0
+def test_reference_mask_boosts_only_selected_reference_tokens():
+    # Reference image: 16x16, select its left half, keeping the VAE geometry.
+    source_mask = torch.zeros((1, 16, 16))
+    source_mask[:, :, :8] = 1.0
+    bias = bias_for(boosts=[4.0], source_masks=[source_mask])
+    selected = bias[0, 0, 7:, 3:7]
+    torch.testing.assert_close(selected[:, [0, 2]], torch.full((8, 2), math.log(4.0)))
+    assert torch.count_nonzero(selected[:, [1, 3]]) == 0
 
 
-def test_regions_outside_mask_retain_zero_additional_bias():
-    boost = 4.0
-    # Fully unmasked region (mask == 0.0)
-    mask_zero = torch.zeros((1, 10, 10))
-
-    bias = _compute_ref_attention_bias_patchified(
-        boosts=[boost],
-        txt_len=5,
-        ref_token_lens=[25],
-        tgt_len=10,
-        ref_masks=[mask_zero],
-        ref_token_grids=[(5, 5)],
-        mask_modes=["hard"],
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-
-    assert bias is not None
-    # All attention bias values must be exactly 0.0 (NO -1e4 penalty)
-    assert torch.all(bias == 0.0)
+def test_target_mask_boosts_only_query_tokens_inside_target():
+    target = torch.zeros((1, 16, 32))
+    target[:, :, :16] = 1.0
+    bias = bias_for(boosts=[2.0], target_masks=[target], scopes=["boost in mask"])
+    selected = bias[0, 0, 7:, 3:7]
+    rows = [0, 1, 4, 5]
+    other = [2, 3, 6, 7]
+    torch.testing.assert_close(selected[rows], torch.full((4, 4), math.log(2.0)))
+    assert torch.count_nonzero(selected[other]) == 0
 
 
-def test_target_region_boost_only_applies_to_target_queries_inside_box():
-    boost = 2.0
-    expected = math.log(boost)
-    target_mask = _target_region_box_mask(
-        (0.0, 0.0, 0.5, 1.0),
-        target_grid=(2, 4),
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-    bias = _compute_ref_attention_bias_patchified(
-        boosts=[boost],
-        txt_len=2,
-        ref_token_lens=[4],
-        tgt_len=8,
-        ref_target_masks=[target_mask],
-        ref_attention_scopes=["boost in region"],
-        target_grid=(2, 4),
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-    target_to_ref = bias[0, 0, 6:, 2:6]
-    inside_rows = [0, 1, 4, 5]
-    outside_rows = [2, 3, 6, 7]
-    assert torch.allclose(target_to_ref[inside_rows], torch.full((4, 4), expected))
-    assert torch.all(target_to_ref[outside_rows] == 0.0)
+def test_source_and_target_masks_intersect_not_overwrite_each_other():
+    source = torch.tensor([[[1., 0.], [0., 1.]]])
+    target = torch.tensor([[[1., 0., 0., 0.], [1., 0., 0., 0.]]])
+    bias = bias_for(boosts=[3.0], source_masks=[source],
+                    target_masks=[target], scopes=["boost in mask"])
+    selected = bias[0, 0, 7:, 3:7]
+    assert selected[0, 0].item() == pytest.approx(math.log(3.0))
+    assert selected[0, 3].item() == pytest.approx(math.log(3.0))
+    assert selected[0, 1].item() == 0.0
+    assert selected[1, 0].item() == 0.0
 
 
-def test_target_region_only_blocks_reference_outside_box():
-    target_mask = _target_region_box_mask(
-        (0.0, 0.0, 0.5, 1.0),
-        target_grid=(2, 4),
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-    bias = _compute_ref_attention_bias_patchified(
-        boosts=[1.0],
-        txt_len=2,
-        ref_token_lens=[4],
-        tgt_len=8,
-        ref_target_masks=[target_mask],
-        ref_attention_scopes=["only in region"],
-        target_grid=(2, 4),
-        device=torch.device("cpu"),
-        dtype=torch.float32,
-    )
-    target_to_ref = bias[0, 0, 6:, 2:6]
-    inside_rows = [0, 1, 4, 5]
-    outside_rows = [2, 3, 6, 7]
-    assert torch.all(target_to_ref[inside_rows] == 0.0)
-    assert torch.isneginf(target_to_ref[outside_rows]).all()
+def test_only_in_mask_blocks_direct_attention_outside_target_even_with_neutral_boost():
+    target = torch.zeros((1, 16, 32))
+    target[:, :, :16] = 1.0
+    bias = bias_for(boosts=[1.0], target_masks=[target], scopes=["only in mask"])
+    selected = bias[0, 0, 7:, 3:7]
+    assert (selected[[0, 1, 4, 5]] == 0.0).all()
+    assert torch.isneginf(selected[[2, 3, 6, 7]]).all()
+
+
+def test_mask_batches_are_independent():
+    target = torch.zeros((2, 16, 32))
+    target[0, :, :16] = 1.0
+    target[1, :, 16:] = 1.0
+    bias = bias_for(boosts=[2.0], target_masks=[target],
+                    scopes=["boost in mask"], batch_size=2)
+    a, b = bias[:, 0, 7:, 3:7]
+    assert a[0, 0].item() == pytest.approx(math.log(2.0))
+    assert b[0, 0].item() == 0.0
+    assert a[3, 0].item() == 0.0
+    assert b[3, 0].item() == pytest.approx(math.log(2.0))
+
+
+def test_source_and_target_masks_match_their_own_reference_blocks():
+    source_one = torch.tensor([[[1., 0.], [0., 0.]]])
+    source_two = torch.tensor([[[0., 0.], [0., 1.]]])
+    bias = bias_for(boosts=[2.0, 3.0], source_masks=[source_one, source_two])
+    # text 0..2, first ref 3..6, second ref 7..10, target from 11 onward
+    block1 = bias[0, 0, 11:, 3:7]
+    block2 = bias[0, 0, 11:, 7:11]
+    torch.testing.assert_close(block1[:, 0], torch.full((8,), math.log(2.0)))
+    assert torch.count_nonzero(block1[:, 1:]) == 0
+    torch.testing.assert_close(block2[:, 3], torch.full((8,), math.log(3.0)))
+    assert torch.count_nonzero(block2[:, :3]) == 0
+
+
+def test_missing_target_mask_and_wrong_batch_fail_clearly():
+    with pytest.raises(ValueError, match="target_attention_mask"):
+        bias_for(boosts=[2.0], scopes=["boost in mask"])
+    bad = torch.ones((3, 16, 16))
+    with pytest.raises(ValueError, match="batch"):
+        bias_for(boosts=[2.0], source_masks=[bad], batch_size=2)
