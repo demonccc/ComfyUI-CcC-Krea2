@@ -49,6 +49,7 @@ class MockKrea2DiT(nn.Module):
         self.txtfusion_called = False
         self.txtmlp_called = False
         self.first_called_count = 0
+        self.first_inputs = []
         self.pe_embedder_called_with = None
         self.tmlp_called_with = None
         self.tproj_called_with = None
@@ -76,6 +77,7 @@ class MockKrea2DiT(nn.Module):
 
     def first(self, x_patch):
         self.first_called_count += 1
+        self.first_inputs.append(x_patch.detach().clone())
         return self.first_layer(x_patch)
 
     def tmlp(self, t_emb):
@@ -246,3 +248,40 @@ def test_unmasked_reference_regions_retain_zero_bias():
     masked_tokens = target_to_ref_bias[:, :32]
     assert torch.allclose(masked_tokens, torch.tensor(expected_boost_val))
 
+
+
+def test_forward_preserves_both_smaller_and_larger_prepared_reference_latents():
+    """After the VAE, neither a smaller nor a larger ref is resized to the target.
+
+    Inspect the actual patchified tensors entering the transformer projection,
+    not a hardcoded node schema or a mock's expected return value.
+    """
+    dit = MockKrea2DiT()
+    target = torch.zeros((1, 16, 32, 32))
+    references = [
+        torch.full((1, 16, 20, 28), 0.25),
+        torch.full((1, 16, 48, 16), 0.75),
+    ]
+    result = krea2_dit_incontext_forward(
+        dit_model=dit,
+        x=target,
+        timesteps=torch.tensor([1.0]),
+        context=torch.rand((1, 11, 64)),
+        ref_latents=references,
+    )
+    assert result.shape == target.shape
+    # Projection receives target first, then each prepared reference in chain order.
+    projected_input = dit.first_inputs
+    assert len(projected_input) == 1 + len(references)
+    patch = dit.patch
+    for original, patch_tokens in zip([target] + references, projected_input):
+        expected_count = (original.shape[-2] // patch) * (original.shape[-1] // patch)
+        assert patch_tokens.shape[1] == expected_count
+        torch.testing.assert_close(
+            patch_tokens.mean(), original.mean(), rtol=0, atol=1e-6
+        )
+    positions = dit.pe_embedder_called_with
+    assert positions.shape[1] == (11 + sum(t.shape[1] for t in projected_input))
+    assert torch.unique(positions[0, 11:11 + projected_input[1].shape[1], 0]).tolist() == [1.0]
+    start_second = 11 + projected_input[1].shape[1]
+    assert torch.unique(positions[0, start_second:start_second + projected_input[2].shape[1], 0]).tolist() == [2.0]
