@@ -12,6 +12,8 @@ class VisualReferenceEntry:
 
     image: Optional[torch.Tensor] = None
     boost: float = 1.0
+    reference_boost_mask: Optional[torch.Tensor] = None
+    target_attention_mask: Optional[torch.Tensor] = None
     reference_fit: str = "native"
     rope_mode: str = "spatial"
     reference_stack: str = "overlay"
@@ -26,7 +28,6 @@ class VisualReferenceEntry:
     semantic_resize_method: str = "bicubic"
     prompt_annotation: str = ""
     attention_scope: str = "global"
-    region_tag: str = ""
 
     @property
     def rope_position(self) -> str:
