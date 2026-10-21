@@ -5,7 +5,6 @@ from typing import Any, Optional
 import torch
 
 from .. import edit_engine as edit_engine_runtime
-from ..attention_regions import resolved_regions_by_tag
 from ..constants import NODE_CATEGORY
 from ..prompt_augmentation import CCC_KREA2_PROMPT_AUGMENTATION, apply_prompt_augmentation
 from ..grounding import resize_grounding_image
@@ -191,6 +190,7 @@ def _combine_reference_chains(
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=float(entry.boost),
+                attention_mask=entry.reference_boost_mask,
                 visual_reference_fit=entry.resolved_fit_mode,
                 visual_resize_method=entry.resize_method,
                 rope_position=entry.rope_position,
@@ -223,31 +223,30 @@ def _conditioning_extras(conditioning):
     return {}
 
 
-def _resolve_reference_attention(visual_entries, latent):
-    resolved = tuple(latent.get("ccc_krea2_attention_regions") or ())
-    by_tag = resolved_regions_by_tag(resolved)
-    boxes = []
-    scopes = []
+def _resolve_reference_target_masks(visual_entries, latent):
+    """Read masks from their owning Visual References, never from a parallel chain."""
+    samples = latent["samples"]
+    target_h, target_w = (int(samples.shape[-2]) * 8, int(samples.shape[-1]) * 8)
+    batch = int(samples.shape[0])
+    masks, scopes = [], []
     for index, entry in enumerate(visual_entries, start=1):
-        scope = str(getattr(entry, "attention_scope", "global") or "global")
-        tag = str(getattr(entry, "region_tag", "") or "").strip()
+        scope = entry.attention_scope
+        mask = entry.target_attention_mask
+        if scope != "global" and mask is None:
+            raise ValueError(f"[Krea2 CcC Edit] Visual Reference {index} requires a target_attention_mask.")
+        if mask is not None:
+            if mask.ndim == 2:
+                mask = mask.unsqueeze(0)
+            if mask.ndim != 3 or tuple(mask.shape[-2:]) != (target_h, target_w):
+                raise ValueError(
+                    f"[Krea2 CcC Edit] Visual Reference {index} target_attention_mask must match "
+                    f"the prepared target {target_w}x{target_h}; received {tuple(mask.shape)}."
+                )
+            if mask.shape[0] not in (1, batch):
+                raise ValueError(f"[Krea2 CcC Edit] Visual Reference {index} target mask batch must be 1 or {batch}.")
+        masks.append(mask if scope != "global" else None)
         scopes.append(scope)
-        if scope == "global":
-            boxes.append(None)
-            continue
-        if not tag:
-            raise ValueError(
-                f"[Krea2 CcC Edit] Visual Reference {index} uses regional attention but has no region tag."
-            )
-        region = by_tag.get(tag)
-        if region is None:
-            available = ", ".join(sorted(by_tag)) or "<none>"
-            raise ValueError(
-                f"[Krea2 CcC Edit] Visual Reference {index} targets unknown Attention Region '{tag}'. "
-                f"Available tags: {available}."
-            )
-        boxes.append(tuple(region.target_box_normalized))
-    return boxes, scopes
+    return masks, scopes
 
 
 def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
@@ -272,7 +271,7 @@ class CcCKrea2Edit:
     FUNCTION = "process"
     DESCRIPTION = (
         "Krea2 CcC Edit orchestrator. Krea2 CcC Edit resolves target geometry and reference preparation while "
-        "appearance refs, fit state, per-pass boosts and RoPE placement travel with CONDITIONING. "
+        "appearance refs, per-reference masks, boosts and RoPE placement travel with CONDITIONING. "
         "The grounded negative branch always uses an empty text prompt and neutral reference boosts. "
         "Krea2 CcC Edit owns a single edit runtime for all visual references."
     )
@@ -336,7 +335,7 @@ class CcCKrea2Edit:
         reference_count = len(visual_entries)
         rope_positions = [entry.rope_position for entry in visual_entries]
         positive_boosts = [float(entry.boost) for entry in visual_entries]
-        target_regions, attention_scopes = _resolve_reference_attention(visual_entries, latent)
+        target_masks, attention_scopes = _resolve_reference_target_masks(visual_entries, latent)
 
         if reference_count:
             positive = attach_reference_runtime_to_conditioning(
@@ -344,7 +343,7 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=positive_boosts,
-                reference_target_regions=target_regions,
+                reference_target_masks=target_masks,
                 reference_attention_scopes=attention_scopes,
             )
             negative = attach_reference_runtime_to_conditioning(
@@ -402,7 +401,7 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"resize_method={entry.resize_method}, rope={entry.rope_position}, semantic={entry.semantic}, "
-                f"attention_scope={entry.attention_scope}, region_tag={entry.region_tag or '<none>'}, "
+                f"attention_scope={entry.attention_scope}, reference_boost_mask={entry.reference_boost_mask is not None}, target_attention_mask={entry.target_attention_mask is not None}, "
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method={entry.semantic_resize_method}, prompt_annotation={annotation}"
             )
