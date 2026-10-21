@@ -320,21 +320,18 @@ def test_latent_semantic_metadata_uses_content_image():
     assert target_image.shape[-3:-1] == (1024, 1024)
 
 
-def test_edit_runtime_latent_matches_pre_split_contract():
+def test_edit_runtime_latent_transports_only_sampling_contract():
     samples = torch.zeros((1, 16, 64, 80))
-    target_vision_context = object()
     latent = {
         "samples": samples,
         "batch_index": [0],
-        "target_vision_context": target_vision_context,
         "ccc_krea2_latent_semantic": {"enabled": True, "image": object()},
         "ccc_krea2_latent_info": "diagnostics",
+        "ccc_krea2_target_preview_image": torch.zeros((1, 512, 640, 3)),
     }
-
     runtime = _runtime_latent(latent)
-    assert set(runtime) == {"samples", "batch_index", "target_vision_context"}
+    assert set(runtime) == {"samples", "batch_index"}
     assert runtime["samples"] is samples
-    assert runtime["target_vision_context"] is target_vision_context
 
 
 def test_mixed_visual_and_vision_references_keep_chain_order():
