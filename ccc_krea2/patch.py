@@ -567,7 +567,7 @@ def krea2_dit_incontext_forward(
             sb, sc, st, sh, sw = src.shape
             src = src.reshape(sb * st, sc, sh, sw)
         src = _repeat_to_batch_size(src, batch)
-        keep_own_grid = fit_flags[index] and src.shape[-2] <= height and src.shape[-1] <= width
+        keep_own_grid = fit_flags[index]
         if src.shape[-2:] != (height, width) and not keep_own_grid:
             src = _fit_latent(src, height, width).to(x.dtype)
         sources.append(_pad_to_patch_size(src, patch_size))
