@@ -358,7 +358,7 @@ def test_latent_exports_blank_image_on_the_exact_target_grid():
     latent, _ = _build_target_latent(
         vae=None, content="empty", content_image=None,
         target_w=192, target_h=128,
-        content_fit="crop", resize_method="bicubic", batch_size=2,
+        content_fit="crop", batch_size=2,
     )
     image = latent["ccc_krea2_target_preview_image"]
     assert image.shape == (2, 128, 192, 3)
