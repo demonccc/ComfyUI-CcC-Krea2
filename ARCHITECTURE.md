@@ -158,7 +158,7 @@ Preset dimensions are explicit curated width/height pairs and bypass geometry po
 
 When target content is enabled, content fit is independent: crop, contain, or stretch.
 
-Visual Reference fit is a separate operation and supports native, crop, contain, and fit. RoPE placement is independent from Visual Reference pixel preparation.
+Visual Reference fit is a separate operation and supports native, crop, contain, and fit. RoPE placement is independent from Visual Reference pixel preparation. Visual Reference supports overlay/stacked placement, spatial/collapsed token coordinates, and latent/source geometry selection; native uses source geometry. Edit emits a `rope_preview` IMAGE built with the runtime's shared RoPE planner. Only Visual References and the target are depicted.
 
 ### Semantic Grounding Cadence
 
