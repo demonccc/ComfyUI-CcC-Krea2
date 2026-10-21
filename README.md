@@ -65,7 +65,7 @@ The VAE/appearance path supports **native, crop, contain, and fit**:
 - contain: uniformly fit the source inside the target, preserve aspect ratio, then crop down only the minimum pixels required for /16 alignment.
 - native: keep 1:1 source pixel scale and center-crop width/height down to /16.
 
-RoPE placement is independent from pixel fit.
+RoPE placement is independent from pixel fit. Visual Reference supports `rope_mode=spatial|collapsed`, `reference_stack=overlay|stacked`, and `rope_geometry=latent|source`. `native` forces `source`. `outside + center + center` is rejected. Stacks may extend beyond the target. Edit exposes `rope_preview` (IMAGE) showing the target and Visual References only; collapsed references render as points.
 
 The Qwen path is controlled by semantic. When enabled, the same image can be downscaled only when it exceeds semantic_grounding_px. prompt_annotation is identification-only and becomes Image N: <annotation>; edit instructions belong in Edit's positive prompt.
 
