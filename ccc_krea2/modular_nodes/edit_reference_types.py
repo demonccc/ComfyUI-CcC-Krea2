@@ -13,6 +13,9 @@ class VisualReferenceEntry:
     image: Optional[torch.Tensor] = None
     boost: float = 1.0
     reference_fit: str = "native"
+    rope_mode: str = "spatial"
+    reference_stack: str = "overlay"
+    rope_geometry: str = "latent"
     placement_grid: str = "inside"
     grid_horizontal_position: str = "center"
     grid_vertical_position: str = "center"
@@ -29,7 +32,10 @@ class VisualReferenceEntry:
     def rope_position(self) -> str:
         """Compact transport representation consumed by the Krea2 patch."""
         grid = "inside" if self.reference_fit == "crop" else self.placement_grid
-        return f"{grid}:{self.grid_horizontal_position}:{self.grid_vertical_position}"
+        geometry = "source" if self.reference_fit == "native" else self.rope_geometry
+        height = self.image.shape[1] // 16 if self.image is not None else 0
+        width = self.image.shape[2] // 16 if self.image is not None else 0
+        return f"{grid}:{self.grid_horizontal_position}:{self.grid_vertical_position}:{self.reference_stack}:{self.rope_mode}:{geometry}:{height}:{width}"
 
     @property
     def resolved_fit_mode(self) -> str:
