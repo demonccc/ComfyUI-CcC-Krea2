@@ -9,6 +9,7 @@
 - Removed obsolete pixel-fit and sampling transformations; `geometry.resize_tensor` remains the shared pixel resampler and `krea2edit_geometry` owns Visual Reference preparation.
 - Removed ignored internal resize controls and corrected diagnostics to reflect fixed bicubic behavior. Active semantic image downscaling no longer depends on a legacy grounding preset module.
 - Updated tests to exercise current geometry and target tensor behavior rather than retired helper APIs.
+- Restored the previously requested Prompt Creator max token ceiling to 32768 (32-token increments), with generation-path coverage.
 - No files under `workflows/` were changed. `03_regional_attention.json` is a legacy example requiring migration.
 
 ### Attention masks and simplified Edit
