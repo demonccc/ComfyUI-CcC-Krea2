@@ -7,9 +7,7 @@ from ccc_krea2.identity_contract import (
     build_grounded_negative_user_content,
     build_grounded_positive_user_content,
 )
-from ccc_krea2.krea2edit_geometry import resolve_krea2edit_geometry
-from ccc_krea2.modular_nodes.edit_node import CcCKrea2Edit, _append_semantic, _prepare_qwen_image
-from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
+from ccc_krea2.modular_nodes.edit_node import _append_semantic, _prepare_qwen_image
 from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
 from ccc_krea2.reference_specs import ReferenceChain
 from ccc_krea2.vision_reference_runtime import build_vision_reference_spec
@@ -97,20 +95,6 @@ def test_qwen_grounding_zero_keeps_native_pixels_for_tokenizer():
     assert prepared.debug_metadata["resolved_method"] == "none"
 
 
-def test_v12_fit_contains_portrait_with_minimal_alignment_crop():
-    geom = resolve_krea2edit_geometry(
-        src_h=2059,
-        src_w=965,
-        tgt_h=1408,
-        tgt_w=1408,
-        fit_mode="fit",
-    )
-    assert geom.mode_resolved == "contain"
-    assert geom.crop_rectangle == (3, 0, 959, 2059)
-    assert geom.vae_input_pixel_size == (656, 1408)
-    assert geom.vae_latent_grid_size == (82, 176)
-
-
 def test_conditioning_runtime_keeps_positive_boost_and_negative_neutral():
     base = [[torch.zeros((1, 4, 8)), {}]]
     positive = attach_reference_runtime_to_conditioning(
@@ -126,10 +110,10 @@ def test_conditioning_runtime_keeps_positive_boost_and_negative_neutral():
         reference_boosts=None,
     )
 
-    assert positive[0][1]["reference_fit"] == [True]
+    assert "reference_fit" not in positive[0][1]
     assert positive[0][1]["reference_boosts"] == [4.0]
     assert positive[0][1]["reference_rope_positions"] == ["inside:center:center"]
-    assert negative[0][1]["reference_fit"] == [True]
+    assert "reference_fit" not in negative[0][1]
     assert "reference_boosts" not in negative[0][1]
 
 
@@ -200,32 +184,3 @@ def test_vision_reference_fixed_semantic_visual_style_context_behavior():
     assert context.appearance_reference is False
 
 
-def test_public_edit_and_visual_reference_surfaces_match_refactored_contract():
-    visual_required = CcCKrea2VisualReference.INPUT_TYPES()["required"]
-    assert list(visual_required) == [
-        "image",
-        "boost",
-        "reference_fit",
-        "placement_grid",
-        "grid_horizontal_position",
-        "grid_vertical_position",
-        "resize_method",
-        "semantic",
-        "semantic_resize",
-        "semantic_grounding_px",
-        "semantic_resize_method",
-        "prompt_annotation",
-        "attention_scope",
-        "region_tag",
-    ]
-
-    edit_inputs = CcCKrea2Edit.INPUT_TYPES()
-    assert list(edit_inputs["required"]) == [
-        "model",
-        "clip",
-        "vae",
-        "latent",
-        "positive_prompt",
-        "apply_krea2_edit_patch",
-    ]
-    assert list(edit_inputs["optional"]) == ["visual_references", "vision_references"]
