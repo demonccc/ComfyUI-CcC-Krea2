@@ -1,35 +1,109 @@
-"""Three-axis RoPE positioning for Krea2 visual references."""
+"""Reference RoPE layout planner and runtime coordinate builder."""
 
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import torch
 
 
-def resolve_rope_axes(position: str) -> Tuple[str, str, str]:
-    """Resolve the compact three-axis RoPE placement value."""
+@dataclass(frozen=True)
+class RopePlacement:
+    frame: int
+    x: float
+    y: float
+    width: float
+    height: float
+    collapsed: bool = False
+
+
+def parse_rope_position(position: str):
     aliases = {
-        "none": ("inside", "center", "center"),
-        "up": ("outside", "center", "up"),
-        "down": ("outside", "center", "down"),
-        "left": ("outside", "left", "center"),
-        "right": ("outside", "right", "center"),
+        "none": ("inside", "center", "center", "overlay", "spatial", "latent"),
+        "up": ("outside", "center", "up", "overlay", "spatial", "latent"),
+        "down": ("outside", "center", "down", "overlay", "spatial", "latent"),
+        "left": ("outside", "left", "center", "overlay", "spatial", "latent"),
+        "right": ("outside", "right", "center", "overlay", "spatial", "latent"),
     }
     if position in aliases:
         return aliases[position]
-
     parts = position.split(":")
-    if len(parts) != 3:
-        raise ValueError(
-            f"Invalid reference RoPE position '{position}'. Expected grid:horizontal:vertical."
-        )
-    grid, horizontal, vertical = parts
-    if grid not in ("inside", "outside"):
-        raise ValueError(f"Invalid RoPE grid '{grid}'. Expected inside or outside.")
-    if horizontal not in ("center", "left", "right"):
-        raise ValueError(f"Invalid RoPE horizontal '{horizontal}'. Expected center, left, or right.")
-    if vertical not in ("center", "up", "down"):
-        raise ValueError(f"Invalid RoPE vertical '{vertical}'. Expected center, up, or down.")
-    return grid, horizontal, vertical
+    if len(parts) == 3:
+        parts += ["overlay", "spatial", "latent"]
+    if len(parts) != 6:
+        raise ValueError("RoPE position must be grid:horizontal:vertical:stack:mode:geometry")
+    grid, horizontal, vertical, stack, mode, geometry = parts
+    allowed = (
+        ("inside", "outside"),
+        ("center", "left", "right"),
+        ("center", "up", "down"),
+        ("overlay", "stacked"),
+        ("spatial", "collapsed"),
+        ("latent", "source"),
+    )
+    for value, values in zip(parts, allowed):
+        if value not in values:
+            raise ValueError(f"Invalid RoPE value {value!r}; expected {values}")
+    if grid == "outside" and horizontal == "center" and vertical == "center":
+        raise ValueError("outside + center + center is not a valid RoPE placement")
+    return grid, horizontal, vertical, stack, mode, geometry
+
+
+def resolve_rope_axes(position: str) -> Tuple[str, str, str]:
+    return parse_rope_position(position)[:3]
+
+
+def plan_rope_positions(
+    ref_token_grids: List[Tuple[int, int]],
+    target_grid: Tuple[int, int],
+    ref_rope_positions: Optional[List[str]] = None,
+    source_token_grids: Optional[List[Tuple[int, int]]] = None,
+) -> List[RopePlacement]:
+    """Shared source of truth for runtime RoPE offsets and annotated preview.
+
+    Units are model RoPE tokens, not RGB pixels. Native references use their
+    own source dimensions; geometry mode chooses layout dimensions for others.
+    """
+    th, tw = target_grid
+    cursors = {"left": 0.0, "right": float(tw), "up": 0.0, "down": float(th)}
+    result = []
+    for i, (rh, rw) in enumerate(ref_token_grids):
+        value = ref_rope_positions[i] if ref_rope_positions and i < len(ref_rope_positions) else "none"
+        grid, horizontal, vertical, stack, mode, geometry = parse_rope_position(value)
+        layout_h, layout_w = (source_token_grids[i] if geometry == "source" and source_token_grids else (rh, rw))
+        layout_h, layout_w = float(layout_h), float(layout_w)
+
+        if grid == "inside":
+            x = {"left": 0.0, "center": (tw - layout_w) / 2.0, "right": tw - layout_w}[horizontal]
+            y = {"up": 0.0, "center": (th - layout_h) / 2.0, "down": th - layout_h}[vertical]
+        else:
+            x = {"left": -layout_w, "center": (tw - layout_w) / 2.0, "right": float(tw)}[horizontal]
+            y = {"up": -layout_h, "center": (th - layout_h) / 2.0, "down": float(th)}[vertical]
+
+        # Stacking advances each selected directional axis, in reference order.
+        # Inside stacking is allowed to overflow beyond the target.
+        if stack == "stacked":
+            for direction, active, size in (
+                ("left", horizontal == "left", layout_w),
+                ("right", horizontal == "right", layout_w),
+                ("up", vertical == "up", layout_h),
+                ("down", vertical == "down", layout_h),
+            ):
+                if not active:
+                    continue
+                if direction == "left":
+                    x = cursors[direction] - size if grid == "outside" else cursors[direction]
+                    cursors[direction] = x if grid == "outside" else x + size
+                elif direction == "right":
+                    x = cursors[direction] if grid == "outside" else cursors[direction] - size
+                    cursors[direction] = x + size if grid == "outside" else x
+                elif direction == "up":
+                    y = cursors[direction] - size if grid == "outside" else cursors[direction]
+                    cursors[direction] = y if grid == "outside" else y + size
+                else:
+                    y = cursors[direction] if grid == "outside" else cursors[direction] - size
+                    cursors[direction] = y + size if grid == "outside" else y
+        result.append(RopePlacement(i + 1, x, y, float(rw), float(rh), mode == "collapsed"))
+    return result
 
 
 def build_incontext_3d_rope_pos_ids(
@@ -39,64 +113,29 @@ def build_incontext_3d_rope_pos_ids(
     target_grid: Tuple[int, int],
     device: torch.device,
     ref_rope_positions: Optional[List[str]] = None,
+    source_token_grids: Optional[List[Tuple[int, int]]] = None,
 ) -> torch.Tensor:
-    """Build Krea2 3D RoPE IDs from fitted refs plus optional coordinate displacement.
-
-    Reference sizing is not controlled here. Every visual reference is fitted to the target
-    latent first. This function only changes the coordinate placement used by RoPE.
-
-    ``inside:center:center`` uses the current Krea2 CcC Edit centered placement. Outside/left/right/up/down
-    placements use the same coordinate builder.
-    """
-    tgt_gh, tgt_gw = target_grid
-    list_pos = []
-
-    if txt_len > 0:
-        list_pos.append(torch.zeros((txt_len, 3), device=device, dtype=torch.float32))
-
-    for i, (r_gh, r_gw) in enumerate(ref_token_grids):
-        frame_idx = i + 1
-        position = (
-            ref_rope_positions[i]
-            if ref_rope_positions is not None and i < len(ref_rope_positions)
-            else "none"
-        )
-        grid, horizontal, vertical = resolve_rope_axes(position)
-
-        centered_x = max(0.0, (tgt_gw - r_gw) / 2.0)
-        centered_y = max(0.0, (tgt_gh - r_gh) / 2.0)
-
-        if horizontal == "left":
-            x_off = 0.0 if grid == "inside" else -float(r_gw)
-        elif horizontal == "right":
-            x_off = float(max(0, tgt_gw - r_gw)) if grid == "inside" else float(tgt_gw)
+    layout = plan_rope_positions(ref_token_grids, target_grid, ref_rope_positions, source_token_grids)
+    parts = []
+    if txt_len:
+        parts.append(torch.zeros((txt_len, 3), device=device, dtype=torch.float32))
+    for (rh, rw), ref in zip(ref_token_grids, layout):
+        if ref.collapsed:
+            ys = torch.full((rh,), ref.y + ref.height / 2, device=device)
+            xs = torch.full((rw,), ref.x + ref.width / 2, device=device)
         else:
-            x_off = centered_x
-
-        if vertical == "up":
-            y_off = 0.0 if grid == "inside" else -float(r_gh)
-        elif vertical == "down":
-            y_off = float(max(0, tgt_gh - r_gh)) if grid == "inside" else float(tgt_gh)
-        else:
-            y_off = centered_y
-
-        grid_y = torch.arange(r_gh, device=device, dtype=torch.float32) + y_off
-        grid_x = torch.arange(r_gw, device=device, dtype=torch.float32) + x_off
-        mesh_y, mesh_x = torch.meshgrid(grid_y, grid_x, indexing="ij")
-        mesh_t = torch.full_like(mesh_y, fill_value=float(frame_idx))
-        list_pos.append(torch.stack([mesh_t.flatten(), mesh_y.flatten(), mesh_x.flatten()], dim=-1))
-
-    tgt_y = torch.arange(tgt_gh, device=device, dtype=torch.float32)
-    tgt_x = torch.arange(tgt_gw, device=device, dtype=torch.float32)
-    mesh_ty, mesh_tx = torch.meshgrid(tgt_y, tgt_x, indexing="ij")
-    mesh_tt = torch.zeros_like(mesh_ty)
-    list_pos.append(torch.stack([mesh_tt.flatten(), mesh_ty.flatten(), mesh_tx.flatten()], dim=-1))
-
-    return torch.cat(list_pos, dim=0).unsqueeze(0).repeat(batch_size, 1, 1)
+            ys = torch.arange(rh, device=device, dtype=torch.float32) + ref.y
+            xs = torch.arange(rw, device=device, dtype=torch.float32) + ref.x
+        yy, xx = torch.meshgrid(ys, xs, indexing="ij")
+        tt = torch.full_like(yy, float(ref.frame))
+        parts.append(torch.stack((tt.flatten(), yy.flatten(), xx.flatten()), dim=-1))
+    th, tw = target_grid
+    yy, xx = torch.meshgrid(torch.arange(th, device=device, dtype=torch.float32),
+                            torch.arange(tw, device=device, dtype=torch.float32), indexing="ij")
+    parts.append(torch.stack((torch.zeros_like(yy).flatten(), yy.flatten(), xx.flatten()), dim=-1))
+    return torch.cat(parts, dim=0).unsqueeze(0).repeat(batch_size, 1, 1)
 
 
 def install_krea2_rope_positioning() -> None:
-    """Install the Krea2 CcC Edit RoPE placement builder in the edit runtime."""
     from .. import patch as patch_module
-
     patch_module._build_incontext_3d_rope_pos_ids = build_incontext_3d_rope_pos_ids
