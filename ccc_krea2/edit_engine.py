@@ -15,6 +15,7 @@ from .identity_contract import (
     build_grounded_positive_user_content,
 )
 from .target_latent import should_include_target_in_vision, TargetVisionContext
+from .patch import _conditioning_set_values
 
 
 def run_krea2_edit_orchestrator(
@@ -253,6 +254,9 @@ def run_krea2_edit_orchestrator(
     vae_latents_for_transport: List[torch.Tensor] = [
         ref["latent_tokens"] for ref in vae_ref_specs if ref.get("latent_tokens") is not None
     ]
+    prepared_reference_masks = [ref["mask"] for ref in vae_ref_specs if ref.get("latent_tokens") is not None]
+    if len(prepared_reference_masks) != len(vae_latents_for_transport):
+        raise ValueError("[Krea2 CcC Edit] Reference masks and VAE latents are out of alignment.")
     patched_model = model
     pos_conditioning = attach_reference_latents_to_conditioning(
         pos_qwen_context.conditioning, vae_latents_for_transport
@@ -260,6 +264,13 @@ def run_krea2_edit_orchestrator(
     neg_conditioning = attach_reference_latents_to_conditioning(
         neg_qwen_context.conditioning, vae_latents_for_transport
     )
+
+    if any(mask is not None for mask in prepared_reference_masks):
+        # Each source mask follows its corresponding VAE latent, even when vision-only
+        # references are interleaved with appearance references.
+        pos_conditioning = _conditioning_set_values(
+            pos_conditioning, {"reference_boost_masks": prepared_reference_masks}
+        )
 
     # Step 7: Build edit_info report
     info_lines = [
@@ -290,7 +301,6 @@ def run_krea2_edit_orchestrator(
         sp = ref["spec"]
         ref_item = ref["ref_item"]
         b_boost = getattr(sp, "attention_boost", 1.0)
-        m_boost = getattr(sp, "masked_attention_boost", 1.0)
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_range = ref_item.get("physical_qwen_range")
         phys_idx = phys_range[0] if phys_range else None
@@ -341,7 +351,7 @@ def run_krea2_edit_orchestrator(
             )
         info_lines.extend(
             [
-                f"  Base Attention Boost: {b_boost:.2f} | Masked Attention Boost: {m_boost:.2f}",
+                f"  Reference Attention Boost: {b_boost:.2f}",
                 f"  Has Attention Mask: {'yes' if ref.get('mask') is not None else 'no'}",
             ]
         )
