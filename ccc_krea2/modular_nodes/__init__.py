@@ -5,7 +5,7 @@ from .vision_reference_node import CcCKrea2VisionReference
 from .size_resolver_node import CcCKrea2SizeResolver
 from .latent_node import CcCKrea2Latent
 from .edit_node import CcCKrea2Edit
-from .edit_prompt_creator_node import CcCKrea2EditPromptCreator
+from .edit_prompt_creator_public_node import CcCKrea2EditPromptCreator
 from .character_sheet_node import CcCKrea2CharacterSheet
 from .paint_geometry_node import CcCKrea2PaintRestore
 from .paint_prepare_node import CcCKrea2PaintPrepare
