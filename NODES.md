@@ -1,12 +1,11 @@
 # ComfyUI-Krea-CcC Nodes
 
-This document describes the **15 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
+This document describes the **14 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
 
 ## Public Node Inventory
 
 | Display name | Node id |
 | --- | --- |
-| Krea2 CcC Attention Region | CcCKrea2AttentionRegion |
 | Krea2 CcC Visual Reference | CcCKrea2VisualReference |
 | Krea2 CcC Vision Reference | CcCKrea2VisionReference |
 | Krea2 CcC Size Resolver | CcCKrea2SizeResolver |
@@ -23,23 +22,6 @@ This document describes the **15 public nodes registered in ccc_krea2/nodes.py**
 | Krea2 CcC Text To Image | CcCKrea2TextToImage |
 
 The Reference Cache implementation has been removed. There are no cache nodes and no public Krea2 CcC Paint Geometry node.
-
-## Krea2 CcC Attention Region
-
-Declares one tagged rectangular target region. Multiple nodes can be chained.
-
-| Control | Values | Default | Meaning |
-| --- | --- | --- | --- |
-| tag | text | subject | Unique region name used by Visual Reference. |
-| x | 0..100 | 0 | Left edge as target/content percentage. |
-| y | 0..100 | 0 | Top edge as target/content percentage. |
-| width | 0.1..100 | 100 | Width as percentage. |
-| height | 0.1..100 | 100 | Height as percentage. |
-| previous_regions | KREA2_ATTENTION_REGION_CHAIN | optional | Previous region chain. |
-
-Output: attention_regions.
-
-Latent transports these boxes through target geometry. If content_fit=crop touches or removes any part of a declared region, Latent raises an error instead of clipping or relocating the box.
 
 ## Krea2 CcC Visual Reference
 
@@ -59,10 +41,11 @@ Required controls:
 | semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
-| attention_scope | global, boost in region, only in region | global | Target-side reference scope. |
-| region_tag | text | empty | Attention Region tag for regional modes. |
+| attention_scope | global, boost in mask, only in mask | global | Scope on the prepared target; no tags. |
 
-Optional input: previous_references.
+Optional inputs: `previous_references`, `reference_boost_mask` (MASK on the original reference, transformed alongside the image), and `target_attention_mask` (MASK drawn on the final target canvas, required for regional attention). Each Visual Reference owns both masks; no separate tags or mask ordering is needed.
+
+`global` applies boost to selected reference tokens from the entire target; `boost in mask` limits the boost to white pixels in the target mask; `only in mask` additionally blocks direct target-to-reference attention outside the target mask. `reference_boost_mask` limits boost to selected reference tokens and combines with the target mask when both are connected.
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
@@ -148,12 +131,12 @@ Optional inputs:
 
 - dimensions_image
 - content_image
-- attention_regions
 
 Outputs:
 
 - latent
 - latent_info
+- target_image (the exact post-fit target canvas, or neutral gray when empty, for aligned mask painting)
 
 from_image requires dimensions_image. latent_semantic requires content=from_image and content_image.
 
