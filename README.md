@@ -37,7 +37,7 @@ Size Resolver -------> Latent --------------^
 Latent.target_image -> ComfyUI mask editor -> Visual Reference.target_attention_mask
 ~~~
 
-Each Visual Reference may receive `reference_boost_mask` (painted on the reference image) and `target_attention_mask` (painted on `Latent.target_image`). The first selects which reference tokens receive boost; the second controls which target tokens receive the boost or direct-attention restriction. Both travel with their reference; no tags or separate region chain exist.
+Each Visual Reference may receive `reference_boost_mask` (painted on the reference image) and `target_attention_mask` (painted on `Latent.target_image`). The first selects which reference tokens receive boost; the second controls which target tokens receive the boost or direct-attention restriction. Both travel with their reference; no tags or separate region chain exist. Masks must have the **exact pixel dimensions** of their respective source or final target image; mismatches are errors, not automatically corrected. An Attention Mask adjusts reference influence, whereas Paint/Inpaint controls pixel replacement.
 
 The reference nodes can be chained in any order using `previous_references`; they expose one shared `references` output. Edit accepts a single `references` input. Appearance references go through VAE and (optionally) Qwen; Vision references are Qwen-only.
 
@@ -223,10 +223,10 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
 - workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — tagged regional attention with two identity references; BodySwap disabled by default.
+- workflows/03_regional_attention.json — **legacy/incompatible** with the current mask API: still uses removed tagged Attention Region nodes. Kept unchanged pending workflow migration.
 - workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference; BodySwap disabled by default.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
-- workflows/06_text_to_image.json — Krea2 text-to-image path with an optional Vision Reference feeding positive multimodal conditioning.
+- workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference used to produce text guidance before final conditioning.
 - workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
 - workflows/08_prompt_creator_create_from_theme.json — Prompt Creator create_from_theme preset.
 - workflows/09_prompt_creator_custom.json — Prompt Creator custom-mode contract test.
