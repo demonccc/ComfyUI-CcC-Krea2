@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Attention masks and simplified Edit
+
+- Visual Reference owns two optional masks: `reference_boost_mask` on the reference image and `target_attention_mask` on the final target; masks remain aligned to their own reference entries.
+- Latent adds `target_image` output (post-fit canvas or neutral empty canvas) for aligned mask painting.
+- Mask attention modes are `global`, `boost in mask`, and `only in mask`; reference boosts operate on selected source tokens and target scopes operate on selected target queries.
+- Removed the tagged Attention Region node, rectangle-percent editor, tag matching, unused legacy mask branches and obsolete post-VAE latent resize.
+- Existing example workflows were intentionally not modified in this change.
+
 ### Reference-chain and geometry cleanup
 
 - Unified Visual and Vision references under the `KREA2_REFERENCE_CHAIN` socket, with `references` inputs/outputs across Edit, Prompt Creator, and T2I. `previous_references` accepts mixed chains.
@@ -14,10 +22,6 @@
 
 - Added `workflows/06_text_to_image.json`, a complete native T2I example wiring Krea2 CcC Text To Image into the Krea2 sampling/decode/output path.
 - Optional Krea2 CcC Edit Prompt Creator with enhance, create_from_image, and create_from_theme modes, reusing the same multimodal Krea2/Qwen3-VL CLIP as Generate Text.
-- Chainable Krea2 CcC Attention Region nodes with unique tags and percentage-based target boxes.
-- Visual Reference regional attention scopes: global, boost in region, and only in region.
-- Target-side region transport through Latent geometry, strict crop guardrails, and token-grid projection for regional attention.
-- Regional attention example workflow with two tagged subjects.
 - Krea2 CcC Paint Restore for exact depadding or generated-crop compositing.
 
 ### Changed
@@ -43,5 +47,5 @@
 - Positive conditioning uses configured per-reference boosts; grounded negative uses neutral boosts and fixed empty negative text.
 - Semantic-only references remain Qwen-only and do not add VAE appearance latents.
 - Size Resolver outputs only width and height.
-- Latent owns final target dimensions, /16 alignment, optional target content, optional target semantic metadata, and transformed Attention Regions.
+- Latent owns final target dimensions, /16 alignment, optional target content, optional target semantic metadata, and an aligned target_image mask canvas.
 - Documentation and checked-in workflows now track the current 14-node public registry.
