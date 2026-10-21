@@ -37,7 +37,10 @@ Required controls:
 | placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. Outside + center + center is invalid. |
 | grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
 | grid_vertical_position | center, up, down | center | Vertical RoPE/grid position. |
-| rope_mode | spatial, collapsed | spatial | Keep token positions or collapse every reference token onto one RoPE point. |\n| reference_stack | overlay, stacked | overlay | Position refs over the same origin or accumulate in chain order (may overflow target). |\n| rope_geometry | latent, source | latent | Dimensions used for placement; native forces source. |\n| semantic | boolean | true | Also show this image to Qwen. |
+| rope_mode | spatial, collapsed | spatial | Keep token positions or collapse every reference token onto one RoPE point. |
+| reference_stack | overlay, stacked | overlay | Position refs over the same origin or accumulate in chain order (may overflow target). |
+| rope_geometry | latent, source | latent | Dimensions used for placement; native forces source. |
+| semantic | boolean | true | Also show this image to Qwen. |
 | semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
@@ -46,6 +49,8 @@ Required controls:
 Optional inputs: `previous_references`, `reference_boost_mask` (MASK on the original reference, transformed alongside the image), and `target_attention_mask` (MASK drawn on the final target canvas, required for regional attention). Each Visual Reference owns both masks; no separate tags or mask ordering is needed.
 
 `global` applies boost to selected reference tokens from the entire target; `boost in mask` limits the boost to white pixels in the target mask; `only in mask` additionally blocks direct target-to-reference attention outside the target mask. `reference_boost_mask` limits boost to selected reference tokens and combines with the target mask when both are connected.
+
+Masks must be aligned to their own images: `reference_boost_mask` must match the original Visual Reference image pixel dimensions; `target_attention_mask` must match the final `Latent.target_image` dimensions. ComfyUI MASK inputs accept one mask shared by the batch or one per item. Mismatched sizes raise an error, not an implicit resize. The source mask follows the reference's crop/resize **before** VAE; at runtime both masks are projected to the DiT token grids using area reduction and a >0.5 threshold. `only in mask` restricts *direct attention*, not image editing/pixel preservation (use Paint for inpainting).
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
@@ -475,7 +480,7 @@ The node applies prompt augmentation and creates an empty SD3-compatible latent 
 
 - workflows/01_scene_subject.json — Scene + Subject edit.
 - workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — tagged regional references.
+- workflows/03_regional_attention.json — **legacy/incompatible**: still contains the removed `CcCKrea2AttentionRegion` nodes. Intentionally unchanged; migrate its regions to per-Visual-Reference target masks before using.
 - workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
 - workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
 - workflows/06_text_to_image.json — T2I example with a Semantic Vision Reference enriching positive Qwen conditioning.
