@@ -72,13 +72,7 @@ The Qwen path is controlled by semantic. When enabled, the same image can be dow
 
 Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.\n\nPositive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
 
-Regional attention is optional:
-
-- global
-- boost in region
-- only in region
-
-A regional reference binds to a tagged **Attention Region** carried through Latent geometry.
+Visual Reference attention supports `global`, `boost in mask`, and `only in mask`. Each Visual Reference accepts an optional `reference_boost_mask` (source-image pixels, transformed with the image) and `target_attention_mask` (final target-image pixels). Masks stay with their owning reference; there are no tags or separate Attention Region nodes. Latent exports `target_image` to provide a mask-painting canvas matching its final geometry.
 
 ## Vision Reference
 
