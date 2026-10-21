@@ -104,8 +104,8 @@ def run_krea2_edit_orchestrator(
                     getattr(spec, "rope_position", "inside:center:center") or "inside:center:center"
                 )
                 rope_parts = rope_position.split(":")
-                if len(rope_parts) == 3:
-                    _, grid_horizontal, grid_vertical = rope_parts
+                if len(rope_parts) >= 3:
+                    grid_horizontal, grid_vertical = rope_parts[1:3]
                 else:
                     grid_horizontal, grid_vertical = "center", "center"
                 geom = resolve_krea2edit_geometry(
