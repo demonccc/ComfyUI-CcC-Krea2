@@ -147,6 +147,7 @@ def _build_target_latent(
     latent_h = target_h // 8
     latent_w = target_w // 8
 
+    preview_image = None
     if content == "empty":
         samples = torch.zeros((batch_size, 16, latent_h, latent_w), dtype=torch.float32)
         placement: Dict[str, Any] = {"mode": "empty"}
@@ -163,6 +164,7 @@ def _build_target_latent(
             resize_method="bicubic",
         )
         samples = normalize_vae_output(vae.encode(canvas), batch_size=batch_size)
+        preview_image = canvas
     else:
         raise ValueError(
             f"[Krea2 CcC Edit] Invalid content mode '{content}'. Expected empty or from_image."
@@ -170,6 +172,7 @@ def _build_target_latent(
 
     return {
         "samples": samples,
+        "ccc_krea2_target_preview_image": preview_image,
         "batch_index": list(range(batch_size)),
         "target_vision_context": TargetVisionContext(include_in_vision="no"),
     }, placement
