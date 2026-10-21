@@ -180,7 +180,7 @@ Required inputs/controls:
 | user_prompt | text | empty |
 | system_prompt | text | enhance preset |
 | thinking | boolean | false |
-| max_tokens | 32..4096, step 32 | 512 |
+| max_tokens | 32..32768, step 32 | 512 |
 | temperature | 0.01..2.0 | 0.25 |
 | top_p | 0..1 | 0.90 |
 | seed | 0..18446744073709551615 | 0 |
