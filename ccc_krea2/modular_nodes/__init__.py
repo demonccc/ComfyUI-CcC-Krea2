@@ -1,6 +1,5 @@
 """Package initialization for the split Krea2 Edit nodes."""
 
-from .attention_region_node import CcCKrea2AttentionRegion
 from .visual_reference_node import CcCKrea2VisualReference
 from .vision_reference_node import CcCKrea2VisionReference
 from .size_resolver_node import CcCKrea2SizeResolver
@@ -13,7 +12,6 @@ from .paint_prepare_node import CcCKrea2PaintPrepare
 from .paint_node import CcCKrea2Paint
 
 __all__ = [
-    "CcCKrea2AttentionRegion",
     "CcCKrea2VisualReference",
     "CcCKrea2VisionReference",
     "CcCKrea2SizeResolver",
