@@ -52,10 +52,10 @@ Required controls:
 | image | IMAGE | — | Source reference. |
 | boost | 0..10 | 1.0 | Positive target-to-reference attention boost. |
 | reference_fit | native, crop, contain, fit | native | Appearance/VAE pixel fit. |
-| placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. |
+| placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. Outside + center + center is invalid. |
 | grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
 | grid_vertical_position | center, up, down | center | Vertical RoPE/grid position. |
-| semantic | boolean | true | Also show this image to Qwen. |
+| rope_mode | spatial, collapsed | spatial | Keep token positions or collapse every reference token onto one RoPE point. |\n| reference_stack | overlay, stacked | overlay | Position refs over the same origin or accumulate in chain order (may overflow target). |\n| rope_geometry | latent, source | latent | Dimensions used for placement; native forces source. |\n| semantic | boolean | true | Also show this image to Qwen. |
 | semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
