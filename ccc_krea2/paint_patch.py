@@ -403,7 +403,7 @@ def patch_krea2_paint_model(model: Any, *, kv_cache: bool = True) -> Any:
 
         if dit_model is None or not refs:
             fallback_kwargs = dict(kwargs)
-            for key in ("ref_latents", "ref_boosts", "ref_fit", "ccc_ref_rope_positions"):
+            for key in ("ref_latents", "ref_boosts", "ccc_ref_rope_positions"):
                 fallback_kwargs.pop(key, None)
             return executor(x, timesteps, context, *wargs, **fallback_kwargs)
 
