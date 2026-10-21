@@ -303,7 +303,7 @@ class _MockVAE:
 
 def test_latent_semantic_metadata_uses_content_image():
     image = torch.zeros((1, 128, 128, 3))
-    latent, _ = CcCKrea2Latent().process(
+    latent, _, target_image = CcCKrea2Latent().process(
         vae=_MockVAE(),
         dimensions="preset",
         content="from_image",
@@ -316,6 +316,8 @@ def test_latent_semantic_metadata_uses_content_image():
     assert metadata["enabled"] is True
     assert metadata["image"] is image
     assert metadata["instruction"] == "Reimagine the target content"
+    assert target_image is latent["ccc_krea2_target_preview_image"]
+    assert target_image.shape[-3:-1] == (1024, 1024)
 
 
 def test_edit_runtime_latent_matches_pre_split_contract():
@@ -353,3 +355,15 @@ def test_mixed_visual_and_vision_references_keep_chain_order():
     )
     assert len(prepared.references) == 3
     assert [ref.appearance_reference for ref in prepared.references] == [True, False, True]
+
+def test_latent_exports_blank_image_on_the_exact_target_grid():
+    from ccc_krea2.modular_nodes.latent_node import _build_target_latent
+    latent, _ = _build_target_latent(
+        vae=None, content="empty", content_image=None,
+        target_w=192, target_h=128,
+        content_fit="crop", resize_method="bicubic", batch_size=2,
+    )
+    image = latent["ccc_krea2_target_preview_image"]
+    assert image.shape == (2, 128, 192, 3)
+    assert latent["samples"].shape == (2, 16, 16, 24)
+    assert torch.all(image == 0.5)
