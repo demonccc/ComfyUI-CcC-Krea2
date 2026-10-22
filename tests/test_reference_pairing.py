@@ -143,12 +143,12 @@ def test_tiled_style_preserves_crop_resolution_before_qwen():
 
 
 
-def test_original_preset_keeps_single_unmodified_qwen_reference():
+def test_native_preset_keeps_single_unmodified_qwen_reference():
     image = torch.rand(1, 64, 96, 3)
     refs, _ = CcCKrea2Reference().process(
-        image, vision_mode="original", vision_instruction=""
+        image, vision_mode="native", vision_instruction=""
     )
-    assert refs.entries[1].mode == "original"
+    assert refs.entries[1].mode == "native"
     with patch(
         "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
         side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
@@ -158,7 +158,7 @@ def test_original_preset_keeps_single_unmodified_qwen_reference():
     spec = chain.references[0]
     assert spec.appearance_reference
     assert spec.include_in_vision
-    assert spec.vision_reference_mode == "original"
+    assert spec.vision_reference_mode == "native"
     assert spec.semantic_extract == "none"
     assert spec.vision_instruction == ""
     resolved, _ = resolve_reference_slots_and_aliases(chain)
