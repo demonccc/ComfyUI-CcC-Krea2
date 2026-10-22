@@ -186,7 +186,7 @@ function migrateLegacyT2IWidgets(node, values) {
 
 function setupLoraDisabledState(node, attempts = 0) {
     if (node.__cccLoraDisabledInstalled) return;
-    const count = node.comfyClass === "CcCKrea2LoRAStackWithPrompt" ? 5 : 10;
+    const count = 5;
     const find = (name) => node.widgets?.find((widget) => widget.name === name);
 
     if (!find("lora_1_enabled")) {
