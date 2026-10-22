@@ -82,3 +82,31 @@ def test_public_ui_has_no_ineffective_guidance_presets():
     fields = CcCKrea2Reference.INPUT_TYPES()["required"]
     assert "vision_guidance_detail" not in fields
     assert "vision_vision_guidance" not in fields
+
+
+def test_visual_semantic_follows_vision_enable():
+    image = torch.zeros((1, 32, 32, 3))
+    node = CcCKrea2Reference()
+    combined, _ = node.process(image, visual_enable=True, vision_enable=True)
+    assert combined.entries[0].semantic is True
+    assert combined.entries[0].semantic_resize is True
+    assert combined.entries[0].semantic_grounding_px == 768
+    assert len(combined.entries) == 2
+
+    visual_only, _ = node.process(image, visual_enable=True, vision_enable=False)
+    assert visual_only.entries[0].semantic is False
+    assert len(visual_only.entries) == 1
+
+    vision_only, _ = node.process(image, visual_enable=False, vision_enable=True)
+    assert len(vision_only.entries) == 1
+    assert isinstance(vision_only.entries[0], VisionReferenceEntry)
+
+
+def test_combined_semantic_resize_controls_match_vision_options():
+    image = torch.zeros((1, 32, 32, 3))
+    chain, _ = CcCKrea2Reference().process(
+        image, vision_resize=False, vision_max_edge=1024
+    )
+    assert chain.entries[0].semantic
+    assert chain.entries[0].semantic_resize is False
+    assert chain.entries[0].semantic_grounding_px == 1024
