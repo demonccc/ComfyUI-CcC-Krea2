@@ -95,7 +95,11 @@ class CcCKrea2Reference:
             vision_image = image
             resize = bool(kwargs.get("vision_resize", True))
             max_edge = int(kwargs.get("vision_max_edge", 768))
-            if resize:
+            tiled_style = (
+                kwargs.get("vision_mode", "semantic") == "style"
+                and kwargs.get("vision_style_processing", "full") != "full"
+            )
+            if resize and not tiled_style:
                 if max_edge < 1:
                     raise ValueError("[Krea2 CcC Reference] vision_max_edge must be positive.")
                 height, width = (int(image.shape[-3]), int(image.shape[-2]))
@@ -109,8 +113,14 @@ class CcCKrea2Reference:
             if visual_enable:
                 # One source image and one logical reference: the Vision preset
                 # augments the immediately preceding Visual entry in Edit.
-                paired_entry = replace(chain.entries[-1], paired_visual=True)
+                paired_entry = replace(chain.entries[-1], paired_visual=True,
+                                       tile_resize=resize and tiled_style,
+                                       tile_max_edge=max_edge)
                 chain = EditReferenceChain(chain.entries[:-1] + (paired_entry,))
+            elif tiled_style:
+                tiled_entry = replace(chain.entries[-1], tile_resize=resize,
+                                      tile_max_edge=max_edge)
+                chain = EditReferenceChain(chain.entries[:-1] + (tiled_entry,))
             info.append(vision_info)
         info.append(f"Chain Entries: {len(chain.entries)}")
         return chain, "\n".join(info)
