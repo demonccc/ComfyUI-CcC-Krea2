@@ -5,6 +5,7 @@ patch consumes VisualReferenceEntry while Qwen guidance consumes VisionReference
 They are emitted by a single user-facing node, in the original reference order.
 """
 from typing import Optional
+from dataclasses import replace
 import torch
 
 from ..constants import NODE_CATEGORY
@@ -105,6 +106,11 @@ class CcCKrea2Reference:
                     )
             chain, vision_info = self._vision.process(
                 image=vision_image, previous_references=chain, **vision_kwargs)
+            if visual_enable:
+                # One source image and one logical reference: the Vision preset
+                # augments the immediately preceding Visual entry in Edit.
+                paired_entry = replace(chain.entries[-1], paired_visual=True)
+                chain = EditReferenceChain(chain.entries[:-1] + (paired_entry,))
             info.append(vision_info)
         info.append(f"Chain Entries: {len(chain.entries)}")
         return chain, "\n".join(info)
