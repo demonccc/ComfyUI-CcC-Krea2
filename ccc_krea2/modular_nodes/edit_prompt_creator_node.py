@@ -254,7 +254,6 @@ class CcCKrea2EditPromptCreator:
         return {
             "required": {
                 "clip": ("CLIP",),
-                "references": ("KREA2_REFERENCE_CHAIN",),
                 "mode": (PROMPT_CREATOR_MODES, {"default": "enhance"}),
                 "user_prompt": (
                     "STRING",
@@ -307,6 +306,7 @@ class CcCKrea2EditPromptCreator:
                 ),
             },
             "optional": {
+                "references": ("KREA2_REFERENCE_CHAIN",),
                 "reference_edit_image": (
                     "IMAGE",
                     {
@@ -322,7 +322,7 @@ class CcCKrea2EditPromptCreator:
     def create(
         self,
         clip: Any,
-        references: EditReferenceChain,
+        references: Optional[EditReferenceChain] = None,
         mode: str = "enhance",
         user_prompt: str = "",
         system_prompt: str = "",
