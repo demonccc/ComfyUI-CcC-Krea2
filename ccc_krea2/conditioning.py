@@ -351,7 +351,12 @@ def encode_krea2_qwen_context(
             summary_rows = int(getattr(spec, "vision_summary_rows", 0) or 0)
 
             vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
-            if vision_mode == "semantic":
+            if vision_mode == "original":
+                # Training-style Krea2Edit Qwen conditioning: preserve vision rows.
+                extract = None
+                fidelity = 1.0
+                indirect = False
+            elif vision_mode == "semantic":
                 extract = "subject"
                 fidelity = getattr(spec, "semantic_strength", 0.25)
                 indirect = False
