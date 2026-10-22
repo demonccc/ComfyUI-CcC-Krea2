@@ -91,7 +91,10 @@ def build_grounded_negative_user_content(
     blocks = []
     for item in resolved_references:
         spec = item.get("spec")
-        if spec is None or not getattr(spec, "include_in_vision", True):
+        if spec is None or not (
+            getattr(spec, "include_in_vision", True)
+            or getattr(spec, "negative_vision_only", False)
+        ):
             continue
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
         if ref_path == "style" or not getattr(spec, "appearance_reference", True):
