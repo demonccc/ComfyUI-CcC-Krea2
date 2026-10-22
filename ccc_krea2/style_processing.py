@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Any, Union
 from .reference_specs import StyleReferenceSpec, PreparedVisionImage
 from .vision_prep import prepare_vision_image
+from .geometry import resize_tensor
 
 
 SHUFFLE_2X2 = (2, 0, 3, 1)
@@ -221,6 +222,12 @@ def expand_style_reference_spans(
     prep_spec = spec.prepared_image.prep_spec
 
     for crop in slices:
+        if spec.style_tile_resize and max(crop.shape[1], crop.shape[2]) > spec.style_tile_max_edge:
+            if spec.style_tile_max_edge < 1:
+                raise ValueError("style_tile_max_edge must be positive")
+            scale = spec.style_tile_max_edge / max(crop.shape[1], crop.shape[2])
+            crop = resize_tensor(crop, max(1, round(crop.shape[1] * scale)),
+                                 max(1, round(crop.shape[2] * scale)), "bicubic")
         if prep_spec.mode == "tokenizer_native":
             crop = crop[..., :3].clamp(0.0, 1.0)
             h, w = int(crop.shape[1]), int(crop.shape[2])
