@@ -206,7 +206,10 @@ def _combine_reference_chains(
                     else entry.prompt_annotation if entry.semantic else ""
                 ),
                 appearance_reference=True,
-                include_in_vision=entry.semantic,
+                # Tiled Style contributes its own 4/16 Qwen crops. The
+                # appearance frame remains in VAE/RoPE but must not add a
+                # second full-sized Qwen image.
+                include_in_vision=entry.semantic and not tiled_style,
                 attention_boost=float(entry.boost),
                 attention_mask=entry.reference_boost_mask,
                 visual_reference_fit=entry.resolved_fit_mode,
