@@ -69,6 +69,7 @@ def test_combined_tiled_style_preserves_all_crops(processing, expected):
     assert len(chain.references) == 2
     assert chain.references[0].appearance_reference is True
     assert chain.references[0].include_in_vision is False
+    assert chain.references[0].negative_vision_only is True
     assert chain.references[1].style_processing == processing
     slots, _ = resolve_reference_slots_and_aliases(chain)
     assert slots[0]["vae_reference_frame"] == 1
@@ -94,3 +95,26 @@ def test_tiled_style_followed_by_second_reference_retains_valid_qwen_slots():
     assert slots[2]["physical_qwen_range"] == (2, 5)
     assert slots[0]["vae_reference_frame"] == 1
     assert slots[1]["vae_reference_frame"] == 2
+
+
+def test_tiled_style_negative_grounding_retains_one_appearance_image():
+    from ccc_krea2.identity_contract import (
+        build_grounded_positive_user_content,
+        build_grounded_negative_user_content,
+    )
+    from ccc_krea2.constants import VISION_PAD_TOKEN
+
+    image = torch.rand(1, 128, 128, 3)
+    refs, _ = CcCKrea2Reference().process(
+        image, vision_mode="style", vision_style_processing="2x2"
+    )
+    with patch(
+        "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+        side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
+    ):
+        chain = _combine_reference_chains(None, refs, {"samples": torch.empty(1, 4, 8, 8)})
+    slots, _ = resolve_reference_slots_and_aliases(chain)
+    positive = build_grounded_positive_user_content(slots, "apply scene")
+    negative = build_grounded_negative_user_content(slots, "")
+    assert positive.count(VISION_PAD_TOKEN) == 4
+    assert negative.count(VISION_PAD_TOKEN) == 1
