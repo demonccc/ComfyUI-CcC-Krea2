@@ -33,5 +33,5 @@ VISION_DIRECTIVES = {
     "visual": VISUAL_DIRECTIVE,
     "style": STYLE_DIRECTIVE,
     "context": CONTEXT_DIRECTIVE,
-    "original": "",
+    "native": "",
 }
