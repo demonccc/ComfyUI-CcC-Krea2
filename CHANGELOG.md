@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Paired Visual/Vision conditioning correction
+
+- Fixed unified Reference to associate the enabled Visual and Vision paths as one logical Edit reference instead of submitting the same full image twice to Qwen and shifting Image N aliases.
+- Visual geometry/VAE uses original source pixels, while Qwen uses the Vision image after its optional bicubic-antialias resize and applies its selected mode policy.
+- For Style with 2x2 or 4x4 tiling, a distinct style span is still required (one full appearance image plus 4/16 style crops); this is deliberate and preserves tiling.
+- Added regression checks for combined and isolated modes, physical Qwen slot numbering, image geometry, and tiled Style spans. GPU-based fidelity tests remain outstanding.
+
+
 ### Five-slot LoRA consistency
 
 - Limited LoRA Stack and LoRA Stack Sliders to five positions; LoRA Stack with Prompt already had five. Updated UI toggle behavior and loader regression tests.
