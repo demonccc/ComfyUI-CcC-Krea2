@@ -4,7 +4,7 @@ Public modes:
 - crop: use the target grid as an inside crop window over the source.
 - contain: scale the reference to fit inside the target, preserve aspect ratio,
   then center-crop only the minimum pixels required for /16.
-- fit: preserve aspect ratio, cover the target, and crop excess content.
+- fit: training-aligned fit-inside geometry; near-matched aspect ratios use a\n  small center-crop to fill the grid, mismatched ratios use /16-aligned fit.
 - native: preserve 1:1 source scale and center-crop each edge down to /16.
 """
 
@@ -119,11 +119,17 @@ def resolve_krea2edit_geometry(
         resolved = "contain"
 
     elif fit_mode == "fit":
-        # Cover the target at uniform scale, crop excess source pixels, then
-        # resize once in pixel space (bicubic + antialias) before VAE encoding.
-        scale = max(target_cap_h / float(src_h), target_cap_w / float(src_w))
-        vae_h = target_cap_h
-        vae_w = target_cap_w
+        # Match comfyui-krea2edit's V2 training-aligned FIT preparation:
+        # near-matched AR fills via minimal crop; otherwise fit inside,
+        # floor /16 and crop the source to avoid resampling distortion.
+        scale = min(target_cap_h / float(src_h), target_cap_w / float(src_w))
+        if (src_h * scale >= target_cap_h * 0.92
+                and src_w * scale >= target_cap_w * 0.92):
+            scale = max(target_cap_h / float(src_h), target_cap_w / float(src_w))
+            vae_h, vae_w = target_cap_h, target_cap_w
+        else:
+            vae_h = min(_floor16(src_h * scale), target_cap_h)
+            vae_w = min(_floor16(src_w * scale), target_cap_w)
         left, top, crop_w, crop_h = _centered_crop_for_scaled_grid(
             src_h=src_h,
             src_w=src_w,
