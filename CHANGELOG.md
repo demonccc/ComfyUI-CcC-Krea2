@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Further reference-conditioning audit
+
+- Paired Style with 2x2/4x4 crops now keeps one VAE appearance reference but contributes only 4/16 crop images to **positive** Qwen conditioning, instead of adding an unintended full-size positive image.
+- The unconditional Qwen branch still receives the original appearance image, preserving the grounded negative conditioning contract.
+- Deferred style crop references until after normal edit references to avoid invalid style-before-edit slot ordering when chaining multiple references.
+- Added contract tests for positive/negative image blocks, single VAE frame, multiple reference ordering, and style crop slots.
+- Remaining verification: Qwen/LoRA image-quality regression on live ComfyUI; pre-tile vision resize currently reduces the full image before splitting tiles, potentially losing fine texture detail.
+
+
 ### Paired Visual/Vision conditioning correction
 
 - Fixed unified Reference to associate the enabled Visual and Vision paths as one logical Edit reference instead of submitting the same full image twice to Qwen and shifting Image N aliases.
