@@ -21,6 +21,14 @@ def test_schema_has_visual_before_vision():
     assert "visual_semantic" not in keys
 
 
+def test_both_enabled_by_default():
+    schema = CcCKrea2Reference.INPUT_TYPES()["required"]
+    assert schema["visual_enable"][1]["default"] is True
+    assert schema["vision_enable"][1]["default"] is True
+    chain, _ = CcCKrea2Reference().process(image())
+    assert len(chain.entries) == 2
+
+
 def test_visual_only_has_no_qwen_image():
     chain, info = CcCKrea2Reference().process(image(), visual_enable=True, vision_enable=False)
     assert len(chain.entries) == 1
