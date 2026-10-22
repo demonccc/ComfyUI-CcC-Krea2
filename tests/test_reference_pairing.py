@@ -140,3 +140,27 @@ def test_tiled_style_preserves_crop_resolution_before_qwen():
     crops, _, _ = expand_style_reference_spans(spec, 1, None)
     assert len(crops) == 4
     assert all(tuple(crop.vision_image.shape) == (1, 768, 768, 3) for crop in crops)
+
+
+
+def test_original_preset_keeps_single_unmodified_qwen_reference():
+    image = torch.rand(1, 64, 96, 3)
+    refs, _ = CcCKrea2Reference().process(
+        image, vision_mode="original", vision_instruction=""
+    )
+    assert refs.entries[1].mode == "original"
+    with patch(
+        "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+        side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
+    ):
+        chain = _combine_reference_chains(None, refs, {"samples": torch.empty(1, 4, 8, 12)})
+    assert len(chain.references) == 1
+    spec = chain.references[0]
+    assert spec.appearance_reference
+    assert spec.include_in_vision
+    assert spec.vision_reference_mode == "original"
+    assert spec.semantic_extract == "none"
+    assert spec.vision_instruction == ""
+    resolved, _ = resolve_reference_slots_and_aliases(chain)
+    assert resolved[0]["physical_qwen_range"] == (1, 1)
+    assert resolved[0]["vae_reference_frame"] == 1
