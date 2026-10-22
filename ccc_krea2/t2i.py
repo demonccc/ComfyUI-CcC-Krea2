@@ -80,7 +80,7 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "and no mention of a reference image."
     ),
     "style": LEGACY_VISUAL_SYSTEM_PROMPT,
-    "original": (
+    "native": (
         "Describe the supplied image directly and accurately, without applying semantic, "
         "style or context extraction rules. Return a concise English description "
         "of the visible content only."
@@ -108,7 +108,7 @@ def _public_vision_mode(runtime_mode: str) -> str:
         "style_direct": "visual",
         "style_indirect": "style",
         "context_indirect": "context",
-        "original": "original",
+        "native": "native",
     }.get(runtime_mode, runtime_mode)
 
 
