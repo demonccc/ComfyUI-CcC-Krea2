@@ -63,6 +63,8 @@ class ReferenceSpec:
     # Style path
     style_fidelity: float = 0.5
     style_processing: str = "2x2"
+    style_tile_resize: bool = False
+    style_tile_max_edge: int = 768
     indirect_style_transfer: bool = True
 
     @property
