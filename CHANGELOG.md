@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Unified Reference
+
+- Added `Krea2 CcC Reference`, exposing Visual settings first and Vision settings second with independent enable switches.
+- Both enabled paths share one source image and append distinct appearance and Qwen entries to the existing chain, avoiding duplicate Qwen semantics from the Visual path.
+- Retained the two legacy reference node registrations so existing, unchanged workflow JSONs remain loadable. Added UI disabled-state logic and unified-reference contract tests.
+- No workflow JSON changed; end-to-end image fidelity with the Edit LoRA remains to be validated.
+
+
 ### Duplicate implementation consolidation
 
 - Consolidated Edit Prompt Creator's optional-reference contract into its single implementation; its former public wrapper is now an import-only compatibility alias.
