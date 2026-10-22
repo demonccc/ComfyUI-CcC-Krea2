@@ -354,8 +354,13 @@ def encode_krea2_qwen_context(
                 fidelity = getattr(spec, "style_fidelity", 0.0)
                 indirect = False
             elif vision_mode == "context":
-                extract = "context"
-                fidelity = getattr(spec, "semantic_strength", 0.0)
+                # Spatial relations, pose, gaze and hand placement are encoded in
+                # ordered Qwen vision rows. Whitening and sampling those rows
+                # is not a reliable context extractor and destroys geometry.
+                # Keep rows intact; mode-specific instructions constrain the
+                # reference to scene/context rather than subject identity.
+                extract = None
+                fidelity = 1.0
                 indirect = False
             elif str(role_val).lower() == "style":
                 extract = "style"
