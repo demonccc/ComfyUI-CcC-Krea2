@@ -132,7 +132,7 @@ def apply_statistical_style_fidelity(
 
         span = z[:, start:end]  # (B, rows, 12, fused//12)
         mu = span.mean(dim=1, keepdim=True)
-        sigma = span.std(dim=1, keepdim=True, correction=0) + 1e-6
+        sigma = span.std(dim=1, keepdim=True, correction=1 if span.shape[1] > 1 else 0) + 1e-6
 
         if op.extract == "subject":
             target = (span - mu) / sigma
