@@ -24,7 +24,7 @@ def test_subject_matches_moodboard_whitening_formula():
     result, _, _ = apply_statistical_style_fidelity(x, [_op("subject", 0.25)])
     span = x.reshape(1, 10, 12, 2)[:, 2:8]
     mu = span.mean(dim=1, keepdim=True)
-    sigma = span.std(dim=1, keepdim=True, correction=0) + 1e-6
+    sigma = span.std(dim=1, keepdim=True, correction=1 if span.shape[1] > 1 else 0) + 1e-6
     expected = 0.25 * span + 0.75 * ((span - mu) / sigma)
     assert torch.allclose(result.reshape(1, 10, 12, 2)[:, 2:8], expected)
 
@@ -34,7 +34,7 @@ def test_style_matches_moodboard_channel_statistics():
     result, _, _ = apply_statistical_style_fidelity(x, [_op("style", 0.0)])
     span = x.reshape(1, 10, 12, 2)[:, 2:8]
     mu = span.mean(dim=1, keepdim=True)
-    sigma = span.std(dim=1, keepdim=True, correction=0) + 1e-6
+    sigma = span.std(dim=1, keepdim=True, correction=1 if span.shape[1] > 1 else 0) + 1e-6
     expected = torch.cat((mu, mu + sigma, mu - sigma), dim=1)[:, [0, 1, 2, 0, 1, 2]]
     assert torch.allclose(result.reshape(1, 10, 12, 2)[:, 2:8], expected)
 
