@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Vision preset audit
+
+- Confirmed that Edit uses mode-specific Qwen embedding transforms (subject whitening, full direct visual rows, style statistics, and compacted context rows), while T2I uses Qwen-generated textual guidance. These are distinct consumer-specific implementations.
+- Fixed custom Vision instruction propagation for Semantic, Style and Context in Edit; it was previously applied only in Visual. Added regression tests for all four modes.
+- Preset consolidation and full runtime regression validation remain pending; workflow JSON files are unchanged.
+
+
 ### Unified Reference
 
 - Added `Krea2 CcC Reference`, exposing Visual settings first and Vision settings second with independent enable switches.
