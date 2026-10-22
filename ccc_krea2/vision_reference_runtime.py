@@ -37,13 +37,12 @@ CONTEXT_DIRECTIVE = (
 
 
 def _with_user_instruction(base: str, instruction: str, scope: str) -> str:
+    """Apply custom guidance without contradicting the selected Vision preset."""
     user = (instruction or "").strip()
-    if not user or scope != "visual":
+    if not user:
         return base
-
     return (
-        f"{base} Apply this extra visual guidance to the SAME subject/result requested by the user's prompt; "
-        f"do not create an additional subject from the reference. Additional visual guidance: {user}"
+        f"{base} Additional {scope} guidance (subject to the mode's preservation rules): {user}"
     )
 
 
