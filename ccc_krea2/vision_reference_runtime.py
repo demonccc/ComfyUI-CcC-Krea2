@@ -99,6 +99,8 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_summary_rows=0,
             vision_indirect=False,
             style_processing=entry.processing,
+            style_tile_resize=entry.tile_resize,
+            style_tile_max_edge=entry.tile_max_edge,
             style_fidelity=0.0,
             indirect_style_transfer=False,
         )
