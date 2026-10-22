@@ -59,3 +59,26 @@ def test_both_paths_share_image_and_keep_chain_order():
 def test_both_disabled_rejected():
     with pytest.raises(ValueError, match="Enable Visual, Vision"):
         CcCKrea2Reference().process(image(), visual_enable=False, vision_enable=False)
+
+
+def test_vision_resize_limits_edge_without_touching_visual_pixels():
+    original = torch.rand((1, 1200, 1600, 3))
+    chain, _ = CcCKrea2Reference().process(
+        original, vision_resize=True, vision_max_edge=768
+    )
+    assert chain.entries[0].image is original
+    assert tuple(chain.entries[1].image.shape) == (1, 576, 768, 3)
+
+
+def test_vision_resize_disabled_passes_source_unchanged():
+    original = torch.rand((1, 1200, 1600, 3))
+    chain, _ = CcCKrea2Reference().process(
+        original, vision_resize=False
+    )
+    assert chain.entries[1].image is original
+
+
+def test_public_ui_has_no_ineffective_guidance_presets():
+    fields = CcCKrea2Reference.INPUT_TYPES()["required"]
+    assert "vision_guidance_detail" not in fields
+    assert "vision_vision_guidance" not in fields
