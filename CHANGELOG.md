@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Moodboard embedding correction
+
+- Verified that Subject uses the same whitened-span blend and Style uses the same channel statistics blend as Krea2 Moodboard, rather than merely sharing descriptive prompts.
+- Fixed Context: full ordered Qwen vision rows are preserved instead of whitening and subsampling 64 rows. Subsampling is not a pose/interaction extractor and discarded spatial information. Context remains constrained by its mode directive; testing is needed to determine whether direct tokens leak appearance.
+- Retained Moodboard sample standard deviation for regular spans; guarded single-token spans against NaNs.
+- Added formula-level unit tests and checks for Context's no-compaction contract. No workflow JSON changed; image-quality regression testing is still required.
+
+
 ### Moodboard-aligned Vision updates
 
 - Reviewed RedNodeAI Krea2 Moodboard: subject whitening and style mean/standard-deviation transforms already correspond to the existing conditioning path; indirect mode is a separate token-removal strategy, not an equivalent context extractor.
