@@ -215,6 +215,7 @@ def _combine_reference_chains(
                 # appearance frame remains in VAE/RoPE but must not add a
                 # second full-sized Qwen image.
                 include_in_vision=entry.semantic and not tiled_style,
+                negative_vision_only=tiled_style,
                 attention_boost=float(entry.boost),
                 attention_mask=entry.reference_boost_mask,
                 visual_reference_fit=entry.resolved_fit_mode,
