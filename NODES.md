@@ -449,7 +449,7 @@ Optional input: `prompt_augmentation`, allowing prompt triggers to accumulate ac
 
 Outputs: `model`, `prompt_augmentation`.
 
-Edit and T2I accept `prompt_augmentation` on their own optional inputs. This does not alter Edit's fixed-empty grounded negative prompt.
+Edit, Paint, and T2I accept `prompt_augmentation` on their own optional inputs. This does not alter Edit's fixed-empty grounded negative prompt.
 
 ## Krea2 CcC Lora Stack Sliders
 
