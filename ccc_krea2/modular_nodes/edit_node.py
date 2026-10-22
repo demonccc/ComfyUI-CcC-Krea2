@@ -163,8 +163,10 @@ def _combine_reference_chains(
             if entry.paired_visual:
                 if index < 2 or not isinstance(entries[index - 2], VisualReferenceEntry):
                     raise ValueError("[Krea2 CcC Edit] Paired Vision must immediately follow its Visual source.")
-                # The preceding Visual has already created the VAE reference
-                # and its single Qwen image. No duplicate slot should be added.
+                if entry.mode == "style_indirect" and entry.processing != "full":
+                    # Tiled style needs separate Qwen image spans (4/16 crops).
+                    # Preserve those crops instead of silently losing tiling.
+                    chain = chain.append(build_vision_reference_spec(entry))
                 continue
             chain = chain.append(build_vision_reference_spec(entry))
             continue
@@ -186,7 +188,10 @@ def _combine_reference_chains(
             semantic_resize=entry.semantic_resize if entry.semantic else False,
             resize_method="bicubic",
         )
-        vision_spec = build_vision_reference_spec(paired) if paired else None
+        # A tiled style reference is multiple distinct Qwen crops, not one
+        # image; retain it as an additional style span after the Visual frame.
+        tiled_style = bool(paired and paired.mode == "style_indirect" and paired.processing != "full")
+        vision_spec = build_vision_reference_spec(paired) if paired and not tiled_style else None
         if vision_spec is not None:
             # Keep the untouched original image for VAE geometry while taking
             # the Vision path's resized image and per-mode extraction policy.
