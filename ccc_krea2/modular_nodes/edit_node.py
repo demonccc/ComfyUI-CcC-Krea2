@@ -1,6 +1,7 @@
 """Krea2 CcC Edit node."""
 
 from typing import Any, Optional
+from dataclasses import replace
 
 import torch
 
@@ -156,14 +157,28 @@ def _combine_reference_chains(
     """Translate the split public nodes into the common orchestrator ReferenceChain."""
     chain = ReferenceChain()
 
-    for index, entry in enumerate((references or EditReferenceChain()).entries, start=1):
+    entries = (references or EditReferenceChain()).entries
+    for index, entry in enumerate(entries, start=1):
         if isinstance(entry, VisionReferenceEntry):
+            if entry.paired_visual:
+                if index < 2 or not isinstance(entries[index - 2], VisualReferenceEntry):
+                    raise ValueError("[Krea2 CcC Edit] Paired Vision must immediately follow its Visual source.")
+                # The preceding Visual has already created the VAE reference
+                # and its single Qwen image. No duplicate slot should be added.
+                continue
             chain = chain.append(build_vision_reference_spec(entry))
             continue
         if not isinstance(entry, VisualReferenceEntry):
             raise TypeError(f"Unexpected edit reference type: {type(entry).__name__}")
         if entry.image is None:
             raise ValueError(f"[Krea2 CcC Edit] Visual reference {index} has no IMAGE.")
+        paired = (
+            entries[index]
+            if index < len(entries)
+            and isinstance(entries[index], VisionReferenceEntry)
+            and entries[index].paired_visual
+            else None
+        )
         prep = _prepare_qwen_image(
             image=entry.image,
             clip=clip,
@@ -171,12 +186,20 @@ def _combine_reference_chains(
             semantic_resize=entry.semantic_resize if entry.semantic else False,
             resize_method="bicubic",
         )
+        vision_spec = build_vision_reference_spec(paired) if paired else None
+        if vision_spec is not None:
+            # Keep the untouched original image for VAE geometry while taking
+            # the Vision path's resized image and per-mode extraction policy.
+            prep = replace(prep, vision_image=vision_spec.prepared_image.vision_image)
         chain = chain.append(
             ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
                 alias="",
-                vision_instruction=entry.prompt_annotation if entry.semantic else "",
+                vision_instruction=(
+                    vision_spec.vision_instruction if vision_spec is not None
+                    else entry.prompt_annotation if entry.semantic else ""
+                ),
                 appearance_reference=True,
                 include_in_vision=entry.semantic,
                 attention_boost=float(entry.boost),
@@ -184,6 +207,14 @@ def _combine_reference_chains(
                 visual_reference_fit=entry.resolved_fit_mode,
                 visual_resize_method="bicubic",
                 rope_position=entry.rope_position,
+                vision_reference_mode=vision_spec.vision_reference_mode if vision_spec else "",
+                vision_summary_rows=vision_spec.vision_summary_rows if vision_spec else 0,
+                vision_indirect=vision_spec.vision_indirect if vision_spec else False,
+                semantic_extract=vision_spec.semantic_extract if vision_spec else "none",
+                semantic_strength=vision_spec.semantic_strength if vision_spec else 1.0,
+                style_fidelity=vision_spec.style_fidelity if vision_spec else 0.5,
+                style_processing=vision_spec.style_processing if vision_spec else "full",
+                indirect_style_transfer=vision_spec.indirect_style_transfer if vision_spec else False,
             )
         )
 
