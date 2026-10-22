@@ -53,7 +53,8 @@ def test_both_paths_share_image_and_keep_chain_order():
     assert isinstance(chain.entries[0], VisualReferenceEntry)
     assert isinstance(chain.entries[1], VisionReferenceEntry)
     assert chain.entries[0].image is chain.entries[1].image
-    assert chain.entries[0].semantic is False
+    assert chain.entries[0].semantic is True
+    assert chain.entries[1].paired_visual is True
 
 
 def test_both_disabled_rejected():
