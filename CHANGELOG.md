@@ -5,10 +5,10 @@
 ### Upstream Krea2Edit V2 parity audit
 
 - Compared our Edit implementation with `lbouaraba/comfyui-krea2edit` V2 reference node and grounding encoder.
-- Corrected `fit` geometry: near-matched aspect ratios use a small crop to fill the target; truly mismatched images fit inside with /16-aligned dimensions and source-space grid crop before bicubic antialiasing. Previously our `fit` always covered/cropped the source.
+- The attempted upstream `fit` replacement was reverted: reference framing modes remain project-defined.
 - Edit Qwen encoding now uses the upstream training-grounded system template about image color, shape, texture and spatial relationships, rather than the generic Krea2 template.
 - Kept `contain`, `crop` and `native` as distinct public geometry choices; did not change RoPE or patch behavior without validated parity evidence.
-- Added static geometry/template tests. Actual V1.2/V2 GPU image generation and full pytest have not been executed.
+- Added grounding-template tests; project geometry remains unchanged. Actual V1.2/V2 GPU image generation and full pytest have not been executed.
 
 
 ### Vision Style resize fidelity
