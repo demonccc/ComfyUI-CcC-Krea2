@@ -232,6 +232,56 @@ app.registerExtension({
         if (!node || !node.comfyClass) return;
         if (NATIVE_LORA_NODES.has(node.comfyClass)) setupLoraDisabledState(node);
 
+        if (node.comfyClass === "CcCKrea2Reference") {
+            const find = (name) => node.widgets?.find((w) => w.name === name);
+            const refresh = () => {
+                const visual = find("visual_enable")?.value === true;
+                const vision = find("vision_enable")?.value === true;
+                for (const widget of node.widgets ?? []) {
+                    if (widget.name.startsWith("visual_") && widget.name !== "visual_enable") {
+                        widget.disabled = !visual;
+                    } else if (widget.name.startsWith("vision_") && widget.name !== "vision_enable") {
+                        widget.disabled = !vision;
+                    }
+                }
+                const fit = find("visual_reference_fit")?.value ?? "native";
+                setWidgetDisabled(node, "visual_placement_grid", !visual || fit === "crop");
+                setWidgetDisabled(node, "visual_rope_geometry", !visual || fit === "native");
+                if (visual && fit === "crop" && find("visual_placement_grid")) {
+                    find("visual_placement_grid").value = "inside";
+                }
+                if (visual && fit === "native" && find("visual_rope_geometry")) {
+                    find("visual_rope_geometry").value = "source";
+                }
+                const visionMode = find("vision_mode")?.value ?? "semantic";
+                setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
+                if (vision && visionMode !== "style" && find("vision_style_processing")) {
+                    find("vision_style_processing").value = "full";
+                }
+                setWidgetDisabled(node, "vision_guidance_seed",
+                    !vision || (find("vision_guidance_seed_mode")?.value ?? "fixed") !== "fixed");
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (const name of ["visual_enable", "visual_reference_fit",
+                                "vision_enable", "vision_mode", "vision_guidance_seed_mode"]) {
+                const widget = find(name);
+                if (!widget) continue;
+                const original = widget.callback;
+                widget.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const configure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = configure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            setTimeout(refresh, 20);
+        }
+
         if (node.comfyClass === "CcCKrea2VisualReference") {
             const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
             const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
