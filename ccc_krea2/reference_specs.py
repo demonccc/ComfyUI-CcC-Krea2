@@ -42,6 +42,7 @@ class ReferenceSpec:
     parsed_aliases: Tuple[str, ...] = ()
     vision_instruction: str = ""
     include_in_vision: bool = True
+    negative_vision_only: bool = False
 
     # Visual/edit path
     appearance_reference: bool = True
