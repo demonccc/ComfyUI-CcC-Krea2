@@ -30,6 +30,16 @@ except ImportError:
     KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
 
 
+# Upstream comfyui-krea2edit / Krea2EditGroundedEncode training-matched
+# system instruction. The generic Krea2 template is not equivalent for Edit.
+KREA2_EDIT_GROUNDED_TEMPLATE = (
+    "<|im_start|>system\\n"
+    "Describe the image by detailing the color, shape, size, "
+    "texture, quantity, text, spatial relationships of the objects and background:"
+    "<|im_end|>\\n<|im_start|>user\\n{}<|im_end|>\\n<|im_start|>assistant\\n"
+)
+
+
 def attach_reference_latents_to_conditioning(
     conditioning: List[Any], reference_latents: List[torch.Tensor]
 ) -> List[Any]:
@@ -288,7 +298,7 @@ def encode_krea2_qwen_context(
 
     warnings_list: List[str] = []
     try:
-        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_TEMPLATE)
+        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_EDIT_GROUNDED_TEMPLATE)
     except TypeError:
         tokens = clip.tokenize(prompt or "", images=physical_images)
     except Exception as e:
