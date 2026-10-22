@@ -6,7 +6,7 @@ The public surface currently contains **15 registered nodes** (including the uni
 
 ## Unified Reference (new workflows)
 
-**Krea2 CcC Reference** combines the former Visual and Vision reference controls in one node and one source `image`. The controls are ordered with `visual_enable` and all Visual settings first, followed by `vision_enable` and all Vision settings. Both groups are enabled by default. Disabled groups are greyed out in ComfyUI and are not processed.
+**Krea2 CcC Reference** combines the former Visual and Vision reference controls in one node and one source `image`. The controls are ordered with `visual_enable` and all Visual settings first, followed by `vision_enable` and all Vision settings. Both groups are enabled by default. Disabled groups are greyed out in ComfyUI and are not processed. Vision optionally downsizes the source with bicubic antialiasing (`vision_resize=true`, `vision_max_edge=768`) independently of Visual, without cropping or upscaling. The combined node omits the legacy guidance detail/sampling presets, which have no equivalent Edit effect.
 
 - **Visual only**: VAE appearance reference, Fit, RoPE, Boost, reference mask and target attention mask. It does **not** send the image to Qwen.
 - **Vision only**: Qwen Semantic / Visual / Style / Context guidance without any appearance/VAE reference.
