@@ -80,7 +80,10 @@ class CcCKrea2Reference:
             }
             chain, = self._visual.process(
                 image=image, previous_references=chain,
-                semantic=False, reference_boost_mask=reference_boost_mask,
+                semantic=bool(vision_enable),
+                semantic_resize=bool(kwargs.get("vision_resize", True)),
+                semantic_grounding_px=int(kwargs.get("vision_max_edge", 768)),
+                reference_boost_mask=reference_boost_mask,
                 target_attention_mask=target_attention_mask, **visual_kwargs)
         if vision_enable:
             vision_kwargs = {
