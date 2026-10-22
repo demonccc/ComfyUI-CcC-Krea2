@@ -255,7 +255,7 @@ def _generate_t2i_vision_guidance(
     target_prompt: str,
 ):
     public_mode = _public_vision_mode(entry.mode)
-    system_prompt = VISION_DIRECTIVES[public_mode] + "\\n\\n" + T2I_VISION_SYSTEM_PROMPTS[public_mode]
+    system_prompt = VISION_DIRECTIVES[public_mode] + "\n\n" + T2I_VISION_SYSTEM_PROMPTS[public_mode]
     analysis_images = _t2i_analysis_images(entry)
 
     user_instruction = str(entry.instruction or "").strip()
