@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Original Krea2Edit Vision preset
+
+- Added **Original** to the unified Vision mode options. For Edit it forwards Qwen vision embeddings without statistical Semantic/Style extraction or any forced preset-specific instruction, following original Krea2Edit grounding semantics while preserving user-provided instructions.
+- Existing Visual remains direct embeddings plus an explicit visual-guidance instruction, so it is not identical to Original.
+- T2I uses an ordinary visual description for Original, because T2I consumes Qwen-derived text rather than injecting Qwen vision rows as Edit does.
+
+
 ### Upstream Krea2Edit V2 parity audit
 
 - Compared our Edit implementation with `lbouaraba/comfyui-krea2edit` V2 reference node and grounding encoder.
