@@ -118,3 +118,25 @@ def test_tiled_style_negative_grounding_retains_one_appearance_image():
     negative = build_grounded_negative_user_content(slots, "")
     assert positive.count(VISION_PAD_TOKEN) == 4
     assert negative.count(VISION_PAD_TOKEN) == 1
+
+
+def test_tiled_style_preserves_crop_resolution_before_qwen():
+    from ccc_krea2.style_processing import expand_style_reference_spans
+    from ccc_krea2.t2i import _t2i_analysis_images
+
+    image = torch.rand(1, 1536, 1536, 3)
+    refs, _ = CcCKrea2Reference().process(
+        image, vision_mode="style", vision_style_processing="2x2",
+        vision_resize=True, vision_max_edge=768,
+    )
+    vision_entry = refs.entries[1]
+    assert tuple(vision_entry.image.shape) == (1, 1536, 1536, 3)
+    assert vision_entry.tile_resize
+    assert all(tuple(crop.shape) == (1, 768, 768, 3)
+               for crop in _t2i_analysis_images(vision_entry))
+    spec = __import__("ccc_krea2.vision_reference_runtime", fromlist=[
+        "build_vision_reference_spec",
+    ]).build_vision_reference_spec(vision_entry)
+    crops, _, _ = expand_style_reference_spans(spec, 1, None)
+    assert len(crops) == 4
+    assert all(tuple(crop.vision_image.shape) == (1, 768, 768, 3) for crop in crops)
