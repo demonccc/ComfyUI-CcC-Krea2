@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Five-slot LoRA consistency
+
+- Limited LoRA Stack and LoRA Stack Sliders to five positions; LoRA Stack with Prompt already had five. Updated UI toggle behavior and loader regression tests.
+- Verified the existing `prompt_augmentation` optional input and consumption paths in Edit, Paint, and T2I. Paint and Edit apply the positive augmentation without changing their grounded negative branch; T2I applies positive and negative augmentation.
+- Existing workflow JSON files are intentionally unchanged. Saved ten-slot node configurations must be migrated manually if slots 6–10 were populated.
+
+
 ### Moodboard embedding correction
 
 - Verified that Subject uses the same whitened-span blend and Style uses the same channel statistics blend as Krea2 Moodboard, rather than merely sharing descriptive prompts.
