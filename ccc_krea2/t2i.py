@@ -110,7 +110,23 @@ def _t2i_analysis_images(entry: VisionReferenceEntry):
     image = entry.image
     if entry.mode != "style_indirect" or entry.processing == "full":
         return [image]
-    return slice_style_image(image, mode=entry.processing)
+    crops = slice_style_image(image, mode=entry.processing)
+    if entry.tile_resize:
+        from .geometry import resize_tensor
+        if entry.tile_max_edge < 1:
+            raise ValueError("Vision Style tile_max_edge must be positive.")
+        resized = []
+        for crop in crops:
+            h, w = int(crop.shape[1]), int(crop.shape[2])
+            if max(h, w) > entry.tile_max_edge:
+                scale = entry.tile_max_edge / max(h, w)
+                crop = resize_tensor(
+                    crop, max(1, round(h * scale)),
+                    max(1, round(w * scale)), "bicubic",
+                )
+            resized.append(crop)
+        return resized
+    return crops
 
 
 def _mode_guidance_policy(
