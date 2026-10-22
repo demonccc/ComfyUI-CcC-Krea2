@@ -156,6 +156,7 @@ def _combine_reference_chains(
 ) -> ReferenceChain:
     """Translate the split public nodes into the common orchestrator ReferenceChain."""
     chain = ReferenceChain()
+    pending_styles = []
 
     entries = (references or EditReferenceChain()).entries
     for index, entry in enumerate(entries, start=1):
@@ -166,9 +167,13 @@ def _combine_reference_chains(
                 if entry.mode == "style_indirect" and entry.processing != "full":
                     # Tiled style needs separate Qwen image spans (4/16 crops).
                     # Preserve those crops instead of silently losing tiling.
-                    chain = chain.append(build_vision_reference_spec(entry))
+                    pending_styles.append(build_vision_reference_spec(entry))
                 continue
-            chain = chain.append(build_vision_reference_spec(entry))
+            vision_spec = build_vision_reference_spec(entry)
+            if isinstance(vision_spec, StyleReferenceSpec):
+                pending_styles.append(vision_spec)
+            else:
+                chain = chain.append(vision_spec)
             continue
         if not isinstance(entry, VisualReferenceEntry):
             raise TypeError(f"Unexpected edit reference type: {type(entry).__name__}")
@@ -240,6 +245,10 @@ def _combine_reference_chains(
             alias="target image",
         )
 
+    # Style tiles expand into multiple physical images and must follow all
+    # normal/appearance references to preserve Qwen image slot numbering.
+    for style_spec in pending_styles:
+        chain = chain.append(style_spec)
     return chain
 
 
