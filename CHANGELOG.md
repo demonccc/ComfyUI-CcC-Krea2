@@ -2,13 +2,20 @@
 
 ## Unreleased
 
+### Vision Style resize fidelity
+
+- Fixed pre-tile downscaling for unified Vision Style 2x2/4x4: preserve the original reference until tiled, then bicubic-antialias resize each crop independently if it exceeds vision_max_edge. Both Edit and T2I use the same policy.
+- Added regression test for 1536x1536 -> four 768x768 Qwen crops, retaining more fine texture information than whole-image downscale-first.
+- Live ComfyUI image generation, complete pytest suite and V1.2/V2 comparative quality checks have **not** been run in this environment.
+
+
 ### Further reference-conditioning audit
 
 - Paired Style with 2x2/4x4 crops now keeps one VAE appearance reference but contributes only 4/16 crop images to **positive** Qwen conditioning, instead of adding an unintended full-size positive image.
 - The unconditional Qwen branch still receives the original appearance image, preserving the grounded negative conditioning contract.
 - Deferred style crop references until after normal edit references to avoid invalid style-before-edit slot ordering when chaining multiple references.
 - Added contract tests for positive/negative image blocks, single VAE frame, multiple reference ordering, and style crop slots.
-- Remaining verification: Qwen/LoRA image-quality regression on live ComfyUI; pre-tile vision resize currently reduces the full image before splitting tiles, potentially losing fine texture detail.
+- Remaining verification: Qwen/LoRA image-quality regression on live ComfyUI.
 
 
 ### Paired Visual/Vision conditioning correction
