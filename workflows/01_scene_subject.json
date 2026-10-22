@@ -153,11 +153,6 @@
           "links": [
             9
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -181,13 +176,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -274,14 +270,14 @@
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         500
       ],
       "size": [
-        410,
-        390
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -300,36 +296,48 @@
           "links": [
             3
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         1,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the scene image.",
-        "global",
-        ""
+        "full",
+        "fixed",
+        0
       ],
-      "title": "Scene Visual Reference"
+      "title": "Scene Reference"
     },
     {
       "id": 8,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         830,
         500
       ],
       "size": [
-        410,
-        420
+        470,
+        600
       ],
       "flags": {},
       "order": 8,
@@ -353,25 +361,37 @@
           "links": [
             14
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the subject image.",
-        "global",
-        ""
+        "full",
+        "fixed",
+        0
       ],
-      "title": "Subject Visual Reference"
+      "title": "Subject Reference"
     },
     {
       "id": 16,
