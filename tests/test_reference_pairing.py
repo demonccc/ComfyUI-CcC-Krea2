@@ -74,3 +74,23 @@ def test_combined_tiled_style_preserves_all_crops(processing, expected):
     assert slots[0]["vae_reference_frame"] == 1
     assert slots[0]["physical_qwen_range"] is None
     assert slots[1]["physical_qwen_range"] == (1, expected)
+
+
+def test_tiled_style_followed_by_second_reference_retains_valid_qwen_slots():
+    first = torch.rand(1, 64, 64, 3)
+    second = torch.rand(1, 64, 64, 3)
+    node = CcCKrea2Reference()
+    references, _ = node.process(first, vision_mode="style", vision_style_processing="2x2")
+    references, _ = node.process(second, previous_references=references, vision_mode="semantic")
+    with patch(
+        "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+        side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
+    ):
+        chain = _combine_reference_chains(None, references, {"samples": torch.empty(1, 4, 8, 8)})
+    assert [spec.appearance_reference for spec in chain.references] == [True, True, False]
+    slots, _ = resolve_reference_slots_and_aliases(chain)
+    assert slots[0]["physical_qwen_range"] is None
+    assert slots[1]["physical_qwen_range"] == (1, 1)
+    assert slots[2]["physical_qwen_range"] == (2, 5)
+    assert slots[0]["vae_reference_frame"] == 1
+    assert slots[1]["vae_reference_frame"] == 2
