@@ -35,7 +35,7 @@ class CcCKrea2Reference:
         for name, spec in visual["required"].items():
             if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px", "prompt_annotation"):
                 required["visual_" + name] = spec
-        required["vision_enable"] = ("BOOLEAN", {"default": False})
+        required["vision_enable"] = ("BOOLEAN", {"default": True})
         for name, spec in vision["required"].items():
             if name != "image":
                 required["vision_" + name] = spec
@@ -59,7 +59,7 @@ class CcCKrea2Reference:
             vision_guidance=vision_vision_guidance,
         )
 
-    def process(self, image: torch.Tensor, visual_enable=True, vision_enable=False,
+    def process(self, image: torch.Tensor, visual_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
                 reference_boost_mask=None, target_attention_mask=None, **kwargs):
         if not visual_enable and not vision_enable:
