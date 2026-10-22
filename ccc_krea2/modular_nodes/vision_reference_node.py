@@ -15,7 +15,7 @@ from ..qwen_guidance import (
 from .edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 
 
-VISION_MODES = ("semantic", "visual", "style", "context")
+VISION_MODES = ("semantic", "visual", "style", "context", "original")
 STYLE_PROCESSING = ("full", "2x2", "4x4")
 
 VISION_RUNTIME_MODES = {
@@ -23,6 +23,7 @@ VISION_RUNTIME_MODES = {
     "visual": "style_direct",
     "style": "style_indirect",
     "context": "context_indirect",
+    "original": "original",
     "semantic_reference": "semantic_only",
     "visual_reference": "style_direct",
     "style_reference": "style_indirect",
