@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Final Native/Edit contract audit
+
+- Verified the Native Vision mode routes through Edit as unchanged Qwen image rows with no preset-specific directive; Visual still has explicit appearance guidance.
+- Removed a silent Qwen tokenizer fallback that could ignore the Krea2Edit-specific grounded template. Incompatible encoders now report an actionable error rather than silently changing grounding behavior.
+- Live ComfyUI/GPU validation and comprehensive automated test execution are still pending.
+
+
 ### Native Krea2Edit Vision preset
 
 - Added **Native** to the unified Vision mode options. For Edit it forwards Qwen vision embeddings without statistical Semantic/Style extraction or any forced preset-specific instruction, following original Krea2Edit grounding semantics while preserving user-provided instructions.
