@@ -298,9 +298,16 @@ def encode_krea2_qwen_context(
 
     warnings_list: List[str] = []
     try:
-        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_EDIT_GROUNDED_TEMPLATE)
-    except TypeError:
-        tokens = clip.tokenize(prompt or "", images=physical_images)
+        tokens = clip.tokenize(
+            prompt or "", images=physical_images,
+            llama_template=KREA2_EDIT_GROUNDED_TEMPLATE,
+        )
+    except TypeError as e:
+        raise TypeError(
+            f"{LOGGER_PREFIX} Qwen encoder does not accept llama_template; "
+            "Krea2Edit's grounded system instruction cannot be guaranteed. "
+            "Use a compatible Qwen3-VL encoder."
+        ) from e
     except Exception as e:
         raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
