@@ -62,14 +62,14 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     """Translate one public Vision Reference entry into the proven internal reference contract."""
     prep = prepare_tokenizer_native_image(entry.image)
 
-    if entry.mode == "original":
+    if entry.mode == "native":
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
             vision_instruction=entry.instruction.strip(),
             appearance_reference=False,
             include_in_vision=True,
-            vision_reference_mode="original",
+            vision_reference_mode="native",
             vision_summary_rows=0,
             vision_indirect=False,
             semantic_extract="none",
