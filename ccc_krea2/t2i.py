@@ -80,6 +80,11 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "and no mention of a reference image."
     ),
     "style": LEGACY_VISUAL_SYSTEM_PROMPT,
+    "original": (
+        "Describe the supplied image directly and accurately, without applying semantic, "
+        "style or context extraction rules. Return a concise English description "
+        "of the visible content only."
+    ),
     "context": (
         "Analyze the supplied reference image only for scene CONTEXT and staging. Reproduce the situation, not the "
         "subject's visual identity. Capture setting and environment, camera/framing/viewpoint, subject count and scene "
@@ -103,6 +108,7 @@ def _public_vision_mode(runtime_mode: str) -> str:
         "style_direct": "visual",
         "style_indirect": "style",
         "context_indirect": "context",
+        "original": "original",
     }.get(runtime_mode, runtime_mode)
 
 
