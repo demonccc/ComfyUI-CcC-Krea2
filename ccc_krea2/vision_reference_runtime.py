@@ -111,9 +111,11 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="context",
-            vision_summary_rows=64,
+            # Keep spatial rows intact: whitening and subsampling are not a
+            # spatial-context extractor and erase gaze/pose/interaction detail.
+            vision_summary_rows=0,
             vision_indirect=False,
-            semantic_strength=0.0,
+            semantic_strength=1.0,
             indirect_vision_context=False,
         )
 
