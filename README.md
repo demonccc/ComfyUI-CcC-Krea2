@@ -70,7 +70,9 @@ RoPE placement is independent from pixel fit. Visual Reference supports `rope_mo
 
 The Qwen path is controlled by semantic. When enabled, the same image can be downscaled only when it exceeds semantic_grounding_px. prompt_annotation is identification-only and becomes Image N: <annotation>; edit instructions belong in Edit's positive prompt.
 
-Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.\n\nPositive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
+Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.
+
+Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
 
 Visual Reference attention supports `global`, `boost in mask`, and `only in mask`. Each Visual Reference accepts an optional `reference_boost_mask` (source-image pixels, transformed with the image) and `target_attention_mask` (final target-image pixels). Masks stay with their owning reference; there are no tags or separate Attention Region nodes. Latent exports `target_image` to provide a mask-painting canvas matching its final geometry.
 
