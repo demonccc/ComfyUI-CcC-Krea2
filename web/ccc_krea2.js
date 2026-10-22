@@ -253,6 +253,7 @@ app.registerExtension({
                 if (visual && fit === "native" && find("visual_rope_geometry")) {
                     find("visual_rope_geometry").value = "source";
                 }
+                setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
                 const visionMode = find("vision_mode")?.value ?? "semantic";
                 setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
                 if (vision && visionMode !== "style" && find("vision_style_processing")) {
@@ -263,7 +264,7 @@ app.registerExtension({
                 node.setDirtyCanvas?.(true, true);
             };
             for (const name of ["visual_enable", "visual_reference_fit",
-                                "vision_enable", "vision_mode", "vision_guidance_seed_mode"]) {
+                                "vision_enable", "vision_resize", "vision_mode", "vision_guidance_seed_mode"]) {
                 const widget = find(name);
                 if (!widget) continue;
                 const original = widget.callback;
