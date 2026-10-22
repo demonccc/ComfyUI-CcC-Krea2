@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Moodboard-aligned Vision updates
+
+- Reviewed RedNodeAI Krea2 Moodboard: subject whitening and style mean/standard-deviation transforms already correspond to the existing conditioning path; indirect mode is a separate token-removal strategy, not an equivalent context extractor.
+- Centralized canonical Semantic/Visual/Style/Context directives in `vision_presets.py` and included them in both Edit and T2I guidance.
+- Unified Reference now optionally downsizes the Vision-only copy using the shared bicubic antialiasing helper and a 768px max edge; Visual keeps the source image untouched.
+- Removed misleading guidance detail and sampling presets from the unified node UI while retaining old-node compatibility.
+- Kept Context's existing embedding compaction unchanged pending image-fidelity validation. Runtime tests could not be run in this environment.
+
+
 ### Vision preset audit
 
 - Confirmed that Edit uses mode-specific Qwen embedding transforms (subject whitening, full direct visual rows, style statistics, and compacted context rows), while T2I uses Qwen-generated textual guidance. These are distinct consumer-specific implementations.
