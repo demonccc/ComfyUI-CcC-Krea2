@@ -8,6 +8,7 @@ from typing import Optional
 import torch
 
 from ..constants import NODE_CATEGORY
+from ..geometry import resize_tensor
 from .edit_reference_types import EditReferenceChain
 from .visual_reference_node import CcCKrea2VisualReference
 from .vision_reference_node import CcCKrea2VisionReference
@@ -36,8 +37,10 @@ class CcCKrea2Reference:
             if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px", "prompt_annotation"):
                 required["visual_" + name] = spec
         required["vision_enable"] = ("BOOLEAN", {"default": True})
+        required["vision_resize"] = ("BOOLEAN", {"default": True})
+        required["vision_max_edge"] = ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64})
         for name, spec in vision["required"].items():
-            if name != "image":
+            if name != "image" and name not in ("guidance_detail", "vision_guidance"):
                 required["vision_" + name] = spec
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
@@ -85,8 +88,20 @@ class CcCKrea2Reference:
                 for name in CcCKrea2VisionReference.INPUT_TYPES()["required"]
                 if name != "image" and "vision_" + name in kwargs
             }
+            vision_image = image
+            resize = bool(kwargs.get("vision_resize", True))
+            max_edge = int(kwargs.get("vision_max_edge", 768))
+            if resize:
+                if max_edge < 1:
+                    raise ValueError("[Krea2 CcC Reference] vision_max_edge must be positive.")
+                height, width = (int(image.shape[-3]), int(image.shape[-2]))
+                if max(height, width) > max_edge:
+                    scale = max_edge / float(max(height, width))
+                    vision_image = resize_tensor(
+                        image, max(1, round(height * scale)), max(1, round(width * scale)), "bicubic"
+                    )
             chain, vision_info = self._vision.process(
-                image=image, previous_references=chain, **vision_kwargs)
+                image=vision_image, previous_references=chain, **vision_kwargs)
             info.append(vision_info)
         info.append(f"Chain Entries: {len(chain.entries)}")
         return chain, "\n".join(info)
