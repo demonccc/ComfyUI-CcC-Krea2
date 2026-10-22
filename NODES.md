@@ -106,7 +106,7 @@ Vision Reference defines information semantics rather than a transport algorithm
 - **Style**: intentionally reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior, and its final conditioning explicitly treats that guidance as the dominant visual treatment. Supports full, 2x2, or 4x4 analysis.
 - **Context**: mandatory scene staging including setting, viewpoint, exact pose and limb placement, head orientation, gaze target, gesture, action, interaction, crop/framing, composition, object placement, depth, and spatial relationships while excluding identity, clothing, and visual style.
 
-There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, Context, and Original. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
+There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, Context, and Native. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
 
 ## Krea2 CcC Size Resolver
 
