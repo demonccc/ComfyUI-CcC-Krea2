@@ -68,6 +68,9 @@ def test_combined_tiled_style_preserves_all_crops(processing, expected):
         chain = _combine_reference_chains(None, refs, {"samples": torch.empty(1, 4, 8, 8)})
     assert len(chain.references) == 2
     assert chain.references[0].appearance_reference is True
+    assert chain.references[0].include_in_vision is False
     assert chain.references[1].style_processing == processing
     slots, _ = resolve_reference_slots_and_aliases(chain)
-    assert slots[1]["physical_qwen_range"] == (2, expected + 1)
+    assert slots[0]["vae_reference_frame"] == 1
+    assert slots[0]["physical_qwen_range"] is None
+    assert slots[1]["physical_qwen_range"] == (1, expected)
