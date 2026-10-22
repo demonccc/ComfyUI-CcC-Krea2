@@ -153,11 +153,6 @@
           "links": [
             13
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -181,13 +176,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -274,14 +270,14 @@
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         500
       ],
       "size": [
-        410,
-        390
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -300,36 +296,48 @@
           "links": [
             3
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         1,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the scene image.",
-        "global",
-        ""
+        "full",
+        "fixed",
+        0
       ],
       "title": "Scene Global Reference"
     },
     {
       "id": 8,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         830,
         500
       ],
       "size": [
-        410,
-        420
+        470,
+        600
       ],
       "flags": {},
       "order": 8,
@@ -353,23 +361,35 @@
           "links": [
             6
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the woman reference image.",
-        "only in region",
-        "woman"
+        "full",
+        "fixed",
+        0
       ],
       "title": "Woman Regional Reference"
     },
@@ -679,7 +699,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Regional Attention workflow.\n\nAttention Region nodes are chainable and define percentage boxes on the target/content image:\n- woman: x=5, y=10, width=40, height=80\n- man: x=55, y=10, width=40, height=80\n\nThe Scene Visual Reference stays global.\nWoman and Man Visual References use attention_scope=\"only in region\" and bind to their matching region_tag.\n\nLatent uses the Scene as dimensions/content with content_fit=contain and carries both tagged boxes through the target transform before Edit projects them to the Krea target token grid.\n\nGuardrail: changing content_fit to crop is allowed only when the complete declared boxes survive the crop. Any partial or complete removal raises an error rather than silently clipping a region."
+        "Legacy Attention Region nodes were removed. All references currently use global attention. To test regional attention, connect a MASK aligned to Krea2 Latent.target_image to each Reference.target_attention_mask and select the desired visual_attention_scope."
       ]
     },
     {
@@ -711,11 +731,6 @@
           "name": "content_image",
           "type": "IMAGE",
           "link": 10
-        },
-        {
-          "name": "attention_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
-          "link": 12
         }
       ],
       "outputs": [
@@ -789,14 +804,14 @@
     },
     {
       "id": 19,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         1280,
         500
       ],
       "size": [
-        430,
-        440
+        470,
+        600
       ],
       "flags": {},
       "order": 10,
@@ -820,103 +835,37 @@
           "links": [
             7
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the man reference image.",
-        "only in region",
-        "man"
+        "full",
+        "fixed",
+        0
       ],
       "title": "Man Regional Reference"
-    },
-    {
-      "id": 20,
-      "type": "CcCKrea2AttentionRegion",
-      "pos": [
-        380,
-        1020
-      ],
-      "size": [
-        420,
-        260
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "attention_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
-          "links": [
-            11
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2AttentionRegion"
-      },
-      "widgets_values": [
-        "woman",
-        5,
-        10,
-        40,
-        80
-      ],
-      "title": "Attention Region: woman"
-    },
-    {
-      "id": 21,
-      "type": "CcCKrea2AttentionRegion",
-      "pos": [
-        380,
-        1320
-      ],
-      "size": [
-        420,
-        280
-      ],
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "previous_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
-          "link": 11
-        }
-      ],
-      "outputs": [
-        {
-          "name": "attention_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
-          "links": [
-            12
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2AttentionRegion"
-      },
-      "widgets_values": [
-        "man",
-        55,
-        10,
-        40,
-        80
-      ],
-      "title": "Attention Region: man"
     }
   ],
   "links": [
@@ -999,22 +948,6 @@
       17,
       2,
       "IMAGE"
-    ],
-    [
-      11,
-      20,
-      0,
-      21,
-      0,
-      "KREA2_ATTENTION_REGION_CHAIN"
-    ],
-    [
-      12,
-      21,
-      0,
-      17,
-      3,
-      "KREA2_ATTENTION_REGION_CHAIN"
     ],
     [
       13,
