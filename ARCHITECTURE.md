@@ -1,10 +1,20 @@
 # Architecture
 
+## Unified Krea2 CcC Reference
+
+Node ID: `CcCKrea2Reference`. This is the recommended reference node for new workflows.
+
+The required inputs start with `image`, then `visual_enable` and the complete `visual_*` group, then `vision_enable` and the complete `vision_*` group. Optional inputs are `previous_references`, `reference_boost_mask`, and `target_attention_mask`. Disabled groups are greyed out and ignored. At least one path must be enabled.
+
+The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Qwen-specific Semantic, Visual, Style, or Context guidance without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
+
+The previous Visual Reference and Vision Reference node IDs are retained for existing workflows; do not use them for new workflows.
+
 ## Public Surface
 
-**Current code contract:** the 14 registered nodes are authoritative; old workflow JSON files have deliberately not been migrated.
+**Current code contract:** the 15 registered nodes are authoritative; old workflow JSON files have deliberately not been migrated.
 
-The current package registers **14 public nodes**:
+The current package registers **15 registered nodes**:
 
 ~~~text
 Edit:
