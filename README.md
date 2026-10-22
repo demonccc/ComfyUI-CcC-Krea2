@@ -2,7 +2,20 @@
 
 ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
-The public surface currently contains **14 nodes**. The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
+The public surface currently contains **15 registered nodes** (including the unified Reference and the two legacy reference nodes). The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
+
+## Unified Reference (new workflows)
+
+**Krea2 CcC Reference** combines the former Visual and Vision reference controls in one node and one source `image`. The controls are ordered with `visual_enable` and all Visual settings first, followed by `vision_enable` and all Vision settings. Disabled groups are greyed out in ComfyUI and are not processed.
+
+- **Visual only**: VAE appearance reference, Fit, RoPE, Boost, reference mask and target attention mask. It does **not** send the image to Qwen.
+- **Vision only**: Qwen Semantic / Visual / Style / Context guidance without any appearance/VAE reference.
+- **Both**: one source image contributes one Visual entry and one Vision entry to the same ordered reference chain; Qwen is not fed a duplicate semantic copy from the Visual path.
+- **Neither**: invalid configuration. At least one path must be enabled.
+
+The Krea2 Edit LoRA remains attached to the model as before. Its image-reference attention is provided by the enabled Visual path; the Vision path supplies separate Qwen conditioning and is **not** a substitute for the LoRA's spatial reference mechanism. Fidelity of the Vision modes with the LoRA still needs image-generation testing.
+
+Legacy `Krea2 CcC Visual Reference` and `Krea2 CcC Vision Reference` nodes remain registered solely so saved workflows are not broken; new workflows should use **Krea2 CcC Reference**. Existing `workflows/` files were intentionally not modified.
 
 ## Public Nodes
 
