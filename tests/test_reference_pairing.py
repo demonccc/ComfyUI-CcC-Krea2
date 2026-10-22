@@ -53,3 +53,21 @@ def test_vision_resize_does_not_resize_visual_vae_source():
     prepared = chain.references[0].prepared_image
     assert prepared.original_image is image
     assert tuple(prepared.vision_image.shape) == (1, 480, 768, 3)
+
+
+@pytest.mark.parametrize("processing,expected", [("2x2", 4), ("4x4", 16)])
+def test_combined_tiled_style_preserves_all_crops(processing, expected):
+    image = torch.rand(1, 128, 128, 3)
+    refs, _ = CcCKrea2Reference().process(
+        image, vision_mode="style", vision_style_processing=processing
+    )
+    with patch(
+        "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+        side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
+    ):
+        chain = _combine_reference_chains(None, refs, {"samples": torch.empty(1, 4, 8, 8)})
+    assert len(chain.references) == 2
+    assert chain.references[0].appearance_reference is True
+    assert chain.references[1].style_processing == processing
+    slots, _ = resolve_reference_slots_and_aliases(chain)
+    assert slots[1]["physical_qwen_range"] == (2, expected + 1)
