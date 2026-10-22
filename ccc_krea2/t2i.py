@@ -14,6 +14,7 @@ from .krea_geometry import (
 )
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 from .qwen_guidance import guidance_detail_instruction, guidance_generation_kwargs
+from .vision_presets import VISION_DIRECTIVES
 from .style_processing import slice_style_image
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
@@ -254,7 +255,7 @@ def _generate_t2i_vision_guidance(
     target_prompt: str,
 ):
     public_mode = _public_vision_mode(entry.mode)
-    system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
+    system_prompt = VISION_DIRECTIVES[public_mode] + "\\n\\n" + T2I_VISION_SYSTEM_PROMPTS[public_mode]
     analysis_images = _t2i_analysis_images(entry)
 
     user_instruction = str(entry.instruction or "").strip()
