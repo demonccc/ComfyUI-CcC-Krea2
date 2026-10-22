@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Duplicate implementation consolidation
+
+- Consolidated Edit Prompt Creator's optional-reference contract into its single implementation; its former public wrapper is now an import-only compatibility alias.
+- Kept its ComfyUI node identifier, inputs, outputs and legacy Python import path stable. No workflow JSON files were changed.
+
+
 ### Architecture cleanup
 
 - Removed unused role-based Subject/Scene target latent generation and inactive target-vision metadata. The active Latent node owns target geometry and VAE output.
