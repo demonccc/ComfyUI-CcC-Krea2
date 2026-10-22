@@ -55,6 +55,9 @@ class VisionReferenceEntry:
     guidance_seed: int = 0
     guidance_detail: str = "balanced"
     vision_guidance: str = "balanced"
+    # True when this Vision entry belongs to the immediately preceding Visual
+    # entry from the unified Reference node, not an extra logical image.
+    paired_visual: bool = False
 
 
 @dataclass(frozen=True)
