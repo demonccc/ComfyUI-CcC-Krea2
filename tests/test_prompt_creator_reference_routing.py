@@ -53,10 +53,10 @@ def test_vision_only_analysis_uses_original_source():
 
 class _FakeClip:
     def __init__(self):
-        self.images = None
+        self.images = None\n        self.prompt = None\n        self.system_prompt = None
 
     def tokenize(self, prompt, **kwargs):
-        self.images = kwargs["images"]
+        self.images = kwargs["images"]\n        self.prompt = prompt\n        self.system_prompt = kwargs.get("system_prompt")
         return {"prompt": prompt}
 
     def generate(self, tokens, **kwargs):
@@ -83,3 +83,31 @@ def test_creator_returns_edit_chain_before_other_references():
     assert clip.images[1] is other_image
     assert result[1].entries == edit.entries + others.entries
     assert "Image 1" in result[2] and "Image 2" in result[2]
+
+
+def test_enhance_concatenates_preset_user_and_guidelines_without_images():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
+        PRESET_SYSTEM_PROMPTS, KREA2_PROMPT_GUIDELINES,
+    )
+    clip = _FakeClip()
+    image_chain, _ = CcCKrea2Reference().process(_image(0.5))
+    result = CcCKrea2EditPromptCreator().create(
+        clip=clip, mode="enhance", user_prompt="a dog", references=image_chain,
+    )
+    assert clip.images == []
+    assert result[1] is not None and result[1].entries == image_chain.entries
+    # The preset is included in the generation prompt once, not duplicated in system_prompt.
+    assert clip.prompt.startswith(PRESET_SYSTEM_PROMPTS["enhance"] + "\\n\\nUSER PROMPT:\\na dog")
+    assert clip.prompt.endswith(KREA2_PROMPT_GUIDELINES)
+    assert clip.system_prompt == ""
+
+
+def test_other_presets_do_not_receive_shared_guidelines_yet():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
+        _build_generation_prompt,
+    )
+    prompt = _build_generation_prompt(
+        mode="create_from_theme", user_prompt="a dog", mapping_lines=[],
+        has_reference_edit_image=False, thinking=False,
+    )
+    assert "KREA2 PROMPT GUIDELINES:" not in prompt
