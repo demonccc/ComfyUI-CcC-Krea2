@@ -7,6 +7,12 @@ import torch
 
 
 @dataclass(frozen=True)
+class ImageReferenceEntry:
+    """Always-present image, without active conditioning."""
+    image: torch.Tensor
+
+
+@dataclass(frozen=True)
 class VisualReferenceEntry:
     """One visual edit reference before Qwen/VAE preparation."""
 
@@ -68,9 +74,9 @@ class VisionReferenceEntry:
 class EditReferenceChain:
     """One ordered chain containing both appearance and Qwen-only references."""
 
-    entries: Tuple[VisualReferenceEntry | VisionReferenceEntry, ...] = ()
+    entries: Tuple[ImageReferenceEntry | VisualReferenceEntry | VisionReferenceEntry, ...] = ()
 
-    def append(self, entry: VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
+    def append(self, entry: ImageReferenceEntry | VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
         return EditReferenceChain(self.entries + (entry,))
 
     def __len__(self) -> int:
