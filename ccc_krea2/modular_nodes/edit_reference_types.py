@@ -64,6 +64,8 @@ class VisionReferenceEntry:
     # True when this Vision entry belongs to the immediately preceding Visual
     # entry from the unified Reference node, not an extra logical image.
     paired_visual: bool = False
+    # Original source image, independent from the optional Qwen resize.
+    source_image: Optional[torch.Tensor] = None
     # For tiled Style, resize each crop after slicing instead of downscaling
     # the entire image before slicing and losing high-frequency details.
     tile_resize: bool = False
