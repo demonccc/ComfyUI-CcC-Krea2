@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prompt Creator `enhance` now uses the agreed one-line task instruction and assembles `preset → USER PROMPT → KREA2 PROMPT GUIDELINES` in the Qwen generation message. Enhance does not analyze reference images, but forwards the reference chain unchanged. Other presets and their system prompts are unchanged. Added regression tests (not executed in ComfyUI).
+
 - Migrated workflow 05 to the new Reference-chain `reference_edit_image` socket and corrected the order and passthrough to Edit.
 - Added workflow 19: Scene + Subject + Prompt Creator. The generated prompt enhances the edit while both reference conditionings remain connected.
 - Structurally validated all 19 workflow JSON graphs for link, input/output type, and endpoint consistency. No ComfyUI execution or image-generation quality tests were run.
