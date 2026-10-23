@@ -506,3 +506,10 @@ Examples are historical fixtures and have not been migrated in this cleanup; a w
 ### Edit RoPE annotated preview
 
 `rope_preview` returns a three-image `IMAGE` batch in fixed order: **layout**, **overlay_boxes**, **overlay_visuals**. All three share the same spatial extent and layout planner. `layout` draws the target and colored reference boxes. `overlay_boxes` draws the target's VAE-prepared image when the input Latent was created `from_image` (otherwise a neutral canvas), with translucent reference boxes. `overlay_visuals` draws the same opaque target with VAE-prepared Visual Reference images overlaid transparently. `collapsed` references are points in all three views, not image thumbnails. Qwen-only Vision References are excluded. The target image is preserved as Latent metadata and exported as `target_image` for mask painting and RoPE preview; it is the original post-fit pixel canvas, not a VAE decode of latent samples.
+
+
+### Reference image transport (updated)
+
+Every Reference always exposes its original source image to downstream nodes, even with `vae_rope_enable=false` and `vision_enable=false`. The image-only representation contributes no Edit conditioning. `vae_rope_enable` replaces `visual_enable`; `vae_rope_*` replaces the corresponding `visual_*` widget names. Vision independently controls Qwen conditioning and may resize its own analysis image without discarding the source.
+
+Prompt Creator's optional `reference_edit_image` input now accepts `KREA2_REFERENCE_CHAIN` (not `IMAGE`). For analysis, edit images are first and the optional `references` chain follows. Paired VAE/RoPE+Vision entries are analyzed once. The output `references` combines the edit chain first and the other chain next, keeping the processing switches unchanged. The source image is available to Prompt Creator even when both conditioning paths are disabled. Existing saved workflows need socket and widget migration; workflow JSONs were not changed.
