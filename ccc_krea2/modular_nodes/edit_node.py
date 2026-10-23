@@ -17,7 +17,7 @@ from ..reference_specs import (
     StyleReferenceSpec,
     VisionPrepSpec,
 )
-from .edit_reference_types import EditReferenceChain, VisualReferenceEntry, VisionReferenceEntry
+from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 from ..vision_reference_runtime import build_vision_reference_spec
 from .rope_position import install_krea2_rope_positioning
 from .rope_preview import render_rope_preview
@@ -160,6 +160,8 @@ def _combine_reference_chains(
 
     entries = (references or EditReferenceChain()).entries
     for index, entry in enumerate(entries, start=1):
+        if isinstance(entry, ImageReferenceEntry):
+            continue  # Raw image is intentionally not an Edit conditioning source.
         if isinstance(entry, VisionReferenceEntry):
             if entry.paired_visual:
                 if index < 2 or not isinstance(entries[index - 2], VisualReferenceEntry):
