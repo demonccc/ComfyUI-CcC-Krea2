@@ -10,7 +10,7 @@ import torch
 
 from ..constants import NODE_CATEGORY
 from ..geometry import resize_tensor
-from .edit_reference_types import EditReferenceChain
+from .edit_reference_types import EditReferenceChain, ImageReferenceEntry
 from .visual_reference_node import CcCKrea2VisualReference
 from .vision_reference_node import CcCKrea2VisionReference
 
@@ -33,10 +33,10 @@ class CcCKrea2Reference:
     def INPUT_TYPES(cls):
         visual = CcCKrea2VisualReference.INPUT_TYPES()
         vision = CcCKrea2VisionReference.INPUT_TYPES()
-        required = {"image": ("IMAGE",), "visual_enable": ("BOOLEAN", {"default": True})}
+        required = {"image": ("IMAGE",), "vae_rope_enable": ("BOOLEAN", {"default": True})}
         for name, spec in visual["required"].items():
             if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px", "prompt_annotation"):
-                required["visual_" + name] = spec
+                required["vae_rope_" + name] = spec
         required["vision_enable"] = ("BOOLEAN", {"default": True})
         required["vision_resize"] = ("BOOLEAN", {"default": True})
         required["vision_max_edge"] = ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64})
@@ -63,21 +63,19 @@ class CcCKrea2Reference:
             vision_guidance=vision_vision_guidance,
         )
 
-    def process(self, image: torch.Tensor, visual_enable=True, vision_enable=True,
+    def process(self, image: torch.Tensor, vae_rope_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
                 reference_boost_mask=None, target_attention_mask=None, **kwargs):
-        if not visual_enable and not vision_enable:
-            raise ValueError("[Krea2 CcC Reference] Enable Visual, Vision, or both.")
         chain = previous_references if previous_references is not None else EditReferenceChain()
         info = ["=== Krea2 CcC Reference ===",
-                f"Visual: {'enabled' if visual_enable else 'disabled'}",
+                f"VAE/RoPE: {'enabled' if vae_rope_enable else 'disabled'}",
                 f"Vision: {'enabled' if vision_enable else 'disabled'}"]
-        if visual_enable:
+        if vae_rope_enable:
             visual_kwargs = {
-                name: kwargs["visual_" + name]
+                name: kwargs["vae_rope_" + name]
                 for name in CcCKrea2VisualReference.INPUT_TYPES()["required"]
                 if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px", "prompt_annotation")
-                and "visual_" + name in kwargs
+                and "vae_rope_" + name in kwargs
             }
             chain, = self._visual.process(
                 image=image, previous_references=chain,
@@ -122,5 +120,7 @@ class CcCKrea2Reference:
                                       tile_max_edge=max_edge)
                 chain = EditReferenceChain(chain.entries[:-1] + (tiled_entry,))
             info.append(vision_info)
+        if not vae_rope_enable and not vision_enable:
+            chain = chain.append(ImageReferenceEntry(image=image))
         info.append(f"Chain Entries: {len(chain.entries)}")
         return chain, "\n".join(info)
