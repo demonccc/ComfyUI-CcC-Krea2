@@ -66,6 +66,12 @@ class CcCKrea2Reference:
     def process(self, image: torch.Tensor, vae_rope_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
                 reference_boost_mask=None, target_attention_mask=None, **kwargs):
+        # Accept saved workflows with the previous visual control spelling.
+        if "visual_enable" in kwargs:
+            vae_rope_enable = bool(kwargs.pop("visual_enable"))
+        for key in tuple(kwargs):
+            if key.startswith("visual_"):
+                kwargs.setdefault("vae_rope_" + key[len("visual_"):], kwargs.pop(key))
         chain = previous_references if previous_references is not None else EditReferenceChain()
         info = ["=== Krea2 CcC Reference ===",
                 f"VAE/RoPE: {'enabled' if vae_rope_enable else 'disabled'}",
@@ -108,7 +114,7 @@ class CcCKrea2Reference:
                     )
             chain, vision_info = self._vision.process(
                 image=vision_image, previous_references=chain, **vision_kwargs)
-            if visual_enable:
+            if vae_rope_enable:
                 # One source image and one logical reference: the Vision preset
                 # augments the immediately preceding Visual entry in Edit.
                 paired_entry = replace(chain.entries[-1], paired_visual=True,
