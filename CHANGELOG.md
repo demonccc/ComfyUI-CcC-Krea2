@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Migrated workflow 05 to the new Reference-chain `reference_edit_image` socket and corrected the order and passthrough to Edit.
+- Added workflow 19: Scene + Subject + Prompt Creator. The generated prompt enhances the edit while both reference conditionings remain connected.
+- Structurally validated all 19 workflow JSON graphs for link, input/output type, and endpoint consistency. No ComfyUI execution or image-generation quality tests were run.
+
+
 ### Reference image transport and Prompt Creator
 
 - Public Reference VAE/RoPE controls now use the `vae_rope_` prefix instead of `visual_`, with `vae_rope_enable` replacing `visual_enable`.
