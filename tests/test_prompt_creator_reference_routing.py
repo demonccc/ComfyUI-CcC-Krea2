@@ -53,10 +53,14 @@ def test_vision_only_analysis_uses_original_source():
 
 class _FakeClip:
     def __init__(self):
-        self.images = None\n        self.prompt = None\n        self.system_prompt = None
+        self.images = None
+        self.prompt = None
+        self.system_prompt = None
 
     def tokenize(self, prompt, **kwargs):
-        self.images = kwargs["images"]\n        self.prompt = prompt\n        self.system_prompt = kwargs.get("system_prompt")
+        self.images = kwargs["images"]
+        self.prompt = prompt
+        self.system_prompt = kwargs.get("system_prompt")
         return {"prompt": prompt}
 
     def generate(self, tokens, **kwargs):
@@ -97,7 +101,7 @@ def test_enhance_concatenates_preset_user_and_guidelines_without_images():
     assert clip.images == []
     assert result[1] is not None and result[1].entries == image_chain.entries
     # The preset is included in the generation prompt once, not duplicated in system_prompt.
-    assert clip.prompt.startswith(PRESET_SYSTEM_PROMPTS["enhance"] + "\\n\\nUSER PROMPT:\\na dog")
+    assert clip.prompt.startswith(PRESET_SYSTEM_PROMPTS["enhance"] + "\n\nUSER PROMPT:\na dog")
     assert clip.prompt.endswith(KREA2_PROMPT_GUIDELINES)
     assert clip.system_prompt == ""
 
