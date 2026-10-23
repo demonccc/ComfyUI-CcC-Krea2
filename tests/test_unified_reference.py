@@ -4,7 +4,7 @@ import pytest
 
 from ccc_krea2.modular_nodes.reference_node import CcCKrea2Reference
 from ccc_krea2.modular_nodes.edit_reference_types import (
-    VisualReferenceEntry, VisionReferenceEntry, EditReferenceChain,
+    ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry, EditReferenceChain,
 )
 
 
@@ -14,11 +14,11 @@ def image():
 
 def test_schema_has_visual_before_vision():
     keys = list(CcCKrea2Reference.INPUT_TYPES()["required"])
-    assert keys[0:2] == ["image", "visual_enable"]
-    assert keys.index("visual_reference_fit") < keys.index("vision_enable")
+    assert keys[0:2] == ["image", "vae_rope_enable"]
+    assert keys.index("vae_rope_reference_fit") < keys.index("vision_enable")
     assert keys.index("vision_enable") < keys.index("vision_mode")
     assert "semantic" not in keys
-    assert "visual_semantic" not in keys
+    assert "vae_rope_semantic" not in keys
 
 
 def test_both_enabled_by_default():
@@ -111,3 +111,14 @@ def test_combined_semantic_resize_controls_match_vision_options():
     assert chain.entries[0].semantic
     assert chain.entries[0].semantic_resize is False
     assert chain.entries[0].semantic_grounding_px == 1024
+
+
+def test_vision_only_preserves_original_even_when_qwen_image_is_resized():
+    source = torch.rand((1, 1200, 1600, 3))
+    chain, _ = CcCKrea2Reference().process(
+        source, vae_rope_enable=False, vision_enable=True,
+        vision_resize=True, vision_max_edge=768,
+    )
+    assert len(chain.entries) == 1
+    assert chain.entries[0].source_image is source
+    assert tuple(chain.entries[0].image.shape) == (1, 576, 768, 3)
