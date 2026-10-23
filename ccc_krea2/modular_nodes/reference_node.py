@@ -117,14 +117,18 @@ class CcCKrea2Reference:
             if vae_rope_enable:
                 # One source image and one logical reference: the Vision preset
                 # augments the immediately preceding Visual entry in Edit.
-                paired_entry = replace(chain.entries[-1], paired_visual=True,
+                paired_entry = replace(chain.entries[-1], paired_visual=True, source_image=image,
                                        tile_resize=resize and tiled_style,
                                        tile_max_edge=max_edge)
                 chain = EditReferenceChain(chain.entries[:-1] + (paired_entry,))
             elif tiled_style:
-                tiled_entry = replace(chain.entries[-1], tile_resize=resize,
+                tiled_entry = replace(chain.entries[-1], source_image=image, tile_resize=resize,
                                       tile_max_edge=max_edge)
                 chain = EditReferenceChain(chain.entries[:-1] + (tiled_entry,))
+            if not vae_rope_enable and not tiled_style:
+                chain = EditReferenceChain(chain.entries[:-1] + (
+                    replace(chain.entries[-1], source_image=image),
+                ))
             info.append(vision_info)
         if not vae_rope_enable and not vision_enable:
             chain = chain.append(ImageReferenceEntry(image=image))
