@@ -167,7 +167,10 @@ def _collect_analysis_images(
             if entry.image is None:
                 warnings.append(f"{role} reference has no source image.")
                 continue
-            images.append(entry.image)
+            images.append(
+                entry.source_image if isinstance(entry, VisionReferenceEntry) and entry.source_image is not None
+                else entry.image
+            )
             index = len(images)
             mapping_lines.append(
                 f"Vision input {index} = Image {index}. Role: {role} reference."
