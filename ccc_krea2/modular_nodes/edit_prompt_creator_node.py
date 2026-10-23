@@ -14,15 +14,7 @@ from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, Visua
 PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
 
 PRESET_SYSTEM_PROMPTS = {
-    "enhance": """Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.
-
-Preserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.""",
+    "enhance": "Enhance the user\'s prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
 
     "create_from_image": """Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
 
@@ -44,6 +36,26 @@ Write the result as a direct description of the desired final image, not as an e
 
 Return only the final I2I prompt as one plain-text paragraph.""",
 }
+
+
+KREA2_PROMPT_GUIDELINES = """Write the final image description in natural language.
+
+Preserve the user's specified elements, relationships, and style.
+
+Make the description rich and detailed, with coherent subjects, attributes, actions, and surroundings.
+
+Avoid unnecessary specifications that conflict with the intended result.
+
+Return only the final image description as one cohesive English paragraph."""
+
+
+def _build_krea2_prompt(preset_prompt: str, user_prompt: str) -> str:
+    """Shared preset / user / guidelines contract, currently enabled for Enhance only."""
+    return (
+        f"{preset_prompt}\n\n"
+        f"USER PROMPT:\n{user_prompt}\n\n"
+        f"KREA2 PROMPT GUIDELINES:\n{KREA2_PROMPT_GUIDELINES}"
+    )
 
 
 def _resolve_system_prompt(mode: str, system_prompt: str) -> str:
@@ -198,6 +210,9 @@ def _build_generation_prompt(
             "[Krea2 CcC Edit Prompt Creator] create_from_image requires reference_edit_image."
         )
 
+    if mode == "enhance":
+        return _build_krea2_prompt(PRESET_SYSTEM_PROMPTS["enhance"], clean_user_prompt)
+
     mappings = "\n".join(mapping_lines) if mapping_lines else "No analyzable visual images were supplied."
     guidance = clean_user_prompt or "No additional user guidance."
 
@@ -327,9 +342,11 @@ class CcCKrea2EditPromptCreator:
 
         if reference_edit_image is not None and not isinstance(reference_edit_image, EditReferenceChain):
             raise TypeError("[Krea2 CcC Edit Prompt Creator] reference_edit_image must be a Reference chain.")
-        images, mapping_lines, warnings = _collect_analysis_images(
-            references=references,
-            reference_edit_image=reference_edit_image,
+        images, mapping_lines, warnings = (
+            ([], [], []) if mode == "enhance" else _collect_analysis_images(
+                references=references,
+                reference_edit_image=reference_edit_image,
+            )
         )
         combined_references = EditReferenceChain(
             (reference_edit_image.entries if reference_edit_image is not None else ()) + references.entries
@@ -350,7 +367,7 @@ class CcCKrea2EditPromptCreator:
             "images": images,
             "min_length": 1,
             "thinking": bool(thinking),
-            "system_prompt": system_prompt,
+            "system_prompt": "" if mode == "enhance" else system_prompt,
         }
         thinking_prefilled = bool(thinking)
         if thinking_prefilled:
