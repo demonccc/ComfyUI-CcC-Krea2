@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Reference image transport and Prompt Creator
+
+- Public Reference VAE/RoPE controls now use the `vae_rope_` prefix instead of `visual_`, with `vae_rope_enable` replacing `visual_enable`.
+- Source images remain available even when both VAE/RoPE and Vision are disabled; a raw image-only chain entry carries the source without conditioning.
+- Vision references retain the original source pixels independently of Qwen resizing.
+- Prompt Creator accepts an Edit Reference chain on `reference_edit_image`, analyzes Edit images before other references, removes paired Visual/Vision duplicates from its analysis image list, and forwards the combined chain to Edit without changing enabled processing paths.
+- Existing workflows using the previous `IMAGE` socket on Prompt Creator or old Reference widget names must be migrated. Workflow JSON files are not changed in this patch.
+- Added reference transport and Prompt Creator routing tests; runtime/GPU validation remains pending.
+
+
 ### Final Native/Edit contract audit
 
 - Verified the Native Vision mode routes through Edit as unchanged Qwen image rows with no preset-specific directive; Visual still has explicit appearance guidance.
