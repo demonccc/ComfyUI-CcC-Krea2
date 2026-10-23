@@ -755,7 +755,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Scene + Subject + Prompt Creator.\n\n- Prompt Creator analyzes Scene Image first (Image 1) and Subject Image second (Image 2).\n- The scene and subject references remain independent and are both forwarded to Edit with their selected VAE/RoPE and Vision conditions.\n- The new prompt describes the desired combined image and strengthens the edit instruction. It does not replace visual conditioning.\n- Change each Reference mode as needed. Both are enabled by default.\n- Target Latent remains 1024x1024; no geometry or RoPE algorithms are changed."
+        "Scene + Subject + Prompt Creator.\n\n- Prompt Creator analyzes Scene Image first (Image 1) and Subject Image second (Image 2).\n- The scene and subject references remain independent and are both forwarded to Edit with their selected VAE/RoPE and Vision conditions.\n- The generated prompt must preserve Image 1 outfit/pose/scene exactly while using Image 2 exclusively for identity/body shape. Image numbers are Prompt Creator analysis labels, not a substitute for describing the actual clothes and pose. It does not replace visual conditioning.\n- Change each Reference mode as needed. Both are enabled by default.\n- Target Latent remains 1024x1024; no geometry or RoPE algorithms are changed."
       ]
     },
     {
@@ -820,7 +820,7 @@
       },
       "widgets_values": [
         "enhance",
-        "Use the scene in Image 1 as the environment and composition. Place the subject from Image 2 into that scene, preserving its recognizable identity and appearance. Adapt the subject's pose and interactions to the scene without copying the original scene subject's identity.",
+        "Use Image 1 as the authoritative blueprint for the complete outfit, exact clothing details and colors, accessories, pose, body position, gestures, interactions, setting, camera angle, framing, and composition. Use Image 2 only for the woman's face, identity, body shape, and proportions. Generate a direct, detailed description of the final image: the woman from Image 2 must wear the outfit of Image 1 and reproduce the pose and scene of Image 1 as closely as physically possible. Do not copy the face or identity of the woman in Image 1. Do not preserve the clothes, pose, or background from Image 2. Specify concrete visible details instead of referring to Image 1 or Image 2 in the final prompt. Do not introduce extra people.",
         "Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.\n\nTreat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.\n\nPreserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.\n\nWrite the result as a direct description of the desired final image, not as an explanation of the editing process.\n\nReturn only the final I2I prompt as one plain-text paragraph.",
         true,
         2048,
