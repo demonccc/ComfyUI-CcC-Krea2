@@ -1,6 +1,6 @@
 {
   "last_node_id": 17,
-  "last_link_id": 24,
+  "last_link_id": 27,
   "nodes": [
     {
       "id": 1,
@@ -315,8 +315,8 @@
         },
         {
           "name": "reference_edit_image",
-          "type": "IMAGE",
-          "link": 5
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 26
         }
       ],
       "outputs": [
@@ -324,15 +324,14 @@
           "name": "created_prompt",
           "type": "STRING",
           "links": [
-            7,
-            25
+            7
           ]
         },
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "links": [
-            6
+            27
           ]
         },
         {
@@ -351,7 +350,7 @@
       },
       "widgets_values": [
         "create_from_image",
-        "Use the subject from Image 1 in the situation shown by the reference edit image. Maintain the face and the body shape.",
+        "Use the subject in Image 2 in the scene and action shown in Image 1. Preserve the subject's recognizable appearance; use Image 1 for scene composition and activity.",
         "Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.\n\nTreat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.\n\nUse the user's instructions to determine what should be preserved, changed, emphasized, or adapted.\n\nWrite the result as a direct description of the desired final image, not as an explanation of the editing process.\n\nReturn only the final I2I prompt as one plain-text paragraph.",
         true,
         2048,
@@ -380,11 +379,6 @@
           "name": "image",
           "type": "IMAGE",
           "link": 8
-        },
-        {
-          "name": "previous_references",
-          "type": "KREA2_REFERENCE_CHAIN",
-          "link": 25
         }
       ],
       "outputs": [
@@ -392,7 +386,7 @@
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "links": [
-            9
+            26
           ]
         },
         {
@@ -424,7 +418,7 @@
         "fixed",
         0
       ],
-      "title": "Scene Reference (DISABLED)"
+      "title": "Scene Edit Reference (Vision only)"
     },
     {
       "id": 10,
@@ -530,7 +524,7 @@
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "link": 9
+          "link": 27
         }
       ],
       "outputs": [
@@ -798,7 +792,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Edit Prompt Creator create_from_image test.\n\n- The reference edit image is the authoritative visual blueprint used by Prompt Creator.\n- Image 1 remains the visible subject reference used by Edit.\n- Prompt Creator returns a direct description of the desired final image.\n- The reference edit image is internal to prompt creation and also supplies target dimensions.\n- The optional Vision Reference branch is intentionally disabled.\n- thinking: enabled; max_tokens: 2048; temperature: 0.25; top_p: 0.90.\n- BodySwap LoRA is present in the stack but disabled by default."
+        "Prompt Creator analyzes the scene edit reference first (Image 1), then the subject reference (Image 2). Scene Reference uses Vision only; Subject Reference uses VAE/RoPE plus Vision. Prompt Creator forwards both to Edit, without duplicate references. The source scene image also sets the target latent size."
       ],
       "title": "Workflow Notes"
     }
@@ -837,14 +831,6 @@
       "CLIP"
     ],
     [
-      5,
-      6,
-      0,
-      8,
-      2,
-      "IMAGE"
-    ],
-    [
       7,
       8,
       0,
@@ -859,14 +845,6 @@
       9,
       0,
       "IMAGE"
-    ],
-    [
-      9,
-      9,
-      0,
-      11,
-      5,
-      "KREA2_REFERENCE_CHAIN"
     ],
     [
       10,
@@ -989,11 +967,19 @@
       "IMAGE"
     ],
     [
-      25,
-      8,
-      0,
+      26,
       9,
+      0,
+      8,
+      2,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      27,
+      8,
       1,
+      11,
+      5,
       "KREA2_REFERENCE_CHAIN"
     ]
   ],
