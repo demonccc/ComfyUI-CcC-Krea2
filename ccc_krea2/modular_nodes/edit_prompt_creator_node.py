@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Tuple
 import torch
 
 from ..constants import NODE_CATEGORY
-from .edit_reference_types import EditReferenceChain, VisualReferenceEntry
+from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 
 
 PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
@@ -149,47 +149,29 @@ def _normalize_created_prompt(text: str) -> str:
 
 def _collect_analysis_images(
     references: EditReferenceChain,
-    reference_edit_image: Optional[torch.Tensor],
+    reference_edit_image: Optional[EditReferenceChain],
 ) -> Tuple[List[torch.Tensor], List[str], List[str]]:
+    """Send edit images first, then the remaining references, without paired duplicates."""
     images: List[torch.Tensor] = []
     mapping_lines: List[str] = []
     warnings: List[str] = []
-    krea_image_index = 1
-
-    visual_entries = (entry for entry in references.entries if isinstance(entry, VisualReferenceEntry))
-    for chain_index, entry in enumerate(visual_entries, start=1):
-        downstream_image_index = krea_image_index if entry.semantic else None
-        if entry.semantic:
-            krea_image_index += 1
-
-        if entry.image is None:
-            warnings.append(
-                f"Visual reference {chain_index} has no raw IMAGE for Prompt Creator analysis."
-            )
-            continue
-
-        images.append(entry.image)
-        internal_index = len(images)
-        annotation = entry.prompt_annotation.strip()
-        if downstream_image_index is not None:
+    for role, chain in (
+        ("EDIT", reference_edit_image or EditReferenceChain()),
+        ("REFERENCE", references),
+    ):
+        for entry in chain.entries:
+            if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+                continue
+            if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
+                continue
+            if entry.image is None:
+                warnings.append(f"{role} reference has no source image.")
+                continue
+            images.append(entry.image)
+            index = len(images)
             mapping_lines.append(
-                f"Vision input {internal_index} = Image {downstream_image_index}. "
-                f"Role: {annotation or 'Visual reference.'}"
+                f"Vision input {index} = Image {index}. Role: {role} reference."
             )
-        else:
-            mapping_lines.append(
-                f"Vision input {internal_index} = visual reference {chain_index}, "
-                f"but it has no downstream Image N label. "
-                f"Role: {annotation or 'Appearance-only visual reference.'}"
-            )
-
-    if reference_edit_image is not None:
-        images.append(reference_edit_image)
-        mapping_lines.append(
-            f"Vision input {len(images)} = INTERNAL REFERENCE EDIT IMAGE. "
-            "Use it for analysis only; the final prompt must describe its useful content in words."
-        )
-
     return images, mapping_lines, warnings
 
 
@@ -245,8 +227,8 @@ class CcCKrea2EditPromptCreator:
     FUNCTION = "create"
     DESCRIPTION = (
         "Optional Qwen3-VL prompt creator. Reuses the same multimodal CLIP as Krea2/Generate Text, "
-        "reads the mixed Visual/Vision Reference chain, and optionally analyzes a reference_edit_image. "
-        "It only creates text and passes the full reference chain through unchanged."
+        "reads the edit reference first, then other references, including image-only sources. "
+        "It generates text and forwards the ordered chain without changing conditioning flags."
     )
 
     @classmethod
@@ -308,11 +290,11 @@ class CcCKrea2EditPromptCreator:
             "optional": {
                 "references": ("KREA2_REFERENCE_CHAIN",),
                 "reference_edit_image": (
-                    "IMAGE",
+                    "KREA2_REFERENCE_CHAIN",
                     {
                         "tooltip": (
-                            "Internal image used to understand an edit situation. "
-                            "create_from_image requires it. The image itself is not added to Visual References."
+                            "Reference for the image being edited; analyzed first. "
+                            "Can contain an image even when both conditioning paths are disabled."
                         )
                     },
                 ),
@@ -331,7 +313,7 @@ class CcCKrea2EditPromptCreator:
         temperature: float = 0.25,
         top_p: float = 0.90,
         seed: int = 0,
-        reference_edit_image: Optional[torch.Tensor] = None,
+        reference_edit_image: Optional[EditReferenceChain] = None,
     ):
         if references is None:
             references = EditReferenceChain()
@@ -340,9 +322,14 @@ class CcCKrea2EditPromptCreator:
                 "[Krea2 CcC Edit Prompt Creator] references must be a EditReferenceChain."
             )
 
+        if reference_edit_image is not None and not isinstance(reference_edit_image, EditReferenceChain):
+            raise TypeError("[Krea2 CcC Edit Prompt Creator] reference_edit_image must be a Reference chain.")
         images, mapping_lines, warnings = _collect_analysis_images(
             references=references,
             reference_edit_image=reference_edit_image,
+        )
+        combined_references = EditReferenceChain(
+            (reference_edit_image.entries if reference_edit_image is not None else ()) + references.entries
         )
         system_prompt = _resolve_system_prompt(
             mode=str(mode),
@@ -420,4 +407,4 @@ class CcCKrea2EditPromptCreator:
             info_lines.extend(["", "Thinking:", thinking_text])
         info_lines.extend(["", "Created Prompt:", created_prompt])
 
-        return created_prompt, references, "\n".join(info_lines), thinking_text
+        return created_prompt, combined_references, "\n".join(info_lines), thinking_text
