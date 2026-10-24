@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
-    PRESET_SYSTEM_PROMPTS,
+    _resolve_preset,
     PROMPT_CREATOR_MODES,
     CcCKrea2EditPromptCreator,
 )
@@ -62,8 +62,7 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
         clip=clip,
         references=chain,
         mode="create_from_image_i2i",
-        user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
-        system_prompt="this must be ignored for preset modes",
+        instructions="Use the subject from Image 1 in the situation shown by the reference edit image.",
         thinking=True,
         max_tokens=2048,
         temperature=0.25,
@@ -86,7 +85,7 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
-    assert "System Prompt Source: preset" in info
+    assert "Effective Qwen Prompt" in info
     assert "Thinking:" in info
 
 
@@ -101,8 +100,8 @@ def test_meta_instruction_leak_is_removed_and_reference_name_is_normalized():
     created, _, _, thinking = CcCKrea2EditPromptCreator().create(
         clip=clip,
         references=_chain(),
-        mode="enhance",
-        user_prompt="Put the woman on a white bed.",
+        mode="enhance_t2i",
+        instructions="Put the woman on a white bed.",
     )
 
     assert created == "The woman from Image 1 is seated on a white bed."
@@ -120,55 +119,35 @@ def test_meta_instruction_only_output_is_rejected():
         CcCKrea2EditPromptCreator().create(
             clip=clip,
             references=_chain(),
-            mode="enhance",
-            user_prompt="Improve this edit.",
+            mode="enhance_t2i",
+            instructions="Improve this edit.",
         )
 
 
-def test_custom_mode_uses_exact_system_prompt():
-    clip = _FakeClip("The woman from Image 1 is standing under neon lights.")
-    custom = "Build a cyberpunk situation around the referenced subject. Return only the edit prompt."
-
-    created, _, info, _ = CcCKrea2EditPromptCreator().create(
-        clip=clip,
-        references=_chain(),
-        mode="custom",
-        user_prompt="",
-        system_prompt=custom,
-    )
-
-    assert created == "The woman from Image 1 is standing under neon lights."
-    assert clip.tokenize_kwargs["system_prompt"] == custom
-    assert "System Prompt Source: custom" in info
-
-
-def test_custom_mode_requires_system_prompt():
-    with pytest.raises(ValueError, match="requires a non-empty system_prompt"):
-        CcCKrea2EditPromptCreator().create(
-            clip=_FakeClip(),
-            references=_chain(),
-            mode="custom",
-            user_prompt="",
-            system_prompt="",
-        )
+def test_none_mode_uses_instructions_and_guidelines_only():
+    clip = _FakeClip()
+    CcCKrea2EditPromptCreator().create(clip=clip, mode="none", instructions="A new idea.")
+    assert clip.tokenize_prompt.startswith("INSTRUCTIONS:\\nA new idea.")
+    assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
+    assert clip.tokenize_kwargs["system_prompt"] == ""
 
 
 def test_image_presets_accept_optional_image_inputs():
     for mode in ("create_from_image_t2i", "create_from_image_i2i"):
         clip = _FakeClip()
         CcCKrea2EditPromptCreator().create(
-            clip=clip, mode=mode, user_prompt="Describe an imaginative scene."
+            clip=clip, mode=mode, instructions="Describe an imaginative scene."
         )
         assert clip.tokenize_kwargs["images"] == []
         assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
-        assert PRESET_SYSTEM_PROMPTS[mode] in clip.tokenize_prompt
+        assert _resolve_preset(mode) in clip.tokenize_prompt
 
 
 def test_enhance_and_create_from_theme_require_user_text():
-    for mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i"):
-        with pytest.raises(ValueError, match="requires a non-empty user_prompt"):
+    for mode in ("enhance_t2i", "enhance_i2i", "create_from_theme_t2i", "create_from_theme_i2i"):
+        with pytest.raises(ValueError, match="instructions must not be empty"):
             CcCKrea2EditPromptCreator().create(
-                clip=_FakeClip(), references=_chain(), mode=mode, user_prompt=""
+                clip=_FakeClip(), references=_chain(), mode=mode, instructions=""
             )
 
 
@@ -186,8 +165,8 @@ def test_appearance_only_reference_has_no_downstream_image_number():
     CcCKrea2EditPromptCreator().create(
         clip=clip,
         references=chain,
-        mode="enhance",
-        user_prompt="Use the subject in an outdoor scene.",
+        mode="enhance_t2i",
+        instructions="Use the subject in an outdoor scene.",
     )
 
     assert "has no downstream Image N label" in clip.tokenize_prompt
@@ -202,16 +181,16 @@ def test_thinking_truncation_without_final_prompt_is_reported():
         CcCKrea2EditPromptCreator().create(
             clip=clip,
             references=_chain(),
-            mode="enhance",
-            user_prompt="Improve this edit.",
+            mode="enhance_t2i",
+            instructions="Improve this edit.",
             thinking=True,
         )
 
 def test_high_token_budget_is_passed_unmodified_to_qwen():
     clip = _FakeClip("The woman from Image 1 is wearing a blue dress.")
     created, passthrough, info, thinking = CcCKrea2EditPromptCreator().create(
-        clip=clip, references=_chain(), mode="enhance",
-        user_prompt="Describe the dress in detail.",
+        clip=clip, references=_chain(), mode="enhance_t2i",
+        instructions="Describe the dress in detail.",
         max_tokens=32768,
     )
     assert created
