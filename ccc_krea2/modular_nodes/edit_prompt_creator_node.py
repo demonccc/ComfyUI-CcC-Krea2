@@ -309,11 +309,37 @@ class CcCKrea2EditPromptCreator:
             generation_prompt,
             thinking_prefilled=thinking_prefilled,
         )
-        if not raw_created_prompt.strip() and thinking_text:
-            raise RuntimeError(
-                "[Krea2 CcC Edit Prompt Creator] Qwen generation ended inside the thinking block before "
-                "producing a final prompt. Increase max_tokens or disable thinking."
+        used_thinking_fallback = False
+        if not raw_created_prompt.strip() and thinking_text and thinking_prefilled:
+            # An unfinished thinking block is not a usable edit prompt.
+            # Retry once without thinking; preserve the original reasoning output.
+            fallback_kwargs = {
+                **tokenize_kwargs,
+                "thinking": False,
+            }
+            fallback_kwargs.pop("llama_template", None)
+            fallback_tokens = clip.tokenize(generation_prompt, **fallback_kwargs)
+            fallback_ids = clip.generate(
+                fallback_tokens,
+                do_sample=True,
+                max_length=int(max_tokens),
+                temperature=float(temperature),
+                top_k=64,
+                top_p=float(top_p),
+                min_p=0.05,
+                repetition_penalty=1.05,
+                seed=int(seed),
             )
+            fallback_prompt, _ = _split_generated_text(
+                clip, fallback_ids, generation_prompt, thinking_prefilled=False
+            )
+            if not fallback_prompt.strip():
+                raise RuntimeError(
+                    "[Krea2 CcC Edit Prompt Creator] Qwen produced no final prompt, "
+                    "including the retry with thinking disabled. Increase max_tokens or adjust instructions."
+                )
+            raw_created_prompt = fallback_prompt
+            used_thinking_fallback = True
         created_prompt = _normalize_created_prompt(raw_created_prompt)
 
         info_lines = [
@@ -321,6 +347,7 @@ class CcCKrea2EditPromptCreator:
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
             f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
+            f"Thinking Fallback: {'retry without thinking' if used_thinking_fallback else 'not needed'}",
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
