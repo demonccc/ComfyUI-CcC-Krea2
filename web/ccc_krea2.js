@@ -440,6 +440,8 @@ app.registerExtension({
                 [contentWidget, () => { updateContentState(); updateSemanticState(); }],
                 [contentFitWidget, updateContentState],
                 [semanticWidget, updateSemanticState],
+                ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
+                    .map(name => [node.widgets?.find(w => w.name === name), updateSemanticState]),
             ]) {
                 if (!widget) continue;
                 const originalCallback = widget.callback;
