@@ -100,10 +100,9 @@ def test_enhance_concatenates_preset_user_and_guidelines_without_images():
     )
     assert clip.images == []
     assert result[1] is not None and result[1].entries == image_chain.entries
-    # The preset is included in the generation prompt once, not duplicated in system_prompt.
-    assert clip.prompt.startswith(_resolve_preset("enhance_t2i") + "\n\nINSTRUCTIONS:\na dog")
-    assert clip.prompt.endswith(KREA2_PROMPT_GUIDELINES)
-    assert clip.system_prompt == ""
+    assert clip.prompt.startswith("INSTRUCTIONS:\na dog")
+    assert _resolve_preset("enhance_t2i") in clip.system_prompt
+    assert KREA2_PROMPT_GUIDELINES in clip.system_prompt
 
 
 def test_other_presets_do_not_receive_shared_guidelines_yet():
@@ -113,7 +112,7 @@ def test_other_presets_do_not_receive_shared_guidelines_yet():
     prompt = _build_generation_prompt(
         mode="none", instructions="a dog", mapping_lines=[],
     )
-    assert "KREA2 PROMPT GUIDELINES:" in prompt
+    assert prompt == "INSTRUCTIONS:\na dog"
 
 
 def test_analysis_only_source_does_not_steal_edit_image_numbers():
