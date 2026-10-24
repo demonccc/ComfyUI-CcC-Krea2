@@ -10,7 +10,7 @@ from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
 from .modular_nodes.latent_node import CcCKrea2Latent
 from .modular_nodes.edit_node import CcCKrea2Edit
 from .modular_nodes.edit_prompt_creator_node import CcCKrea2EditPromptCreator
-from .modular_nodes.character_sheet_node import CcCKrea2CharacterSheet
+from .modular_nodes.layout_node import CcCKrea2LayoutCell, CcCKrea2LayoutComposer
 from .modular_nodes.paint_geometry_node import CcCKrea2PaintRestore
 from .modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare
 from .modular_nodes.paint_node import CcCKrea2Paint
@@ -23,7 +23,8 @@ NODE_CLASS_MAPPINGS = {
     "CcCKrea2Latent": CcCKrea2Latent,
     "CcCKrea2Edit": CcCKrea2Edit,
     "CcCKrea2EditPromptCreator": CcCKrea2EditPromptCreator,
-    "CcCKrea2CharacterSheet": CcCKrea2CharacterSheet,
+    "CcCKrea2LayoutCell": CcCKrea2LayoutCell,
+    "CcCKrea2LayoutComposer": CcCKrea2LayoutComposer,
     "CcCKrea2PaintPrepare": CcCKrea2PaintPrepare,
     "CcCKrea2PaintRestore": CcCKrea2PaintRestore,
     "CcCKrea2Paint": CcCKrea2Paint,
@@ -42,7 +43,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2Latent": "Krea2 CcC Latent",
     "CcCKrea2Edit": "Krea2 CcC Edit",
     "CcCKrea2EditPromptCreator": "Krea2 CcC Edit Prompt Creator",
-    "CcCKrea2CharacterSheet": "Krea2 CcC Character Sheet",
+    "CcCKrea2LayoutCell": "Krea2 CcC Layout Cell",
+    "CcCKrea2LayoutComposer": "Krea2 CcC Layout Composer",
     "CcCKrea2PaintPrepare": "Krea2 CcC Paint Prepare",
     "CcCKrea2PaintRestore": "Krea2 CcC Paint Restore",
     "CcCKrea2Paint": "Krea2 CcC Paint",
