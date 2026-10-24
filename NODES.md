@@ -187,9 +187,8 @@ Required inputs/controls:
 | --- | --- | --- |
 | clip | CLIP | — |
 | references | KREA2_REFERENCE_CHAIN | optional |
-| mode | enhance, create_from_image, create_from_theme, custom | enhance |
-| user_prompt | text | empty |
-| system_prompt | text | enhance preset |
+| mode | enhance_t2i/i2i, create_from_image_t2i/i2i, create_from_theme_t2i/i2i, none | enhance_t2i |
+| instructions | text | empty |
 | thinking | boolean | false |
 | max_tokens | 32..32768, step 32 | 512 |
 | temperature | 0.01..2.0 | 0.25 |
@@ -209,22 +208,18 @@ Outputs:
 
 The first three output slots remain compatible with the earlier node contract; thinking is the fourth output.
 
-### Mode and system_prompt behavior
+### Presets and instructions
 
-- enhance: treats the user's instructions as the authoritative guide and uses available visual context to make the requested final image clearer without changing intent.
-- create_from_image: requires reference_edit_image and treats it as the authoritative visual blueprint for the desired result; the user's instructions decide what should be preserved, changed, emphasized, or adapted. Visual References remain part of the multimodal analysis and keep their Image N mapping; reference_edit_image is an additional internal blueprint image, not a replacement for those references.
-- create_from_theme: treats the user's theme or idea as the authoritative creative direction and uses the available visual context to build a coherent final-image prompt.
-- custom: sends the editable system_prompt exactly as the Qwen system prompt.
+The node exposes six presets from three shared templates. Each family generates either a text-to-image (T2I) or image-to-image (I2I) prompt, replacing only the `{kind}` placeholder:
 
-For enhance, create_from_image, and create_from_theme, the frontend shows the effective preset system_prompt in the text field but keeps it greyed/read-only. Selecting custom enables the same field for editing. When entering custom for the first time, the current preset becomes the starting text; an existing custom value is preserved when switching away and back.
+- `enhance_t2i` / `enhance_i2i`: enrich the instructions while preserving their intent.
+- `create_from_image_t2i` / `create_from_image_i2i`: analyze optional reference images and use the instructions to decide which visual information is relevant and how to use it.
+- `create_from_theme_t2i` / `create_from_theme_i2i`: invent a scene inspired by the instructions.
+- `none`: no preset instruction; the user writes the complete task in `instructions`.
 
-The backend does not trust the visible field for preset modes: it resolves the canonical preset by mode. In custom mode, it requires a non-empty system_prompt.
+There is no editable `system_prompt` textbox and no frontend preset preview or graying. The prompt sent to Qwen is assembled as preset instruction (if selected), `INSTRUCTIONS`, optional neutral `IMAGE MAPPING` (Image 1, Image 2, etc.), and shared `KREA2 PROMPT GUIDELINES`. The guidelines also apply to `none`. The full effective assembled prompt appears on the `creator_info` output.
 
-### Generalist preset behavior
-
-The built-in presets intentionally avoid hard-coding people, clothing, poses, objects, or other content-specific checklists. Prompt Creator analyzes the available visual context and follows the user's request, producing a direct description of the desired final image rather than explaining the edit operation.
-
-For create_from_image, the reference edit image is the primary visual blueprint. The preset does not predefine which visual details are important; relevance is determined by the image and the user's instructions.
+Both Image and Theme families accept references optionally, and do not assign image roles. Enhance remains text-only for prompt analysis; reference chains remain available for downstream Edit.
 
 ### Thinking
 
