@@ -81,7 +81,7 @@ def test_creator_returns_edit_chain_before_other_references():
     clip = _FakeClip()
     result = CcCKrea2EditPromptCreator().create(
         clip=clip, reference_edit_image=edit, references=others,
-        mode="create_from_image",
+        mode="create_from_image_i2i",
     )
     assert clip.images[0] is edit_image
     assert clip.images[1] is other_image
@@ -111,7 +111,7 @@ def test_other_presets_do_not_receive_shared_guidelines_yet():
         _build_generation_prompt,
     )
     prompt = _build_generation_prompt(
-        mode="create_from_theme", user_prompt="a dog", mapping_lines=[],
+        mode="custom", user_prompt="a dog", mapping_lines=[],
         has_reference_edit_image=False, thinking=False,
     )
     assert "KREA2 PROMPT GUIDELINES:" not in prompt
