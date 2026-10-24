@@ -6,7 +6,7 @@ from ccc_krea2.modular_nodes.reference_node import CcCKrea2Reference
 from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
     CcCKrea2EditPromptCreator, _collect_analysis_images,
 )
-from ccc_krea2.modular_nodes.edit_reference_types import ImageReferenceEntry
+from ccc_krea2.modular_nodes.edit_reference_types import ImageReferenceEntry, VisionReferenceEntry
 
 
 def _image(v):
@@ -184,7 +184,7 @@ def test_creator_remaps_qwen_output_against_edit_slots():
     assert "Analysis Image 2 -> Edit Image 1" in result[2]
 
 
-def test_reference_edit_image_with_vision_enabled_stays_analysis_only():
+def test_reference_edit_image_with_vision_enabled_reaches_qwen_but_not_vae():
     from ccc_krea2.modular_nodes.edit_prompt_creator_node import _edit_image_slot_map
     image_edit, _ = CcCKrea2Reference().process(
         _image(0.1), vae_rope_enable=False, vision_enable=True,
@@ -198,5 +198,7 @@ def test_reference_edit_image_with_vision_enabled_stays_analysis_only():
         mode="create_from_image_i2i", instructions="Edit the reference image.",
     )
     assert len(clip.images) == 2
-    assert result[1].entries == subject.entries
-    assert _edit_image_slot_map(subject, image_edit) == [None, None]
+    assert len(result[1].entries) == 2
+    assert isinstance(result[1].entries[0], VisionReferenceEntry)
+    assert result[1].entries[1:] == subject.entries
+    assert _edit_image_slot_map(subject, image_edit) == [1, None]
