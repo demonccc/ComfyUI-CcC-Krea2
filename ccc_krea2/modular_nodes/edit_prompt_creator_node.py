@@ -180,10 +180,7 @@ def _edit_image_slot_map(
     Images with both conditioning paths off remain analysis-only. A tiled style
     reference has multiple Qwen crops, so it has no single physical Image N.
     """
-    entries = (
-        (reference_edit_image.entries if reference_edit_image is not None else ())
-        + references.entries
-    )
+    entries = references.entries
     active = []
     deferred_styles = []
     analysis_positions = []
@@ -225,7 +222,8 @@ def _edit_image_slot_map(
         if count == 1:
             slot_map[index] = next_slot
         next_slot += count
-    return [slot_map.get(index) for index in analysis_positions]
+    prefix = sum(1 for entry in (reference_edit_image.entries if reference_edit_image else ()) if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)) and not (isinstance(entry, VisionReferenceEntry) and entry.paired_visual) and entry.image is not None)
+    return [None] * prefix + [slot_map.get(index) for index in analysis_positions]
 
 
 def _remap_created_image_labels(
