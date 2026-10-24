@@ -1,6 +1,6 @@
 # ComfyUI-Krea-CcC
 
-ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
+ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, grid-based image layouts, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
 The public surface currently contains **15 registered nodes** (including the unified Reference and the two legacy reference nodes). The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
 
@@ -27,7 +27,7 @@ Legacy `Krea2 CcC Visual Reference` and `Krea2 CcC Vision Reference` nodes remai
 | Edit | **Krea2 CcC Latent** | Owns target dimensions, Krea geometry policy, optional target content, semantic target context, and an aligned `target_image` output for masks. |
 | Edit | **Krea2 CcC Edit Prompt Creator** | Optional multimodal prompt creator using the same Krea2/Qwen3-VL CLIP as Edit. |
 | Edit | **Krea2 CcC Edit** | Final edit orchestrator and Krea2 CcC edit runtime. |
-| Utility | **Krea2 CcC Character Sheet** | Deterministically composes generic portrait/body references into one Krea-aligned image. |
+| Utility | **Krea2 CcC Layout Cell / Layout Composer** | Compose a chain of images into a Krea-sized grid, including full rows or columns. |
 | Paint | **Krea2 CcC Paint Prepare** | Owns Paint geometry, outpaint expansion, mask processing, semantic reference, VAE preparation, and sampling latent. |
 | Paint | **Krea2 CcC Paint** | Builds AnyPaint/Krea Paint conditioning and installs the Paint runtime. |
 | Paint | **Krea2 CcC Paint Restore** | Restores decoded Paint output to the requested canvas. |
@@ -66,7 +66,7 @@ reference_edit_image-+
 
 Prompt Creator examines **only Visual Reference entries** from the mixed reference chain and passes the entire chain through unchanged. Its optional reference_edit_image is used internally for prompt analysis, not as an appearance reference.
 
-**Character Sheet** is also a utility before Visual Reference. It creates one deterministic IMAGE; the result can then be connected to a normal Visual Reference.
+**Layout Cell / Layout Composer** build image sheets from a chain of positioned source images; the composited IMAGE can feed a Reference or Edit workflow.
 
 ## Visual Reference
 
@@ -170,23 +170,10 @@ All preset modes enforce final edit text with no system/meta preamble. Downstrea
 
 The Visual Reference chain is returned unchanged.
 
-## Character Sheet
+## Image Layout
 
-Character Sheet accepts generic portrait_1..4 and body_1..2 inputs. Numbers indicate ordering only; specific camera angles are not required.
+`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/20_layout_composer_2x2_1x1_1x1.json` demonstrates four columns: two stacked images in each of the first two columns, and one full-height image in each remaining column.
 
-Available layouts:
-
-- 1 portrait
-- 2 portraits
-- 3 portraits
-- 4 portraits
-- 1 body
-- 2 bodies
-- 1 portrait + 2 bodies
-- 3 portraits + 1 body
-- 4 portraits + 1 body
-
-It always preserves source aspect ratio and fits the complete image inside each slot. There is no crop/cover/stretch mode.
 
 ## Paint
 
@@ -237,7 +224,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
 - workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
 - workflows/03_regional_attention.json — **legacy/incompatible** with the current mask API: still uses removed tagged Attention Region nodes. Kept unchanged pending workflow migration.
-- workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference; BodySwap disabled by default.
+- workflows/20_layout_composer_2x2_1x1_1x1.json — six-image grid with four columns and two full-height columns.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
 - workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference used to produce text guidance before final conditioning.
 - workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
