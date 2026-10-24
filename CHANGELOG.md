@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replaced Character Sheet with chainable `Krea2 CcC Layout Cell` and `Krea2 CcC Layout Composer` nodes. Each cell defines row/column or full-row/full-column placement, contain/stretch/crop/fit, position and signed offsets; the composer calculates grid sizes from a Krea image preset and validates overlaps/gaps. Removed the obsolete Character Sheet implementation, test and sample workflow; added `workflows/20_layout_composer_2x2_1x1_1x1.json` (four columns: stacked cells in the first two, full-height images in the final two) and unit tests. No GPU tests executed.
+
 - Latent retains its existing LATENT, info and target-image outputs, VAE encoding, sizing and content-fit behavior. Only optional semantic conditioning uses the Reference Vision mode and parameter contract; added regression coverage to guard the original outputs.
 
 - Reference node UI now disables/grays `vae_rope_*` controls when `vae_rope_enable` is off and `vision_*` controls when `vision_enable` is off, preserving the existing fit, resize, style, and seed-dependent states. Fixed stale frontend selectors using the former `visual_*` names; backend conditioning unchanged.
