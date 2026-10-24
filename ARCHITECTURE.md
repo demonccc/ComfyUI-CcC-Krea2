@@ -12,9 +12,9 @@ The previous Visual Reference and Vision Reference node IDs are retained for exi
 
 ## Public Surface
 
-**Current code contract:** the 15 registered nodes are authoritative; old workflow JSON files have deliberately not been migrated.
+**Current code contract:** the registered node mappings in `ccc_krea2/nodes.py` are authoritative; examples in `workflows/` demonstrate supported configurations.
 
-The current package registers **15 registered nodes**:
+The package exposes these principal nodes:
 
 ~~~text
 Edit:
@@ -26,7 +26,8 @@ Edit:
   Krea2 CcC Edit
 
 Utility:
-  Krea2 CcC Character Sheet
+  Krea2 CcC Layout Cell
+  Krea2 CcC Layout Composer
 
 Paint:
   Krea2 CcC Paint Prepare
@@ -87,24 +88,17 @@ Visible downstream references are named Image N. The final-output sanitizer remo
 
 reference_edit_image is visible to the Creator only unless the user separately wires that image into another existing path. The final prompt therefore verbalizes useful scene details instead of referring to the hidden image itself.
 
-### Character Sheet
+### Image Layout
 
-Character Sheet is a deterministic IMAGE utility before Visual Reference:
+The layout utility uses a chain of independent cells and a final composer:
 
 ~~~text
-portrait/body IMAGE inputs
-        |
-        v
-Character Sheet
-  preserve aspect
-  fit complete source
-  no crop/stretch
-        |
-        v
-normal Visual Reference
+IMAGE --> Layout Cell --> Layout Cell --> Layout Cell --> Layout Composer --> IMAGE
+                shared KREA2_LAYOUT_CHAIN
 ~~~
 
-It does not run Qwen, VAE, conditioning, or latent processing.
+Each cell declares a row/column or a full row/column, fit mode, alignment and signed offsets. The composer resolves Krea preset dimensions, padding and gaps before composing, rejecting overlapping or unfilled grid cells. This replaces the former sheet-specific utility.
+
 
 ## Visual Reference: Two Independent Representations
 
