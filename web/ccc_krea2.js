@@ -1,38 +1,5 @@
 import { app } from "../../scripts/app.js";
 
-const PROMPT_CREATOR_PRESETS = {
-    enhance: `Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.
-
-Preserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
-
-    create_from_image: `Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
-
-Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
-
-    create_from_theme: `Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's theme or idea as the authoritative creative direction. Use the available visual context to build a coherent desired result that fits it.
-
-Keep the prompt focused on the intended final image. Add only the visual detail needed to make the result clear and useful.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
-};
-
-
 // Consolidated from the existing compactLoader frontend behavior.
 // LoRA stacks use ComfyUI's native BOOLEAN, COMBO, FLOAT and STRING widgets.
 // Keep widget types, callbacks and workflow serialization untouched.
@@ -186,7 +153,7 @@ function migrateLegacyT2IWidgets(node, values) {
 
 function setupLoraDisabledState(node, attempts = 0) {
     if (node.__cccLoraDisabledInstalled) return;
-    const count = node.comfyClass === "CcCKrea2LoRAStackWithPrompt" ? 5 : 10;
+    const count = 5;
     const find = (name) => node.widgets?.find((widget) => widget.name === name);
 
     if (!find("lora_1_enabled")) {
@@ -232,6 +199,90 @@ app.registerExtension({
         if (!node || !node.comfyClass) return;
         if (NATIVE_LORA_NODES.has(node.comfyClass)) setupLoraDisabledState(node);
 
+        if (node.comfyClass === "CcCKrea2LayoutCell") {
+            const find = (name) => node.widgets?.find(w => w.name === name);
+            const refresh = () => {
+                const placement = find("placement")?.value ?? "cell";
+                const fit = find("fit")?.value ?? "contain";
+                setWidgetDisabled(node, "row", placement === "full_column");
+                setWidgetDisabled(node, "column", placement === "full_row");
+                const hasPosition = fit === "crop" || fit === "fit";
+                setWidgetDisabled(node, "resize_percent", fit !== "crop");
+                for (const name of ["horizontal_position", "vertical_position", "offset_x", "offset_y"]) {
+                    setWidgetDisabled(node, name, !hasPosition);
+                }
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (const name of ["placement", "fit"]) {
+                const widget = find(name);
+                if (!widget) continue;
+                const old = widget.callback;
+                widget.callback = function (...args) {
+                    const result = old?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const oldConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = oldConfigure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            setTimeout(refresh, 20);
+        }
+
+        if (node.comfyClass === "CcCKrea2Reference") {
+            const find = (name) => node.widgets?.find((w) => w.name === name);
+            const refresh = () => {
+                const visual = find("vae_rope_enable")?.value === true;
+                const vision = find("vision_enable")?.value === true;
+                for (const widget of node.widgets ?? []) {
+                    if (widget.name.startsWith("vae_rope_") && widget.name !== "vae_rope_enable") {
+                        setWidgetDisabled(node, widget.name, !visual);
+                    } else if (widget.name.startsWith("vision_") && widget.name !== "vision_enable") {
+                        setWidgetDisabled(node, widget.name, !vision);
+                    }
+                }
+                const fit = find("vae_rope_reference_fit")?.value ?? "native";
+                setWidgetDisabled(node, "vae_rope_placement_grid", !visual || fit === "crop");
+                setWidgetDisabled(node, "vae_rope_rope_geometry", !visual || fit === "native");
+                if (visual && fit === "crop" && find("vae_rope_placement_grid")) {
+                    find("vae_rope_placement_grid").value = "inside";
+                }
+                if (visual && fit === "native" && find("vae_rope_rope_geometry")) {
+                    find("vae_rope_rope_geometry").value = "source";
+                }
+                setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
+                const visionMode = find("vision_mode")?.value ?? "semantic";
+                setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
+                if (vision && visionMode !== "style" && find("vision_style_processing")) {
+                    find("vision_style_processing").value = "full";
+                }
+                setWidgetDisabled(node, "vision_guidance_seed",
+                    !vision || (find("vision_guidance_seed_mode")?.value ?? "fixed") !== "fixed");
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (const name of ["vae_rope_enable", "vae_rope_reference_fit",
+                                "vision_enable", "vision_resize", "vision_mode", "vision_guidance_seed_mode"]) {
+                const widget = find(name);
+                if (!widget) continue;
+                const original = widget.callback;
+                widget.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const configure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = configure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            setTimeout(refresh, 20);
+        }
+
         if (node.comfyClass === "CcCKrea2VisualReference") {
             const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
             const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
@@ -267,6 +318,8 @@ app.registerExtension({
 
             for (const [widget, callback] of [
                 [semanticWidget, updateSemanticState],
+                ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
+                    .map(name => [node.widgets?.find(w => w.name === name), updateSemanticState]),
                 [semanticResizeWidget, updateSemanticState],
                 [fitWidget, updateFitState],
             ]) {
@@ -399,16 +452,29 @@ app.registerExtension({
             };
 
             const updateSemanticState = () => {
-                const enabled = semanticWidget?.value === true;
-                setDisabled("latent_semantic_instruction", !enabled);
-                setDisabled("latent_grounding_px", !enabled);
+                const enabled = semanticWidget?.value === true && contentWidget?.value === "from_image";
+                setWidgetDisabled(node, "latent_semantic", contentWidget?.value !== "from_image");
+                for (const widget of node.widgets ?? []) {
+                    if (widget.name.startsWith("latent_vision_")) {
+                        setWidgetDisabled(node, widget.name, !enabled);
+                    }
+                }
+                setWidgetDisabled(node, "latent_vision_max_edge", !enabled ||
+                    node.widgets?.find(w => w.name === "latent_vision_resize")?.value !== true);
+                const mode = node.widgets?.find(w => w.name === "latent_vision_mode")?.value ?? "semantic";
+                setWidgetDisabled(node, "latent_vision_style_processing", !enabled || mode !== "style");
+                const seedMode = node.widgets?.find(w => w.name === "latent_vision_guidance_seed_mode")?.value ?? "fixed";
+                setWidgetDisabled(node, "latent_vision_guidance_seed", !enabled || seedMode !== "fixed");
+                node.setDirtyCanvas?.(true, true);
             };
 
             for (const [widget, callback] of [
                 [dimensionsWidget, updateDimensionsState],
-                [contentWidget, updateContentState],
+                [contentWidget, () => { updateContentState(); updateSemanticState(); }],
                 [contentFitWidget, updateContentState],
                 [semanticWidget, updateSemanticState],
+                ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
+                    .map(name => [node.widgets?.find(w => w.name === name), updateSemanticState]),
             ]) {
                 if (!widget) continue;
                 const originalCallback = widget.callback;
@@ -417,6 +483,15 @@ app.registerExtension({
                     callback();
                 };
             }
+
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = originalConfigure?.apply(this, args);
+                updateDimensionsState();
+                updateContentState();
+                updateSemanticState();
+                return result;
+            };
 
             setTimeout(() => {
                 updateDimensionsState();
@@ -449,87 +524,6 @@ app.registerExtension({
             }
         }
 
-        if (node.comfyClass === "CcCKrea2EditPromptCreator") {
-            const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const systemPromptWidget = node.widgets?.find((w) => w.name === "system_prompt");
-
-            if (!modeWidget || !systemPromptWidget) return;
-
-            let previousMode = modeWidget.value ?? "enhance";
-            let customSystemPrompt =
-                previousMode === "custom" ? String(systemPromptWidget.value ?? "") : "";
-
-            const setSystemPromptValue = (value) => {
-                if (systemPromptWidget.value !== value) {
-                    systemPromptWidget.value = value;
-                }
-
-                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
-                if (inputEl && "value" in inputEl && inputEl.value !== value) {
-                    inputEl.value = value;
-                }
-
-                systemPromptWidget.triggerDraw?.();
-            };
-
-            const setSystemPromptEditable = (editable) => {
-                systemPromptWidget.options ??= {};
-                systemPromptWidget.options.read_only = !editable;
-                systemPromptWidget.disabled = false;
-
-                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
-                if (inputEl) {
-                    inputEl.readOnly = !editable;
-                    inputEl.style.opacity = editable ? "" : "0.65";
-                }
-
-                systemPromptWidget.triggerDraw?.();
-            };
-
-            const updatePromptCreatorState = () => {
-                const mode = modeWidget.value ?? "enhance";
-
-                if (previousMode === "custom" && mode !== "custom") {
-                    customSystemPrompt = String(systemPromptWidget.value ?? "");
-                }
-
-                if (mode === "custom") {
-                    if (!customSystemPrompt.trim()) {
-                        customSystemPrompt =
-                            PROMPT_CREATOR_PRESETS[previousMode] ??
-                            PROMPT_CREATOR_PRESETS.enhance;
-                    }
-                    setSystemPromptValue(customSystemPrompt);
-                    setSystemPromptEditable(true);
-                } else {
-                    setSystemPromptValue(
-                        PROMPT_CREATOR_PRESETS[mode] ?? PROMPT_CREATOR_PRESETS.enhance
-                    );
-                    setSystemPromptEditable(false);
-                }
-
-                previousMode = mode;
-                node.setDirtyCanvas?.(true, true);
-            };
-
-            const originalModeCallback = modeWidget.callback;
-            modeWidget.callback = function () {
-                if (originalModeCallback) originalModeCallback.apply(this, arguments);
-                updatePromptCreatorState();
-            };
-
-            const originalSystemPromptCallback = systemPromptWidget.callback;
-            systemPromptWidget.callback = function () {
-                if (originalSystemPromptCallback) {
-                    originalSystemPromptCallback.apply(this, arguments);
-                }
-                if ((modeWidget.value ?? "enhance") === "custom") {
-                    customSystemPrompt = String(systemPromptWidget.value ?? "");
-                }
-            };
-
-            setTimeout(updatePromptCreatorState, 100);
-        }
 
     }
 });

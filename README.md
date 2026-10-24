@@ -1,8 +1,21 @@
 # ComfyUI-Krea-CcC
 
-ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, character sheets, LoRA workflows, and AnyPaint-style inpaint/outpaint.
+ComfyUI-Krea-CcC provides ComfyUI nodes for Krea 2 generation, text-to-image, reference-guided editing, prompt creation, Vision guidance, grid-based image layouts, LoRA workflows, and AnyPaint-style inpaint/outpaint.
 
-The public surface currently contains **14 nodes**. The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
+The public surface currently contains **15 registered nodes** (including the unified Reference and the two legacy reference nodes). The former Reference Cache feature has been removed. Paint geometry remains internal to Paint Prepare/Restore.
+
+## Unified Reference (new workflows)
+
+**Krea2 CcC Reference** combines the former Visual and Vision reference controls in one node and one source `image`. The controls are ordered with `visual_enable` and all Visual settings first, followed by `vision_enable` and all Vision settings. Both groups are enabled by default. Disabled groups are greyed out in ComfyUI and are not processed. Vision optionally downsizes the source with bicubic antialiasing (`vision_resize=true`, `vision_max_edge=768`) independently of Visual, without cropping or upscaling. The combined node omits the legacy guidance detail/sampling presets, which have no equivalent Edit effect.
+
+- **Visual only**: VAE appearance reference, Fit, RoPE, Boost, reference mask and target attention mask. It does **not** send the image to Qwen.
+- **Vision only**: Qwen Semantic / Visual / Style / Context / Native guidance without any appearance/VAE reference.
+- **Both**: one source image contributes one Visual entry and one Vision entry to the same ordered reference chain; Qwen is not fed a duplicate semantic copy from the Visual path.
+- **Neither**: invalid configuration. At least one path must be enabled.
+
+The Krea2 Edit LoRA remains attached to the model as before. Its image-reference attention is provided by the enabled Visual path; the Vision path supplies separate Qwen conditioning and is **not** a substitute for the LoRA's spatial reference mechanism. Fidelity of the Vision modes with the LoRA still needs image-generation testing.
+
+Legacy `Krea2 CcC Visual Reference` and `Krea2 CcC Vision Reference` nodes remain registered solely so saved workflows are not broken; new workflows should use **Krea2 CcC Reference**. Existing `workflows/` files were intentionally not modified.
 
 ## Public Nodes
 
@@ -14,7 +27,7 @@ The public surface currently contains **14 nodes**. The former Reference Cache f
 | Edit | **Krea2 CcC Latent** | Owns target dimensions, Krea geometry policy, optional target content, semantic target context, and an aligned `target_image` output for masks. |
 | Edit | **Krea2 CcC Edit Prompt Creator** | Optional multimodal prompt creator using the same Krea2/Qwen3-VL CLIP as Edit. |
 | Edit | **Krea2 CcC Edit** | Final edit orchestrator and Krea2 CcC edit runtime. |
-| Utility | **Krea2 CcC Character Sheet** | Deterministically composes generic portrait/body references into one Krea-aligned image. |
+| Utility | **Krea2 CcC Layout Cell / Layout Composer** | Compose a chain of images into a Krea-sized grid, including full rows or columns. |
 | Paint | **Krea2 CcC Paint Prepare** | Owns Paint geometry, outpaint expansion, mask processing, semantic reference, VAE preparation, and sampling latent. |
 | Paint | **Krea2 CcC Paint** | Builds AnyPaint/Krea Paint conditioning and installs the Paint runtime. |
 | Paint | **Krea2 CcC Paint Restore** | Restores decoded Paint output to the requested canvas. |
@@ -47,13 +60,13 @@ The reference nodes can be chained in any order using `previous_references`; the
 references --> Edit Prompt Creator --> references --> Edit
                      |                    ^
 CLIP ----------------+                    |
-user_prompt ---------+--> created_prompt -+--> Edit.positive_prompt
+instructions -------+--> created_prompt -+--> Edit.positive_prompt
 reference_edit_image-+
 ~~~
 
 Prompt Creator examines **only Visual Reference entries** from the mixed reference chain and passes the entire chain through unchanged. Its optional reference_edit_image is used internally for prompt analysis, not as an appearance reference.
 
-**Character Sheet** is also a utility before Visual Reference. It creates one deterministic IMAGE; the result can then be connected to a normal Visual Reference.
+**Layout Cell / Layout Composer** build image sheets from a chain of positioned source images; the composited IMAGE can feed a Reference or Edit workflow.
 
 ## Visual Reference
 
@@ -70,7 +83,9 @@ RoPE placement is independent from pixel fit. Visual Reference supports `rope_mo
 
 The Qwen path is controlled by semantic. When enabled, the same image can be downscaled only when it exceeds semantic_grounding_px. prompt_annotation is identification-only and becomes Image N: <annotation>; edit instructions belong in Edit's positive prompt.
 
-Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.\n\nPositive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
+Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.
+
+Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
 
 Visual Reference attention supports `global`, `boost in mask`, and `only in mask`. Each Visual Reference accepts an optional `reference_boost_mask` (source-image pixels, transformed with the image) and `target_attention_mask` (final target-image pixels). Masks stay with their owning reference; there are no tags or separate Attention Region nodes. Latent exports `target_image` to provide a mask-painting canvas matching its final geometry.
 
@@ -85,7 +100,7 @@ Modes:
 - **Style** — reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior, then applies that guidance strongly as the dominant visual treatment. Style processing may still analyze the full image or 2x2 / 4x4 tiles.
 - **Context** — mandatory scene staging: setting, framing/viewpoint, exact pose, head orientation, gaze, gesture, hands/limbs, interaction, composition, depth, object placement, and spatial relationships are treated as constraints rather than loose description, without copying identity, clothing, or visual style.
 
-Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Detail changes the extraction policy as well as its token budget; Vision Guidance has deliberately separated conservative/balanced/flexible sampling behavior. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, and Context.
+Only **Style** uses the `style_processing` control. Semantic, Visual, and Context are fixed to full-image processing. The optional `instruction` is stored with the reference and each consumer decides how to apply it within the selected mode. T2I currently converts all Vision modes into Qwen-generated text guidance before final Krea conditioning. Guidance Detail changes the extraction policy as well as its token budget; Vision Guidance has deliberately separated conservative/balanced/flexible sampling behavior. Guidance Seed, Guidance Detail, and Vision Guidance are available for Semantic, Visual, Style, Context, and Native.
 
 ## Latent and Target Geometry
 
@@ -140,16 +155,14 @@ Official references used for the target policy:
 
 The Creator reuses the same multimodal Krea2/Qwen3-VL CLIP as ComfyUI Generate Text and Edit.
 
-Modes:
+The node uses one editable `instructions` field and seven selector choices: six presets in three families plus `none`:
 
-- enhance: improve an existing edit instruction without changing its intent.
-- create_from_image: analyze reference_edit_image and reconstruct a detailed situation instead of collapsing it to a short summary.
-- create_from_theme: expand a high-level theme into a concrete, detailed new situation while keeping referenced subjects anchored.
-- custom: edit and send the system_prompt directly.
+- `enhance_t2i` / `enhance_i2i`: enrich the instruction without changing intent.
+- `create_from_image_t2i` / `create_from_image_i2i`: analyze available images, using the instructions to decide which details matter and how to apply them.
+- `create_from_theme_t2i` / `create_from_theme_i2i`: invent a scene inspired by the instructions.
+- `none`: user supplies the entire task through `instructions`, without a preset.
 
-The system_prompt field always shows the effective prompt. For preset modes it is greyed/read-only; custom enables editing. Switching to custom starts from the current preset unless an earlier custom value exists.
-
-create_from_image asks Qwen to capture relevant pose/body position, other people and interactions, props, environment, spatial relationships, framing, camera angle, composition, and lighting while preserving explicit user constraints such as face, identity, anatomy, body shape, and body proportions.
+Each pair uses one shared template with a `{kind}` placeholder for `text-to-image` or `image-to-image`. Every mode appends the common Krea2 guidelines; the effective full prompt sent to Qwen is available in `creator_info`. The old visible `system_prompt` widget and preset graying behavior have been removed.
 
 thinking uses the Qwen3-VL thinking convention and pre-fills the assistant turn with <think> when enabled. The reasoning before </think> is returned separately on the thinking output, while only the final edit text remains in created_prompt. An unfinished thinking block raises an error instead of producing an empty/invalid final prompt.
 
@@ -157,23 +170,10 @@ All preset modes enforce final edit text with no system/meta preamble. Downstrea
 
 The Visual Reference chain is returned unchanged.
 
-## Character Sheet
+## Image Layout
 
-Character Sheet accepts generic portrait_1..4 and body_1..2 inputs. Numbers indicate ordering only; specific camera angles are not required.
+`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), crop-only positive `resize_percent` (default 100%), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/20_layout_composer_2x2_1x1_1x1.json` demonstrates four columns: two stacked images in each of the first two columns, and one full-height image in each remaining column.
 
-Available layouts:
-
-- 1 portrait
-- 2 portraits
-- 3 portraits
-- 4 portraits
-- 1 body
-- 2 bodies
-- 1 portrait + 2 bodies
-- 3 portraits + 1 body
-- 4 portraits + 1 body
-
-It always preserves source aspect ratio and fits the complete image inside each slot. There is no crop/cover/stretch mode.
 
 ## Paint
 
@@ -213,7 +213,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## LoRA and Text to Image
 
-**LoRA Stack** and **LoRA Stack Sliders** each support 10 model-only slots. **LoRA Stack with Prompt** supports 5 model-only slots with per-slot positive prepend/append triggers and outputs `prompt_augmentation`. Connect that output explicitly to either Edit or T2I to apply it; Edit always keeps its grounded negative prompt empty.
+**LoRA Stack**, **LoRA Stack Sliders**, and **LoRA Stack with Prompt** each support 5 model-only slots. **LoRA Stack with Prompt** supports per-slot positive prepend/append triggers with per-slot positive prepend/append triggers and outputs `prompt_augmentation`. Connect that output explicitly to Edit, Paint, or T2I to apply it; Edit always keeps its grounded negative prompt empty.
 
 **Text to Image** encodes positive/negative text with the supplied CLIP, creates its empty latent from the shared Krea geometry presets/policies, and returns MODEL / positive / negative / LATENT. Qwen guidance controls do not live on T2I: they travel with **Vision Reference**. With a Vision Reference, T2I uses Qwen multimodal generation only as an analysis step, then encodes the resulting mode-scoped guidance as text-only Krea2 conditioning. Direct Vision rows never enter the final T2I conditioning, so the source image cannot overpower the prompt or appear as an extra subject. The explicit negative prompt remains text-only.
 
@@ -224,7 +224,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
 - workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
 - workflows/03_regional_attention.json — **legacy/incompatible** with the current mask API: still uses removed tagged Attention Region nodes. Kept unchanged pending workflow migration.
-- workflows/04_character_sheet_identity.json — generic portrait/body Character Sheet used as one Visual Reference; BodySwap disabled by default.
+- workflows/20_layout_composer_2x2_1x1_1x1.json — six-image grid with four columns and two full-height columns.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
 - workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference used to produce text guidance before final conditioning.
 - workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
@@ -247,3 +247,6 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
 
 **RoPE preview:** Edit emits one `IMAGE` batch containing three annotated views in order: `layout`, `overlay_boxes` and `overlay_visuals`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point, and Qwen-only Vision References are not shown.
+
+
+**Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts a Reference chain for `reference_edit_image`, analyzes it first and forwards both chains, while disabled conditioning stays disabled. Existing workflows using the former IMAGE socket/widget names require migration.

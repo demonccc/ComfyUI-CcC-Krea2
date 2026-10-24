@@ -153,11 +153,6 @@
           "links": [
             9
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -181,13 +176,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -274,14 +270,14 @@
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         500
       ],
       "size": [
-        410,
-        390
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -300,36 +296,48 @@
           "links": [
             3
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         1,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the scene image.",
-        "global",
-        ""
+        "full",
+        "fixed",
+        0
       ],
-      "title": "Scene Visual Reference"
+      "title": "Scene Reference"
     },
     {
       "id": 8,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         830,
         500
       ],
       "size": [
-        410,
-        420
+        470,
+        600
       ],
       "flags": {},
       "order": 8,
@@ -353,73 +361,37 @@
           "links": [
             14
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
         "This is the subject image.",
-        "global",
-        ""
+        "full",
+        "fixed",
+        0
       ],
-      "title": "Subject Visual Reference"
-    },
-    {
-      "id": 16,
-      "type": "CcCKrea2SizeResolver",
-      "pos": [
-        400,
-        980
-      ],
-      "size": [
-        420,
-        180
-      ],
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "long_edge_image",
-          "type": "IMAGE",
-          "link": 12
-        },
-        {
-          "name": "aspect_ratio_image",
-          "type": "IMAGE",
-          "link": 13
-        }
-      ],
-      "outputs": [
-        {
-          "name": "width",
-          "type": "INT",
-          "links": [
-            21
-          ]
-        },
-        {
-          "name": "height",
-          "type": "INT",
-          "links": [
-            22
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2SizeResolver"
-      },
-      "widgets_values": [],
-      "title": "Subject Long Edge + Scene Aspect Size"
+      "title": "Subject Reference"
     },
     {
       "id": 17,
@@ -440,16 +412,6 @@
           "name": "vae",
           "type": "VAE",
           "link": 20
-        },
-        {
-          "name": "width",
-          "type": "INT",
-          "link": 21
-        },
-        {
-          "name": "height",
-          "type": "INT",
-          "link": 22
         }
       ],
       "outputs": [
@@ -482,7 +444,7 @@
         768,
         1
       ],
-      "title": "Scene + Subject Latent"
+      "title": "Target Latent - Fixed 1024x1024"
     },
     {
       "id": 9,
@@ -789,7 +751,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Scene + Subject direct Edit workflow.\n\nThis workflow demonstrates the normal path without Edit Prompt Creator:\n- Scene Visual Reference -> Subject Visual Reference -> Edit.\n- Reference order is scene -> subject.\n- Scene boost: 1.0.\n- Subject boost: 4.0.\n- Both references use reference_fit=resize and semantic=true.\n- prompt_annotation is role-only: \"This is the scene image.\" / \"This is the subject image.\"\n- Positive text contains the edit instruction.\n- Negative text is fixed internally to empty; the grounded negative keeps the appearance images with neutral boost 1.0.\n\nSize Resolver takes the Subject long edge and Scene aspect ratio, then feeds width/height into Latent fixed-dimensions mode. Latent content is empty, so target geometry remains independent from reference appearance fitting.\n\nCurrent Visual Reference fit modes are crop, resize, contain, and native."
+        "Updated to current Reference and Latent nodes. Latent uses fixed 1024x1024 (current Latent no longer accepts external width/height sockets). Visual and Vision are enabled for each reference; configure Vision mode on each reference as needed. The retired SizeResolver-to-Latent dimensions links have been removed."
       ]
     }
   ],
@@ -883,22 +845,6 @@
       "VAE"
     ],
     [
-      12,
-      6,
-      0,
-      16,
-      0,
-      "IMAGE"
-    ],
-    [
-      13,
-      5,
-      0,
-      16,
-      1,
-      "IMAGE"
-    ],
-    [
       14,
       8,
       0,
@@ -953,22 +899,6 @@
       17,
       0,
       "VAE"
-    ],
-    [
-      21,
-      16,
-      0,
-      17,
-      1,
-      "INT"
-    ],
-    [
-      22,
-      16,
-      1,
-      17,
-      2,
-      "INT"
     ],
     [
       23,

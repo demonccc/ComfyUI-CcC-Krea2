@@ -134,6 +134,27 @@ def run_krea2_edit_orchestrator(
                 )
 
             if not getattr(spec, "include_in_vision", True):
+                if is_appearance and getattr(spec, "negative_vision_only", False):
+                    # Tiled Style uses only crops in positive Qwen, while the
+                    # unconditional branch still needs the unmodified
+                    # appearance reference for grounded Krea2 Edit.
+                    neg_idx = len(neg_qwen_images) + 1
+                    neg_img = spec.prepared_image.vision_image
+                    neg_qwen_images.append(neg_img)
+                    neg_qwen_image_map.append(
+                        {
+                            "role": ref_role,
+                            "slot": slot,
+                            "logical_reference_id": slot,
+                            "logical_role": ref_role,
+                            "logical_vision_slot": slot,
+                            "physical_qwen_image_index": neg_idx,
+                            "style_group_id": None,
+                            "crop_tile_index": None,
+                            "image": neg_img,
+                            "spec": spec,
+                        }
+                    )
                 continue
 
             if spec.prepared_image is None:

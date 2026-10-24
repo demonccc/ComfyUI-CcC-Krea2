@@ -12,38 +12,18 @@ from .reference_specs import (
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 
 
-SEMANTIC_DIRECTIVE = (
-    "Use the reference image as a subject/content guide for the SAME subject requested by the user's prompt. "
-    "Preserve semantic content such as subject type, attributes, pose, action, objects, composition, and scene meaning, "
-    "while the text prompt controls visual style and rendering. Do not add the reference subject as a second subject."
-)
-
-VISUAL_DIRECTIVE = (
-    "Use this reference as direct visual guidance for the subject/result requested by the user's prompt. "
-    "Preserve visible appearance and details, but do not duplicate the reference subject as an additional subject."
-)
-
-STYLE_DIRECTIVE = (
-    "Use the reference image only as a style guide: adopt its color palette, lighting, texture, line work, shading, "
-    "medium, tone, and overall mood, but do not copy or introduce its subjects, people, identities, clothing, objects, "
-    "layout, pose, or composition."
-)
-
-CONTEXT_DIRECTIVE = (
-    "Use this reference only for situation, action, framing, environment, spatial relationships, and scene context. "
-    "Do not copy identities, clothing, exact appearance, or style, and do not introduce a reference person as an "
-    "additional subject unless the user's prompt explicitly requires that extra role."
+from .vision_presets import (
+    SEMANTIC_DIRECTIVE, VISUAL_DIRECTIVE, STYLE_DIRECTIVE, CONTEXT_DIRECTIVE
 )
 
 
 def _with_user_instruction(base: str, instruction: str, scope: str) -> str:
+    """Apply custom guidance without contradicting the selected Vision preset."""
     user = (instruction or "").strip()
-    if not user or scope != "visual":
+    if not user:
         return base
-
     return (
-        f"{base} Apply this extra visual guidance to the SAME subject/result requested by the user's prompt; "
-        f"do not create an additional subject from the reference. Additional visual guidance: {user}"
+        f"{base} Additional {scope} guidance (subject to the mode's preservation rules): {user}"
     )
 
 
@@ -82,6 +62,20 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     """Translate one public Vision Reference entry into the proven internal reference contract."""
     prep = prepare_tokenizer_native_image(entry.image)
 
+    if entry.mode == "native":
+        return ReferenceSpec(
+            reference_path="edit",
+            prepared_image=prep,
+            vision_instruction=entry.instruction.strip(),
+            appearance_reference=False,
+            include_in_vision=True,
+            vision_reference_mode="native",
+            vision_summary_rows=0,
+            vision_indirect=False,
+            semantic_extract="none",
+            semantic_strength=1.0,
+        )
+
     if entry.mode == "semantic_only":
         return ReferenceSpec(
             reference_path="edit",
@@ -119,6 +113,8 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_summary_rows=0,
             vision_indirect=False,
             style_processing=entry.processing,
+            style_tile_resize=entry.tile_resize,
+            style_tile_max_edge=entry.tile_max_edge,
             style_fidelity=0.0,
             indirect_style_transfer=False,
         )
@@ -131,9 +127,11 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="context",
-            vision_summary_rows=64,
+            # Keep spatial rows intact: whitening and subsampling are not a
+            # spatial-context extractor and erase gaze/pose/interaction detail.
+            vision_summary_rows=0,
             vision_indirect=False,
-            semantic_strength=0.0,
+            semantic_strength=1.0,
             indirect_vision_context=False,
         )
 

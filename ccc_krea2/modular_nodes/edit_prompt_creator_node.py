@@ -8,58 +8,49 @@ from typing import Any, List, Optional, Tuple
 import torch
 
 from ..constants import NODE_CATEGORY
-from .edit_reference_types import EditReferenceChain, VisualReferenceEntry
+from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 
 
-PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
+PROMPT_CREATOR_MODES = ("enhance_t2i", "enhance_i2i", "create_from_image_t2i", "create_from_image_i2i", "create_from_theme_t2i", "create_from_theme_i2i", "none")
 
-PRESET_SYSTEM_PROMPTS = {
-    "enhance": """Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.
-
-Preserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.""",
-
-    "create_from_image": """Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
-
-Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.""",
-
-    "create_from_theme": """Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's theme or idea as the authoritative creative direction. Use the available visual context to build a coherent desired result that fits it.
-
-Keep the prompt focused on the intended final image. Add only the visual detail needed to make the result clear and useful.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.""",
+PRESET_TEMPLATES = {
+    "enhance": "Enhance the instructions into a detailed {kind} prompt for Krea2 by adding relevant and coherent details that develop the original idea while preserving its intent.",
+    "create_from_image": "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the instructions to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the instructions, create a detailed and accurate {kind} prompt for Krea2.",
+    "create_from_theme": "Create an original {kind} prompt for Krea2 inspired by the instructions, freely developing them into a complete, imaginative scene.",
 }
 
+KREA2_PROMPT_GUIDELINES = """Write the final image description in natural language.
 
-def _resolve_system_prompt(mode: str, system_prompt: str) -> str:
+Preserve the specified elements, relationships, and style.
+
+Make the description rich and detailed, with coherent subjects, attributes, actions, and surroundings.
+
+Avoid unnecessary specifications that conflict with the intended result.
+
+Return only the final image description as one cohesive English paragraph."""
+
+
+def _resolve_preset(mode: str) -> str:
     if mode not in PROMPT_CREATOR_MODES:
         raise ValueError(f"[Krea2 CcC Edit Prompt Creator] Invalid mode: {mode!r}.")
+    if mode == "none":
+        return ""
+    family, variant = mode.rsplit("_", 1)
+    return PRESET_TEMPLATES[family].format(kind="text-to-image" if variant == "t2i" else "image-to-image")
 
-    if mode == "custom":
-        resolved = str(system_prompt or "").strip()
-        if not resolved:
-            raise ValueError(
-                "[Krea2 CcC Edit Prompt Creator] mode='custom' requires a non-empty system_prompt."
-            )
-        return resolved
 
-    return PRESET_SYSTEM_PROMPTS[mode]
-
+def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[str]) -> str:
+    preset = _resolve_preset(mode)
+    clean = str(instructions or "").strip()
+    if not clean and not (mode in ("create_from_image_t2i", "create_from_image_i2i") and mapping_lines):
+        raise ValueError("[Krea2 CcC Edit Prompt Creator] instructions must not be empty unless create_from_image has reference images.")
+    parts = []
+    if clean:
+        parts.append("INSTRUCTIONS:\n" + clean)
+    if mapping_lines:
+        neutral = [re.sub(r"\. Role: (?:EDIT|REFERENCE) reference\.$", ".", line) for line in mapping_lines]
+        parts.append("IMAGE MAPPING:\n" + "\n".join(neutral))
+    return "\n\n".join(parts)
 
 
 def _thinking_llama_template(image_count: int) -> str:
@@ -141,7 +132,7 @@ def _normalize_created_prompt(text: str) -> str:
     ):
         raise RuntimeError(
             "[Krea2 CcC Edit Prompt Creator] Qwen returned meta-instructions instead of a final edit prompt. "
-            "Try another seed, increase max_tokens, or adjust the selected/custom system prompt."
+            "Try another seed, increase max_tokens, or adjust the selected preset or instructions."
         )
 
     return cleaned
@@ -149,91 +140,136 @@ def _normalize_created_prompt(text: str) -> str:
 
 def _collect_analysis_images(
     references: EditReferenceChain,
-    reference_edit_image: Optional[torch.Tensor],
+    reference_edit_image: Optional[EditReferenceChain],
 ) -> Tuple[List[torch.Tensor], List[str], List[str]]:
+    """Send edit images first, then the remaining references, without paired duplicates."""
     images: List[torch.Tensor] = []
     mapping_lines: List[str] = []
     warnings: List[str] = []
-    krea_image_index = 1
-
-    visual_entries = (entry for entry in references.entries if isinstance(entry, VisualReferenceEntry))
-    for chain_index, entry in enumerate(visual_entries, start=1):
-        downstream_image_index = krea_image_index if entry.semantic else None
-        if entry.semantic:
-            krea_image_index += 1
-
-        if entry.image is None:
-            warnings.append(
-                f"Visual reference {chain_index} has no raw IMAGE for Prompt Creator analysis."
+    for role, chain in (
+        ("EDIT", reference_edit_image or EditReferenceChain()),
+        ("REFERENCE", references),
+    ):
+        for entry in chain.entries:
+            if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+                continue
+            if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
+                continue
+            if entry.image is None:
+                warnings.append(f"{role} reference has no source image.")
+                continue
+            images.append(
+                entry.source_image if isinstance(entry, VisionReferenceEntry) and entry.source_image is not None
+                else entry.image
             )
-            continue
-
-        images.append(entry.image)
-        internal_index = len(images)
-        annotation = entry.prompt_annotation.strip()
-        if downstream_image_index is not None:
+            index = len(images)
             mapping_lines.append(
-                f"Vision input {internal_index} = Image {downstream_image_index}. "
-                f"Role: {annotation or 'Visual reference.'}"
+                f"Vision input {index} = Image {index}. Role: {role} reference."
             )
-        else:
-            mapping_lines.append(
-                f"Vision input {internal_index} = visual reference {chain_index}, "
-                f"but it has no downstream Image N label. "
-                f"Role: {annotation or 'Appearance-only visual reference.'}"
-            )
-
-    if reference_edit_image is not None:
-        images.append(reference_edit_image)
-        mapping_lines.append(
-            f"Vision input {len(images)} = INTERNAL REFERENCE EDIT IMAGE. "
-            "Use it for analysis only; the final prompt must describe its useful content in words."
-        )
-
     return images, mapping_lines, warnings
 
 
-def _build_generation_prompt(
-    mode: str,
-    user_prompt: str,
-    mapping_lines: List[str],
-    has_reference_edit_image: bool,
-    thinking: bool,
-) -> str:
-    if mode not in PROMPT_CREATOR_MODES:
-        raise ValueError(f"[Krea2 CcC Edit Prompt Creator] Invalid mode: {mode!r}.")
 
-    clean_user_prompt = str(user_prompt or "").strip()
-    if mode in ("enhance", "create_from_theme") and not clean_user_prompt:
-        raise ValueError(
-            f"[Krea2 CcC Edit Prompt Creator] mode={mode!r} requires a non-empty user_prompt."
-        )
-    if mode == "create_from_image" and not has_reference_edit_image:
-        raise ValueError(
-            "[Krea2 CcC Edit Prompt Creator] create_from_image requires reference_edit_image."
-        )
 
-    mappings = "\n".join(mapping_lines) if mapping_lines else "No analyzable visual images were supplied."
-    guidance = clean_user_prompt or "No additional user guidance."
+def _edit_image_slot_map(
+    references: EditReferenceChain,
+    reference_edit_image: Optional[EditReferenceChain],
+) -> List[Optional[int]]:
+    """Map each analyzed source image to its physical Qwen image index in Edit.
 
-    thinking_instruction = ""
-    if thinking:
-        thinking_instruction = (
-            "\n\nTHINKING MODE IS ENABLED:\n"
-            "Before the final edit prompt, analyze the images, roles, user constraints, pose, interactions, "
-            "scene geometry, composition, and preservation requirements inside a <think>...</think> block. "
-            "The <think> block must contain actual reasoning and must be closed with </think>. "
-            "After </think>, output only the final Krea2 edit prompt."
-        )
-
-    return (
-        "IMAGE MAPPING:\n"
-        f"{mappings}\n\n"
-        "USER REQUEST / THEME:\n"
-        f"{guidance}"
-        f"{thinking_instruction}\n\n"
-        "Write the requested Krea2 edit prompt now."
+    Images with both conditioning paths off remain analysis-only. A tiled style
+    reference has multiple Qwen crops, so it has no single physical Image N.
+    """
+    edit_vision_entries = tuple(
+        entry for entry in (reference_edit_image.entries if reference_edit_image else ())
+        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual
     )
+    entries = edit_vision_entries + references.entries
+    active = []
+    deferred_styles = []
+    analysis_positions = []
+    for index, entry in enumerate(entries):
+        if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+            continue
+        if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
+            continue
+        if entry.image is None:
+            continue
+        analysis_positions.append(index)
+    for index, entry in enumerate(entries):
+        if isinstance(entry, ImageReferenceEntry):
+            continue
+        if isinstance(entry, VisualReferenceEntry):
+            paired = (
+                entries[index + 1]
+                if index + 1 < len(entries)
+                and isinstance(entries[index + 1], VisionReferenceEntry)
+                and entries[index + 1].paired_visual else None
+            )
+            tiled = paired is not None and paired.mode == "style_indirect" and paired.processing != "full"
+            if entry.semantic and not tiled:
+                active.append(index)
+            continue
+        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
+            if entry.mode == "style_indirect":
+                deferred_styles.append((index, 1 if entry.processing == "full" else
+                                        16 if entry.processing == "4x4" else 4))
+            else:
+                active.append(index)
+        elif isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+            if entry.mode == "style_indirect" and entry.processing != "full":
+                deferred_styles.append((index, 16 if entry.processing == "4x4" else 4))
+    slot_map = {index: slot for slot, index in enumerate(active, start=1)}
+    # Only full, one-image style references have a stable image index.
+    next_slot = len(active) + 1
+    for index, count in deferred_styles:
+        if count == 1:
+            slot_map[index] = next_slot
+        next_slot += count
+    edit_sources = [
+        entry for entry in (reference_edit_image.entries if reference_edit_image else ())
+        if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry))
+        and not (isinstance(entry, VisionReferenceEntry) and entry.paired_visual)
+        and entry.image is not None
+    ]
+    edit_slots = [slot_map.get(index) for index in range(len(edit_vision_entries))]
+    # Analysis-source order matches the native Vision entries when edit image
+    # has no VAE path. Passive images have no physical Edit slot.
+    edit_mapping = []
+    vision_index = 0
+    for entry in edit_sources:
+        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
+            edit_mapping.append(edit_slots[vision_index])
+            vision_index += 1
+        else:
+            edit_mapping.append(None)
+    return edit_mapping + [
+        slot_map.get(index + len(edit_vision_entries))
+        for index in range(len(references.entries))
+        if isinstance(references.entries[index], (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry))
+        and not (isinstance(references.entries[index], VisionReferenceEntry) and references.entries[index].paired_visual)
+        and references.entries[index].image is not None
+    ]
+
+
+def _remap_created_image_labels(
+    prompt: str, slot_map: List[Optional[int]]
+) -> Tuple[str, List[int]]:
+    """Replace analysis indices with Edit's physical indices simultaneously."""
+    ungrounded = []
+    def replace_label(match):
+        index = int(match.group(1))
+        if index < 1 or index > len(slot_map):
+            return match.group(0)
+        slot = slot_map[index - 1]
+        if slot is None:
+            ungrounded.append(index)
+            return "the analyzed source image"
+        return f"Image {slot}"
+    updated = re.sub(r"(?i)\bImage\s+(\d+)\b", replace_label, prompt)
+    return updated, sorted(set(ungrounded))
+
+
 
 
 class CcCKrea2EditPromptCreator:
@@ -245,8 +281,8 @@ class CcCKrea2EditPromptCreator:
     FUNCTION = "create"
     DESCRIPTION = (
         "Optional Qwen3-VL prompt creator. Reuses the same multimodal CLIP as Krea2/Generate Text, "
-        "reads the mixed Visual/Vision Reference chain, and optionally analyzes a reference_edit_image. "
-        "It only creates text and passes the full reference chain through unchanged."
+        "reads the edit reference first, then other references, including image-only sources. "
+        "It generates text and forwards the ordered chain without changing conditioning flags."
     )
 
     @classmethod
@@ -254,27 +290,14 @@ class CcCKrea2EditPromptCreator:
         return {
             "required": {
                 "clip": ("CLIP",),
-                "references": ("KREA2_REFERENCE_CHAIN",),
-                "mode": (PROMPT_CREATOR_MODES, {"default": "enhance"}),
-                "user_prompt": (
+                "mode": (PROMPT_CREATOR_MODES, {"default": "enhance_t2i"}),
+                "instructions": (
                     "STRING",
                     {
                         "multiline": True,
                         "dynamicPrompts": True,
                         "default": "",
-                        "tooltip": "Edit instruction, image-guided hint, or theme depending on mode.",
-                    },
-                ),
-                "system_prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "dynamicPrompts": False,
-                        "default": PRESET_SYSTEM_PROMPTS["enhance"],
-                        "tooltip": (
-                            "Shows the effective preset system prompt. Preset modes are read-only in the UI; "
-                            "mode=custom enables editing and sends this text as the system prompt."
-                        ),
+                        "tooltip": "Instructions used to generate the Krea2 prompt.",
                     },
                 ),
                 "thinking": (
@@ -307,12 +330,13 @@ class CcCKrea2EditPromptCreator:
                 ),
             },
             "optional": {
+                "references": ("KREA2_REFERENCE_CHAIN",),
                 "reference_edit_image": (
-                    "IMAGE",
+                    "KREA2_REFERENCE_CHAIN",
                     {
                         "tooltip": (
-                            "Internal image used to understand an edit situation. "
-                            "create_from_image requires it. The image itself is not added to Visual References."
+                            "Reference for the image being edited; analyzed first. "
+                            "Can contain an image even when both conditioning paths are disabled."
                         )
                     },
                 ),
@@ -322,16 +346,15 @@ class CcCKrea2EditPromptCreator:
     def create(
         self,
         clip: Any,
-        references: EditReferenceChain,
-        mode: str = "enhance",
-        user_prompt: str = "",
-        system_prompt: str = "",
+        references: Optional[EditReferenceChain] = None,
+        mode: str = "enhance_t2i",
+        instructions: str = "",
         thinking: bool = False,
         max_tokens: int = 512,
         temperature: float = 0.25,
         top_p: float = 0.90,
         seed: int = 0,
-        reference_edit_image: Optional[torch.Tensor] = None,
+        reference_edit_image: Optional[EditReferenceChain] = None,
     ):
         if references is None:
             references = EditReferenceChain()
@@ -340,31 +363,47 @@ class CcCKrea2EditPromptCreator:
                 "[Krea2 CcC Edit Prompt Creator] references must be a EditReferenceChain."
             )
 
-        images, mapping_lines, warnings = _collect_analysis_images(
-            references=references,
-            reference_edit_image=reference_edit_image,
+        if reference_edit_image is not None and not isinstance(reference_edit_image, EditReferenceChain):
+            raise TypeError("[Krea2 CcC Edit Prompt Creator] reference_edit_image must be a Reference chain.")
+        images, mapping_lines, warnings = (
+            ([], [], []) if mode in ("enhance_t2i", "enhance_i2i") else _collect_analysis_images(
+                references=references,
+                reference_edit_image=reference_edit_image,
+            )
         )
-        system_prompt = _resolve_system_prompt(
-            mode=str(mode),
-            system_prompt=system_prompt,
+        # reference_edit_image is an analysis input, not an Edit reference.
+        # Forward only the explicitly connected conditioning references.
+        # The edit image may provide Qwen Vision grounding independently of VAE/RoPE.
+        # Preserve explicitly enabled Vision entries, but never turn passive
+        # analysis images into appearance references.
+        edit_vision_entries = tuple(
+            entry for entry in (reference_edit_image.entries if reference_edit_image else ())
+            if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual
         )
-        generation_prompt = _build_generation_prompt(
-            mode=str(mode),
-            user_prompt=user_prompt,
-            mapping_lines=mapping_lines,
-            has_reference_edit_image=reference_edit_image is not None,
-            thinking=bool(thinking),
-        )
+        combined_references = EditReferenceChain(edit_vision_entries + references.entries)
+        generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
+        slot_map = _edit_image_slot_map(references, reference_edit_image) if images else []
+        system_prompt = "\n\n".join(part for part in (
+            _resolve_preset(str(mode)),
+            KREA2_PROMPT_GUIDELINES,
+        ) if part)
 
+        if images:
+            generation_prompt += ("\n\nOUTPUT IMAGE REFERENCES:\n"
+                "Describe analysis-only images fully in words. Do not refer to them as Image N "
+                "in the final prompt. Any Image N in your final prompt must refer only to "
+                "a reference actually provided to Krea2 Edit. The analysis image numbering "
+                "is not necessarily the Edit conditioning numbering.")
         tokenize_kwargs = {
             "images": images,
             "min_length": 1,
             "thinking": bool(thinking),
             "system_prompt": system_prompt,
         }
-        thinking_prefilled = bool(thinking)
-        if thinking_prefilled:
-            tokenize_kwargs["llama_template"] = _thinking_llama_template(len(images))
+        # Let the active Qwen checkpoint own its assistant/thinking template.
+        # Forcing an open <think> makes non-thinking/abliterated checkpoints
+        # emit their final answer inside a block they never close.
+        thinking_prefilled = False
 
         tokens = clip.tokenize(
             generation_prompt,
@@ -389,17 +428,20 @@ class CcCKrea2EditPromptCreator:
         )
         if not raw_created_prompt.strip() and thinking_text:
             raise RuntimeError(
-                "[Krea2 CcC Edit Prompt Creator] Qwen generation ended inside the thinking block before "
-                "producing a final prompt. Increase max_tokens or disable thinking."
+                "[Krea2 CcC Edit Prompt Creator] Qwen returned reasoning without a final prompt. "
+                f"Decoded reasoning length: {len(thinking_text)} chars; "
+                f"reasoning tail: {thinking_text[-240:]!r}. "
+                "Check Qwen generation/template output; increasing max_tokens alone may not resolve this."
             )
         created_prompt = _normalize_created_prompt(raw_created_prompt)
+        created_prompt, analysis_only_mentions = _remap_created_image_labels(created_prompt, slot_map)
 
         info_lines = [
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
             f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
-            f"System Prompt Source: {'custom' if str(mode) == 'custom' else 'preset'}",
+            f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
             f"Reference Edit Image: {'yes' if reference_edit_image is not None else 'no'}",
@@ -408,10 +450,19 @@ class CcCKrea2EditPromptCreator:
             f"Top P: {float(top_p):.2f}",
             f"Seed: {int(seed)}",
         ]
+        info_lines.extend(["", "Effective Qwen System Prompt:", system_prompt,
+                           "", "Effective Qwen User Prompt:", generation_prompt])
         if mapping_lines:
             info_lines.append("")
             info_lines.append("Image Mapping:")
             info_lines.extend(f"  {line}" for line in mapping_lines)
+        if slot_map:
+            info_lines.append("Edit Image Slots: " + ", ".join(
+                f"Analysis Image {i} -> " + (f"Edit Image {slot}" if slot is not None else "analysis only")
+                for i, slot in enumerate(slot_map, start=1)))
+        if analysis_only_mentions:
+            info_lines.append("Warning: model referred to analysis-only images by number: "
+                              + ", ".join(map(str, analysis_only_mentions)))
         if warnings:
             info_lines.append("")
             info_lines.append("Warnings:")
@@ -420,4 +471,4 @@ class CcCKrea2EditPromptCreator:
             info_lines.extend(["", "Thinking:", thinking_text])
         info_lines.extend(["", "Created Prompt:", created_prompt])
 
-        return created_prompt, references, "\n".join(info_lines), thinking_text
+        return created_prompt, combined_references, "\n".join(info_lines), thinking_text

@@ -30,6 +30,16 @@ except ImportError:
     KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
 
 
+# Upstream comfyui-krea2edit / Krea2EditGroundedEncode training-matched
+# system instruction. The generic Krea2 template is not equivalent for Edit.
+KREA2_EDIT_GROUNDED_TEMPLATE = (
+    "<|im_start|>system\\n"
+    "Describe the image by detailing the color, shape, size, "
+    "texture, quantity, text, spatial relationships of the objects and background:"
+    "<|im_end|>\\n<|im_start|>user\\n{}<|im_end|>\\n<|im_start|>assistant\\n"
+)
+
+
 def attach_reference_latents_to_conditioning(
     conditioning: List[Any], reference_latents: List[torch.Tensor]
 ) -> List[Any]:
@@ -288,9 +298,16 @@ def encode_krea2_qwen_context(
 
     warnings_list: List[str] = []
     try:
-        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_TEMPLATE)
-    except TypeError:
-        tokens = clip.tokenize(prompt or "", images=physical_images)
+        tokens = clip.tokenize(
+            prompt or "", images=physical_images,
+            llama_template=KREA2_EDIT_GROUNDED_TEMPLATE,
+        )
+    except TypeError as e:
+        raise TypeError(
+            f"{LOGGER_PREFIX} Qwen encoder does not accept llama_template; "
+            "Krea2Edit's grounded system instruction cannot be guaranteed. "
+            "Use a compatible Qwen3-VL encoder."
+        ) from e
     except Exception as e:
         raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
@@ -341,7 +358,12 @@ def encode_krea2_qwen_context(
             summary_rows = int(getattr(spec, "vision_summary_rows", 0) or 0)
 
             vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
-            if vision_mode == "semantic":
+            if vision_mode == "native":
+                # Training-style Krea2Edit Qwen conditioning: preserve vision rows.
+                extract = None
+                fidelity = 1.0
+                indirect = False
+            elif vision_mode == "semantic":
                 extract = "subject"
                 fidelity = getattr(spec, "semantic_strength", 0.25)
                 indirect = False
@@ -354,8 +376,13 @@ def encode_krea2_qwen_context(
                 fidelity = getattr(spec, "style_fidelity", 0.0)
                 indirect = False
             elif vision_mode == "context":
-                extract = "context"
-                fidelity = getattr(spec, "semantic_strength", 0.0)
+                # Spatial relations, pose, gaze and hand placement are encoded in
+                # ordered Qwen vision rows. Whitening and sampling those rows
+                # is not a reliable context extractor and destroys geometry.
+                # Keep rows intact; mode-specific instructions constrain the
+                # reference to scene/context rather than subject identity.
+                extract = None
+                fidelity = 1.0
                 indirect = False
             elif str(role_val).lower() == "style":
                 extract = "style"

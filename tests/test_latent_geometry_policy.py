@@ -74,3 +74,51 @@ def test_content_fit_stretch_fills_target_directly():
     )
     assert fitted.shape == (1, 128, 96, 3)
     assert meta["fitted_size"] == (96, 128)
+
+
+def test_latent_keeps_original_outputs_and_adds_vision_metadata_only():
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+
+    class FakeVAE:
+        def encode(self, image):
+            batch, height, width, _ = image.shape
+            return torch.zeros((batch, 16, height // 8, width // 8))
+
+    image = torch.rand((1, 128, 128, 3))
+    node = CcCKrea2Latent()
+    latent, report, target = node.process(
+        vae=FakeVAE(),
+        dimensions="fixed", width=1024, height=1024,
+        content="from_image", content_image=image,
+        latent_semantic=True,
+        latent_vision_mode="context",
+        latent_vision_instruction="Use the image only as scene context.",
+        latent_vision_resize=True,
+        latent_vision_max_edge=768,
+    )
+    assert node.RETURN_TYPES == ("LATENT", "STRING", "IMAGE")
+    assert latent["samples"].shape == (1, 16, 128, 128)
+    assert target.shape == (1, 1024, 1024, 3)
+    assert latent["ccc_krea2_latent_semantic"]["image"] is image
+    assert latent["ccc_krea2_latent_semantic"]["mode"] == "context"
+    assert "Latent Semantic: enabled" in report
+
+
+def test_latent_vision_fields_match_reference_vision_contract():
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+    from ccc_krea2.modular_nodes.vision_reference_node import CcCKrea2VisionReference
+
+    fields = CcCKrea2Latent.INPUT_TYPES()["required"]
+    for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items():
+        if name != "image":
+            assert fields["latent_vision_" + name] == spec
+
+
+def test_public_node_registry_keeps_target_latent_and_only_unified_reference():
+    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+
+    assert "CcCKrea2Latent" in NODE_CLASS_MAPPINGS
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Latent"] == "Krea2 CcC Target Latent"
+    assert "CcCKrea2Reference" in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2VisualReference" not in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2VisionReference" not in NODE_CLASS_MAPPINGS
