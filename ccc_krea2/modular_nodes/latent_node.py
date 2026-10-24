@@ -220,6 +220,7 @@ class CcCKrea2Latent:
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
                 "latent_semantic": ("BOOLEAN", {"default": False}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
                 "latent_vision_resize": ("BOOLEAN", {"default": True}),
                 "latent_vision_max_edge": ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64}),
                 **{
@@ -227,7 +228,6 @@ class CcCKrea2Latent:
                     for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
                     if name != "image"
                 },
-                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
                 "dimensions_image": ("IMAGE",),
