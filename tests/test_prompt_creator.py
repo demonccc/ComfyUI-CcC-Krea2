@@ -50,7 +50,7 @@ def _chain():
 
 
 def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
-    # thinking=True pre-fills the assistant turn with <think>, so decode starts with reasoning text.
+    # The model emits a reasoning block, which should remain separate from the final prompt.
     clip = _FakeClip(
         "The internal image has a seated subject, another person nearby, and a white bed.</think>"
         "The woman from Krea Image 1 is seated on a white bed with her body angled slightly to the side, "
@@ -80,8 +80,7 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
     assert clip.tokenize_kwargs["thinking"] is True
     assert clip.tokenize_kwargs["system_prompt"]
-    assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
-    assert clip.tokenize_kwargs["llama_template"].count("<|image_pad|>") == 3
+    assert "llama_template" not in clip.tokenize_kwargs
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
@@ -164,7 +163,7 @@ def test_image_preset_receives_reference_mapping_without_automatic_roles():
 
 
 def test_thinking_truncation_reports_generated_reasoning_without_retry():
-    clip = _FakeClip("I am still reasoning when max tokens end.")
+    clip = _FakeClip("<think>I am still reasoning when max tokens end.")
     with pytest.raises(RuntimeError, match="Decoded reasoning length:"):
         CcCKrea2EditPromptCreator().create(
             clip=clip, references=_chain(), mode="enhance_t2i",
@@ -215,3 +214,15 @@ def test_preset_is_sent_as_qwen_system_prompt_not_embedded_in_user_text():
     assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
     assert _resolve_preset("create_from_image_i2i") not in clip.tokenize_prompt
     assert "INSTRUCTIONS:" in clip.tokenize_prompt
+
+
+def test_thinking_enabled_accepts_direct_final_response_from_nonthinking_qwen():
+    clip = _FakeClip("The woman from Image 2 is standing beside a window.")
+    created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
+        clip=clip, references=_chain(), mode="create_from_image_i2i",
+        instructions="Describe a new scene.", thinking=True,
+    )
+    assert created == "The woman from Image 2 is standing beside a window."
+    assert reasoning == ""
+    assert clip.tokenize_kwargs["thinking"] is True
+    assert "llama_template" not in clip.tokenize_kwargs
