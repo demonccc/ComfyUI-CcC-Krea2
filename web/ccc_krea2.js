@@ -1,15 +1,7 @@
 import { app } from "../../scripts/app.js";
 
 const PROMPT_CREATOR_PRESETS = {
-    enhance: `Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.
-
-Preserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
+    enhance: "Enhance the user's prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
 
     create_from_image: `Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
 
@@ -21,15 +13,9 @@ Write the result as a direct description of the desired final image, not as an e
 
 Return only the final I2I prompt as one plain-text paragraph.`,
 
-    create_from_theme: `Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
+    create_from_theme_t2i: "Create an original text-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
 
-Treat the user's theme or idea as the authoritative creative direction. Use the available visual context to build a coherent desired result that fits it.
-
-Keep the prompt focused on the intended final image. Add only the visual detail needed to make the result clear and useful.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
+    create_from_theme_i2i: "Create an original image-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
 };
 
 
