@@ -13,7 +13,8 @@ This document describes the **15 registered nodes registered in ccc_krea2/nodes.
 | Krea2 CcC Latent | CcCKrea2Latent |
 | Krea2 CcC Edit Prompt Creator | CcCKrea2EditPromptCreator |
 | Krea2 CcC Edit | CcCKrea2Edit |
-| Krea2 CcC Character Sheet | CcCKrea2CharacterSheet |
+| Krea2 CcC Layout Cell | CcCKrea2LayoutCell |
+| Krea2 CcC Layout Composer | CcCKrea2LayoutComposer |
 | Krea2 CcC Paint Prepare | CcCKrea2PaintPrepare |
 | Krea2 CcC Paint | CcCKrea2Paint |
 | Krea2 CcC Paint Restore | CcCKrea2PaintRestore |
@@ -283,46 +284,12 @@ ordered references
 
 Negative text is fixed internally to an empty string. Appearance images remain available to the grounded negative pass with neutral boosts.
 
-## Krea2 CcC Character Sheet
+## Krea2 CcC Image Layout
 
-Deterministically composes generic portrait/body IMAGE inputs into one IMAGE.
+`CcCKrea2LayoutCell` accepts an IMAGE and an optional `previous_layout` chain. Set `placement` to `cell`, `full_row`, or `full_column`. Rows/columns start at 1. Fit modes: `contain` scales the complete image proportionally into its slot; `stretch` fills the slot non-proportionally; `crop` clips at native pixel scale; `fit` proportionally covers then clips. All resize operations use bicubic antialiasing. `horizontal_position`, `vertical_position`, `offset_x` and `offset_y` apply only to `crop` and `fit`. Offsets are signed pixel additions to the selected alignment.
 
-Required controls:
+`CcCKrea2LayoutComposer` consumes `KREA2_LAYOUT_CHAIN`, Krea `preset_size`, `padding`, `gap`, and `background_color`. It produces `image` and `layout_info`. Output dimensions are resolved before row/column sizes; whole rows/columns span the occupied grid. Overlaps, gaps, invalid positions or impossible padding raise errors. The sample `workflows/20_layout_composer_2x2_1x1_1x1.json` uses six input images across four columns.
 
-| Control | Values | Default |
-| --- | --- | --- |
-| sheet_type | 9 layouts | 1 portrait |
-| sheet_geometry | same curated Krea presets as Latent | 1024 x 1024 |
-| padding | 0..128 | 8 |
-| outer_margin | 0..128 | 8 |
-| background | white, gray, black | white |
-
-Optional IMAGE inputs:
-
-- portrait_1
-- portrait_2
-- portrait_3
-- portrait_4
-- body_1
-- body_2
-
-Layouts:
-
-- 1 portrait
-- 2 portraits
-- 3 portraits
-- 4 portraits
-- 1 body
-- 2 bodies
-- 1 portrait + 2 bodies
-- 3 portraits + 1 body
-- 4 portraits + 1 body
-
-Output: character_sheet.
-
-Input numbers mean ordering only. Specific camera angles are not required.
-
-Every source is uniformly resized to fit completely inside its slot with preserved aspect ratio. Character Sheet does not crop, cover, stretch, run Qwen, encode VAE, or create a latent.
 
 ## Krea2 CcC Paint Prepare
 
@@ -489,7 +456,7 @@ Examples are historical fixtures and have not been migrated in this cleanup; a w
 - workflows/01_scene_subject.json — Scene + Subject edit.
 - workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
 - workflows/03_regional_attention.json — **legacy/incompatible**: still contains the removed `CcCKrea2AttentionRegion` nodes. Intentionally unchanged; migrate its regions to per-Visual-Reference target masks before using.
-- workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
+- workflows/20_layout_composer_2x2_1x1_1x1.json — mixed grid composition with stacked cells and full columns.
 - workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
 - workflows/06_text_to_image.json — T2I example using Vision Reference analysis and text-only final conditioning.
 
