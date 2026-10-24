@@ -239,14 +239,43 @@ def _combine_reference_chains(
         latent_image = latent_semantic.get("image")
         if latent_image is None:
             raise ValueError("[Krea2 CcC Edit] Latent semantic metadata is enabled but does not contain an image.")
-        chain = _append_semantic(
-            chain=chain,
-            image=latent_image,
-            clip=clip,
+        # Reuse the same Vision Reference implementation and runtime modes as Reference.
+        from .vision_reference_node import CcCKrea2VisionReference
+        from ..geometry import resize_tensor
+        source = latent_image
+        vision_image = source
+        resize = bool(latent_semantic.get("vision_resize", True))
+        edge = int(latent_semantic.get("vision_max_edge", 768))
+        mode = latent_semantic.get("mode", "semantic")
+        processing = latent_semantic.get("style_processing", "full")
+        tiled = mode == "style" and processing != "full"
+        if resize and not tiled:
+            h, w = int(source.shape[-3]), int(source.shape[-2])
+            if max(h, w) > edge:
+                scale = edge / float(max(h, w))
+                vision_image = resize_tensor(source, max(1, round(h * scale)), max(1, round(w * scale)), "bicubic")
+        node = CcCKrea2VisionReference()
+        vision_chain, _ = node.process(
+            image=vision_image,
+            mode=mode,
             instruction=str(latent_semantic.get("instruction", "")),
-            grounding_px=int(latent_semantic.get("grounding_px", 768)),
-            alias="target image",
+            style_processing=processing,
+            guidance_seed_mode=latent_semantic.get("guidance_seed_mode", "fixed"),
+            guidance_seed=int(latent_semantic.get("guidance_seed", 0)),
+            guidance_detail=latent_semantic.get("guidance_detail", "balanced"),
+            vision_guidance=latent_semantic.get("vision_guidance", "balanced"),
         )
+        entry = replace(
+            vision_chain.entries[-1],
+            source_image=source,
+            tile_resize=resize and tiled,
+            tile_max_edge=edge,
+        )
+        vision_spec = build_vision_reference_spec(entry)
+        if isinstance(vision_spec, StyleReferenceSpec):
+            pending_styles.append(vision_spec)
+        else:
+            chain = chain.append(vision_spec)
 
     # Style tiles expand into multiple physical images and must follow all
     # normal/appearance references to preserve Qwen image slot numbering.
