@@ -11,7 +11,7 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 
 
-PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme", "custom")
+PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme_t2i", "create_from_theme_i2i", "custom")
 
 PRESET_SYSTEM_PROMPTS = {
     "enhance": "Enhance the user\'s prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
@@ -26,15 +26,9 @@ Write the result as a direct description of the desired final image, not as an e
 
 Return only the final I2I prompt as one plain-text paragraph.""",
 
-    "create_from_theme": """Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
+    "create_from_theme_t2i": "Create an original text-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
 
-Treat the user's theme or idea as the authoritative creative direction. Use the available visual context to build a coherent desired result that fits it.
-
-Keep the prompt focused on the intended final image. Add only the visual detail needed to make the result clear and useful.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.""",
+    "create_from_theme_i2i": "Create an original image-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
 }
 
 
@@ -50,7 +44,7 @@ Return only the final image description as one cohesive English paragraph."""
 
 
 def _build_krea2_prompt(preset_prompt: str, user_prompt: str) -> str:
-    """Shared preset / user / guidelines contract, currently enabled for Enhance only."""
+    """Shared preset / user / guidelines contract, enabled for Enhance and the two Theme presets."""
     return (
         f"{preset_prompt}\n\n"
         f"USER PROMPT:\n{user_prompt}\n\n"
@@ -201,7 +195,7 @@ def _build_generation_prompt(
         raise ValueError(f"[Krea2 CcC Edit Prompt Creator] Invalid mode: {mode!r}.")
 
     clean_user_prompt = str(user_prompt or "").strip()
-    if mode in ("enhance", "create_from_theme") and not clean_user_prompt:
+    if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i") and not clean_user_prompt:
         raise ValueError(
             f"[Krea2 CcC Edit Prompt Creator] mode={mode!r} requires a non-empty user_prompt."
         )
@@ -210,8 +204,8 @@ def _build_generation_prompt(
             "[Krea2 CcC Edit Prompt Creator] create_from_image requires reference_edit_image."
         )
 
-    if mode == "enhance":
-        return _build_krea2_prompt(PRESET_SYSTEM_PROMPTS["enhance"], clean_user_prompt)
+    if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i"):
+        return _build_krea2_prompt(PRESET_SYSTEM_PROMPTS[mode], clean_user_prompt)
 
     mappings = "\n".join(mapping_lines) if mapping_lines else "No analyzable visual images were supplied."
     guidance = clean_user_prompt or "No additional user guidance."
@@ -343,7 +337,7 @@ class CcCKrea2EditPromptCreator:
         if reference_edit_image is not None and not isinstance(reference_edit_image, EditReferenceChain):
             raise TypeError("[Krea2 CcC Edit Prompt Creator] reference_edit_image must be a Reference chain.")
         images, mapping_lines, warnings = (
-            ([], [], []) if mode == "enhance" else _collect_analysis_images(
+            ([], [], []) if mode in ("enhance", "create_from_theme_t2i") else _collect_analysis_images(
                 references=references,
                 reference_edit_image=reference_edit_image,
             )
@@ -367,7 +361,7 @@ class CcCKrea2EditPromptCreator:
             "images": images,
             "min_length": 1,
             "thinking": bool(thinking),
-            "system_prompt": "" if mode == "enhance" else system_prompt,
+            "system_prompt": "" if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i") else system_prompt,
         }
         thinking_prefilled = bool(thinking)
         if thinking_prefilled:
