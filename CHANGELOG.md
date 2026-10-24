@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Simplified Prompt Creator to a single `instructions` textbox; removed editable/preview `system_prompt` and its frontend graying logic. Six T2I/I2I variants now share three preset templates and a `{kind}` placeholder. Added `none` as the no-preset option (shared Krea2 guidelines still apply), and added the effective assembled Qwen prompt to `creator_info`. Updated docs and tests; existing saved workflow widgets/modes require migration, but workflow files were not edited.
+
 - Split Prompt Creator `create_from_image` into `create_from_image_t2i` and `create_from_image_i2i`, both analyzing optional image references and using the user's prompt to determine which details matter and how to use them. Both compose preset, user prompt, and common Krea2 guidelines; other presets and workflows unchanged. Existing workflows selecting `create_from_image` will need their mode updated.
 
 - Split Prompt Creator `create_from_theme` into `create_from_theme_t2i` and `create_from_theme_i2i`, with the approved Krea2 preset instructions and the common preset → user prompt → guidelines structure. Both T2I and I2I accept zero or more optional images, without assigning creative roles; T2I can use images as inspiration. Updated frontend preset previews and regression tests. Existing saved workflows selecting the old mode must select a new theme mode (workflows not modified).
