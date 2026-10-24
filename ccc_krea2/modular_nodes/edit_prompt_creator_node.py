@@ -11,24 +11,17 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 
 
-PROMPT_CREATOR_MODES = ("enhance", "create_from_image_t2i", "create_from_image_i2i", "create_from_theme_t2i", "create_from_theme_i2i", "custom")
+PROMPT_CREATOR_MODES = ("enhance_t2i", "enhance_i2i", "create_from_image_t2i", "create_from_image_i2i", "create_from_theme_t2i", "create_from_theme_i2i", "none")
 
-PRESET_SYSTEM_PROMPTS = {
-    "enhance": "Enhance the user\'s prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
-
-    "create_from_image_t2i": "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate text-to-image prompt for Krea2.",
-
-    "create_from_image_i2i": "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate image-to-image prompt for Krea2.",
-
-    "create_from_theme_t2i": "Create an original text-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
-
-    "create_from_theme_i2i": "Create an original image-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
+PRESET_TEMPLATES = {
+    "enhance": "Enhance the instructions into a detailed {kind} prompt for Krea2 by adding relevant and coherent details that develop the original idea while preserving its intent.",
+    "create_from_image": "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the instructions to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the instructions, create a detailed and accurate {kind} prompt for Krea2.",
+    "create_from_theme": "Create an original {kind} prompt for Krea2 inspired by the instructions, freely developing them into a complete, imaginative scene.",
 }
-
 
 KREA2_PROMPT_GUIDELINES = """Write the final image description in natural language.
 
-Preserve the user's specified elements, relationships, and style.
+Preserve the specified elements, relationships, and style.
 
 Make the description rich and detailed, with coherent subjects, attributes, actions, and surroundings.
 
@@ -37,29 +30,29 @@ Avoid unnecessary specifications that conflict with the intended result.
 Return only the final image description as one cohesive English paragraph."""
 
 
-def _build_krea2_prompt(preset_prompt: str, user_prompt: str) -> str:
-    """Shared preset / user / guidelines contract, enabled for Enhance, Theme and Image presets."""
-    return (
-        f"{preset_prompt}\n\n"
-        f"USER PROMPT:\n{user_prompt}\n\n"
-        f"KREA2 PROMPT GUIDELINES:\n{KREA2_PROMPT_GUIDELINES}"
-    )
-
-
-def _resolve_system_prompt(mode: str, system_prompt: str) -> str:
+def _resolve_preset(mode: str) -> str:
     if mode not in PROMPT_CREATOR_MODES:
         raise ValueError(f"[Krea2 CcC Edit Prompt Creator] Invalid mode: {mode!r}.")
+    if mode == "none":
+        return ""
+    family, variant = mode.rsplit("_", 1)
+    return PRESET_TEMPLATES[family].format(kind="text-to-image" if variant == "t2i" else "image-to-image")
 
-    if mode == "custom":
-        resolved = str(system_prompt or "").strip()
-        if not resolved:
-            raise ValueError(
-                "[Krea2 CcC Edit Prompt Creator] mode='custom' requires a non-empty system_prompt."
-            )
-        return resolved
 
-    return PRESET_SYSTEM_PROMPTS[mode]
-
+def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[str]) -> str:
+    preset = _resolve_preset(mode)
+    clean = str(instructions or "").strip()
+    if not clean:
+        raise ValueError("[Krea2 CcC Edit Prompt Creator] instructions must not be empty.")
+    parts = []
+    if preset:
+        parts.append(preset)
+    parts.append("INSTRUCTIONS:\n" + clean)
+    if mapping_lines:
+        neutral = [re.sub(r"\\. Role: (?:EDIT|REFERENCE) reference\\.$", ".", line) for line in mapping_lines]
+        parts.append("IMAGE MAPPING:\n" + "\n".join(neutral))
+    parts.append("KREA2 PROMPT GUIDELINES:\n" + KREA2_PROMPT_GUIDELINES)
+    return "\n\n".join(parts)
 
 
 def _thinking_llama_template(image_count: int) -> str:
@@ -178,51 +171,6 @@ def _collect_analysis_images(
     return images, mapping_lines, warnings
 
 
-def _build_generation_prompt(
-    mode: str,
-    user_prompt: str,
-    mapping_lines: List[str],
-    has_reference_edit_image: bool,
-    thinking: bool,
-) -> str:
-    if mode not in PROMPT_CREATOR_MODES:
-        raise ValueError(f"[Krea2 CcC Edit Prompt Creator] Invalid mode: {mode!r}.")
-
-    clean_user_prompt = str(user_prompt or "").strip()
-    if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i") and not clean_user_prompt:
-        raise ValueError(
-            f"[Krea2 CcC Edit Prompt Creator] mode={mode!r} requires a non-empty user_prompt."
-        )
-
-    if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i", "create_from_image_t2i", "create_from_image_i2i"):
-        if mode != "enhance" and mapping_lines:
-            clean_user_prompt += "\n\nIMAGE MAPPING:\n" + "\n".join(
-                re.sub(r"\. Role: (?:EDIT|REFERENCE) reference\.$", ".", line)
-                for line in mapping_lines
-            )
-        return _build_krea2_prompt(PRESET_SYSTEM_PROMPTS[mode], clean_user_prompt)
-
-    mappings = "\n".join(mapping_lines) if mapping_lines else "No analyzable visual images were supplied."
-    guidance = clean_user_prompt or "No additional user guidance."
-
-    thinking_instruction = ""
-    if thinking:
-        thinking_instruction = (
-            "\n\nTHINKING MODE IS ENABLED:\n"
-            "Before the final edit prompt, analyze the images, roles, user constraints, pose, interactions, "
-            "scene geometry, composition, and preservation requirements inside a <think>...</think> block. "
-            "The <think> block must contain actual reasoning and must be closed with </think>. "
-            "After </think>, output only the final Krea2 edit prompt."
-        )
-
-    return (
-        "IMAGE MAPPING:\n"
-        f"{mappings}\n\n"
-        "USER REQUEST / THEME:\n"
-        f"{guidance}"
-        f"{thinking_instruction}\n\n"
-        "Write the requested Krea2 edit prompt now."
-    )
 
 
 class CcCKrea2EditPromptCreator:
@@ -243,26 +191,14 @@ class CcCKrea2EditPromptCreator:
         return {
             "required": {
                 "clip": ("CLIP",),
-                "mode": (PROMPT_CREATOR_MODES, {"default": "enhance"}),
-                "user_prompt": (
+                "mode": (PROMPT_CREATOR_MODES, {"default": "enhance_t2i"}),
+                "instructions": (
                     "STRING",
                     {
                         "multiline": True,
                         "dynamicPrompts": True,
                         "default": "",
                         "tooltip": "Edit instruction, image-guided hint, or theme depending on mode.",
-                    },
-                ),
-                "system_prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "dynamicPrompts": False,
-                        "default": PRESET_SYSTEM_PROMPTS["enhance"],
-                        "tooltip": (
-                            "Shows the effective preset system prompt. Preset modes are read-only in the UI; "
-                            "mode=custom enables editing and sends this text as the system prompt."
-                        ),
                     },
                 ),
                 "thinking": (
@@ -312,9 +248,8 @@ class CcCKrea2EditPromptCreator:
         self,
         clip: Any,
         references: Optional[EditReferenceChain] = None,
-        mode: str = "enhance",
-        user_prompt: str = "",
-        system_prompt: str = "",
+        mode: str = "enhance_t2i",
+        instructions: str = "",
         thinking: bool = False,
         max_tokens: int = 512,
         temperature: float = 0.25,
@@ -332,7 +267,7 @@ class CcCKrea2EditPromptCreator:
         if reference_edit_image is not None and not isinstance(reference_edit_image, EditReferenceChain):
             raise TypeError("[Krea2 CcC Edit Prompt Creator] reference_edit_image must be a Reference chain.")
         images, mapping_lines, warnings = (
-            ([], [], []) if mode == "enhance" else _collect_analysis_images(
+            ([], [], []) if mode in ("enhance_t2i", "enhance_i2i") else _collect_analysis_images(
                 references=references,
                 reference_edit_image=reference_edit_image,
             )
@@ -340,23 +275,13 @@ class CcCKrea2EditPromptCreator:
         combined_references = EditReferenceChain(
             (reference_edit_image.entries if reference_edit_image is not None else ()) + references.entries
         )
-        system_prompt = _resolve_system_prompt(
-            mode=str(mode),
-            system_prompt=system_prompt,
-        )
-        generation_prompt = _build_generation_prompt(
-            mode=str(mode),
-            user_prompt=user_prompt,
-            mapping_lines=mapping_lines,
-            has_reference_edit_image=reference_edit_image is not None,
-            thinking=bool(thinking),
-        )
+        generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
 
         tokenize_kwargs = {
             "images": images,
             "min_length": 1,
             "thinking": bool(thinking),
-            "system_prompt": "" if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i", "create_from_image_t2i", "create_from_image_i2i") else system_prompt,
+            "system_prompt": "",
         }
         thinking_prefilled = bool(thinking)
         if thinking_prefilled:
@@ -395,7 +320,7 @@ class CcCKrea2EditPromptCreator:
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
             f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
-            f"System Prompt Source: {'custom' if str(mode) == 'custom' else 'preset'}",
+            f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
             f"Reference Edit Image: {'yes' if reference_edit_image is not None else 'no'}",
@@ -404,6 +329,7 @@ class CcCKrea2EditPromptCreator:
             f"Top P: {float(top_p):.2f}",
             f"Seed: {int(seed)}",
         ]
+        info_lines.extend(["", "Effective System Prompt:", generation_prompt])
         if mapping_lines:
             info_lines.append("")
             info_lines.append("Image Mapping:")
