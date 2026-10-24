@@ -49,7 +49,7 @@ def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[s
         parts.append(preset)
     parts.append("INSTRUCTIONS:\n" + clean)
     if mapping_lines:
-        neutral = [re.sub(r"\\. Role: (?:EDIT|REFERENCE) reference\\.$", ".", line) for line in mapping_lines]
+        neutral = [re.sub(r"\. Role: (?:EDIT|REFERENCE) reference\.$", ".", line) for line in mapping_lines]
         parts.append("IMAGE MAPPING:\n" + "\n".join(neutral))
     parts.append("KREA2 PROMPT GUIDELINES:\n" + KREA2_PROMPT_GUIDELINES)
     return "\n\n".join(parts)
@@ -134,7 +134,7 @@ def _normalize_created_prompt(text: str) -> str:
     ):
         raise RuntimeError(
             "[Krea2 CcC Edit Prompt Creator] Qwen returned meta-instructions instead of a final edit prompt. "
-            "Try another seed, increase max_tokens, or adjust the selected/custom system prompt."
+            "Try another seed, increase max_tokens, or adjust the selected preset or instructions."
         )
 
     return cleaned
@@ -198,7 +198,7 @@ class CcCKrea2EditPromptCreator:
                         "multiline": True,
                         "dynamicPrompts": True,
                         "default": "",
-                        "tooltip": "Edit instruction, image-guided hint, or theme depending on mode.",
+                        "tooltip": "Instructions used to generate the Krea2 prompt.",
                     },
                 ),
                 "thinking": (
@@ -329,7 +329,7 @@ class CcCKrea2EditPromptCreator:
             f"Top P: {float(top_p):.2f}",
             f"Seed: {int(seed)}",
         ]
-        info_lines.extend(["", "Effective System Prompt:", generation_prompt])
+        info_lines.extend(["", "Effective Qwen Prompt (preset + instructions + guidelines):", generation_prompt])
         if mapping_lines:
             info_lines.append("")
             info_lines.append("Image Mapping:")
