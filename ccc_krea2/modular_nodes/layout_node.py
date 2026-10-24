@@ -24,6 +24,7 @@ class LayoutEntry:
     vertical_position: str
     offset_x: int
     offset_y: int
+    resize_percent: int
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ class CcCKrea2LayoutCell:
             "row": ("INT", {"default": 1, "min": 1, "max": 100}),
             "column": ("INT", {"default": 1, "min": 1, "max": 100}),
             "fit": (FITS, {"default": "contain"}),
+            "resize_percent": ("INT", {"default": 100, "min": 1, "max": 1000, "step": 1}),
             "horizontal_position": (HORIZONTAL, {"default": "center"}),
             "vertical_position": (VERTICAL, {"default": "center"}),
             "offset_x": ("INT", {"default": 0, "min": -16384, "max": 16384}),
@@ -62,19 +64,21 @@ class CcCKrea2LayoutCell:
 
     def add(self, image, placement="cell", row=1, column=1, fit="contain",
             horizontal_position="center", vertical_position="center",
-            offset_x=0, offset_y=0, previous_layout=None):
+            offset_x=0, offset_y=0, resize_percent=100, previous_layout=None):
         if placement not in PLACEMENTS or fit not in FITS:
             raise ValueError("Invalid layout placement or fit.")
         if int(row) < 1 or int(column) < 1:
             raise ValueError("Layout Cell: row and column must start at 1.")
         if horizontal_position not in HORIZONTAL or vertical_position not in VERTICAL:
             raise ValueError("Layout Cell: invalid position.")
+        if int(resize_percent) <= 0:
+            raise ValueError("Layout Cell: resize_percent must be positive.")
         chain = previous_layout if previous_layout is not None else LayoutChain()
         if not isinstance(chain, LayoutChain):
             raise TypeError("previous_layout must be KREA2_LAYOUT_CHAIN.")
         return (chain.append(LayoutEntry(
             _image(image), placement, int(row), int(column), fit,
-            horizontal_position, vertical_position, int(offset_x), int(offset_y)
+            horizontal_position, vertical_position, int(offset_x), int(offset_y), int(resize_percent)
         )),)
 
 
@@ -92,7 +96,9 @@ def _place(canvas, image, rect, entry):
     if entry.fit == "stretch":
         scaled = resize_tensor(image, h, w, "bicubic")
     elif entry.fit == "crop":
-        scaled = image
+        scale = entry.resize_percent / 100.0
+        sw, sh = max(1, round(iw * scale)), max(1, round(ih * scale))
+        scaled = resize_tensor(image, sh, sw, "bicubic")
     else:
         ratio = min(w / iw, h / ih) if entry.fit == "contain" else max(w / iw, h / ih)
         sw, sh = max(1, round(iw * ratio)), max(1, round(ih * ratio))
