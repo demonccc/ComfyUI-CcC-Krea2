@@ -42,12 +42,13 @@ def _resolve_preset(mode: str) -> str:
 def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[str]) -> str:
     preset = _resolve_preset(mode)
     clean = str(instructions or "").strip()
-    if not clean:
-        raise ValueError("[Krea2 CcC Edit Prompt Creator] instructions must not be empty.")
+    if not clean and not (mode in ("create_from_image_t2i", "create_from_image_i2i") and mapping_lines):
+        raise ValueError("[Krea2 CcC Edit Prompt Creator] instructions must not be empty unless create_from_image has reference images.")
     parts = []
     if preset:
         parts.append(preset)
-    parts.append("INSTRUCTIONS:\n" + clean)
+    if clean:
+        parts.append("INSTRUCTIONS:\n" + clean)
     if mapping_lines:
         neutral = [re.sub(r"\. Role: (?:EDIT|REFERENCE) reference\.$", ".", line) for line in mapping_lines]
         parts.append("IMAGE MAPPING:\n" + "\n".join(neutral))
