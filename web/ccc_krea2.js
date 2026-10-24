@@ -285,6 +285,8 @@ app.registerExtension({
 
             for (const [widget, callback] of [
                 [semanticWidget, updateSemanticState],
+                ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
+                    .map(name => [node.widgets?.find(w => w.name === name), updateSemanticState]),
                 [semanticResizeWidget, updateSemanticState],
                 [fitWidget, updateFitState],
             ]) {
@@ -417,14 +419,25 @@ app.registerExtension({
             };
 
             const updateSemanticState = () => {
-                const enabled = semanticWidget?.value === true;
-                setDisabled("latent_semantic_instruction", !enabled);
-                setDisabled("latent_grounding_px", !enabled);
+                const enabled = semanticWidget?.value === true && contentWidget?.value === "from_image";
+                setWidgetDisabled("latent_semantic", contentWidget?.value !== "from_image");
+                for (const widget of node.widgets ?? []) {
+                    if (widget.name.startsWith("latent_vision_")) {
+                        setWidgetDisabled(widget.name, !enabled);
+                    }
+                }
+                setWidgetDisabled("latent_vision_max_edge", !enabled ||
+                    node.widgets?.find(w => w.name === "latent_vision_resize")?.value !== true);
+                const mode = node.widgets?.find(w => w.name === "latent_vision_mode")?.value ?? "semantic";
+                setWidgetDisabled("latent_vision_style_processing", !enabled || mode !== "style");
+                const seedMode = node.widgets?.find(w => w.name === "latent_vision_guidance_seed_mode")?.value ?? "fixed";
+                setWidgetDisabled("latent_vision_guidance_seed", !enabled || seedMode !== "fixed");
+                node.setDirtyCanvas?.(true, true);
             };
 
             for (const [widget, callback] of [
                 [dimensionsWidget, updateDimensionsState],
-                [contentWidget, updateContentState],
+                [contentWidget, () => { updateContentState(); updateSemanticState(); }],
                 [contentFitWidget, updateContentState],
                 [semanticWidget, updateSemanticState],
             ]) {
