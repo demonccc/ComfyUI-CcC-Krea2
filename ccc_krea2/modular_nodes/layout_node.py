@@ -65,6 +65,10 @@ class CcCKrea2LayoutCell:
             offset_x=0, offset_y=0, previous_layout=None):
         if placement not in PLACEMENTS or fit not in FITS:
             raise ValueError("Invalid layout placement or fit.")
+        if int(row) < 1 or int(column) < 1:
+            raise ValueError("Layout Cell: row and column must start at 1.")
+        if horizontal_position not in HORIZONTAL or vertical_position not in VERTICAL:
+            raise ValueError("Layout Cell: invalid position.")
         chain = previous_layout if previous_layout is not None else LayoutChain()
         if not isinstance(chain, LayoutChain):
             raise TypeError("previous_layout must be KREA2_LAYOUT_CHAIN.")
@@ -93,6 +97,7 @@ def _place(canvas, image, rect, entry):
         ratio = min(w / iw, h / ih) if entry.fit == "contain" else max(w / iw, h / ih)
         sw, sh = max(1, round(iw * ratio)), max(1, round(ih * ratio))
         scaled = resize_tensor(image, sh, sw, "bicubic")
+    scaled = scaled.clamp(0, 1)
     sh, sw = scaled.shape[1:3]
     if entry.fit in ("contain", "stretch"):
         px, py = (w - sw) // 2, (h - sh) // 2
@@ -127,6 +132,9 @@ class CcCKrea2LayoutComposer:
         if not isinstance(layout, LayoutChain) or not layout.entries:
             raise ValueError("Layout Composer requires a nonempty layout chain.")
         entries = layout.entries
+        for index, e in enumerate(entries, 1):
+            if e.row < 1 or e.column < 1:
+                raise ValueError(f"Layout Composer: Image {index} has invalid row/column.")
         rows = max(e.row for e in entries if e.placement != "full_column") if any(e.placement != "full_column" for e in entries) else 1
         cols = max(e.column for e in entries if e.placement != "full_row") if any(e.placement != "full_row" for e in entries) else 1
         occupied = {}
