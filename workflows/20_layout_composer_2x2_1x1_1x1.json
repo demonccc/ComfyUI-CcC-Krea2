@@ -1,0 +1,703 @@
+{
+  "last_node_id": 14,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [
+        80,
+        80
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "layout_image_1.png"
+      ],
+      "title": "Image 1"
+    },
+    {
+      "id": 2,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        80,
+        340
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "cell",
+        1,
+        1,
+        "contain",
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "R1 C1"
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        490,
+        80
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "layout_image_2.png"
+      ],
+      "title": "Image 2"
+    },
+    {
+      "id": 4,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        490,
+        340
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "previous_layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "cell",
+        2,
+        1,
+        "contain",
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "R2 C1"
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        900,
+        80
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "layout_image_3.png"
+      ],
+      "title": "Image 3"
+    },
+    {
+      "id": 6,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        900,
+        340
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "previous_layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "cell",
+        1,
+        2,
+        "contain",
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "R1 C2"
+    },
+    {
+      "id": 7,
+      "type": "LoadImage",
+      "pos": [
+        1310,
+        80
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "layout_image_4.png"
+      ],
+      "title": "Image 4"
+    },
+    {
+      "id": 8,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        1310,
+        340
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "previous_layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "cell",
+        2,
+        2,
+        "contain",
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "R2 C2"
+    },
+    {
+      "id": 9,
+      "type": "LoadImage",
+      "pos": [
+        1720,
+        80
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "layout_image_5.png"
+      ],
+      "title": "Image 5"
+    },
+    {
+      "id": 10,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        1720,
+        340
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "name": "previous_layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "full_column",
+        1,
+        3,
+        "contain",
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "Full column 3"
+    },
+    {
+      "id": 11,
+      "type": "LoadImage",
+      "pos": [
+        2130,
+        80
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            10
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "layout_image_6.png"
+      ],
+      "title": "Image 6"
+    },
+    {
+      "id": 12,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        2130,
+        340
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 10
+        },
+        {
+          "name": "previous_layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "full_column",
+        1,
+        4,
+        "contain",
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "Full column 4"
+    },
+    {
+      "id": 13,
+      "type": "CcCKrea2LayoutComposer",
+      "pos": [
+        2600,
+        340
+      ],
+      "size": [
+        360,
+        250
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "layout_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutComposer"
+      },
+      "widgets_values": [
+        "1536 x 1024 | 3:2 | ~1.57 MP",
+        16,
+        8,
+        "white"
+      ],
+      "title": "4 columns / 2 rows"
+    },
+    {
+      "id": 14,
+      "type": "PreviewImage",
+      "pos": [
+        3050,
+        340
+      ],
+      "size": [
+        350,
+        300
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 13
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      2,
+      0,
+      4,
+      1,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      4,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      4,
+      0,
+      6,
+      1,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      6,
+      0,
+      8,
+      1,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      8,
+      9,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      8,
+      0,
+      10,
+      1,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      10,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      10,
+      0,
+      12,
+      1,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      12,
+      12,
+      0,
+      13,
+      0,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      13,
+      13,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "version": 0.4
+}
