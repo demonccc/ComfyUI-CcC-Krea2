@@ -220,7 +220,6 @@ class CcCKrea2Latent:
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
                 "latent_semantic": ("BOOLEAN", {"default": False}),
-                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
                 "latent_vision_resize": ("BOOLEAN", {"default": True}),
                 "latent_vision_max_edge": ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64}),
                 **{
@@ -228,6 +227,7 @@ class CcCKrea2Latent:
                     for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
                     if name != "image"
                 },
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
                 "dimensions_image": ("IMAGE",),
@@ -268,16 +268,18 @@ class CcCKrea2Latent:
             geometry_policy=geometry_policy,
         )
 
-        # A saved workflow from before the Latent Vision refactor may restore
-        # the old batch_size widget (typically 1) into latent_vision_mode.
-        # Never reinterpret that numeric value as a semantic preset silently.
-        if latent_semantic and latent_vision_mode not in ("semantic", "visual", "style", "context", "native"):
-            raise ValueError(
-                "[Krea2 CcC Latent] Invalid latent_vision_mode "
-                f"{latent_vision_mode!r}. This may indicate a workflow saved before "
-                "the Latent Vision controls changed. Recreate the Latent node "
-                "or select a valid Latent Vision mode, then save the workflow."
+        # ComfyUI can restore a stale numeric widget value as a Vision mode.
+        # Never activate semantic conditioning with a corrupted preset. Keep the
+        # target latent and VAE editing usable, and report the incompatible value.
+        invalid_vision_mode = latent_vision_mode not in ("semantic", "visual", "style", "context", "native")
+        vision_warning = ""
+        if invalid_vision_mode:
+            vision_warning = (
+                f"Warning: invalid Latent Vision mode {latent_vision_mode!r} from saved workflow; "
+                "semantic conditioning disabled for this execution."
             )
+            latent_semantic = False
+            latent_vision_mode = "semantic"
 
         if latent_semantic and (content != "from_image" or content_image is None):
             raise ValueError(
@@ -324,6 +326,8 @@ class CcCKrea2Latent:
         ]
         if dimensions == "preset":
             lines.append(f"Preset: {preset_size}")
+        if vision_warning:
+            lines.append(vision_warning)
         if latent_semantic:
             lines.extend([
                 f"Latent Vision Mode: {latent_vision_mode}",
