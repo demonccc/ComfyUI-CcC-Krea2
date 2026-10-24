@@ -199,6 +199,38 @@ app.registerExtension({
         if (!node || !node.comfyClass) return;
         if (NATIVE_LORA_NODES.has(node.comfyClass)) setupLoraDisabledState(node);
 
+        if (node.comfyClass === "CcCKrea2LayoutCell") {
+            const find = (name) => node.widgets?.find(w => w.name === name);
+            const refresh = () => {
+                const placement = find("placement")?.value ?? "cell";
+                const fit = find("fit")?.value ?? "contain";
+                setWidgetDisabled(node, "row", placement === "full_column");
+                setWidgetDisabled(node, "column", placement === "full_row");
+                const hasPosition = fit === "crop" || fit === "fit";
+                for (const name of ["horizontal_position", "vertical_position", "offset_x", "offset_y"]) {
+                    setWidgetDisabled(node, name, !hasPosition);
+                }
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (const name of ["placement", "fit"]) {
+                const widget = find(name);
+                if (!widget) continue;
+                const old = widget.callback;
+                widget.callback = function (...args) {
+                    const result = old?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const oldConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = oldConfigure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            setTimeout(refresh, 20);
+        }
+
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
