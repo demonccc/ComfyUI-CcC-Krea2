@@ -49,7 +49,7 @@ def test_create_from_image_analyzes_references_and_reference_edit_image():
         clip=clip,
         references=chain,
         mode="create_from_image_i2i",
-        user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
+        instructions="Use the subject from Image 1 in the situation shown by the reference edit image.",
         reference_edit_image=reference_edit,
     )
 
@@ -72,7 +72,7 @@ def test_create_from_theme_i2i_still_uses_visual_reference_pixels():
         clip=clip,
         references=chain,
         mode="create_from_theme_i2i",
-        user_prompt="Put Image 1 in a neon city at night.",
+        instructions="Put Image 1 in a neon city at night.",
     )
 
     assert passthrough is chain
