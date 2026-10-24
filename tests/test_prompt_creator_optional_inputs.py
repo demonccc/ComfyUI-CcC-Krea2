@@ -59,7 +59,7 @@ def test_theme_i2i_can_run_without_images():
         clip=clip, mode="create_from_theme_i2i", instructions="A whimsical village."
     )
     assert clip.kwargs["images"] == []
-    assert "INSTRUCTIONS:\\nA whimsical village." in clip.prompt
+    assert "INSTRUCTIONS:\nA whimsical village." in clip.prompt
     assert "KREA2 PROMPT GUIDELINES:" in clip.prompt
     assert created
 
