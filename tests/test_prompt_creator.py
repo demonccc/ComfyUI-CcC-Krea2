@@ -61,7 +61,7 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     created, passthrough, info, thinking = CcCKrea2EditPromptCreator().create(
         clip=clip,
         references=chain,
-        mode="create_from_image",
+        mode="create_from_image_i2i",
         user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
         system_prompt="this must be ignored for preset modes",
         thinking=True,
@@ -78,14 +78,11 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     assert len(clip.tokenize_kwargs["images"]) == 3
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
     assert "Vision input 2 = Image 2" in clip.tokenize_prompt
-    assert "INTERNAL REFERENCE EDIT IMAGE" in clip.tokenize_prompt
+    assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
     assert clip.tokenize_kwargs["thinking"] is True
-    assert clip.tokenize_kwargs["system_prompt"] == PRESET_SYSTEM_PROMPTS["create_from_image"]
+    assert clip.tokenize_kwargs["system_prompt"] == ""
     assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
     assert clip.tokenize_kwargs["llama_template"].count("<|image_pad|>") == 3
-    assert "authoritative visual blueprint" in clip.tokenize_kwargs["system_prompt"]
-    assert "direct description of the desired final image" in clip.tokenize_kwargs["system_prompt"]
-    assert "other people in the scene" not in clip.tokenize_kwargs["system_prompt"]
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
@@ -156,11 +153,15 @@ def test_custom_mode_requires_system_prompt():
         )
 
 
-def test_create_from_image_requires_reference_edit_image():
-    with pytest.raises(ValueError, match="requires reference_edit_image"):
+def test_image_presets_accept_optional_image_inputs():
+    for mode in ("create_from_image_t2i", "create_from_image_i2i"):
+        clip = _FakeClip()
         CcCKrea2EditPromptCreator().create(
-            clip=_FakeClip(), references=_chain(), mode="create_from_image", user_prompt=""
+            clip=clip, mode=mode, user_prompt="Describe an imaginative scene."
         )
+        assert clip.tokenize_kwargs["images"] == []
+        assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
+        assert PRESET_SYSTEM_PROMPTS[mode] in clip.tokenize_prompt
 
 
 def test_enhance_and_create_from_theme_require_user_text():
