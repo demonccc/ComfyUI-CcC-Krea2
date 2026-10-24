@@ -1,18 +1,5 @@
 import { app } from "../../scripts/app.js";
 
-const PROMPT_CREATOR_PRESETS = {
-    enhance: "Enhance the user's prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
-
-    create_from_image_t2i: "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate text-to-image prompt for Krea2.",
-
-    create_from_image_i2i: "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate image-to-image prompt for Krea2.",
-
-    create_from_theme_t2i: "Create an original text-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
-
-    create_from_theme_i2i: "Create an original image-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
-};
-
-
 // Consolidated from the existing compactLoader frontend behavior.
 // LoRA stacks use ComfyUI's native BOOLEAN, COMBO, FLOAT and STRING widgets.
 // Keep widget types, callbacks and workflow serialization untouched.
@@ -480,87 +467,6 @@ app.registerExtension({
             }
         }
 
-        if (node.comfyClass === "CcCKrea2EditPromptCreator") {
-            const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const systemPromptWidget = node.widgets?.find((w) => w.name === "system_prompt");
-
-            if (!modeWidget || !systemPromptWidget) return;
-
-            let previousMode = modeWidget.value ?? "enhance";
-            let customSystemPrompt =
-                previousMode === "custom" ? String(systemPromptWidget.value ?? "") : "";
-
-            const setSystemPromptValue = (value) => {
-                if (systemPromptWidget.value !== value) {
-                    systemPromptWidget.value = value;
-                }
-
-                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
-                if (inputEl && "value" in inputEl && inputEl.value !== value) {
-                    inputEl.value = value;
-                }
-
-                systemPromptWidget.triggerDraw?.();
-            };
-
-            const setSystemPromptEditable = (editable) => {
-                systemPromptWidget.options ??= {};
-                systemPromptWidget.options.read_only = !editable;
-                systemPromptWidget.disabled = false;
-
-                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
-                if (inputEl) {
-                    inputEl.readOnly = !editable;
-                    inputEl.style.opacity = editable ? "" : "0.65";
-                }
-
-                systemPromptWidget.triggerDraw?.();
-            };
-
-            const updatePromptCreatorState = () => {
-                const mode = modeWidget.value ?? "enhance";
-
-                if (previousMode === "custom" && mode !== "custom") {
-                    customSystemPrompt = String(systemPromptWidget.value ?? "");
-                }
-
-                if (mode === "custom") {
-                    if (!customSystemPrompt.trim()) {
-                        customSystemPrompt =
-                            PROMPT_CREATOR_PRESETS[previousMode] ??
-                            PROMPT_CREATOR_PRESETS.enhance;
-                    }
-                    setSystemPromptValue(customSystemPrompt);
-                    setSystemPromptEditable(true);
-                } else {
-                    setSystemPromptValue(
-                        PROMPT_CREATOR_PRESETS[mode] ?? PROMPT_CREATOR_PRESETS.enhance
-                    );
-                    setSystemPromptEditable(false);
-                }
-
-                previousMode = mode;
-                node.setDirtyCanvas?.(true, true);
-            };
-
-            const originalModeCallback = modeWidget.callback;
-            modeWidget.callback = function () {
-                if (originalModeCallback) originalModeCallback.apply(this, arguments);
-                updatePromptCreatorState();
-            };
-
-            const originalSystemPromptCallback = systemPromptWidget.callback;
-            systemPromptWidget.callback = function () {
-                if (originalSystemPromptCallback) {
-                    originalSystemPromptCallback.apply(this, arguments);
-                }
-                if ((modeWidget.value ?? "enhance") === "custom") {
-                    customSystemPrompt = String(systemPromptWidget.value ?? "");
-                }
-            };
-
-            setTimeout(updatePromptCreatorState, 100);
-        }
 
     }
 });
