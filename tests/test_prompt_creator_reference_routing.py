@@ -114,3 +114,72 @@ def test_other_presets_do_not_receive_shared_guidelines_yet():
         mode="none", instructions="a dog", mapping_lines=[],
     )
     assert "KREA2 PROMPT GUIDELINES:" in prompt
+
+
+def test_analysis_only_source_does_not_steal_edit_image_numbers():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
+        _edit_image_slot_map, _remap_created_image_labels,
+    )
+    src = _image(0.1)
+    subject = _image(0.9)
+    analysis, _ = CcCKrea2Reference().process(
+        src, vae_rope_enable=False, vision_enable=False,
+    )
+    active, _ = CcCKrea2Reference().process(subject)
+    slots = _edit_image_slot_map(active, analysis)
+    assert slots == [None, 1]
+    prompt, unmatched = _remap_created_image_labels(
+        "The woman from Image 2 stands in the setting of Image 1.", slots,
+    )
+    assert prompt == (
+        "The woman from Image 1 stands in the setting of the analyzed source image."
+    )
+    assert unmatched == [1]
+
+
+def test_analysis_only_interleaved_reference_is_skipped_without_shifting_edit():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import (
+        _edit_image_slot_map, _remap_created_image_labels,
+    )
+    first, _ = CcCKrea2Reference().process(_image(0.1))
+    passive, _ = CcCKrea2Reference().process(
+        _image(0.2), vae_rope_enable=False, vision_enable=False,
+        previous_references=first,
+    )
+    refs, _ = CcCKrea2Reference().process(
+        _image(0.3), previous_references=passive,
+    )
+    assert _edit_image_slot_map(refs, None) == [1, None, 2]
+    prompt, unmatched = _remap_created_image_labels(
+        "Image 3 and Image 1 in a scene.", [1, None, 2]
+    )
+    assert prompt == "Image 2 and Image 1 in a scene."
+    assert unmatched == []
+
+
+def test_visual_only_reference_is_not_assigned_a_qwen_image_slot():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import _edit_image_slot_map
+    ref, _ = CcCKrea2Reference().process(
+        _image(0.4), vae_rope_enable=True, vision_enable=False,
+    )
+    assert _edit_image_slot_map(ref, None) == [None]
+
+
+def test_creator_remaps_qwen_output_against_edit_slots():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import CcCKrea2EditPromptCreator
+
+    class LabelClip(_FakeClip):
+        def decode(self, ids):
+            return "The woman of Image 2 is wearing a red coat."
+
+    scene, _ = CcCKrea2Reference().process(
+        _image(0.1), vae_rope_enable=False, vision_enable=False,
+    )
+    woman, _ = CcCKrea2Reference().process(_image(0.2))
+    result = CcCKrea2EditPromptCreator().create(
+        clip=LabelClip(), references=woman, reference_edit_image=scene,
+        mode="create_from_image_i2i", instructions="Use the woman from Image 2.",
+    )
+    assert result[0] == "The woman of Image 1 is wearing a red coat."
+    assert "Analysis Image 1 -> analysis only" in result[2]
+    assert "Analysis Image 2 -> Edit Image 1" in result[2]
