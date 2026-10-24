@@ -171,6 +171,83 @@ def _collect_analysis_images(
 
 
 
+def _edit_image_slot_map(
+    references: EditReferenceChain,
+    reference_edit_image: Optional[EditReferenceChain],
+) -> List[Optional[int]]:
+    """Map each analyzed source image to its physical Qwen image index in Edit.
+
+    Images with both conditioning paths off remain analysis-only. A tiled style
+    reference has multiple Qwen crops, so it has no single physical Image N.
+    """
+    entries = (
+        (reference_edit_image.entries if reference_edit_image is not None else ())
+        + references.entries
+    )
+    active = []
+    deferred_styles = []
+    analysis_positions = []
+    for index, entry in enumerate(entries):
+        if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+            continue
+        if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
+            continue
+        if entry.image is None:
+            continue
+        analysis_positions.append(index)
+    for index, entry in enumerate(entries):
+        if isinstance(entry, ImageReferenceEntry):
+            continue
+        if isinstance(entry, VisualReferenceEntry):
+            paired = (
+                entries[index + 1]
+                if index + 1 < len(entries)
+                and isinstance(entries[index + 1], VisionReferenceEntry)
+                and entries[index + 1].paired_visual else None
+            )
+            tiled = paired is not None and paired.mode == "style_indirect" and paired.processing != "full"
+            if entry.semantic and not tiled:
+                active.append(index)
+            continue
+        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
+            if entry.mode == "style_indirect":
+                deferred_styles.append((index, 1 if entry.processing == "full" else
+                                        16 if entry.processing == "4x4" else 4))
+            else:
+                active.append(index)
+        elif isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+            if entry.mode == "style_indirect" and entry.processing != "full":
+                deferred_styles.append((index, 16 if entry.processing == "4x4" else 4))
+    slot_map = {index: slot for slot, index in enumerate(active, start=1)}
+    # Only full, one-image style references have a stable image index.
+    next_slot = len(active) + 1
+    for index, count in deferred_styles:
+        if count == 1:
+            slot_map[index] = next_slot
+        next_slot += count
+    return [slot_map.get(index) for index in analysis_positions]
+
+
+def _remap_created_image_labels(
+    prompt: str, slot_map: List[Optional[int]]
+) -> Tuple[str, List[int]]:
+    """Replace analysis indices with Edit's physical indices simultaneously."""
+    ungrounded = []
+    def replace_label(match):
+        index = int(match.group(1))
+        if index < 1 or index > len(slot_map):
+            return match.group(0)
+        slot = slot_map[index - 1]
+        if slot is None:
+            ungrounded.append(index)
+            return "the analyzed source image"
+        return f"Image {slot}"
+    updated = re.sub(r"(?i)\\bImage\\s+(\\d+)\\b", replace_label, prompt)
+    return updated, sorted(set(ungrounded))
+
+
+
+
 class CcCKrea2EditPromptCreator:
     """Create an edit prompt with the same multimodal CLIP used by Krea2."""
 
@@ -274,11 +351,18 @@ class CcCKrea2EditPromptCreator:
             (reference_edit_image.entries if reference_edit_image is not None else ()) + references.entries
         )
         generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
+        slot_map = _edit_image_slot_map(references, reference_edit_image) if images else []
         system_prompt = "\n\n".join(part for part in (
             _resolve_preset(str(mode)),
             KREA2_PROMPT_GUIDELINES,
         ) if part)
 
+        if images:
+            generation_prompt += ("\n\nOUTPUT IMAGE REFERENCES:\n"
+                "Describe analysis-only images fully in words. Do not refer to them as Image N "
+                "in the final prompt. Any Image N in your final prompt must refer only to "
+                "a reference actually provided to Krea2 Edit. The analysis image numbering "
+                "is not necessarily the Edit conditioning numbering.")
         tokenize_kwargs = {
             "images": images,
             "min_length": 1,
@@ -319,6 +403,7 @@ class CcCKrea2EditPromptCreator:
                 "Check Qwen generation/template output; increasing max_tokens alone may not resolve this."
             )
         created_prompt = _normalize_created_prompt(raw_created_prompt)
+        created_prompt, analysis_only_mentions = _remap_created_image_labels(created_prompt, slot_map)
 
         info_lines = [
             "=== Krea2 CcC Edit Prompt Creator ===",
@@ -340,6 +425,13 @@ class CcCKrea2EditPromptCreator:
             info_lines.append("")
             info_lines.append("Image Mapping:")
             info_lines.extend(f"  {line}" for line in mapping_lines)
+        if slot_map:
+            info_lines.append("Edit Image Slots: " + ", ".join(
+                f"Analysis Image {i} -> " + (f"Edit Image {slot}" if slot is not None else "analysis only")
+                for i, slot in enumerate(slot_map, start=1)))
+        if analysis_only_mentions:
+            info_lines.append("Warning: model referred to analysis-only images by number: "
+                              + ", ".join(map(str, analysis_only_mentions)))
         if warnings:
             info_lines.append("")
             info_lines.append("Warnings:")
