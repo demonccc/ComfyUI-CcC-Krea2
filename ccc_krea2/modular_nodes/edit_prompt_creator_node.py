@@ -205,6 +205,8 @@ def _build_generation_prompt(
         )
 
     if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i"):
+        if mode == "create_from_theme_i2i" and mapping_lines:
+            clean_user_prompt += "\n\nIMAGE MAPPING:\n" + "\n".join(mapping_lines)
         return _build_krea2_prompt(PRESET_SYSTEM_PROMPTS[mode], clean_user_prompt)
 
     mappings = "\n".join(mapping_lines) if mapping_lines else "No analyzable visual images were supplied."
