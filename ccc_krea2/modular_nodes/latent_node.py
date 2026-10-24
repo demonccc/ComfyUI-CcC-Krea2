@@ -268,6 +268,17 @@ class CcCKrea2Latent:
             geometry_policy=geometry_policy,
         )
 
+        # A saved workflow from before the Latent Vision refactor may restore
+        # the old batch_size widget (typically 1) into latent_vision_mode.
+        # Never reinterpret that numeric value as a semantic preset silently.
+        if latent_semantic and latent_vision_mode not in ("semantic", "visual", "style", "context", "native"):
+            raise ValueError(
+                "[Krea2 CcC Latent] Invalid latent_vision_mode "
+                f"{latent_vision_mode!r}. This may indicate a workflow saved before "
+                "the Latent Vision controls changed. Recreate the Latent node "
+                "or select a valid Latent Vision mode, then save the workflow."
+            )
+
         if latent_semantic and (content != "from_image" or content_image is None):
             raise ValueError(
                 "[Krea2 CcC Edit] latent_semantic requires content='from_image' and content_image."
