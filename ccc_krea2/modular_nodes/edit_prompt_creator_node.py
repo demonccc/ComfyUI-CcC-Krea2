@@ -11,20 +11,14 @@ from ..constants import NODE_CATEGORY
 from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 
 
-PROMPT_CREATOR_MODES = ("enhance", "create_from_image", "create_from_theme_t2i", "create_from_theme_i2i", "custom")
+PROMPT_CREATOR_MODES = ("enhance", "create_from_image_t2i", "create_from_image_i2i", "create_from_theme_t2i", "create_from_theme_i2i", "custom")
 
 PRESET_SYSTEM_PROMPTS = {
     "enhance": "Enhance the user\'s prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
 
-    "create_from_image": """Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
+    "create_from_image_t2i": "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate text-to-image prompt for Krea2.",
 
-Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
-
-Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.""",
+    "create_from_image_i2i": "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate image-to-image prompt for Krea2.",
 
     "create_from_theme_t2i": "Create an original text-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
 
@@ -44,7 +38,7 @@ Return only the final image description as one cohesive English paragraph."""
 
 
 def _build_krea2_prompt(preset_prompt: str, user_prompt: str) -> str:
-    """Shared preset / user / guidelines contract, enabled for Enhance and the two Theme presets."""
+    """Shared preset / user / guidelines contract, enabled for Enhance, Theme and Image presets."""
     return (
         f"{preset_prompt}\n\n"
         f"USER PROMPT:\n{user_prompt}\n\n"
@@ -199,13 +193,9 @@ def _build_generation_prompt(
         raise ValueError(
             f"[Krea2 CcC Edit Prompt Creator] mode={mode!r} requires a non-empty user_prompt."
         )
-    if mode == "create_from_image" and not has_reference_edit_image:
-        raise ValueError(
-            "[Krea2 CcC Edit Prompt Creator] create_from_image requires reference_edit_image."
-        )
 
-    if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i"):
-        if mode in ("create_from_theme_t2i", "create_from_theme_i2i") and mapping_lines:
+    if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i", "create_from_image_t2i", "create_from_image_i2i"):
+        if mode != "enhance" and mapping_lines:
             clean_user_prompt += "\n\nIMAGE MAPPING:\n" + "\n".join(
                 re.sub(r"\. Role: (?:EDIT|REFERENCE) reference\.$", ".", line)
                 for line in mapping_lines
@@ -366,7 +356,7 @@ class CcCKrea2EditPromptCreator:
             "images": images,
             "min_length": 1,
             "thinking": bool(thinking),
-            "system_prompt": "" if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i") else system_prompt,
+            "system_prompt": "" if mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i", "create_from_image_t2i", "create_from_image_i2i") else system_prompt,
         }
         thinking_prefilled = bool(thinking)
         if thinking_prefilled:
