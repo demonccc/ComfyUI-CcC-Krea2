@@ -67,3 +67,28 @@ def test_offsets_crop_relative_to_alignment():
 def test_invalid_row_rejected():
     with pytest.raises(ValueError, match="start at 1"):
         CcCKrea2LayoutCell().add(_img(0.1), row=0)
+
+
+def test_crop_resize_percent_scales_before_placement():
+    image = torch.ones((1, 10, 20, 3))
+    entry, = CcCKrea2LayoutCell().add(
+        image, fit="crop", horizontal_position="left", vertical_position="up",
+        resize_percent=50,
+    )
+    output, _ = CcCKrea2LayoutComposer().compose(
+        entry, padding=0, gap=0, background_color="black"
+    )
+    assert torch.all(output[0, :5, :10] == 1)
+    assert torch.all(output[0, 5:10, :10] == 0)
+    assert torch.all(output[0, :5, 10:20] == 0)
+
+
+def test_crop_resize_percent_rejects_zero_and_negative():
+    for percent in (0, -10):
+        with pytest.raises(ValueError, match="resize_percent must be positive"):
+            CcCKrea2LayoutCell().add(_img(0.5), fit="crop", resize_percent=percent)
+
+
+def test_crop_resize_percent_default_is_100():
+    chain, = CcCKrea2LayoutCell().add(_img(0.5), fit="crop")
+    assert chain.entries[0].resize_percent == 100
