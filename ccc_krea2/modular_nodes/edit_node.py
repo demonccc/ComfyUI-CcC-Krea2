@@ -265,8 +265,19 @@ def _combine_reference_chains(
             guidance_detail=latent_semantic.get("guidance_detail", "balanced"),
             vision_guidance=latent_semantic.get("vision_guidance", "balanced"),
         )
+        vision_entry = vision_chain.entries[-1]
+        if mode == "semantic":
+            # Restore the target-content preservation directive used before
+            # the Latent Vision refactor. Unlike a generic semantic reference,
+            # the target image defines the scene being edited.
+            user_instruction = vision_entry.instruction.strip()
+            semantic_instruction = (
+                f"{SEMANTIC_SUBJECT_DIRECTIVE} {user_instruction}".strip()
+                if user_instruction else SEMANTIC_SUBJECT_DIRECTIVE
+            )
+            vision_entry = replace(vision_entry, instruction=semantic_instruction)
         entry = replace(
-            vision_chain.entries[-1],
+            vision_entry,
             source_image=source,
             tile_resize=resize and tiled,
             tile_max_edge=edge,
