@@ -18,18 +18,18 @@ class _FakeClip:
 
 
 
-def test_create_from_theme_runs_without_references():
+def test_create_from_theme_t2i_runs_without_references():
     cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
     created, references, info, thinking = cls().create(
         clip=_FakeClip(),
-        mode="create_from_theme",
+        mode="create_from_theme_t2i",
         user_prompt="A dramatic rainy cyberpunk street at night.",
     )
 
     assert created == "A cinematic rainy city scene at night."
     assert isinstance(references, VisualReferenceChain)
     assert not references.entries
-    assert "Mode: create_from_theme" in info
+    assert "Mode: create_from_theme_t2i" in info
     assert thinking == ""
 
 
@@ -47,7 +47,7 @@ def test_prompt_creator_accepts_mixed_chain_and_passes_it_through():
     cls = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]
     created, returned, info, thinking = cls().create(
         clip=_FakeClip(), references=chain,
-        mode="create_from_theme", user_prompt="A new scene."
+        mode="create_from_theme_t2i", user_prompt="A new scene."
     )
     assert returned is chain
     assert "Vision input 1 = Image 1" in info
