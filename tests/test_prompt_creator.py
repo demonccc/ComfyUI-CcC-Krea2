@@ -128,8 +128,8 @@ def test_none_mode_uses_instructions_and_guidelines_only():
     clip = _FakeClip()
     CcCKrea2EditPromptCreator().create(clip=clip, mode="none", instructions="A new idea.")
     assert clip.tokenize_prompt.startswith("INSTRUCTIONS:\nA new idea.")
-    assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
-    assert clip.tokenize_kwargs["system_prompt"] == ""
+    assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
+    assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
 
 
 def test_image_presets_accept_optional_image_inputs():
@@ -140,7 +140,7 @@ def test_image_presets_accept_optional_image_inputs():
         )
         assert clip.tokenize_kwargs["images"] == []
         assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
-        assert _resolve_preset(mode) in clip.tokenize_prompt
+        assert _resolve_preset(mode) in clip.tokenize_kwargs["system_prompt"]
 
 
 def test_enhance_and_create_from_theme_require_user_text():
