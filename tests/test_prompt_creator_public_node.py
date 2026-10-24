@@ -48,7 +48,7 @@ def test_create_from_image_analyzes_references_and_reference_edit_image():
     created, passthrough, info, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
         references=chain,
-        mode="create_from_image",
+        mode="create_from_image_i2i",
         user_prompt="Use the subject from Image 1 in the situation shown by the reference edit image.",
         reference_edit_image=reference_edit,
     )
