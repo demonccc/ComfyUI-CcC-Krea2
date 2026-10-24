@@ -242,7 +242,7 @@ def _remap_created_image_labels(
             ungrounded.append(index)
             return "the analyzed source image"
         return f"Image {slot}"
-    updated = re.sub(r"(?i)\\bImage\\s+(\\d+)\\b", replace_label, prompt)
+    updated = re.sub(r"(?i)\bImage\s+(\d+)\b", replace_label, prompt)
     return updated, sorted(set(ungrounded))
 
 
