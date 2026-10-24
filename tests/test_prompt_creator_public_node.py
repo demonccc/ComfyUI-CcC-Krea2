@@ -64,14 +64,14 @@ def test_create_from_image_analyzes_references_and_reference_edit_image():
     assert "Images Analyzed: 2" in info
 
 
-def test_create_from_theme_still_uses_visual_reference_pixels():
+def test_create_from_theme_i2i_still_uses_visual_reference_pixels():
     clip = _FakeClip()
     chain = _chain()
 
     _, passthrough, _, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
         references=chain,
-        mode="create_from_theme",
+        mode="create_from_theme_i2i",
         user_prompt="Put Image 1 in a neon city at night.",
     )
 
