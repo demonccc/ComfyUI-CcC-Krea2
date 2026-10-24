@@ -207,6 +207,7 @@ app.registerExtension({
                 setWidgetDisabled(node, "row", placement === "full_column");
                 setWidgetDisabled(node, "column", placement === "full_row");
                 const hasPosition = fit === "crop" || fit === "fit";
+                setWidgetDisabled(node, "resize_percent", fit !== "crop");
                 for (const name of ["horizontal_position", "vertical_position", "offset_x", "offset_y"]) {
                     setWidgetDisabled(node, name, !hasPosition);
                 }
