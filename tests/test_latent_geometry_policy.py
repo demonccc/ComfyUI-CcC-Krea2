@@ -112,3 +112,13 @@ def test_latent_vision_fields_match_reference_vision_contract():
     for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items():
         if name != "image":
             assert fields["latent_vision_" + name] == spec
+
+
+def test_public_node_registry_keeps_target_latent_and_only_unified_reference():
+    from ccc_krea2.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+
+    assert "CcCKrea2Latent" in NODE_CLASS_MAPPINGS
+    assert NODE_DISPLAY_NAME_MAPPINGS["CcCKrea2Latent"] == "Krea2 CcC Target Latent"
+    assert "CcCKrea2Reference" in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2VisualReference" not in NODE_CLASS_MAPPINGS
+    assert "CcCKrea2VisionReference" not in NODE_CLASS_MAPPINGS
