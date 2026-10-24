@@ -14,6 +14,7 @@ from ..krea_geometry import (
     resolve_krea_geometry,
 )
 from ..target_latent import get_image_dims, normalize_vae_output
+from .vision_reference_node import CcCKrea2VisionReference
 
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
