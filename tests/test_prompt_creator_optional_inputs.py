@@ -23,7 +23,7 @@ def test_create_from_theme_t2i_runs_without_references():
     created, references, info, thinking = cls().create(
         clip=_FakeClip(),
         mode="create_from_theme_t2i",
-        user_prompt="A dramatic rainy cyberpunk street at night.",
+        instructions="A dramatic rainy cyberpunk street at night.",
     )
 
     assert created == "A cinematic rainy city scene at night."
@@ -42,7 +42,7 @@ def test_theme_t2i_analyzes_optional_images_and_forwards_references():
     clip = _FakeClip()
     created, returned, info, _ = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]().create(
         clip=clip, references=chain,
-        mode="create_from_theme_t2i", user_prompt="A new scene."
+        mode="create_from_theme_t2i", instructions="A new scene."
     )
     assert returned.entries == chain.entries
     assert len(clip.kwargs["images"]) == 1
@@ -56,10 +56,10 @@ def test_theme_t2i_analyzes_optional_images_and_forwards_references():
 def test_theme_i2i_can_run_without_images():
     clip = _FakeClip()
     created, _, _, _ = NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]().create(
-        clip=clip, mode="create_from_theme_i2i", user_prompt="A whimsical village."
+        clip=clip, mode="create_from_theme_i2i", instructions="A whimsical village."
     )
     assert clip.kwargs["images"] == []
-    assert "USER PROMPT:\\nA whimsical village." in clip.prompt
+    assert "INSTRUCTIONS:\\nA whimsical village." in clip.prompt
     assert "KREA2 PROMPT GUIDELINES:" in clip.prompt
     assert created
 
@@ -71,7 +71,7 @@ def test_theme_i2i_uses_neutral_image_mapping():
     clip = _FakeClip()
     NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]().create(
         clip=clip, references=chain, mode="create_from_theme_i2i",
-        user_prompt="Invent a different setting."
+        instructions="Invent a different setting."
     )
     assert len(clip.kwargs["images"]) == 1
     assert "Vision input 1 = Image 1." in clip.prompt
