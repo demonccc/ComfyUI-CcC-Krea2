@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Replaced Character Sheet with chainable `Krea2 CcC Layout Cell` and `Krea2 CcC Layout Composer` nodes. Each cell defines row/column or full-row/full-column placement, contain/stretch/crop/fit, position and signed offsets; the composer calculates grid sizes from a Krea image preset and validates overlaps/gaps. Removed the obsolete Character Sheet implementation, test and sample workflow; added `workflows/20_layout_composer_2x2_1x1_1x1.json` (four columns: stacked cells in the first two, full-height images in the final two) and unit tests. No GPU tests executed.
+- Introduced chainable `Krea2 CcC Layout Cell` and `Krea2 CcC Layout Composer` nodes. Each cell defines row/column or full-row/full-column placement, contain/stretch/crop/fit, position and signed offsets; the composer calculates grid sizes from a Krea image preset and validates overlaps/gaps. Removed obsolete sheet-specific implementation, tests and sample workflow; added `workflows/20_layout_composer_2x2_1x1_1x1.json` (four columns: stacked cells in the first two, full-height images in the final two) and unit tests. No GPU tests executed.
 
 - Latent retains its existing LATENT, info and target-image outputs, VAE encoding, sizing and content-fit behavior. Only optional semantic conditioning uses the Reference Vision mode and parameter contract; added regression coverage to guard the original outputs.
 
@@ -171,7 +171,6 @@
 - Merged the former public Paint Geometry stage into Krea2 CcC Paint Prepare. Paint Prepare now owns native image/mask geometry, outpaint expansion, pad/crop normalization, mask processing, semantic-reference preparation, VAE preparation, and returns paint_geometry for Restore.
 - Removed the unused Reference Cache feature completely; normal Visual Reference is the appearance-reference path.
 - Updated AnyPaint example workflow to the current Paint Prepare -> Paint -> decode -> Paint Restore path.
-- Character Sheet now uses generic portrait/body inputs, nine explicit layouts, fixed no-crop fit behavior using bicubic antialiasing, and the same curated Krea geometry presets as Latent.
 - Explicit outpaint margins keep their selected padding fill as semantic/reference context while remaining fully generable.
 - Paint runtime consumes the appearance latent prepared by Paint Prepare and no longer creates the target latent.
 - Added Krea geometry policies to Latent for fixed and image-derived dimensions: nearest curated Krea aspect or aspect-preserving Krea bounds.
