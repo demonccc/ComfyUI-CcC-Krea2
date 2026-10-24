@@ -127,7 +127,7 @@ def test_meta_instruction_only_output_is_rejected():
 def test_none_mode_uses_instructions_and_guidelines_only():
     clip = _FakeClip()
     CcCKrea2EditPromptCreator().create(clip=clip, mode="none", instructions="A new idea.")
-    assert clip.tokenize_prompt.startswith("INSTRUCTIONS:\\nA new idea.")
+    assert clip.tokenize_prompt.startswith("INSTRUCTIONS:\nA new idea.")
     assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
     assert clip.tokenize_kwargs["system_prompt"] == ""
 
@@ -151,26 +151,15 @@ def test_enhance_and_create_from_theme_require_user_text():
             )
 
 
-def test_appearance_only_reference_has_no_downstream_image_number():
+def test_image_preset_receives_reference_mapping_without_automatic_roles():
     clip = _FakeClip()
-    chain = VisualReferenceChain(
-        (
-            VisualReferenceEntry(image=_image(0.2), semantic=False),
-            VisualReferenceEntry(
-                image=_image(0.8), semantic=True, prompt_annotation="This is the subject image."
-            ),
-        )
-    )
-
     CcCKrea2EditPromptCreator().create(
-        clip=clip,
-        references=chain,
-        mode="enhance_t2i",
-        instructions="Use the subject in an outdoor scene.",
+        clip=clip, references=_chain(),
+        mode="create_from_image_t2i", instructions="Describe Image 2.",
     )
-
-    assert "has no downstream Image N label" in clip.tokenize_prompt
-    assert "Vision input 2 = Image 1" in clip.tokenize_prompt
+    assert len(clip.tokenize_kwargs["images"]) == 2
+    assert "Vision input 2 = Image 2." in clip.tokenize_prompt
+    assert "Role:" not in clip.tokenize_prompt
 
 
 def test_thinking_truncation_without_final_prompt_is_reported():
