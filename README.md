@@ -172,7 +172,7 @@ The Visual Reference chain is returned unchanged.
 
 ## Image Layout
 
-`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/20_layout_composer_2x2_1x1_1x1.json` demonstrates four columns: two stacked images in each of the first two columns, and one full-height image in each remaining column.
+`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), crop-only positive `resize_percent` (default 100%), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/20_layout_composer_2x2_1x1_1x1.json` demonstrates four columns: two stacked images in each of the first two columns, and one full-height image in each remaining column.
 
 
 ## Paint
