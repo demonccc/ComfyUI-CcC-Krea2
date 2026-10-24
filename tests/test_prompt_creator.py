@@ -77,15 +77,16 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     assert len(clip.tokenize_kwargs["images"]) == 3
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
     assert "Vision input 2 = Image 2" in clip.tokenize_prompt
-    assert "KREA2 PROMPT GUIDELINES:" in clip.tokenize_prompt
+    assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
     assert clip.tokenize_kwargs["thinking"] is True
-    assert clip.tokenize_kwargs["system_prompt"] == ""
+    assert clip.tokenize_kwargs["system_prompt"]
     assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
     assert clip.tokenize_kwargs["llama_template"].count("<|image_pad|>") == 3
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
-    assert "Effective Qwen Prompt" in info
+    assert "Effective Qwen System Prompt" in info
+    assert "Effective Qwen User Prompt" in info
     assert "Thinking:" in info
 
 
@@ -202,3 +203,15 @@ def test_image_preset_requires_instructions_without_images():
             CcCKrea2EditPromptCreator().create(
                 clip=_FakeClip(), mode=mode, instructions=""
             )
+
+
+def test_preset_is_sent_as_qwen_system_prompt_not_embedded_in_user_text():
+    clip = _FakeClip()
+    CcCKrea2EditPromptCreator().create(
+        clip=clip, references=_chain(), mode="create_from_image_i2i",
+        instructions="Describe the final image.", thinking=True,
+    )
+    assert _resolve_preset("create_from_image_i2i") in clip.tokenize_kwargs["system_prompt"]
+    assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
+    assert _resolve_preset("create_from_image_i2i") not in clip.tokenize_prompt
+    assert "INSTRUCTIONS:" in clip.tokenize_prompt
