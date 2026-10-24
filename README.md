@@ -60,7 +60,7 @@ The reference nodes can be chained in any order using `previous_references`; the
 references --> Edit Prompt Creator --> references --> Edit
                      |                    ^
 CLIP ----------------+                    |
-user_prompt ---------+--> created_prompt -+--> Edit.positive_prompt
+instructions -------+--> created_prompt -+--> Edit.positive_prompt
 reference_edit_image-+
 ~~~
 
@@ -155,16 +155,14 @@ Official references used for the target policy:
 
 The Creator reuses the same multimodal Krea2/Qwen3-VL CLIP as ComfyUI Generate Text and Edit.
 
-Modes:
+The node uses one editable `instructions` field and seven selector choices: six presets in three families plus `none`:
 
-- enhance: improve an existing edit instruction without changing its intent.
-- create_from_image: analyze reference_edit_image and reconstruct a detailed situation instead of collapsing it to a short summary.
-- create_from_theme: expand a high-level theme into a concrete, detailed new situation while keeping referenced subjects anchored.
-- custom: edit and send the system_prompt directly.
+- `enhance_t2i` / `enhance_i2i`: enrich the instruction without changing intent.
+- `create_from_image_t2i` / `create_from_image_i2i`: analyze available images, using the instructions to decide which details matter and how to apply them.
+- `create_from_theme_t2i` / `create_from_theme_i2i`: invent a scene inspired by the instructions.
+- `none`: user supplies the entire task through `instructions`, without a preset.
 
-The system_prompt field always shows the effective prompt. For preset modes it is greyed/read-only; custom enables editing. Switching to custom starts from the current preset unless an earlier custom value exists.
-
-create_from_image asks Qwen to capture relevant pose/body position, other people and interactions, props, environment, spatial relationships, framing, camera angle, composition, and lighting while preserving explicit user constraints such as face, identity, anatomy, body shape, and body proportions.
+Each pair uses one shared template with a `{kind}` placeholder for `text-to-image` or `image-to-image`. Every mode appends the common Krea2 guidelines; the effective full prompt sent to Qwen is available in `creator_info`. The old visible `system_prompt` widget and preset graying behavior have been removed.
 
 thinking uses the Qwen3-VL thinking convention and pre-fills the assistant turn with <think> when enabled. The reasoning before </think> is returned separately on the thinking output, while only the final edit text remains in created_prompt. An unfinished thinking block raises an error instead of producing an empty/invalid final prompt.
 
