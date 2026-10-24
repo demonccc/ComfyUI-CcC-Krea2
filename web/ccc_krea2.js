@@ -202,23 +202,23 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
-                const visual = find("visual_enable")?.value === true;
+                const visual = find("vae_rope_enable")?.value === true;
                 const vision = find("vision_enable")?.value === true;
                 for (const widget of node.widgets ?? []) {
-                    if (widget.name.startsWith("visual_") && widget.name !== "visual_enable") {
-                        widget.disabled = !visual;
+                    if (widget.name.startsWith("vae_rope_") && widget.name !== "vae_rope_enable") {
+                        setWidgetDisabled(node, widget.name, !visual);
                     } else if (widget.name.startsWith("vision_") && widget.name !== "vision_enable") {
-                        widget.disabled = !vision;
+                        setWidgetDisabled(node, widget.name, !vision);
                     }
                 }
-                const fit = find("visual_reference_fit")?.value ?? "native";
-                setWidgetDisabled(node, "visual_placement_grid", !visual || fit === "crop");
-                setWidgetDisabled(node, "visual_rope_geometry", !visual || fit === "native");
-                if (visual && fit === "crop" && find("visual_placement_grid")) {
-                    find("visual_placement_grid").value = "inside";
+                const fit = find("vae_rope_reference_fit")?.value ?? "native";
+                setWidgetDisabled(node, "vae_rope_placement_grid", !visual || fit === "crop");
+                setWidgetDisabled(node, "vae_rope_rope_geometry", !visual || fit === "native");
+                if (visual && fit === "crop" && find("vae_rope_placement_grid")) {
+                    find("vae_rope_placement_grid").value = "inside";
                 }
-                if (visual && fit === "native" && find("visual_rope_geometry")) {
-                    find("visual_rope_geometry").value = "source";
+                if (visual && fit === "native" && find("vae_rope_rope_geometry")) {
+                    find("vae_rope_rope_geometry").value = "source";
                 }
                 setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
                 const visionMode = find("vision_mode")?.value ?? "semantic";
@@ -230,7 +230,7 @@ app.registerExtension({
                     !vision || (find("vision_guidance_seed_mode")?.value ?? "fixed") !== "fixed");
                 node.setDirtyCanvas?.(true, true);
             };
-            for (const name of ["visual_enable", "visual_reference_fit",
+            for (const name of ["vae_rope_enable", "vae_rope_reference_fit",
                                 "vision_enable", "vision_resize", "vision_mode", "vision_guidance_seed_mode"]) {
                 const widget = find(name);
                 if (!widget) continue;
