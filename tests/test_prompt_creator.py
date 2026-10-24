@@ -164,7 +164,7 @@ def test_create_from_image_requires_reference_edit_image():
 
 
 def test_enhance_and_create_from_theme_require_user_text():
-    for mode in ("enhance", "create_from_theme"):
+    for mode in ("enhance", "create_from_theme_t2i", "create_from_theme_i2i"):
         with pytest.raises(ValueError, match="requires a non-empty user_prompt"):
             CcCKrea2EditPromptCreator().create(
                 clip=_FakeClip(), references=_chain(), mode=mode, user_prompt=""
