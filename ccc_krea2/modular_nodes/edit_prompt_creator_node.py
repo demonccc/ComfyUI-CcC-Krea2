@@ -180,7 +180,11 @@ def _edit_image_slot_map(
     Images with both conditioning paths off remain analysis-only. A tiled style
     reference has multiple Qwen crops, so it has no single physical Image N.
     """
-    entries = references.entries
+    edit_vision_entries = tuple(
+        entry for entry in (reference_edit_image.entries if reference_edit_image else ())
+        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual
+    )
+    entries = edit_vision_entries + references.entries
     active = []
     deferred_styles = []
     analysis_positions = []
@@ -222,8 +226,30 @@ def _edit_image_slot_map(
         if count == 1:
             slot_map[index] = next_slot
         next_slot += count
-    prefix = sum(1 for entry in (reference_edit_image.entries if reference_edit_image else ()) if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)) and not (isinstance(entry, VisionReferenceEntry) and entry.paired_visual) and entry.image is not None)
-    return [None] * prefix + [slot_map.get(index) for index in analysis_positions]
+    edit_sources = [
+        entry for entry in (reference_edit_image.entries if reference_edit_image else ())
+        if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry))
+        and not (isinstance(entry, VisionReferenceEntry) and entry.paired_visual)
+        and entry.image is not None
+    ]
+    edit_slots = [slot_map.get(index) for index in range(len(edit_vision_entries))]
+    # Analysis-source order matches the native Vision entries when edit image
+    # has no VAE path. Passive images have no physical Edit slot.
+    edit_mapping = []
+    vision_index = 0
+    for entry in edit_sources:
+        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
+            edit_mapping.append(edit_slots[vision_index])
+            vision_index += 1
+        else:
+            edit_mapping.append(None)
+    return edit_mapping + [
+        slot_map.get(index + len(edit_vision_entries))
+        for index in range(len(references.entries))
+        if isinstance(references.entries[index], (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry))
+        and not (isinstance(references.entries[index], VisionReferenceEntry) and references.entries[index].paired_visual)
+        and references.entries[index].image is not None
+    ]
 
 
 def _remap_created_image_labels(
@@ -347,7 +373,14 @@ class CcCKrea2EditPromptCreator:
         )
         # reference_edit_image is an analysis input, not an Edit reference.
         # Forward only the explicitly connected conditioning references.
-        combined_references = references
+        # The edit image may provide Qwen Vision grounding independently of VAE/RoPE.
+        # Preserve explicitly enabled Vision entries, but never turn passive
+        # analysis images into appearance references.
+        edit_vision_entries = tuple(
+            entry for entry in (reference_edit_image.entries if reference_edit_image else ())
+            if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual
+        )
+        combined_references = EditReferenceChain(edit_vision_entries + references.entries)
         generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
         slot_map = _edit_image_slot_map(references, reference_edit_image) if images else []
         system_prompt = "\n\n".join(part for part in (
