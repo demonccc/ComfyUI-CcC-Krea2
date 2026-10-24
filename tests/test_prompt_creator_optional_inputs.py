@@ -34,7 +34,7 @@ def test_create_from_theme_t2i_runs_without_references():
 
 
 
-def test_theme_t2i_ignores_images_and_forwards_references():
+def test_theme_t2i_analyzes_optional_images_and_forwards_references():
     import torch
     from ccc_krea2.modular_nodes.edit_reference_types import VisualReferenceEntry
     image = torch.ones((1, 64, 64, 3))
@@ -45,7 +45,9 @@ def test_theme_t2i_ignores_images_and_forwards_references():
         mode="create_from_theme_t2i", user_prompt="A new scene."
     )
     assert returned.entries == chain.entries
-    assert clip.kwargs["images"] == []
+    assert len(clip.kwargs["images"]) == 1
+    assert "Vision input 1 = Image 1." in clip.prompt
+    assert "Role: " not in clip.prompt
     assert "KREA2 PROMPT GUIDELINES:" in clip.prompt
     assert clip.prompt.startswith("Create an original text-to-image prompt for Krea2")
     assert created
@@ -60,3 +62,17 @@ def test_theme_i2i_can_run_without_images():
     assert "USER PROMPT:\\nA whimsical village." in clip.prompt
     assert "KREA2 PROMPT GUIDELINES:" in clip.prompt
     assert created
+
+def test_theme_i2i_uses_neutral_image_mapping():
+    import torch
+    from ccc_krea2.modular_nodes.edit_reference_types import VisualReferenceEntry
+    image = torch.ones((1, 64, 64, 3))
+    chain = VisualReferenceChain((VisualReferenceEntry(image=image, semantic=True),))
+    clip = _FakeClip()
+    NODE_CLASS_MAPPINGS["CcCKrea2EditPromptCreator"]().create(
+        clip=clip, references=chain, mode="create_from_theme_i2i",
+        user_prompt="Invent a different setting."
+    )
+    assert len(clip.kwargs["images"]) == 1
+    assert "Vision input 1 = Image 1." in clip.prompt
+    assert "Role: " not in clip.prompt
