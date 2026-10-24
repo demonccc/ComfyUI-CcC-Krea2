@@ -193,12 +193,17 @@ def test_thinking_truncation_retries_without_thinking_and_preserves_reasoning():
 
 def test_thinking_truncation_fails_if_retry_also_has_no_final_prompt():
     class NoFinalClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
         def decode(self, generated_ids):
-            return ""
+            self.calls += 1
+            return "Unfinished reasoning" if self.calls == 1 else ""
 
     with pytest.raises(RuntimeError, match="no final prompt"):
         CcCKrea2EditPromptCreator().create(
-            clip=NoFinalClip(""), references=_chain(), mode="enhance_t2i",
+            clip=NoFinalClip(), references=_chain(), mode="enhance_t2i",
             instructions="Improve this edit.", thinking=True,
         )
 
