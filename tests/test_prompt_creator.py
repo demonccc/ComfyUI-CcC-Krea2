@@ -187,3 +187,22 @@ def test_high_token_budget_is_passed_unmodified_to_qwen():
     assert thinking == ""
     assert clip.generate_kwargs["max_length"] == 32768
     assert "Max Tokens: 32768" in info
+
+
+def test_image_preset_allows_empty_instructions_when_images_exist():
+    for mode in ("create_from_image_t2i", "create_from_image_i2i"):
+        clip = _FakeClip()
+        CcCKrea2EditPromptCreator().create(
+            clip=clip, references=_chain(), mode=mode, instructions=""
+        )
+        assert len(clip.tokenize_kwargs["images"]) == 2
+        assert "IMAGE MAPPING:" in clip.tokenize_prompt
+        assert "INSTRUCTIONS:" not in clip.tokenize_prompt
+
+
+def test_image_preset_requires_instructions_without_images():
+    for mode in ("create_from_image_t2i", "create_from_image_i2i"):
+        with pytest.raises(ValueError, match="instructions must not be empty"):
+            CcCKrea2EditPromptCreator().create(
+                clip=_FakeClip(), mode=mode, instructions=""
+            )
