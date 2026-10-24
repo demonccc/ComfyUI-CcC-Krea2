@@ -43,7 +43,7 @@ def _chain():
 def test_create_from_image_analyzes_references_and_reference_edit_image():
     clip = _FakeClip()
     chain = _chain()
-    reference_edit = _image(0.9)
+    reference_edit = VisualReferenceChain((VisualReferenceEntry(image=_image(0.9), semantic=True),))
 
     created, passthrough, info, _ = CcCKrea2EditPromptCreator().create(
         clip=clip,
@@ -54,12 +54,12 @@ def test_create_from_image_analyzes_references_and_reference_edit_image():
     )
 
     assert created.startswith("The subject from Image 1")
-    assert passthrough is chain
+    assert passthrough.entries == reference_edit.entries + chain.entries
     assert len(clip.tokenize_kwargs["images"]) == 2
-    assert torch.equal(clip.tokenize_kwargs["images"][0], chain.entries[0].image)
-    assert torch.equal(clip.tokenize_kwargs["images"][1], reference_edit)
+    assert torch.equal(clip.tokenize_kwargs["images"][0], reference_edit.entries[0].image)
+    assert torch.equal(clip.tokenize_kwargs["images"][1], chain.entries[0].image)
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
-    assert "Vision input 2 = INTERNAL REFERENCE EDIT IMAGE" in clip.tokenize_prompt
+    assert "Vision input 2 = Image 2" in clip.tokenize_prompt
     assert "Visual Reference Chain Entries: 1" in info
     assert "Images Analyzed: 2" in info
 
@@ -75,7 +75,7 @@ def test_create_from_theme_i2i_still_uses_visual_reference_pixels():
         instructions="Put Image 1 in a neon city at night.",
     )
 
-    assert passthrough is chain
+    assert passthrough.entries == chain.entries
     assert len(clip.tokenize_kwargs["images"]) == 1
     assert torch.equal(clip.tokenize_kwargs["images"][0], chain.entries[0].image)
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
