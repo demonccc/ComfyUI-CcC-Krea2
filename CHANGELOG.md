@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split Prompt Creator `create_from_image` into `create_from_image_t2i` and `create_from_image_i2i`, both analyzing optional image references and using the user's prompt to determine which details matter and how to use them. Both compose preset, user prompt, and common Krea2 guidelines; other presets and workflows unchanged. Existing workflows selecting `create_from_image` will need their mode updated.
+
 - Split Prompt Creator `create_from_theme` into `create_from_theme_t2i` and `create_from_theme_i2i`, with the approved Krea2 preset instructions and the common preset → user prompt → guidelines structure. Both T2I and I2I accept zero or more optional images, without assigning creative roles; T2I can use images as inspiration. Updated frontend preset previews and regression tests. Existing saved workflows selecting the old mode must select a new theme mode (workflows not modified).
 
 - Prompt Creator `enhance` now uses the agreed one-line task instruction and assembles `preset → USER PROMPT → KREA2 PROMPT GUIDELINES` in the Qwen generation message. Enhance does not analyze reference images, but forwards the reference chain unchanged. Other presets and their system prompts are unchanged. Added regression tests (not executed in ComfyUI).
