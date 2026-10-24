@@ -45,14 +45,11 @@ def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[s
     if not clean and not (mode in ("create_from_image_t2i", "create_from_image_i2i") and mapping_lines):
         raise ValueError("[Krea2 CcC Edit Prompt Creator] instructions must not be empty unless create_from_image has reference images.")
     parts = []
-    if preset:
-        parts.append(preset)
     if clean:
         parts.append("INSTRUCTIONS:\n" + clean)
     if mapping_lines:
         neutral = [re.sub(r"\. Role: (?:EDIT|REFERENCE) reference\.$", ".", line) for line in mapping_lines]
         parts.append("IMAGE MAPPING:\n" + "\n".join(neutral))
-    parts.append("KREA2 PROMPT GUIDELINES:\n" + KREA2_PROMPT_GUIDELINES)
     return "\n\n".join(parts)
 
 
@@ -277,12 +274,16 @@ class CcCKrea2EditPromptCreator:
             (reference_edit_image.entries if reference_edit_image is not None else ()) + references.entries
         )
         generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
+        system_prompt = "\n\n".join(part for part in (
+            _resolve_preset(str(mode)),
+            KREA2_PROMPT_GUIDELINES,
+        ) if part)
 
         tokenize_kwargs = {
             "images": images,
             "min_length": 1,
             "thinking": bool(thinking),
-            "system_prompt": "",
+            "system_prompt": system_prompt,
         }
         thinking_prefilled = bool(thinking)
         if thinking_prefilled:
@@ -332,7 +333,8 @@ class CcCKrea2EditPromptCreator:
             f"Top P: {float(top_p):.2f}",
             f"Seed: {int(seed)}",
         ]
-        info_lines.extend(["", "Effective Qwen Prompt (preset + instructions + guidelines):", generation_prompt])
+        info_lines.extend(["", "Effective Qwen System Prompt:", system_prompt,
+                           "", "Effective Qwen User Prompt:", generation_prompt])
         if mapping_lines:
             info_lines.append("")
             info_lines.append("Image Mapping:")
