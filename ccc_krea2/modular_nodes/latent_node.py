@@ -219,8 +219,13 @@ class CcCKrea2Latent:
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
                 "latent_semantic": ("BOOLEAN", {"default": False}),
-                "latent_semantic_instruction": ("STRING", {"multiline": True, "default": ""}),
-                "latent_grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 32}),
+                "latent_vision_resize": ("BOOLEAN", {"default": True}),
+                "latent_vision_max_edge": ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64}),
+                **{
+                    "latent_vision_" + name: spec
+                    for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
+                    if name != "image"
+                },
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
@@ -240,8 +245,15 @@ class CcCKrea2Latent:
         content="empty",
         content_fit="crop",
         latent_semantic=False,
-        latent_semantic_instruction="",
-        latent_grounding_px=768,
+        latent_vision_resize=True,
+        latent_vision_max_edge=768,
+        latent_vision_mode="semantic",
+        latent_vision_instruction="",
+        latent_vision_style_processing="full",
+        latent_vision_guidance_seed_mode="fixed",
+        latent_vision_guidance_seed=0,
+        latent_vision_guidance_detail="balanced",
+        latent_vision_vision_guidance="balanced",
         batch_size=1,
         dimensions_image=None,
         content_image=None,
@@ -273,8 +285,15 @@ class CcCKrea2Latent:
         latent["ccc_krea2_latent_semantic"] = {
             "enabled": bool(latent_semantic),
             "image": content_image if latent_semantic else None,
-            "instruction": latent_semantic_instruction.strip() if latent_semantic else "",
-            "grounding_px": int(latent_grounding_px),
+            "vision_resize": bool(latent_vision_resize),
+            "vision_max_edge": int(latent_vision_max_edge),
+            "mode": latent_vision_mode,
+            "instruction": latent_vision_instruction,
+            "style_processing": latent_vision_style_processing,
+            "guidance_seed_mode": latent_vision_guidance_seed_mode,
+            "guidance_seed": int(latent_vision_guidance_seed),
+            "guidance_detail": latent_vision_guidance_detail,
+            "vision_guidance": latent_vision_vision_guidance,
         }
 
         lines = [
@@ -294,9 +313,11 @@ class CcCKrea2Latent:
         if dimensions == "preset":
             lines.append(f"Preset: {preset_size}")
         if latent_semantic:
-            lines.append(f"Latent Grounding: {int(latent_grounding_px)} px")
-            if latent_semantic_instruction.strip():
-                lines.append(f"Latent Semantic Instruction: {latent_semantic_instruction.strip()}")
+            lines.extend([
+                f"Latent Vision Mode: {latent_vision_mode}",
+                f"Latent Vision Resize: {latent_vision_resize}",
+                f"Latent Vision Max Edge: {latent_vision_max_edge}",
+            ])
 
         latent_info = "\n".join(lines)
         latent["ccc_krea2_latent_info"] = latent_info
