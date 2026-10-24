@@ -347,9 +347,9 @@ class CcCKrea2EditPromptCreator:
                 reference_edit_image=reference_edit_image,
             )
         )
-        combined_references = EditReferenceChain(
-            (reference_edit_image.entries if reference_edit_image is not None else ()) + references.entries
-        )
+        # reference_edit_image is an analysis input, not an Edit reference.
+        # Forward only the explicitly connected conditioning references.
+        combined_references = references
         generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
         slot_map = _edit_image_slot_map(references, reference_edit_image) if images else []
         system_prompt = "\n\n".join(part for part in (
