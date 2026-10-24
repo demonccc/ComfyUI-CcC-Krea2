@@ -3,15 +3,9 @@ import { app } from "../../scripts/app.js";
 const PROMPT_CREATOR_PRESETS = {
     enhance: "Enhance the user's prompt by adding relevant and coherent details that develop the original idea while preserving its intent.",
 
-    create_from_image: `Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
+    create_from_image_t2i: "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate text-to-image prompt for Krea2.",
 
-Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
-
-Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
+    create_from_image_i2i: "Analyze the provided images thoroughly to identify and understand their visible content, characteristics, details, and relationships. Use the user's prompt to determine which visual information is relevant and how that information should be used to construct the desired result. Based on this analysis and the user's instructions, create a detailed and accurate image-to-image prompt for Krea2.",
 
     create_from_theme_t2i: "Create an original text-to-image prompt for Krea2 inspired by the user's prompt, freely developing it into a complete, imaginative scene.",
 
