@@ -162,48 +162,11 @@ def test_image_preset_receives_reference_mapping_without_automatic_roles():
     assert "Role:" not in clip.tokenize_prompt
 
 
-def test_thinking_truncation_retries_without_thinking_and_preserves_reasoning():
-    class SequenceClip(_FakeClip):
-        def __init__(self):
-            super().__init__()
-            self.requests = []
-            self.calls = 0
-
-        def tokenize(self, prompt, **kwargs):
-            self.requests.append(kwargs)
-            return super().tokenize(prompt, **kwargs)
-
-        def decode(self, generated_ids):
-            self.calls += 1
-            if self.calls == 1:
-                return "I am still reasoning when max tokens end."
-            return "A detailed image description of the final result."
-
-    clip = SequenceClip()
-    created, _, info, thinking = CcCKrea2EditPromptCreator().create(
-        clip=clip, references=_chain(), mode="enhance_t2i",
-        instructions="Improve this edit.", thinking=True,
-    )
-    assert created == "A detailed image description of the final result."
-    assert thinking == "I am still reasoning when max tokens end."
-    assert [request["thinking"] for request in clip.requests] == [True, False]
-    assert "llama_template" not in clip.requests[1]
-    assert "Thinking Fallback: retry without thinking" in info
-
-
-def test_thinking_truncation_fails_if_retry_also_has_no_final_prompt():
-    class NoFinalClip(_FakeClip):
-        def __init__(self):
-            super().__init__()
-            self.calls = 0
-
-        def decode(self, generated_ids):
-            self.calls += 1
-            return "Unfinished reasoning" if self.calls == 1 else ""
-
-    with pytest.raises(RuntimeError, match="no final prompt"):
+def test_thinking_truncation_reports_generated_reasoning_without_retry():
+    clip = _FakeClip("I am still reasoning when max tokens end.")
+    with pytest.raises(RuntimeError, match="Decoded reasoning length:"):
         CcCKrea2EditPromptCreator().create(
-            clip=NoFinalClip(), references=_chain(), mode="enhance_t2i",
+            clip=clip, references=_chain(), mode="enhance_t2i",
             instructions="Improve this edit.", thinking=True,
         )
 
