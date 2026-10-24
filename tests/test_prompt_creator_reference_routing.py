@@ -70,7 +70,7 @@ class _FakeClip:
         return "The woman is standing in a garden."
 
 
-def test_creator_returns_edit_chain_before_other_references():
+def test_creator_analyzes_edit_image_first_but_forwards_only_conditioning_references():
     edit_image, other_image = _image(0.2), _image(0.8)
     edit, _ = CcCKrea2Reference().process(
         edit_image, vae_rope_enable=False, vision_enable=False,
@@ -85,7 +85,7 @@ def test_creator_returns_edit_chain_before_other_references():
     )
     assert clip.images[0] is edit_image
     assert clip.images[1] is other_image
-    assert result[1].entries == edit.entries + others.entries
+    assert result[1].entries == others.entries
     assert "Image 1" in result[2] and "Image 2" in result[2]
 
 
@@ -182,3 +182,21 @@ def test_creator_remaps_qwen_output_against_edit_slots():
     assert result[0] == "The woman of Image 1 is wearing a red coat."
     assert "Analysis Image 1 -> analysis only" in result[2]
     assert "Analysis Image 2 -> Edit Image 1" in result[2]
+
+
+def test_reference_edit_image_with_vision_enabled_stays_analysis_only():
+    from ccc_krea2.modular_nodes.edit_prompt_creator_node import _edit_image_slot_map
+    image_edit, _ = CcCKrea2Reference().process(
+        _image(0.1), vae_rope_enable=False, vision_enable=True,
+    )
+    subject, _ = CcCKrea2Reference().process(
+        _image(0.2), vae_rope_enable=True, vision_enable=False,
+    )
+    clip = _FakeClip()
+    result = CcCKrea2EditPromptCreator().create(
+        clip=clip, references=subject, reference_edit_image=image_edit,
+        mode="create_from_image_i2i", instructions="Edit the reference image.",
+    )
+    assert len(clip.images) == 2
+    assert result[1].entries == subject.entries
+    assert _edit_image_slot_map(subject, image_edit) == [None, None]
