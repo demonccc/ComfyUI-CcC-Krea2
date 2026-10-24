@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Latent retains its existing LATENT, info and target-image outputs, VAE encoding, sizing and content-fit behavior. Only optional semantic conditioning uses the Reference Vision mode and parameter contract; added regression coverage to guard the original outputs.
+
 - Reference node UI now disables/grays `vae_rope_*` controls when `vae_rope_enable` is off and `vision_*` controls when `vision_enable` is off, preserving the existing fit, resize, style, and seed-dependent states. Fixed stale frontend selectors using the former `visual_*` names; backend conditioning unchanged.
 
 - Simplified Prompt Creator to a single `instructions` textbox; removed editable/preview `system_prompt` and its frontend graying logic. Six T2I/I2I variants now share three preset templates and a `{kind}` placeholder. Added `none` as the no-preset option (shared Krea2 guidelines still apply), and added the effective assembled Qwen prompt to `creator_info`. Updated docs and tests; existing saved workflow widgets/modes require migration, but workflow files were not edited.
