@@ -326,10 +326,12 @@ class CcCKrea2EditPromptCreator:
             "thinking": bool(thinking),
             "system_prompt": system_prompt,
         }
-        # Let the active Qwen checkpoint own its assistant/thinking template.
-        # Forcing an open <think> makes non-thinking/abliterated checkpoints
-        # emit their final answer inside a block they never close.
-        thinking_prefilled = False
+        # Restore explicit Qwen thinking prefill when requested.
+        # The opening <think> is supplied by the chat template and the
+        # generated continuation is split at </think>.
+        thinking_prefilled = bool(thinking)
+        if thinking_prefilled:
+            tokenize_kwargs["llama_template"] = _thinking_llama_template(len(images))
 
         tokens = clip.tokenize(
             generation_prompt,
