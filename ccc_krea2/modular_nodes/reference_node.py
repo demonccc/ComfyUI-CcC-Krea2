@@ -46,7 +46,7 @@ class CcCKrea2Reference:
                 required["vision_" + name] = spec
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
-            "reference_attention": ("KREA2_MASK_CHAIN",),
+            "mask_attention": ("KREA2_MASK_CHAIN",),
             "target_attention_mask": visual["optional"]["target_attention_mask"],
         }
         return {"required": required, "optional": optional}
@@ -66,7 +66,7 @@ class CcCKrea2Reference:
 
     def process(self, image: torch.Tensor, vae_rope_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
-                reference_boost_mask=None, reference_attention=None, target_attention_mask=None, **kwargs):
+                reference_boost_mask=None, mask_attention=None, target_attention_mask=None, **kwargs):
         # Accept saved workflows with the previous visual control spelling.
         if "visual_enable" in kwargs:
             vae_rope_enable = bool(kwargs.pop("visual_enable"))
@@ -78,11 +78,11 @@ class CcCKrea2Reference:
                 f"VAE/RoPE: {'enabled' if vae_rope_enable else 'disabled'}",
                 f"Vision: {'enabled' if vision_enable else 'disabled'}"]
         attention_weight_map = None
-        if reference_attention is not None:
-            if not isinstance(reference_attention, MaskChain):
+        if mask_attention is not None:
+            if not isinstance(mask_attention, MaskChain):
                 raise TypeError("Reference attention must come from Krea2 CcC Mask.")
             height, width = int(image.shape[1]), int(image.shape[2])
-            if reference_attention.geometry != (int(image.shape[0]), height, width):
+            if mask_attention.geometry != (int(image.shape[0]), height, width):
                 raise ValueError("Reference attention masks must match reference image geometry.")
             # Region weights override the global reference boost; last region wins.
             global_boost = float(kwargs.get("vae_rope_boost", 1.0))
@@ -90,7 +90,7 @@ class CcCKrea2Reference:
                 (int(image.shape[0]), height, width),
                 global_boost, dtype=torch.float32, device=image.device
             )
-            for region in reference_attention.regions:
+            for region in mask_attention.regions:
                 selection = region.mask.to(image.device) > 0.5
                 attention_weight_map = torch.where(
                     selection, torch.full_like(attention_weight_map, float(region.boost)),
