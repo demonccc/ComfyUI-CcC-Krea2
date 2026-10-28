@@ -274,6 +274,12 @@ app.registerExtension({
                 if (!widget) continue;
                 const original = widget.callback;
                 widget.callback = function (...args) {
+                    if (name === "vision_mode") {
+                        const mode = find("vision_mode")?.value;
+                        const fidelity = find("vision_vision_fidelity");
+                        if (fidelity && mode === "style") fidelity.value = 0.0;
+                        else if (fidelity && mode === "semantic") fidelity.value = 0.25;
+                    }
                     const result = original?.apply(this, args);
                     refresh();
                     return result;
