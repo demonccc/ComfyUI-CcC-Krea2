@@ -261,16 +261,16 @@ Install the official Comfy-Org model `sam3.1_multiplex_fp16.safetensors` in
 `Krea2 CcC Mask` through `sam_model` and `sam_clip`. These are **not**
 the Krea2 generation model/CLIP.
 
-Each Mask accepts an IMAGE and either a text prompt (source `sam3`) or
-an external MASK (source `external_mask`). Feed the prior `attention`
-into the next `previous_masks`, and feed the prior `image` into its
+Each Mask accepts an IMAGE and either a text prompt (SAM 3.1) or
+an external MASK (a connected `mask`). Feed the prior `mask_attention`
+into the next `previous_mask_attention`, and feed the prior `image` into its
 `image` input. Outputs are the unchanged image, the union of all masks,
 the regional-attention chain, a preview and diagnostic info.
 
 For Paint, connect the **last** Mask's `image` and `mask` to
 `Krea2 CcC Paint Prepare`; Paint consumes Paint Prepare's context.
-For Edit, connect the **last** Mask's `attention` into
-`Krea2 CcC Reference.reference_attention` and ensure its `image` is
+For Edit, connect the **last** Mask's `mask_attention` into
+`Krea2 CcC Reference.mask_attention` and ensure its `image` is
 the corresponding Reference image. Pixels outside regional masks retain
 Reference's global `boost`, whereas masked pixels take their own
 **absolute** `boost` (last-overlapping region wins). A regional boost
