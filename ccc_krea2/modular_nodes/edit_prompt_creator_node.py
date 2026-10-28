@@ -140,116 +140,63 @@ def _normalize_created_prompt(text: str) -> str:
 
 def _collect_analysis_images(
     references: EditReferenceChain,
-    reference_edit_image: Optional[EditReferenceChain],
 ) -> Tuple[List[torch.Tensor], List[str], List[str]]:
-    """Send edit images first, then the remaining references, without paired duplicates."""
+    """Analyze every source in the single ordered reference chain once."""
     images: List[torch.Tensor] = []
     mapping_lines: List[str] = []
     warnings: List[str] = []
-    for role, chain in (
-        ("EDIT", reference_edit_image or EditReferenceChain()),
-        ("REFERENCE", references),
-    ):
-        for entry in chain.entries:
-            if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
-                continue
-            if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
-                continue
-            if entry.image is None:
-                warnings.append(f"{role} reference has no source image.")
-                continue
-            images.append(
-                entry.source_image if isinstance(entry, VisionReferenceEntry) and entry.source_image is not None
-                else entry.image
-            )
-            index = len(images)
-            mapping_lines.append(
-                f"Vision input {index} = Image {index}. Role: {role} reference."
-            )
+    for entry in references.entries:
+        if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
+            continue
+        if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
+            continue
+        if entry.image is None:
+            warnings.append("Reference has no source image.")
+            continue
+        images.append(
+            entry.source_image if isinstance(entry, VisionReferenceEntry) and entry.source_image is not None
+            else entry.image
+        )
+        index = len(images)
+        mapping_lines.append(f"Vision input {index} = Image {index}.")
     return images, mapping_lines, warnings
 
 
-
-
-def _edit_image_slot_map(
-    references: EditReferenceChain,
-    reference_edit_image: Optional[EditReferenceChain],
-) -> List[Optional[int]]:
-    """Map each analyzed source image to its physical Qwen image index in Edit.
-
-    Images with both conditioning paths off remain analysis-only. A tiled style
-    reference has multiple Qwen crops, so it has no single physical Image N.
-    """
-    edit_vision_entries = tuple(
-        entry for entry in (reference_edit_image.entries if reference_edit_image else ())
-        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual
-    )
-    entries = edit_vision_entries + references.entries
+def _edit_image_slot_map(references: EditReferenceChain) -> List[Optional[int]]:
+    """Map analyzed images to Edit's physical Qwen slots, preserving chain order."""
+    entries = references.entries
     active = []
     deferred_styles = []
     analysis_positions = []
     for index, entry in enumerate(entries):
         if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
             continue
-        if not isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)):
-            continue
-        if entry.image is None:
-            continue
-        analysis_positions.append(index)
+        if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)) and entry.image is not None:
+            analysis_positions.append(index)
     for index, entry in enumerate(entries):
         if isinstance(entry, ImageReferenceEntry):
             continue
         if isinstance(entry, VisualReferenceEntry):
-            paired = (
-                entries[index + 1]
-                if index + 1 < len(entries)
-                and isinstance(entries[index + 1], VisionReferenceEntry)
-                and entries[index + 1].paired_visual else None
-            )
+            paired = (entries[index + 1] if index + 1 < len(entries)
+                      and isinstance(entries[index + 1], VisionReferenceEntry)
+                      and entries[index + 1].paired_visual else None)
             tiled = paired is not None and paired.mode == "style_indirect" and paired.processing != "full"
             if entry.semantic and not tiled:
                 active.append(index)
             continue
-        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
+        if isinstance(entry, VisionReferenceEntry):
             if entry.mode == "style_indirect":
                 deferred_styles.append((index, 1 if entry.processing == "full" else
                                         16 if entry.processing == "4x4" else 4))
-            else:
+            elif not entry.paired_visual:
                 active.append(index)
-        elif isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
-            if entry.mode == "style_indirect" and entry.processing != "full":
-                deferred_styles.append((index, 16 if entry.processing == "4x4" else 4))
     slot_map = {index: slot for slot, index in enumerate(active, start=1)}
-    # Only full, one-image style references have a stable image index.
     next_slot = len(active) + 1
     for index, count in deferred_styles:
         if count == 1:
             slot_map[index] = next_slot
         next_slot += count
-    edit_sources = [
-        entry for entry in (reference_edit_image.entries if reference_edit_image else ())
-        if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry))
-        and not (isinstance(entry, VisionReferenceEntry) and entry.paired_visual)
-        and entry.image is not None
-    ]
-    edit_slots = [slot_map.get(index) for index in range(len(edit_vision_entries))]
-    # Analysis-source order matches the native Vision entries when edit image
-    # has no VAE path. Passive images have no physical Edit slot.
-    edit_mapping = []
-    vision_index = 0
-    for entry in edit_sources:
-        if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
-            edit_mapping.append(edit_slots[vision_index])
-            vision_index += 1
-        else:
-            edit_mapping.append(None)
-    return edit_mapping + [
-        slot_map.get(index + len(edit_vision_entries))
-        for index in range(len(references.entries))
-        if isinstance(references.entries[index], (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry))
-        and not (isinstance(references.entries[index], VisionReferenceEntry) and references.entries[index].paired_visual)
-        and references.entries[index].image is not None
-    ]
+    return [slot_map.get(index) for index in analysis_positions]
 
 
 def _remap_created_image_labels(
@@ -331,15 +278,6 @@ class CcCKrea2EditPromptCreator:
             },
             "optional": {
                 "references": ("KREA2_REFERENCE_CHAIN",),
-                "reference_edit_image": (
-                    "KREA2_REFERENCE_CHAIN",
-                    {
-                        "tooltip": (
-                            "Reference for the image being edited; analyzed first. "
-                            "Can contain an image even when both conditioning paths are disabled."
-                        )
-                    },
-                ),
             },
         }
 
@@ -354,7 +292,6 @@ class CcCKrea2EditPromptCreator:
         temperature: float = 0.25,
         top_p: float = 0.90,
         seed: int = 0,
-        reference_edit_image: Optional[EditReferenceChain] = None,
     ):
         if references is None:
             references = EditReferenceChain()
@@ -363,26 +300,14 @@ class CcCKrea2EditPromptCreator:
                 "[Krea2 CcC Edit Prompt Creator] references must be a EditReferenceChain."
             )
 
-        if reference_edit_image is not None and not isinstance(reference_edit_image, EditReferenceChain):
-            raise TypeError("[Krea2 CcC Edit Prompt Creator] reference_edit_image must be a Reference chain.")
         images, mapping_lines, warnings = (
-            ([], [], []) if mode in ("enhance_t2i", "enhance_i2i") else _collect_analysis_images(
-                references=references,
-                reference_edit_image=reference_edit_image,
-            )
+            ([], [], []) if mode in ("enhance_t2i", "enhance_i2i")
+            else _collect_analysis_images(references)
         )
-        # reference_edit_image is an analysis input, not an Edit reference.
-        # Forward only the explicitly connected conditioning references.
-        # The edit image may provide Qwen Vision grounding independently of VAE/RoPE.
-        # Preserve explicitly enabled Vision entries, but never turn passive
-        # analysis images into appearance references.
-        edit_vision_entries = tuple(
-            entry for entry in (reference_edit_image.entries if reference_edit_image else ())
-            if isinstance(entry, VisionReferenceEntry) and not entry.paired_visual
-        )
-        combined_references = EditReferenceChain(edit_vision_entries + references.entries)
+        # The Prompt Creator does not change which references reach Edit.
+        combined_references = references
         generation_prompt = _build_generation_prompt(str(mode), instructions, mapping_lines)
-        slot_map = _edit_image_slot_map(references, reference_edit_image) if images else []
+        slot_map = _edit_image_slot_map(references) if images else []
         system_prompt = "\n\n".join(part for part in (
             _resolve_preset(str(mode)),
             KREA2_PROMPT_GUIDELINES,
@@ -444,7 +369,6 @@ class CcCKrea2EditPromptCreator:
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
-            f"Reference Edit Image: {'yes' if reference_edit_image is not None else 'no'}",
             f"Max Tokens: {int(max_tokens)}",
             f"Temperature: {float(temperature):.2f}",
             f"Top P: {float(top_p):.2f}",
