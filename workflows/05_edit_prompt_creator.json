@@ -1,6 +1,6 @@
 {
   "last_node_id": 17,
-  "last_link_id": 27,
+  "last_link_id": 28,
   "nodes": [
     {
       "id": 1,
@@ -247,6 +247,11 @@
           "name": "image",
           "type": "IMAGE",
           "link": 2
+        },
+        {
+          "name": "previous_references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 28
         }
       ],
       "outputs": [
@@ -346,11 +351,10 @@
         "Node name for S&R": "CcCKrea2EditPromptCreator"
       },
       "widgets_values": [
-        "create_from_image",
+        "create_from_image_i2i",
         "Use the subject in Image 2 in the scene and action shown in Image 1. Preserve the subject's recognizable appearance; use Image 1 for scene composition and activity.",
-        "Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.\n\nTreat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.\n\nUse the user's instructions to determine what should be preserved, changed, emphasized, or adapted.\n\nWrite the result as a direct description of the desired final image, not as an explanation of the editing process.\n\nReturn only the final I2I prompt as one plain-text paragraph.",
         true,
-        2048,
+        4096,
         0.25,
         0.9,
         0
@@ -382,7 +386,9 @@
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "links": []
+          "links": [
+            28
+          ]
         },
         {
           "name": "reference_info",
@@ -969,6 +975,14 @@
       1,
       11,
       5,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      28,
+      9,
+      0,
+      7,
+      1,
       "KREA2_REFERENCE_CHAIN"
     ]
   ],
