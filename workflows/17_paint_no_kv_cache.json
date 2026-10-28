@@ -1,6 +1,6 @@
 {
-  "last_node_id": 21,
-  "last_link_id": 26,
+  "last_node_id": 53,
+  "last_link_id": 30,
   "nodes": [
     {
       "id": 1,
@@ -198,14 +198,14 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4
+            27
           ]
         },
         {
           "name": "MASK",
           "type": "MASK",
           "links": [
-            5
+            28
           ]
         }
       ],
@@ -235,7 +235,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 4
+          "link": 29
         },
         {
           "name": "vae",
@@ -245,7 +245,7 @@
         {
           "name": "mask",
           "type": "MASK",
-          "link": 5
+          "link": 30
         }
       ],
       "outputs": [
@@ -845,6 +845,75 @@
       },
       "widgets_values": [],
       "title": "Restore Native Canvas"
+    },
+    {
+      "id": 53,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        150,
+        -700
+      ],
+      "size": [
+        355,
+        280
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 27
+        },
+        {
+          "name": "external_mask",
+          "type": "MASK",
+          "link": 28
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            30
+          ]
+        },
+        {
+          "name": "attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": []
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "external_mask",
+        "",
+        1,
+        0.5,
+        false
+      ],
+      "title": "Mask: External (Paint)"
     }
   ],
   "links": [
@@ -871,22 +940,6 @@
       13,
       1,
       "CLIP"
-    ],
-    [
-      4,
-      5,
-      0,
-      6,
-      0,
-      "IMAGE"
-    ],
-    [
-      5,
-      5,
-      1,
-      6,
-      2,
-      "MASK"
     ],
     [
       6,
@@ -1047,6 +1100,38 @@
       18,
       0,
       "IMAGE"
+    ],
+    [
+      27,
+      5,
+      0,
+      53,
+      "image",
+      "IMAGE"
+    ],
+    [
+      28,
+      5,
+      1,
+      53,
+      "external_mask",
+      "MASK"
+    ],
+    [
+      29,
+      53,
+      0,
+      6,
+      "image",
+      "IMAGE"
+    ],
+    [
+      30,
+      53,
+      1,
+      6,
+      "mask",
+      "MASK"
     ]
   ],
   "groups": [
