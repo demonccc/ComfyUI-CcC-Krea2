@@ -5,6 +5,7 @@ from .lora_loader import CcCKrea2LoRALoader
 from .t2i import CcCKrea2TextToImage
 from .modular_nodes.reference_node import CcCKrea2Reference
 from .modular_nodes.mask_node import CcCKrea2Mask
+from .modular_nodes.attention_preview_node import CcCKrea2AttentionPreview
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
 from .modular_nodes.latent_node import CcCKrea2Latent
 from .modular_nodes.edit_node import CcCKrea2Edit
@@ -17,6 +18,7 @@ from .modular_nodes.paint_node import CcCKrea2Paint
 NODE_CLASS_MAPPINGS = {
     "CcCKrea2Reference": CcCKrea2Reference,
     "CcCKrea2Mask": CcCKrea2Mask,
+    "CcCKrea2AttentionPreview": CcCKrea2AttentionPreview,
     "CcCKrea2SizeResolver": CcCKrea2SizeResolver,
     "CcCKrea2Latent": CcCKrea2Latent,
     "CcCKrea2Edit": CcCKrea2Edit,
@@ -36,6 +38,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "CcCKrea2Reference": "Krea2 CcC Reference",
     "CcCKrea2Mask": "Krea2 CcC Mask",
+    "CcCKrea2AttentionPreview": "Krea2 CcC Attention Preview",
     "CcCKrea2SizeResolver": "Krea2 CcC Size Resolver",
     "CcCKrea2Latent": "Krea2 CcC Target Latent",
     "CcCKrea2Edit": "Krea2 CcC Edit",
