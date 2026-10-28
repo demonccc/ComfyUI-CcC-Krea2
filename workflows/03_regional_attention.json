@@ -1,6 +1,6 @@
 {
   "last_node_id": 54,
-  "last_link_id": 36,
+  "last_link_id": 37,
   "nodes": [
     {
       "id": 1,
@@ -477,6 +477,13 @@
           "name": "edit_info",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "rope_preview",
+          "type": "IMAGE",
+          "links": [
+            37
+          ]
         }
       ],
       "properties": {
@@ -709,7 +716,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "SAM3.1 masks: face boost 2.0, hair boost 0.25. Face -> Hair chained; the latter overrides overlaps. Unmasked pixels retain Reference boost. Last SAM3 mask unloads model. The model loads from Comfy-Org/sam3.1 into models/checkpoints."
+        "Reference attention test: SAM3.1 face boost 2.0, hair 0.25, last region overrides overlaps. The Edit rope_preview output provides four views: layout, RoPE overlay boxes, RoPE references, and RoPE-positioned references with Boost heatmap. No standalone Attention Preview node."
       ]
     },
     {
@@ -1087,6 +1094,34 @@
         true
       ],
       "title": "Mask: Hair"
+    },
+    {
+      "id": 53,
+      "type": "PreviewImage",
+      "pos": [
+        1820,
+        -950
+      ],
+      "size": [
+        320,
+        320
+      ],
+      "flags": {},
+      "order": 55,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 37
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Edit RoPE + Regional Boost Views"
     }
   ],
   "links": [
@@ -1337,6 +1372,14 @@
       8,
       "reference_attention",
       "KREA2_MASK_CHAIN"
+    ],
+    [
+      37,
+      9,
+      5,
+      53,
+      0,
+      "IMAGE"
     ]
   ],
   "groups": [
