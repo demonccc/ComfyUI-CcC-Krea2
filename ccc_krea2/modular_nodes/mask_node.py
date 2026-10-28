@@ -22,55 +22,36 @@ class MaskChain:
     regions: Tuple[AttentionRegion, ...]
 
 
-_SAM3_PROCESSOR = None
+def _sam31_mask(image, prompt, confidence, model, clip):
+    """Use the built-in ComfyUI SAM3 detector and its CLIP text conditioning."""
+    if model is None or clip is None:
+        raise ValueError("SAM 3.1 requires MODEL and CLIP from CheckpointLoaderSimple.")
+    try:
+        import nodes
+        from comfy_extras.nodes_sam3 import SAM3_Detect
+    except ImportError as exc:
+        raise RuntimeError("This ComfyUI version does not include native SAM3_Detect.") from exc
+    conditioning = nodes.CLIPTextEncode().encode(clip, prompt)[0]
+    result = SAM3_Detect.execute(
+        model=model, image=image, conditioning=conditioning,
+        threshold=float(confidence), refine_iterations=2, individual_masks=False,
+    )
+    # ComfyUI NodeOutput wraps the returned native socket values.
+    if hasattr(result, "values"):
+        return result.values[0]
+    if isinstance(result, (tuple, list)):
+        return result[0]
+    raise TypeError("Unexpected SAM3_Detect output shape; update ComfyUI core.")
 
 
-def _get_sam3():
-    global _SAM3_PROCESSOR
-    if _SAM3_PROCESSOR is None:
-        try:
-            from sam3.model_builder import build_sam3_image_model
-            from sam3.model.sam3_image_processor import Sam3Processor
-        except ImportError as exc:
-            raise RuntimeError(
-                "SAM 3 is not installed. Install the official facebookresearch/sam3 package "
-                "and obtain checkpoint access, or select external_mask."
-            ) from exc
-        model = build_sam3_image_model()
-        _SAM3_PROCESSOR = Sam3Processor(model)
-    return _SAM3_PROCESSOR
-
-
-def _sam3_mask(image, prompt, confidence):
-    import numpy as np
-    from PIL import Image
-    processor = _get_sam3()
-    processor.confidence_threshold = float(confidence)
-    output_masks = []
-    for frame in image:
-        pil = Image.fromarray((frame[..., :3].detach().float().cpu().clamp(0, 1).numpy() * 255).astype(np.uint8))
-        with torch.inference_mode():
-            result = processor.set_text_prompt(
-                state=processor.set_image(pil), prompt=str(prompt).strip()
-            )
-        candidates = result["masks"]
-        if not torch.is_tensor(candidates):
-            candidates = torch.as_tensor(candidates)
-        if candidates.numel() == 0:
-            selected = torch.zeros(pil.height, pil.width)
-        else:
-            candidates = candidates.float()
-            while candidates.ndim > 3 and candidates.shape[1] == 1:
-                candidates = candidates[:, 0]
-            if candidates.ndim == 2:
-                candidates = candidates.unsqueeze(0)
-            selected = candidates.amax(dim=0)
-            if selected.shape != (pil.height, pil.width):
-                selected = F.interpolate(
-                    selected[None, None], size=(pil.height, pil.width), mode="bilinear", align_corners=False
-                )[0, 0]
-        output_masks.append(selected.cpu().clamp(0, 1))
-    return torch.stack(output_masks, dim=0).to(image.device)
+def _offload_sam31(model):
+    """Request ComfyUI's model manager to unload only SAM3; never unload Krea2."""
+    import comfy.model_management as mm
+    # ModelPatcher.offload_model() is not portable across ComfyUI versions.
+    # Its manager removes only the requested model from the GPU-resident list.
+    mm.unload_model_clones(model)
+    if hasattr(mm, "soft_empty_cache"):
+        mm.soft_empty_cache()
 
 
 def _normalize_mask(mask, batch, height, width, device):
@@ -100,18 +81,22 @@ class CcCKrea2Mask:
             "required": {
                 "image": ("IMAGE",),
                 "source": (["external_mask", "sam3"], {"default": "external_mask"}),
+                "unload_sam_model": ("BOOLEAN", {"default": False}),
                 "prompt": ("STRING", {"default": "face"}),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
             },
             "optional": {
                 "external_mask": ("MASK",),
+                "sam_model": ("MODEL",),
+                "sam_clip": ("CLIP",),
                 "previous_masks": ("KREA2_MASK_CHAIN",),
             },
         }
 
     def process(self, image, source="external_mask", prompt="face", boost=1.0,
-                confidence=0.5, external_mask=None, previous_masks=None):
+                confidence=0.5, external_mask=None, previous_masks=None,
+                sam_model=None, sam_clip=None, unload_sam_model=False):
         if image.ndim != 4:
             raise ValueError("Image must have ComfyUI BHWC dimensions.")
         batch, height, width = image.shape[:3]
@@ -123,7 +108,9 @@ class CcCKrea2Mask:
         elif source == "sam3":
             if not str(prompt).strip():
                 raise ValueError("SAM 3 requires a text prompt.")
-            mask = _sam3_mask(image, prompt, confidence)
+            mask = _sam31_mask(image, prompt, confidence, sam_model, sam_clip)
+            if unload_sam_model:
+                _offload_sam31(sam_model)
         else:
             raise ValueError(f"Unknown segmentation source: {source}")
         mask = _normalize_mask(mask, batch, height, width, image.device)
