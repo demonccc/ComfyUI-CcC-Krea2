@@ -261,8 +261,10 @@ Install the official Comfy-Org model `sam3.1_multiplex_fp16.safetensors` in
 `Krea2 CcC Mask` through `sam_model` and `sam_clip`. These are **not**
 the Krea2 generation model/CLIP.
 
-Each Mask accepts an IMAGE and either a text prompt (SAM 3.1) or
-an external MASK (a connected `mask`). Feed the prior `mask_attention`
+Each Mask accepts an IMAGE and a `source` selector (`sam` or `mask`).
+`sam` runs native SAM 3.1 with `prompt` and `confidence` (plus optional
+`unload_sam_model` at the end of the chain); `mask` uses the connected
+standard `mask` socket and disables irrelevant SAM controls in the UI. Feed the prior `mask_attention`
 into the next `previous_mask_attention`, and feed the prior `image` into its
 `image` input. Outputs are the unchanged image, the union of all masks,
 the regional-attention chain, a preview and diagnostic info.
@@ -304,3 +306,5 @@ Native detector refinement remains at 2 iterations. Paint workflows
 Mask node in `external_mask` mode. Outpaint workflow
 `15_paint_outpaint` intentionally uses no external segmentation:
 Paint Prepare generates the expansion mask based on canvas geometry.
+
+When Prompt Creator thinking fills the output budget without producing a final prompt, it attempts one generation with thinking disabled, preserving the original reasoning output. If this retry also yields no final prompt, the error is retained rather than passing unfinished reasoning as an edit prompt.
