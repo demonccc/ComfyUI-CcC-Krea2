@@ -227,6 +227,7 @@ def patch_krea2_model(model: Any) -> Any:
             for key in (
                 "ref_latents", "ref_boosts", "ccc_ref_rope_positions",
                 "ccc_ref_target_masks", "ccc_ref_attention_scopes", "ccc_ref_boost_masks",
+                "ccc_ref_attention_maps",
             ):
                 fallback_kwargs.pop(key, None)
             return executor(x, timesteps, context, *wargs, **fallback_kwargs)
