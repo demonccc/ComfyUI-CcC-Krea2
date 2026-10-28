@@ -321,10 +321,12 @@
         true,
         768,
         "semantic",
-        "This is the scene image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the scene image.",
+        0.25
       ],
       "title": "Scene Global Reference"
     },
@@ -386,10 +388,12 @@
         true,
         768,
         "semantic",
-        "This is the woman reference image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the woman reference image.",
+        0.25
       ],
       "title": "Woman Regional Reference"
     },
@@ -860,10 +864,12 @@
         true,
         768,
         "semantic",
-        "This is the man reference image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the man reference image.",
+        0.25
       ],
       "title": "Man Regional Reference"
     }
