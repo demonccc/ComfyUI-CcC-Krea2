@@ -235,6 +235,8 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
+                const currentMode = find("vision_mode");
+                if (currentMode?.value === "native") currentMode.value = "none";
                 const visual = find("vae_rope_enable")?.value === true;
                 const vision = find("vision_enable")?.value === true;
                 for (const widget of node.widgets ?? []) {
@@ -256,6 +258,9 @@ app.registerExtension({
                 setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
                 const visionMode = find("vision_mode")?.value ?? "semantic";
                 setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
+                setWidgetDisabled(node, "vision_instruction", !vision || visionMode === "none" || visionMode === "native");
+                setWidgetDisabled(node, "vision_reference_annotation", !vision);
+                setWidgetDisabled(node, "vision_vision_fidelity", !vision || !["semantic", "style"].includes(visionMode));
                 if (vision && visionMode !== "style" && find("vision_style_processing")) {
                     find("vision_style_processing").value = "full";
                 }
