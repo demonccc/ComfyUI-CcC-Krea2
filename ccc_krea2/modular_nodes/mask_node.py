@@ -89,10 +89,10 @@ class CcCKrea2Mask:
             "required": {
                 "image": ("IMAGE",),
                 "source": (["external_mask", "sam3"], {"default": "external_mask"}),
-                "unload_sam_model": ("BOOLEAN", {"default": False}),
                 "prompt": ("STRING", {"default": "face"}),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "unload_sam_model": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "external_mask": ("MASK",),
