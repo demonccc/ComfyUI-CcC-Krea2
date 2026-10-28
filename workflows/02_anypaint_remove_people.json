@@ -795,7 +795,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "SAM3.1 masks: face + hair chained as a union. The last Mask unloads SAM3 from GPU. Its IMAGE and MASK outputs feed Paint Prepare, then Paint and Restore."
+        "Remove people via native ComfyUI SAM3.1. The first Mask selects person, the second adds hair (union). The final IMAGE and MASK go to Paint Prepare, then Paint and Paint Restore. Boost values are ignored by Paint. Last mask offloads the SAM model."
       ]
     },
     {
@@ -969,12 +969,12 @@
       },
       "widgets_values": [
         "sam3",
-        "face",
-        2,
+        "person",
+        1,
         0.5,
         false
       ],
-      "title": "Mask: Face"
+      "title": "Mask: Person"
     },
     {
       "id": 52,
@@ -1049,7 +1049,7 @@
       "widgets_values": [
         "sam3",
         "hair",
-        0.25,
+        1,
         0.5,
         true
       ],
