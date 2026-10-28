@@ -907,6 +907,7 @@
         "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
+        "mask",
         "",
         1,
         0.5,
