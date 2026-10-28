@@ -308,11 +308,10 @@
         "Node name for S&R": "CcCKrea2EditPromptCreator"
       },
       "widgets_values": [
-        "custom",
+        "none",
         "Use the subject from Image 1 as a heroic explorer in a misty mountain landscape.",
-        "Create a clear English I2I prompt for Krea2 Edit from the user's instructions and the available visual context. Preserve the user's intent and describe the desired final image directly. Return only one plain-text paragraph.",
         true,
-        2048,
+        4096,
         0.25,
         0.9,
         0
