@@ -34,11 +34,11 @@ def test_mask_chain_union_and_last_region_priority():
     second[:, 3:, 3:] = 1
     node = CcCKrea2Mask()
     image_out, m1, c1, _, _ = node.process(
-        image, source="external_mask", external_mask=first, boost=2.
+        image, mask=first, boost=2.
     )
     image_out2, merged, c2, _, _ = node.process(
-        image_out, source="external_mask", external_mask=second,
-        previous_masks=c1, boost=0.
+        image_out, mask=second,
+        previous_mask_attention=c1, boost=0.
     )
     assert image_out2 is image
     torch.testing.assert_close(merged, torch.maximum(first, second))
@@ -56,7 +56,24 @@ def test_external_mask_requires_no_sam_dependency():
     image = torch.zeros((1, 16, 16, 3))
     mask = torch.ones((1, 16, 16))
     _, merged, _, _, _ = CcCKrea2Mask().process(
-        image, external_mask=mask, source="external_mask"
+        image, mask=mask
     )
     torch.testing.assert_close(merged, mask)
 
+
+def test_mask_input_takes_priority_without_sam_model():
+    image = torch.zeros((1, 8, 8, 3))
+    selected = torch.ones((1, 8, 8))
+    _, combined, chain, _, info = CcCKrea2Mask().process(
+        image, mask=selected, sam_model=None, sam_clip=None,
+    )
+    torch.testing.assert_close(combined, selected)
+    assert len(chain.regions) == 1
+    assert "Mask source: mask" in info
+
+
+def test_missing_mask_uses_sam_and_reports_missing_model():
+    image = torch.zeros((1, 8, 8, 3))
+    import pytest
+    with pytest.raises(ValueError, match="requires MODEL and CLIP"):
+        CcCKrea2Mask().process(image)
