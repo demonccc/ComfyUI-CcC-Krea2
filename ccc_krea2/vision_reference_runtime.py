@@ -66,7 +66,23 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
+            vision_instruction="",
+            alias=entry.reference_annotation,
+            appearance_reference=False,
+            include_in_vision=True,
+            vision_reference_mode="native",
+            vision_summary_rows=0,
+            vision_indirect=False,
+            semantic_extract="none",
+            semantic_strength=1.0,
+        )
+
+    if entry.mode == "guided":
+        return ReferenceSpec(
+            reference_path="edit",
+            prepared_image=prep,
             vision_instruction=entry.instruction.strip(),
+            alias=entry.reference_annotation,
             appearance_reference=False,
             include_in_vision=True,
             vision_reference_mode="native",
@@ -80,6 +96,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
+            alias=entry.reference_annotation,
             vision_instruction=_with_user_instruction(SEMANTIC_DIRECTIVE, entry.instruction, "semantic"),
             appearance_reference=False,
             include_in_vision=True,
@@ -87,13 +104,14 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             vision_summary_rows=0,
             vision_indirect=False,
             semantic_extract="subject",
-            semantic_strength=0.25,
+            semantic_strength=entry.vision_fidelity,
         )
 
     if entry.mode == "style_direct":
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
+            alias=entry.reference_annotation,
             vision_instruction=_with_user_instruction(VISUAL_DIRECTIVE, entry.instruction, "visual"),
             appearance_reference=False,
             include_in_vision=True,
@@ -106,6 +124,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
     if entry.mode == "style_indirect":
         return StyleReferenceSpec(
             prepared_image=prep,
+            alias=entry.reference_annotation,
             vision_instruction=_with_user_instruction(STYLE_DIRECTIVE, entry.instruction, "style"),
             appearance_reference=False,
             include_in_vision=True,
@@ -115,7 +134,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             style_processing=entry.processing,
             style_tile_resize=entry.tile_resize,
             style_tile_max_edge=entry.tile_max_edge,
-            style_fidelity=0.0,
+            style_fidelity=entry.vision_fidelity,
             indirect_style_transfer=False,
         )
 
@@ -123,6 +142,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
         return ReferenceSpec(
             reference_path="edit",
             prepared_image=prep,
+            alias=entry.reference_annotation,
             vision_instruction=_with_user_instruction(CONTEXT_DIRECTIVE, entry.instruction, "context"),
             appearance_reference=False,
             include_in_vision=True,
