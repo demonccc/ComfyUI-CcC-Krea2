@@ -322,10 +322,12 @@
         true,
         768,
         "semantic",
-        "This is the scene image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the scene image.",
+        0.25
       ],
       "title": "Scene Reference"
     },
@@ -382,10 +384,12 @@
         true,
         768,
         "semantic",
-        "This is the subject image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the subject image.",
+        0.25
       ],
       "title": "Subject Reference"
     },
