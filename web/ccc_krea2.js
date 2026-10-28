@@ -232,6 +232,33 @@ app.registerExtension({
             setTimeout(refresh, 20);
         }
 
+        if (node.comfyClass === "CcCKrea2Mask") {
+            const find = (name) => node.widgets?.find((w) => w.name === name);
+            const refresh = () => {
+                const usingMask = find("source")?.value === "mask";
+                setWidgetDisabled(node, "prompt", usingMask);
+                setWidgetDisabled(node, "confidence", usingMask);
+                setWidgetDisabled(node, "unload_sam_model", usingMask);
+                node.setDirtyCanvas?.(true, true);
+            };
+            const source = find("source");
+            if (source) {
+                const original = source.callback;
+                source.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = originalConfigure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            setTimeout(refresh, 20);
+        }
+
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
