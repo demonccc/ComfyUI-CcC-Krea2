@@ -225,3 +225,28 @@ def test_thinking_enabled_passes_explicit_think_prefill_to_qwen():
     assert reasoning == ""
     assert clip.tokenize_kwargs["thinking"] is True
     assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
+
+def test_thinking_without_final_retries_with_thinking_disabled():
+    class RetryClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def tokenize(self, prompt, **kwargs):
+            self.calls.append(kwargs.get("thinking"))
+            return super().tokenize(prompt, **kwargs)
+
+        def decode(self, generated_ids):
+            if self.calls[-1]:
+                return "<think>The image contains an outfit, but I have not finished."
+            return "The woman wears a blue dress with gold buttons."
+
+    clip = RetryClip()
+    created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
+        clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
+        thinking=True,
+    )
+    assert created == "The woman wears a blue dress with gold buttons."
+    assert clip.calls == [True, False]
+    assert "Thinking Retry Without Thinking: True" in info
+    assert "The image contains an outfit" in reasoning
