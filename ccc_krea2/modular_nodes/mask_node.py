@@ -85,6 +85,7 @@ class CcCKrea2Mask:
         return {
             "required": {
                 "image": ("IMAGE",),
+                "source": (["sam", "mask"], {"default": "sam"}),
                 "prompt": ("STRING", {"default": "face"}),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
@@ -98,24 +99,24 @@ class CcCKrea2Mask:
             },
         }
 
-    def process(self, image, prompt="face", boost=1.0, confidence=0.5,
+    def process(self, image, source="sam", prompt="face", boost=1.0, confidence=0.5,
                 mask=None, previous_mask_attention=None, sam_model=None,
                 sam_clip=None, unload_sam_model=False):
         if image.ndim != 4:
             raise ValueError("Image must have ComfyUI BHWC dimensions.")
         batch, height, width = image.shape[:3]
         geometry = (batch, height, width)
-        # A connected MASK takes precedence. Otherwise segment with SAM3.
-        # No forced "external_mask" mode or mandatory external MASK socket.
-        if mask is not None:
-            source = "mask"
-        else:
-            source = "sam3"
+        if source == "mask":
+            if mask is None:
+                raise ValueError("[Krea2 CcC Mask] source=mask requires a connected mask.")
+        elif source == "sam":
             if not str(prompt).strip():
-                raise ValueError("SAM 3 requires a text prompt when no mask is connected.")
+                raise ValueError("[Krea2 CcC Mask] source=sam requires a text prompt.")
             mask = _sam31_mask(image, prompt, confidence, sam_model, sam_clip)
             if unload_sam_model:
                 _offload_sam31(sam_model)
+        else:
+            raise ValueError(f"[Krea2 CcC Mask] Unsupported source: {source}")
         mask = _normalize_mask(mask, batch, height, width, image.device)
         if previous_mask_attention is not None:
             if not isinstance(previous_mask_attention, MaskChain) or previous_mask_attention.geometry != geometry:
