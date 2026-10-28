@@ -59,3 +59,16 @@ def test_external_mask_requires_no_sam_dependency():
         image, external_mask=mask, source="external_mask"
     )
     torch.testing.assert_close(merged, mask)
+
+def test_attention_preview_respects_overlap_and_unmasked_background():
+    from ccc_krea2.modular_nodes.attention_preview_node import CcCKrea2AttentionPreview
+    image = torch.full((1, 8, 8, 3), 0.5)
+    a = torch.zeros((1, 8, 8)); a[:, :5, :5] = 1.
+    b = torch.zeros((1, 8, 8)); b[:, 3:, 3:] = 1.
+    node = CcCKrea2Mask()
+    _, _, chain, _, _ = node.process(image, external_mask=a, boost=2.)
+    _, _, chain, _, _ = node.process(image, external_mask=b, previous_masks=chain, boost=0.)
+    preview, info = CcCKrea2AttentionPreview().render(image, chain, reference_boost=1.)
+    torch.testing.assert_close(preview[0, 0, 7], image[0, 0, 7])
+    assert not torch.allclose(preview[0, 3, 3], image[0, 3, 3])
+    assert "Region 2: boost=0.00" in info
