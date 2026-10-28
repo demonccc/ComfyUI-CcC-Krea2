@@ -261,8 +261,8 @@ Install the official Comfy-Org model `sam3.1_multiplex_fp16.safetensors` in
 `Krea2 CcC Mask` through `sam_model` and `sam_clip`. These are **not**
 the Krea2 generation model/CLIP.
 
-Each Mask accepts an IMAGE and a `source` selector (`sam` or `mask`).
-`sam` runs native SAM 3.1 with `prompt` and `confidence` (plus optional
+Each Mask accepts an IMAGE and a `source` selector (`sam3` or `mask`).
+`sam3` runs native SAM 3.1 with `prompt` and `confidence` (plus optional
 `unload_sam_model` at the end of the chain); `mask` uses the connected
 standard `mask` socket and disables irrelevant SAM controls in the UI. Feed the prior `mask_attention`
 into the next `previous_mask_attention`, and feed the prior `image` into its
