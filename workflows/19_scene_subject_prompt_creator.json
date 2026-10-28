@@ -1,6 +1,6 @@
 {
   "last_node_id": 18,
-  "last_link_id": 28,
+  "last_link_id": 29,
   "nodes": [
     {
       "id": 1,
@@ -294,7 +294,9 @@
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "links": []
+          "links": [
+            29
+          ]
         },
         {
           "name": "reference_info",
@@ -348,6 +350,11 @@
           "name": "image",
           "type": "IMAGE",
           "link": 4
+        },
+        {
+          "name": "previous_references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 29
         }
       ],
       "outputs": [
@@ -816,11 +823,10 @@
         "Node name for S&R": "CcCKrea2EditPromptCreator"
       },
       "widgets_values": [
-        "enhance",
+        "create_from_image_i2i",
         "Use Image 1 as the authoritative blueprint for the complete outfit, exact clothing details and colors, accessories, pose, body position, gestures, interactions, setting, camera angle, framing, and composition. Use Image 2 only for the woman's face, identity, body shape, and proportions. Generate a direct, detailed description of the final image: the woman from Image 2 must wear the outfit of Image 1 and reproduce the pose and scene of Image 1 as closely as physically possible. Do not copy the face or identity of the woman in Image 1. Do not preserve the clothes, pose, or background from Image 2. Specify concrete visible details instead of referring to Image 1 or Image 2 in the final prompt. Do not introduce extra people.",
-        "Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.\n\nTreat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.\n\nPreserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.\n\nWrite the result as a direct description of the desired final image, not as an explanation of the editing process.\n\nReturn only the final I2I prompt as one plain-text paragraph.",
         true,
-        2048,
+        4096,
         0.25,
         0.9,
         0
@@ -995,6 +1001,14 @@
       1,
       9,
       5,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      29,
+      7,
+      0,
+      8,
+      1,
       "KREA2_REFERENCE_CHAIN"
     ]
   ],
