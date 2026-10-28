@@ -264,6 +264,8 @@ def _combine_reference_chains(
             guidance_seed=int(latent_semantic.get("guidance_seed", 0)),
             guidance_detail=latent_semantic.get("guidance_detail", "balanced"),
             vision_guidance=latent_semantic.get("vision_guidance", "balanced"),
+            reference_annotation=str(latent_semantic.get("reference_annotation", "")),
+            vision_fidelity=float(latent_semantic.get("vision_fidelity", 0.25)),
         )
         vision_entry = vision_chain.entries[-1]
         if mode == "semantic":
