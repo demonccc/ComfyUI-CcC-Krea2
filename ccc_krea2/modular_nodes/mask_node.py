@@ -39,6 +39,8 @@ def _sam31_mask(image, prompt, confidence, model, clip):
     # ComfyUI NodeOutput wraps the returned native socket values.
     if hasattr(result, "values"):
         return result.values[0]
+    if hasattr(result, "result"):
+        return result.result[0]
     if isinstance(result, (tuple, list)):
         return result[0]
     raise TypeError("Unexpected SAM3_Detect output shape; update ComfyUI core.")
@@ -49,9 +51,15 @@ def _offload_sam31(model):
     import comfy.model_management as mm
     # ModelPatcher.offload_model() is not portable across ComfyUI versions.
     # Its manager removes only the requested model from the GPU-resident list.
-    mm.unload_model_clones(model)
-    if hasattr(mm, "soft_empty_cache"):
-        mm.soft_empty_cache()
+    loaded = getattr(mm, "current_loaded_models", None)
+    if loaded is None:
+        raise RuntimeError("ComfyUI model manager does not expose targeted unload.")
+    for wrapper in list(loaded):
+        if wrapper.model is model:
+            if wrapper.model_unload():
+                loaded.remove(wrapper)
+            mm.soft_empty_cache()
+            return
 
 
 def _normalize_mask(mask, batch, height, width, device):
