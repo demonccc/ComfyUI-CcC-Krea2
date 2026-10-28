@@ -223,7 +223,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
 - workflows/02_anypaint_remove_people.json — SAM 3.1 mask chain -> Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — regional face/hair attention using chained Krea2 CcC Mask nodes, native ComfyUI SAM 3.1, and Attention Preview.
+- workflows/03_regional_attention.json — regional face/hair attention using chained Krea2 CcC Mask nodes, native ComfyUI SAM 3.1, and the fourth RoPE/Boost preview from Edit.
 - workflows/20_layout_composer_2x2_1x1_1x1.json — six-image grid with four columns and two full-height columns.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
 - workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference used to produce text guidance before final conditioning.
@@ -246,7 +246,7 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
 
-**RoPE preview:** Edit emits one `IMAGE` batch containing three annotated views in order: `layout`, `overlay_boxes` and `overlay_visuals`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point, and Qwen-only Vision References are not shown.
+**RoPE preview:** Edit emits one `IMAGE` batch containing four annotated views in order: `layout`, `overlay_boxes`, `overlay_visuals`, and `regional_boosts`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point, and Qwen-only Vision References are not shown.
 
 
 **Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts one ordered `references` chain, analyzes its images once in chain order and forwards that same chain unchanged. To use a scene and a subject, connect Scene Reference to Subject Reference via `previous_references`, then connect Subject Reference to Prompt Creator. Both VAE/RoPE and Vision enable states are preserved. Existing workflows using the former IMAGE socket/widget names require migration.
