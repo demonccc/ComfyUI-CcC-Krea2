@@ -5,7 +5,6 @@ SAM 3 is optional: external masks remain usable without its dependencies.
 from dataclasses import dataclass
 from typing import Tuple
 import torch
-import torch.nn.functional as F
 from ..constants import NODE_CATEGORY
 
 
@@ -37,8 +36,6 @@ def _sam31_mask(image, prompt, confidence, model, clip):
         threshold=float(confidence), refine_iterations=2, individual_masks=False,
     )
     # ComfyUI NodeOutput wraps the returned native socket values.
-    if hasattr(result, "values"):
-        return result.values[0]
     if hasattr(result, "result"):
         return result.result[0]
     if isinstance(result, (tuple, list)):
