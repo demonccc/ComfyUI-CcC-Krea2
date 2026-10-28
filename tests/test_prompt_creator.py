@@ -79,7 +79,7 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
     assert clip.tokenize_kwargs["thinking"] is True
     assert clip.tokenize_kwargs["system_prompt"]
-    assert "llama_template" not in clip.tokenize_kwargs
+    assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
@@ -215,7 +215,7 @@ def test_preset_is_sent_as_qwen_system_prompt_not_embedded_in_user_text():
     assert "INSTRUCTIONS:" in clip.tokenize_prompt
 
 
-def test_thinking_enabled_accepts_direct_final_response_from_nonthinking_qwen():
+def test_thinking_enabled_passes_explicit_think_prefill_to_qwen():
     clip = _FakeClip("The woman from Image 2 is standing beside a window.")
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, references=_chain(), mode="create_from_image_i2i",
@@ -224,4 +224,4 @@ def test_thinking_enabled_accepts_direct_final_response_from_nonthinking_qwen():
     assert created == "The woman from Image 2 is standing beside a window."
     assert reasoning == ""
     assert clip.tokenize_kwargs["thinking"] is True
-    assert "llama_template" not in clip.tokenize_kwargs
+    assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
