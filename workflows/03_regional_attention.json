@@ -1,6 +1,6 @@
 {
-  "last_node_id": 21,
-  "last_link_id": 25,
+  "last_node_id": 52,
+  "last_link_id": 33,
   "nodes": [
     {
       "id": 1,
@@ -251,7 +251,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4
+            4,
+            32
           ]
         },
         {
@@ -354,6 +355,11 @@
           "name": "previous_references",
           "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
+        },
+        {
+          "name": "reference_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 33
         }
       ],
       "outputs": [
@@ -703,7 +709,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Legacy Attention Region nodes were removed. All references currently use global attention. To test regional attention, connect a MASK aligned to Krea2 Latent.target_image to each Reference.target_attention_mask and select the desired visual_attention_scope."
+        "SAM3.1 masks: face boost 2.0, hair boost 0.25. Face -> Hair chained; the latter overrides overlaps. Unmasked pixels retain Reference boost. Last SAM3 mask unloads model. The model loads from Comfy-Org/sam3.1 into models/checkpoints."
       ]
     },
     {
@@ -872,6 +878,215 @@
         0.25
       ],
       "title": "Man Regional Reference"
+    },
+    {
+      "id": 50,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -750,
+        -950
+      ],
+      "size": [
+        355,
+        105
+      ],
+      "flags": {},
+      "order": 45,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            26,
+            28
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            27,
+            29
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "models": [
+          {
+            "name": "sam3.1_multiplex_fp16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/sam3.1/resolve/main/checkpoints/sam3.1_multiplex_fp16.safetensors",
+            "directory": "checkpoints"
+          }
+        ]
+      },
+      "widgets_values": [
+        "sam3.1_multiplex_fp16.safetensors"
+      ],
+      "title": "SAM 3.1 (Comfy-Org)"
+    },
+    {
+      "id": 51,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        -180,
+        -900
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "name": "previous_masks",
+          "type": "KREA2_MASK_CHAIN",
+          "link": null
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 26
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 27
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            30
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            31
+          ]
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "face",
+        2,
+        0.5,
+        false
+      ],
+      "title": "Mask: Face"
+    },
+    {
+      "id": 52,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        260,
+        -900
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 30
+        },
+        {
+          "name": "previous_masks",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 31
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 28
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 29
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            33
+          ]
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "hair",
+        0.25,
+        0.5,
+        true
+      ],
+      "title": "Mask: Hair"
     }
   ],
   "links": [
@@ -1058,6 +1273,70 @@
       14,
       0,
       "IMAGE"
+    ],
+    [
+      26,
+      50,
+      0,
+      51,
+      "sam_model",
+      "MODEL"
+    ],
+    [
+      27,
+      50,
+      1,
+      51,
+      "sam_clip",
+      "CLIP"
+    ],
+    [
+      28,
+      50,
+      0,
+      52,
+      "sam_model",
+      "MODEL"
+    ],
+    [
+      29,
+      50,
+      1,
+      52,
+      "sam_clip",
+      "CLIP"
+    ],
+    [
+      30,
+      51,
+      0,
+      52,
+      "image",
+      "IMAGE"
+    ],
+    [
+      31,
+      51,
+      2,
+      52,
+      "previous_masks",
+      "KREA2_MASK_CHAIN"
+    ],
+    [
+      32,
+      6,
+      0,
+      51,
+      "image",
+      "IMAGE"
+    ],
+    [
+      33,
+      52,
+      2,
+      8,
+      "reference_attention",
+      "KREA2_MASK_CHAIN"
     ]
   ],
   "groups": [
