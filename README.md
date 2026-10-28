@@ -223,7 +223,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
 - workflows/02_anypaint_remove_people.json — SAM 3.1 mask chain -> Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — regional face/hair attention using chained Krea2 CcC Mask nodes and native ComfyUI SAM 3.1.
+- workflows/03_regional_attention.json — regional face/hair attention using chained Krea2 CcC Mask nodes, native ComfyUI SAM 3.1, and Attention Preview.
 - workflows/20_layout_composer_2x2_1x1_1x1.json — six-image grid with four columns and two full-height columns.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
 - workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference used to produce text guidance before final conditioning.
@@ -285,3 +285,28 @@ execute in a different order. No global model unload is used.
 SAM 3.1 text inference depends on the native ComfyUI API; upgrading the
 ComfyUI core may be necessary. GPU inference and unload have not yet
 been validated on the user's machine.
+
+### Regional attention preview and geometry
+
+`Krea2 CcC Attention Preview` takes the **source image** and the
+`attention` chain, plus `reference_boost`, `opacity`, and a palette
+(`regions` or `boost_heatmap`). It overlays the final region priority
+and returns an IMAGE and diagnostic STRING. The preview is in **source
+image coordinates**, before Edit's VAE geometry transforms. It is a
+visualization, not a mask required by Paint or Reference.
+
+Edit transforms each reference attention weight map using the **same crop
+and resize geometry** as its reference IMAGE before the VAE encoder;
+the model patch then projects weights to the actual DiT reference-token
+grid. The RoPE positional displacement belongs to these *same* reference
+tokens, so reference weights move with their tokens without performing a
+second independent spatial warp of the masks. This does not imply the
+preview has target-canvas geometry: a target-space preview would require
+projecting tokens into that specific RoPE layout.
+
+`Krea2 CcC Mask.confidence` controls native SAM3.1 detection threshold.
+Native detector refinement remains at 2 iterations. Paint workflows
+`16_paint_crop_restore` and `17_paint_no_kv_cache` exercise the new
+Mask node in `external_mask` mode. Outpaint workflow
+`15_paint_outpaint` intentionally uses no external segmentation:
+Paint Prepare generates the expansion mask based on canvas geometry.
