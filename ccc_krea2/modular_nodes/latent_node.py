@@ -255,6 +255,8 @@ class CcCKrea2Latent:
         latent_vision_guidance_seed=0,
         latent_vision_guidance_detail="balanced",
         latent_vision_vision_guidance="balanced",
+        latent_vision_reference_annotation="",
+        latent_vision_vision_fidelity=0.25,
         batch_size=1,
         dimensions_image=None,
         content_image=None,
@@ -271,7 +273,7 @@ class CcCKrea2Latent:
         # ComfyUI can restore a stale numeric widget value as a Vision mode.
         # Never activate semantic conditioning with a corrupted preset. Keep the
         # target latent and VAE editing usable, and report the incompatible value.
-        invalid_vision_mode = latent_vision_mode not in ("semantic", "visual", "style", "context", "native")
+        invalid_vision_mode = latent_vision_mode not in ("semantic", "visual", "style", "context", "native", "none", "guided")
         vision_warning = ""
         if invalid_vision_mode:
             vision_warning = (
@@ -308,6 +310,8 @@ class CcCKrea2Latent:
             "guidance_seed": int(latent_vision_guidance_seed),
             "guidance_detail": latent_vision_guidance_detail,
             "vision_guidance": latent_vision_vision_guidance,
+            "reference_annotation": str(latent_vision_reference_annotation or ""),
+            "vision_fidelity": float(latent_vision_vision_fidelity),
         }
 
         lines = [
