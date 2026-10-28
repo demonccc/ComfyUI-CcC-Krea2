@@ -28,7 +28,7 @@ def test_workflow_graph_contract(path):
         if node["type"] in {"CcCKrea2LoRAStack", "CcCKrea2LoRALoader"}:
             assert len(node.get("widgets_values", ())) == 15, (path, node["id"])
         if node["type"] == "CcCKrea2Reference":
-            assert len(node.get("widgets_values", ())) == 18, (path, node["id"])
+            assert len(node.get("widgets_values", ())) == 20, (path, node["id"])
         for index, socket in enumerate(node.get("inputs", ())):
             link_id = socket.get("link")
             if link_id is not None:
