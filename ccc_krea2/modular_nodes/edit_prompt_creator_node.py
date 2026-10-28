@@ -70,12 +70,13 @@ def _split_generated_text(
     generated_ids: Any,
     raw_prompt: str,
     thinking_prefilled: bool = False,
+    thinking_enabled: bool = False,
 ) -> Tuple[str, str]:
     generated_text = str(clip.decode(generated_ids)).strip()
     reasoning, separator, text = generated_text.partition("</think>")
 
     has_reasoning_prefix = reasoning.lstrip().startswith("<think>")
-    if separator and (thinking_prefilled or has_reasoning_prefix or raw_prompt.rstrip().endswith("<think>")):
+    if separator and (thinking_enabled or thinking_prefilled or has_reasoning_prefix or raw_prompt.rstrip().endswith("<think>")):
         cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
         return text.strip(), cleaned_reasoning
 
@@ -350,6 +351,7 @@ class CcCKrea2EditPromptCreator:
             generated_ids,
             generation_prompt,
             thinking_prefilled=thinking_prefilled,
+            thinking_enabled=bool(thinking),
         )
         if not raw_created_prompt.strip() and thinking_text:
             raise RuntimeError(
@@ -365,7 +367,8 @@ class CcCKrea2EditPromptCreator:
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
-            f"Thinking Output: {'present' if thinking_text else ('empty (model did not emit <think>)' if thinking else 'disabled')}",
+            f"Thinking Output: {'present' if thinking_text else ('empty (no reasoning delimiters detected in Qwen output)' if thinking else 'disabled')}",
+            f"Qwen Decoded Output Prefix: {str(clip.decode(generated_ids))[:200]!r}" if thinking and not thinking_text else "Qwen Decoded Output Prefix: <not needed>",
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
