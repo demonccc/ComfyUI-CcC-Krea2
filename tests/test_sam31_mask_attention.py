@@ -76,7 +76,7 @@ def test_missing_mask_uses_sam_and_reports_missing_model():
     image = torch.zeros((1, 8, 8, 3))
     import pytest
     with pytest.raises(ValueError, match="requires MODEL and CLIP"):
-        CcCKrea2Mask().process(image, source="sam")
+        CcCKrea2Mask().process(image, source="sam3")
 
 def test_mask_mode_requires_mask_and_never_calls_sam():
     image = torch.zeros((1, 8, 8, 3))
