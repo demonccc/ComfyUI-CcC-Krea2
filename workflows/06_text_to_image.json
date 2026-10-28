@@ -471,14 +471,14 @@
     },
     {
       "id": 12,
-      "type": "CcCKrea2VisionReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         360,
         620
       ],
       "size": [
         500,
-        380
+        600
       ],
       "flags": {},
       "order": 11,
@@ -499,24 +499,37 @@
           ]
         },
         {
-          "name": "vision_info",
+          "name": "reference_info",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisionReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        false,
+        1,
+        "native",
+        "inside",
+        "center",
+        "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
+        true,
+        true,
+        768,
         "semantic",
         "",
         "full",
         "fixed",
         0,
-        "balanced",
-        "balanced"
+        "",
+        0.25
       ],
-      "title": "Vision Reference"
+      "title": "Reference"
     }
   ],
   "links": [

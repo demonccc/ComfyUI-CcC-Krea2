@@ -7,12 +7,19 @@ import torch
 
 
 @dataclass(frozen=True)
+class ImageReferenceEntry:
+    """Always-present image, without active conditioning."""
+    image: torch.Tensor
+
+
+@dataclass(frozen=True)
 class VisualReferenceEntry:
     """One visual edit reference before Qwen/VAE preparation."""
 
     image: Optional[torch.Tensor] = None
     boost: float = 1.0
-    reference_boost_mask: Optional[torch.Tensor] = None
+    reference_boost_mask: Optional[torch.Tensor] = None  # legacy internal contract
+    attention_weight_map: Optional[torch.Tensor] = None
     target_attention_mask: Optional[torch.Tensor] = None
     reference_fit: str = "native"
     rope_mode: str = "spatial"
@@ -50,20 +57,31 @@ class VisionReferenceEntry:
     mode: str = "semantic_only"
     instruction: str = ""
     processing: str = "full"
+    reference_annotation: str = ""
+    vision_fidelity: float = 0.25
     guidance_seed_mode: str = "fixed"
     guidance_seed_configured: int = 0
     guidance_seed: int = 0
     guidance_detail: str = "balanced"
     vision_guidance: str = "balanced"
+    # True when this Vision entry belongs to the immediately preceding Visual
+    # entry from the unified Reference node, not an extra logical image.
+    paired_visual: bool = False
+    # Original source image, independent from the optional Qwen resize.
+    source_image: Optional[torch.Tensor] = None
+    # For tiled Style, resize each crop after slicing instead of downscaling
+    # the entire image before slicing and losing high-frequency details.
+    tile_resize: bool = False
+    tile_max_edge: int = 768
 
 
 @dataclass(frozen=True)
 class EditReferenceChain:
     """One ordered chain containing both appearance and Qwen-only references."""
 
-    entries: Tuple[VisualReferenceEntry | VisionReferenceEntry, ...] = ()
+    entries: Tuple[ImageReferenceEntry | VisualReferenceEntry | VisionReferenceEntry, ...] = ()
 
-    def append(self, entry: VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
+    def append(self, entry: ImageReferenceEntry | VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
         return EditReferenceChain(self.entries + (entry,))
 
     def __len__(self) -> int:

@@ -1,6 +1,6 @@
 {
   "last_node_id": 17,
-  "last_link_id": 24,
+  "last_link_id": 28,
   "nodes": [
     {
       "id": 1,
@@ -129,11 +129,6 @@
           "links": [
             12
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -141,13 +136,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -234,14 +230,14 @@
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         560
       ],
       "size": [
-        430,
-        430
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -251,6 +247,11 @@
           "name": "image",
           "type": "IMAGE",
           "link": 2
+        },
+        {
+          "name": "previous_references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 28
         }
       ],
       "outputs": [
@@ -260,25 +261,39 @@
           "links": [
             3
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
+        "",
+        "full",
+        "fixed",
+        0,
         "This is the subject image.",
-        "global",
-        ""
+        0.25
       ],
-      "title": "Subject Visual Reference"
+      "title": "Subject Reference"
     },
     {
       "id": 8,
@@ -304,11 +319,6 @@
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
-        },
-        {
-          "name": "reference_edit_image",
-          "type": "IMAGE",
-          "link": 5
         }
       ],
       "outputs": [
@@ -316,15 +326,14 @@
           "name": "created_prompt",
           "type": "STRING",
           "links": [
-            7,
-            25
+            7
           ]
         },
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "links": [
-            6
+            27
           ]
         },
         {
@@ -342,11 +351,10 @@
         "Node name for S&R": "CcCKrea2EditPromptCreator"
       },
       "widgets_values": [
-        "create_from_image",
-        "Use the subject from Image 1 in the situation shown by the reference edit image. Maintain the face and the body shape.",
-        "Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.\n\nTreat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.\n\nUse the user's instructions to determine what should be preserved, changed, emphasized, or adapted.\n\nWrite the result as a direct description of the desired final image, not as an explanation of the editing process.\n\nReturn only the final I2I prompt as one plain-text paragraph.",
+        "create_from_image_i2i",
+        "Use the subject in Image 2 in the scene and action shown in Image 1. Preserve the subject's recognizable appearance; use Image 1 for scene composition and activity.",
         true,
-        2048,
+        4096,
         0.25,
         0.9,
         0
@@ -355,14 +363,14 @@
     },
     {
       "id": 9,
-      "type": "CcCKrea2VisionReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         420,
         1070
       ],
       "size": [
         500,
-        380
+        600
       ],
       "flags": {},
       "order": 9,
@@ -372,11 +380,6 @@
           "name": "image",
           "type": "IMAGE",
           "link": 8
-        },
-        {
-          "name": "previous_references",
-          "type": "KREA2_REFERENCE_CHAIN",
-          "link": 25
         }
       ],
       "outputs": [
@@ -384,28 +387,41 @@
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "links": [
-            9
+            28
           ]
         },
         {
-          "name": "vision_info",
+          "name": "reference_info",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisionReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        false,
+        1,
+        "native",
+        "inside",
+        "center",
+        "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
+        true,
+        true,
+        768,
         "semantic",
         "Use the river scene, running action, water interaction, environment, framing, and spatial composition. Ignore the black dog's identity and appearance.",
         "full",
         "fixed",
         0,
-        "balanced",
-        "balanced"
+        "",
+        0.25
       ],
-      "title": "Scene Vision Reference (DISABLED)"
+      "title": "Scene Edit Reference (Vision only)"
     },
     {
       "id": 10,
@@ -511,7 +527,7 @@
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "link": 9
+          "link": 27
         }
       ],
       "outputs": [
@@ -779,7 +795,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Edit Prompt Creator create_from_image test.\n\n- The reference edit image is the authoritative visual blueprint used by Prompt Creator.\n- Image 1 remains the visible subject reference used by Edit.\n- Prompt Creator returns a direct description of the desired final image.\n- The reference edit image is internal to prompt creation and also supplies target dimensions.\n- The optional Vision Reference branch is intentionally disabled.\n- thinking: enabled; max_tokens: 2048; temperature: 0.25; top_p: 0.90.\n- BodySwap LoRA is present in the stack but disabled by default."
+        "Prompt Creator analyzes the scene edit reference first (Image 1), then the subject reference (Image 2). Scene Reference uses Vision only; Subject Reference uses VAE/RoPE plus Vision. Prompt Creator forwards both to Edit, without duplicate references. The source scene image also sets the target latent size."
       ],
       "title": "Workflow Notes"
     }
@@ -818,14 +834,6 @@
       "CLIP"
     ],
     [
-      5,
-      6,
-      0,
-      8,
-      2,
-      "IMAGE"
-    ],
-    [
       7,
       8,
       0,
@@ -840,14 +848,6 @@
       9,
       0,
       "IMAGE"
-    ],
-    [
-      9,
-      9,
-      0,
-      11,
-      6,
-      "KREA2_REFERENCE_CHAIN"
     ],
     [
       10,
@@ -970,10 +970,18 @@
       "IMAGE"
     ],
     [
-      25,
+      27,
       8,
-      0,
+      1,
+      11,
+      5,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      28,
       9,
+      0,
+      7,
       1,
       "KREA2_REFERENCE_CHAIN"
     ]

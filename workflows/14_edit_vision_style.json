@@ -128,11 +128,6 @@
           "links": [
             12
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -140,13 +135,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -232,14 +228,14 @@
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         560
       ],
       "size": [
-        430,
-        430
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -258,36 +254,50 @@
           "links": [
             25
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
+        "",
+        "full",
+        "fixed",
+        0,
         "This is the subject image.",
-        "global",
-        ""
+        0.25
       ],
-      "title": "Subject Visual Reference"
+      "title": "Subject Reference"
     },
     {
       "id": 9,
-      "type": "CcCKrea2VisionReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         420,
         1070
       ],
       "size": [
         500,
-        380
+        600
       ],
       "flags": {},
       "order": 9,
@@ -313,24 +323,37 @@
           ]
         },
         {
-          "name": "vision_info",
+          "name": "reference_info",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisionReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        false,
+        1,
+        "native",
+        "inside",
+        "center",
+        "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
+        true,
+        true,
+        768,
         "style",
         "Use the visual qualities as an indirect style influence while preserving the subject identity from Image 1.",
         "4x4",
         "fixed",
         0,
-        "balanced",
-        "balanced"
+        "",
+        0
       ],
-      "title": "Vision Reference - Style"
+      "title": "Reference - Style"
     },
     {
       "id": 10,

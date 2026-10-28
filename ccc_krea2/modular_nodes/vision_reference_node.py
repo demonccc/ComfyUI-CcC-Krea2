@@ -15,7 +15,7 @@ from ..qwen_guidance import (
 from .edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 
 
-VISION_MODES = ("semantic", "visual", "style", "context")
+VISION_MODES = ("semantic", "visual", "style", "context", "none", "guided")
 STYLE_PROCESSING = ("full", "2x2", "4x4")
 
 VISION_RUNTIME_MODES = {
@@ -23,6 +23,9 @@ VISION_RUNTIME_MODES = {
     "visual": "style_direct",
     "style": "style_indirect",
     "context": "context_indirect",
+    "native": "native",  # legacy saved workflows
+    "none": "native",
+    "guided": "guided",
     "semantic_reference": "semantic_only",
     "visual_reference": "style_direct",
     "style_reference": "style_indirect",
@@ -97,6 +100,8 @@ class CcCKrea2VisionReference:
                         ),
                     },
                 ),
+                "reference_annotation": ("STRING", {"multiline": True, "default": ""}),
+                "vision_fidelity": ("FLOAT", {"default": 0.25, "min": 0.0, "max": 1.0, "step": 0.05}),
             },
             "optional": {
                 "previous_references": ("KREA2_REFERENCE_CHAIN",),
@@ -157,6 +162,8 @@ class CcCKrea2VisionReference:
         guidance_detail: str = "balanced",
         vision_guidance: str = "balanced",
         previous_references: Optional[VisionReferenceChain] = None,
+        reference_annotation: str = "",
+        vision_fidelity: float = 0.25,
     ) -> Tuple[VisionReferenceChain, str]:
         chain = previous_references if previous_references is not None else VisionReferenceChain()
         runtime_mode = VISION_RUNTIME_MODES.get(mode, mode)
@@ -168,7 +175,9 @@ class CcCKrea2VisionReference:
         entry = VisionReferenceEntry(
             image=image,
             mode=runtime_mode,
-            instruction=instruction.strip(),
+            instruction="" if runtime_mode == "native" else instruction.strip(),
+            reference_annotation=reference_annotation.strip(),
+            vision_fidelity=float(vision_fidelity),
             processing=effective_processing,
             guidance_seed_mode=guidance_seed_mode,
             guidance_seed_configured=int(guidance_seed),
@@ -188,7 +197,9 @@ class CcCKrea2VisionReference:
                 "=== Krea2 CcC Vision Reference ===",
                 f"Mode: {mode}",
                 f"Internal Mode: {runtime_mode}",
-                f"Instruction: {instruction.strip()!r}" if instruction.strip() else "Instruction: <empty>",
+                f"Instruction: {entry.instruction!r}" if entry.instruction else "Instruction: <empty>",
+                f"Reference Annotation: {entry.reference_annotation!r}" if entry.reference_annotation else "Reference Annotation: <empty>",
+                f"Vision Fidelity: {entry.vision_fidelity:.2f}" if runtime_mode in ("semantic_only", "style_indirect") else "Vision Fidelity: <unused>",
                 f"Source Resolution: {source_width} x {source_height}",
                 f"Requested Style Processing: {style_processing}",
                 f"Effective Style Processing: {effective_processing}",

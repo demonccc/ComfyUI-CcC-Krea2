@@ -1,6 +1,6 @@
 {
-  "last_node_id": 21,
-  "last_link_id": 25,
+  "last_node_id": 54,
+  "last_link_id": 37,
   "nodes": [
     {
       "id": 1,
@@ -153,11 +153,6 @@
           "links": [
             13
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -181,13 +176,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_identity_edit_v1_2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -255,7 +251,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4
+            4,
+            32
           ]
         },
         {
@@ -274,14 +271,14 @@
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         500
       ],
       "size": [
-        410,
-        390
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -300,36 +297,50 @@
           "links": [
             3
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         1,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
+        "",
+        "full",
+        "fixed",
+        0,
         "This is the scene image.",
-        "global",
-        ""
+        0.25
       ],
       "title": "Scene Global Reference"
     },
     {
       "id": 8,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         830,
         500
       ],
       "size": [
-        410,
-        420
+        470,
+        600
       ],
       "flags": {},
       "order": 8,
@@ -344,6 +355,11 @@
           "name": "previous_references",
           "type": "KREA2_REFERENCE_CHAIN",
           "link": 3
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 33
         }
       ],
       "outputs": [
@@ -353,23 +369,37 @@
           "links": [
             6
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
+        "",
+        "full",
+        "fixed",
+        0,
         "This is the woman reference image.",
-        "only in region",
-        "woman"
+        0.25
       ],
       "title": "Woman Regional Reference"
     },
@@ -447,6 +477,13 @@
           "name": "edit_info",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "rope_preview",
+          "type": "IMAGE",
+          "links": [
+            37
+          ]
         }
       ],
       "properties": {
@@ -679,7 +716,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Regional Attention workflow.\n\nAttention Region nodes are chainable and define percentage boxes on the target/content image:\n- woman: x=5, y=10, width=40, height=80\n- man: x=55, y=10, width=40, height=80\n\nThe Scene Visual Reference stays global.\nWoman and Man Visual References use attention_scope=\"only in region\" and bind to their matching region_tag.\n\nLatent uses the Scene as dimensions/content with content_fit=contain and carries both tagged boxes through the target transform before Edit projects them to the Krea target token grid.\n\nGuardrail: changing content_fit to crop is allowed only when the complete declared boxes survive the crop. Any partial or complete removal raises an error rather than silently clipping a region."
+        "Reference attention test: SAM3.1 face boost 2.0, hair 0.25, last region overrides overlaps. The Edit rope_preview output provides four views: layout, RoPE overlay boxes, RoPE references, and RoPE-positioned references with Boost heatmap. No standalone Attention Preview node."
       ]
     },
     {
@@ -711,11 +748,6 @@
           "name": "content_image",
           "type": "IMAGE",
           "link": 10
-        },
-        {
-          "name": "attention_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
-          "link": 12
         }
       ],
       "outputs": [
@@ -789,14 +821,14 @@
     },
     {
       "id": 19,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         1280,
         500
       ],
       "size": [
-        430,
-        440
+        470,
+        600
       ],
       "flags": {},
       "order": 10,
@@ -820,103 +852,276 @@
           "links": [
             7
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         4,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "global",
         true,
         true,
         768,
+        "semantic",
+        "",
+        "full",
+        "fixed",
+        0,
         "This is the man reference image.",
-        "only in region",
-        "man"
+        0.25
       ],
       "title": "Man Regional Reference"
     },
     {
-      "id": 20,
-      "type": "CcCKrea2AttentionRegion",
+      "id": 50,
+      "type": "CheckpointLoaderSimple",
       "pos": [
-        380,
-        1020
+        -750,
+        -950
       ],
       "size": [
-        420,
-        260
+        355,
+        105
       ],
       "flags": {},
-      "order": 8,
+      "order": 45,
       "mode": 0,
       "inputs": [],
       "outputs": [
         {
-          "name": "attention_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
+          "name": "MODEL",
+          "type": "MODEL",
           "links": [
-            11
+            26,
+            28
           ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            27,
+            29
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2AttentionRegion"
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "models": [
+          {
+            "name": "sam3.1_multiplex_fp16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/sam3.1/resolve/main/checkpoints/sam3.1_multiplex_fp16.safetensors",
+            "directory": "checkpoints"
+          }
+        ]
       },
       "widgets_values": [
-        "woman",
-        5,
-        10,
-        40,
-        80
+        "sam3.1_multiplex_fp16.safetensors"
       ],
-      "title": "Attention Region: woman"
+      "title": "SAM 3.1 (Comfy-Org)"
     },
     {
-      "id": 21,
-      "type": "CcCKrea2AttentionRegion",
+      "id": 51,
+      "type": "CcCKrea2Mask",
       "pos": [
-        380,
-        1320
+        -180,
+        -900
       ],
       "size": [
-        420,
-        280
+        355,
+        290
       ],
       "flags": {},
-      "order": 9,
+      "order": 51,
       "mode": 0,
       "inputs": [
         {
-          "name": "previous_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
-          "link": 11
+          "name": "image",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "name": "previous_mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": null
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 26
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 27
         }
       ],
       "outputs": [
         {
-          "name": "attention_regions",
-          "type": "KREA2_ATTENTION_REGION_CHAIN",
+          "name": "image",
+          "type": "IMAGE",
           "links": [
-            12
+            30
           ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            31
+          ]
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2AttentionRegion"
+        "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
-        "man",
-        55,
-        10,
-        40,
-        80
+        "sam3",
+        "face",
+        2,
+        0.5,
+        false
       ],
-      "title": "Attention Region: man"
+      "title": "Mask: Face"
+    },
+    {
+      "id": 52,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        260,
+        -900
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 30
+        },
+        {
+          "name": "previous_mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 31
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 28
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 29
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            33
+          ]
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "hair",
+        0.25,
+        0.5,
+        true
+      ],
+      "title": "Mask: Hair"
+    },
+    {
+      "id": 53,
+      "type": "PreviewImage",
+      "pos": [
+        1820,
+        -950
+      ],
+      "size": [
+        320,
+        320
+      ],
+      "flags": {},
+      "order": 55,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 37
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Edit RoPE + Regional Boost Views"
     }
   ],
   "links": [
@@ -999,22 +1204,6 @@
       17,
       2,
       "IMAGE"
-    ],
-    [
-      11,
-      20,
-      0,
-      21,
-      0,
-      "KREA2_ATTENTION_REGION_CHAIN"
-    ],
-    [
-      12,
-      21,
-      0,
-      17,
-      3,
-      "KREA2_ATTENTION_REGION_CHAIN"
     ],
     [
       13,
@@ -1117,6 +1306,78 @@
       13,
       0,
       14,
+      0,
+      "IMAGE"
+    ],
+    [
+      26,
+      50,
+      0,
+      51,
+      "sam_model",
+      "MODEL"
+    ],
+    [
+      27,
+      50,
+      1,
+      51,
+      "sam_clip",
+      "CLIP"
+    ],
+    [
+      28,
+      50,
+      0,
+      52,
+      "sam_model",
+      "MODEL"
+    ],
+    [
+      29,
+      50,
+      1,
+      52,
+      "sam_clip",
+      "CLIP"
+    ],
+    [
+      30,
+      51,
+      0,
+      52,
+      "image",
+      "IMAGE"
+    ],
+    [
+      31,
+      51,
+      2,
+      52,
+      "previous_masks",
+      "KREA2_MASK_CHAIN"
+    ],
+    [
+      32,
+      6,
+      0,
+      51,
+      "image",
+      "IMAGE"
+    ],
+    [
+      33,
+      52,
+      2,
+      8,
+      "reference_attention",
+      "KREA2_MASK_CHAIN"
+    ],
+    [
+      37,
+      9,
+      5,
+      53,
       0,
       "IMAGE"
     ]

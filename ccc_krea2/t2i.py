@@ -14,6 +14,7 @@ from .krea_geometry import (
 )
 from .modular_nodes.edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 from .qwen_guidance import guidance_detail_instruction, guidance_generation_kwargs
+from .vision_presets import VISION_DIRECTIVES
 from .style_processing import slice_style_image
 from .prompt_augmentation import (
     CCC_KREA2_PROMPT_AUGMENTATION,
@@ -79,6 +80,11 @@ T2I_VISION_SYSTEM_PROMPTS = {
         "and no mention of a reference image."
     ),
     "style": LEGACY_VISUAL_SYSTEM_PROMPT,
+    "native": (
+        "Describe the supplied image directly and accurately, without applying semantic, "
+        "style or context extraction rules. Return a concise English description "
+        "of the visible content only."
+    ),
     "context": (
         "Analyze the supplied reference image only for scene CONTEXT and staging. Reproduce the situation, not the "
         "subject's visual identity. Capture setting and environment, camera/framing/viewpoint, subject count and scene "
@@ -102,6 +108,8 @@ def _public_vision_mode(runtime_mode: str) -> str:
         "style_direct": "visual",
         "style_indirect": "style",
         "context_indirect": "context",
+        "native": "native",
+        "guided": "native",
     }.get(runtime_mode, runtime_mode)
 
 
@@ -109,7 +117,23 @@ def _t2i_analysis_images(entry: VisionReferenceEntry):
     image = entry.image
     if entry.mode != "style_indirect" or entry.processing == "full":
         return [image]
-    return slice_style_image(image, mode=entry.processing)
+    crops = slice_style_image(image, mode=entry.processing)
+    if entry.tile_resize:
+        from .geometry import resize_tensor
+        if entry.tile_max_edge < 1:
+            raise ValueError("Vision Style tile_max_edge must be positive.")
+        resized = []
+        for crop in crops:
+            h, w = int(crop.shape[1]), int(crop.shape[2])
+            if max(h, w) > entry.tile_max_edge:
+                scale = entry.tile_max_edge / max(h, w)
+                crop = resize_tensor(
+                    crop, max(1, round(h * scale)),
+                    max(1, round(w * scale)), "bicubic",
+                )
+            resized.append(crop)
+        return resized
+    return crops
 
 
 def _mode_guidance_policy(
@@ -254,7 +278,7 @@ def _generate_t2i_vision_guidance(
     target_prompt: str,
 ):
     public_mode = _public_vision_mode(entry.mode)
-    system_prompt = T2I_VISION_SYSTEM_PROMPTS[public_mode]
+    system_prompt = VISION_DIRECTIVES[public_mode] + "\n\n" + T2I_VISION_SYSTEM_PROMPTS[public_mode]
     analysis_images = _t2i_analysis_images(entry)
 
     user_instruction = str(entry.instruction or "").strip()
