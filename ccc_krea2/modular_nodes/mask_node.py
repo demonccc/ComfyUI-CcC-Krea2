@@ -85,7 +85,7 @@ class CcCKrea2Mask:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "source": (["sam", "mask"], {"default": "sam"}),
+                "source": (["sam3", "mask"], {"default": "sam3"}),
                 "prompt": ("STRING", {"default": "face"}),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
@@ -99,7 +99,7 @@ class CcCKrea2Mask:
             },
         }
 
-    def process(self, image, source="sam", prompt="face", boost=1.0, confidence=0.5,
+    def process(self, image, source="sam3", prompt="face", boost=1.0, confidence=0.5,
                 mask=None, previous_mask_attention=None, sam_model=None,
                 sam_clip=None, unload_sam_model=False):
         if image.ndim != 4:
@@ -109,9 +109,9 @@ class CcCKrea2Mask:
         if source == "mask":
             if mask is None:
                 raise ValueError("[Krea2 CcC Mask] source=mask requires a connected mask.")
-        elif source == "sam":
+        elif source == "sam3":
             if not str(prompt).strip():
-                raise ValueError("[Krea2 CcC Mask] source=sam requires a text prompt.")
+                raise ValueError("[Krea2 CcC Mask] source=sam3 requires a text prompt.")
             mask = _sam31_mask(image, prompt, confidence, sam_model, sam_clip)
             if unload_sam_model:
                 _offload_sam31(sam_model)
