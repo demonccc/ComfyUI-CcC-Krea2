@@ -1051,9 +1051,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "links": [
-            34
-          ]
+          "links": []
         },
         {
           "name": "mask",
@@ -1064,8 +1062,7 @@
           "name": "attention",
           "type": "KREA2_MASK_CHAIN",
           "links": [
-            33,
-            35
+            33
           ]
         },
         {
@@ -1090,83 +1087,6 @@
         true
       ],
       "title": "Mask: Hair"
-    },
-    {
-      "id": 53,
-      "type": "CcCKrea2AttentionPreview",
-      "pos": [
-        1400,
-        -950
-      ],
-      "size": [
-        355,
-        220
-      ],
-      "flags": {},
-      "order": 50,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 34
-        },
-        {
-          "name": "attention",
-          "type": "KREA2_MASK_CHAIN",
-          "link": 35
-        }
-      ],
-      "outputs": [
-        {
-          "name": "preview",
-          "type": "IMAGE",
-          "links": [
-            36
-          ]
-        },
-        {
-          "name": "attention_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2AttentionPreview"
-      },
-      "widgets_values": [
-        1,
-        0.55,
-        "boost_heatmap"
-      ],
-      "title": "Preview: Regional Boost"
-    },
-    {
-      "id": 54,
-      "type": "PreviewImage",
-      "pos": [
-        1800,
-        -950
-      ],
-      "size": [
-        280,
-        260
-      ],
-      "flags": {},
-      "order": 51,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 36
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
     }
   ],
   "links": [
@@ -1417,30 +1337,6 @@
       8,
       "reference_attention",
       "KREA2_MASK_CHAIN"
-    ],
-    [
-      34,
-      52,
-      0,
-      53,
-      "image",
-      "IMAGE"
-    ],
-    [
-      35,
-      52,
-      2,
-      53,
-      "attention",
-      "KREA2_MASK_CHAIN"
-    ],
-    [
-      36,
-      53,
-      0,
-      54,
-      "images",
-      "IMAGE"
     ]
   ],
   "groups": [
