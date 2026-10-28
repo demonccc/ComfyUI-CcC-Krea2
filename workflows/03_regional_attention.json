@@ -357,7 +357,7 @@
           "link": 3
         },
         {
-          "name": "reference_attention",
+          "name": "mask_attention",
           "type": "KREA2_MASK_CHAIN",
           "link": 33
         }
@@ -960,7 +960,7 @@
           "link": 32
         },
         {
-          "name": "previous_masks",
+          "name": "previous_mask_attention",
           "type": "KREA2_MASK_CHAIN",
           "link": null
         },
@@ -989,7 +989,7 @@
           "links": []
         },
         {
-          "name": "attention",
+          "name": "mask_attention",
           "type": "KREA2_MASK_CHAIN",
           "links": [
             31
@@ -1010,7 +1010,6 @@
         "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
-        "sam3",
         "face",
         2,
         0.5,
@@ -1039,7 +1038,7 @@
           "link": 30
         },
         {
-          "name": "previous_masks",
+          "name": "previous_mask_attention",
           "type": "KREA2_MASK_CHAIN",
           "link": 31
         },
@@ -1066,7 +1065,7 @@
           "links": []
         },
         {
-          "name": "attention",
+          "name": "mask_attention",
           "type": "KREA2_MASK_CHAIN",
           "links": [
             33
@@ -1087,7 +1086,6 @@
         "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
-        "sam3",
         "hair",
         0.25,
         0.5,
