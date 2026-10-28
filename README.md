@@ -222,8 +222,8 @@ There is **no public Krea2 CcC Paint Geometry node**.
 **Compatibility note:** Workflow JSON files have not been edited during the refactor. Saved workflows may contain removed node types or outdated inputs; the legacy regional-attention workflow is explicitly identified below.
 
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
-- workflows/02_anypaint_remove_people.json — current three-node inpaint path: Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — **legacy/incompatible** with the current mask API: still uses removed tagged Attention Region nodes. Kept unchanged pending workflow migration.
+- workflows/02_anypaint_remove_people.json — SAM 3.1 mask chain -> Paint Prepare -> Paint -> Paint Restore.
+- workflows/03_regional_attention.json — regional face/hair attention using chained Krea2 CcC Mask nodes and native ComfyUI SAM 3.1.
 - workflows/20_layout_composer_2x2_1x1_1x1.json — six-image grid with four columns and two full-height columns.
 - workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
 - workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference used to produce text guidance before final conditioning.
@@ -250,3 +250,38 @@ ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Pro
 
 
 **Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts one ordered `references` chain, analyzes its images once in chain order and forwards that same chain unchanged. To use a scene and a subject, connect Scene Reference to Subject Reference via `previous_references`, then connect Subject Reference to Prompt Creator. Both VAE/RoPE and Vision enable states are preserved. Existing workflows using the former IMAGE socket/widget names require migration.
+
+## SAM 3.1 masks for Edit and Paint
+
+Install the official Comfy-Org model `sam3.1_multiplex_fp16.safetensors` in
+`ComfyUI/models/checkpoints/` and use a recent ComfyUI containing the native
+`SAM3_Detect` node. Source: https://huggingface.co/Comfy-Org/sam3.1
+
+`CheckpointLoaderSimple` provides SAM's own `MODEL` and `CLIP` to
+`Krea2 CcC Mask` through `sam_model` and `sam_clip`. These are **not**
+the Krea2 generation model/CLIP.
+
+Each Mask accepts an IMAGE and either a text prompt (source `sam3`) or
+an external MASK (source `external_mask`). Feed the prior `attention`
+into the next `previous_masks`, and feed the prior `image` into its
+`image` input. Outputs are the unchanged image, the union of all masks,
+the regional-attention chain, a preview and diagnostic info.
+
+For Paint, connect the **last** Mask's `image` and `mask` to
+`Krea2 CcC Paint Prepare`; Paint consumes Paint Prepare's context.
+For Edit, connect the **last** Mask's `attention` into
+`Krea2 CcC Reference.reference_attention` and ensure its `image` is
+the corresponding Reference image. Pixels outside regional masks retain
+Reference's global `boost`, whereas masked pixels take their own
+**absolute** `boost` (last-overlapping region wins). A regional boost
+of zero blocks direct target-to-reference attention for that region.
+
+To release SAM's GPU weights, set `unload_sam_model=true` **only in the
+last SAM3 Mask** of a sequential chain. This requests a targeted offload
+through ComfyUI's model manager. Other independent branches sharing the
+same SAM model should finish before this point; unconnected branches may
+execute in a different order. No global model unload is used.
+
+SAM 3.1 text inference depends on the native ComfyUI API; upgrading the
+ComfyUI core may be necessary. GPU inference and unload have not yet
+been validated on the user's machine.
