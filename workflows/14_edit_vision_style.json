@@ -279,10 +279,12 @@
         true,
         768,
         "semantic",
-        "This is the subject image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the subject image.",
+        0.25
       ],
       "title": "Subject Reference"
     },
@@ -347,6 +349,8 @@
         "Use the visual qualities as an indirect style influence while preserving the subject identity from Image 1.",
         "4x4",
         "fixed",
+        0,
+        "",
         0
       ],
       "title": "Reference - Style"
