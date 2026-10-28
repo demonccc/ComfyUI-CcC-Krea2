@@ -220,6 +220,7 @@ def _combine_reference_chains(
                 negative_vision_only=tiled_style,
                 attention_boost=float(entry.boost),
                 attention_mask=entry.reference_boost_mask,
+                attention_weight_map=entry.attention_weight_map,
                 visual_reference_fit=entry.resolved_fit_mode,
                 visual_resize_method="bicubic",
                 rope_position=entry.rope_position,
