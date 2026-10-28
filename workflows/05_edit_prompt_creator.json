@@ -281,10 +281,12 @@
         true,
         768,
         "semantic",
-        "This is the subject image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the subject image.",
+        0.25
       ],
       "title": "Subject Reference"
     },
@@ -416,7 +418,9 @@
         "Use the river scene, running action, water interaction, environment, framing, and spatial composition. Ignore the black dog's identity and appearance.",
         "full",
         "fixed",
-        0
+        0,
+        "",
+        0.25
       ],
       "title": "Scene Edit Reference (Vision only)"
     },
