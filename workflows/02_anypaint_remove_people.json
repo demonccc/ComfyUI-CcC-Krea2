@@ -1,6 +1,6 @@
 {
-  "last_node_id": 21,
-  "last_link_id": 26,
+  "last_node_id": 52,
+  "last_link_id": 35,
   "nodes": [
     {
       "id": 1,
@@ -198,15 +198,13 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4
+            33
           ]
         },
         {
           "name": "MASK",
           "type": "MASK",
-          "links": [
-            5
-          ]
+          "links": []
         }
       ],
       "properties": {
@@ -235,7 +233,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 4
+          "link": 34
         },
         {
           "name": "vae",
@@ -245,7 +243,7 @@
         {
           "name": "mask",
           "type": "MASK",
-          "link": 5
+          "link": 35
         }
       ],
       "outputs": [
@@ -797,7 +795,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "AnyPaint remove-people workflow using the current three-node public Paint path.\n\n1. Load an image and paint the removal region in ComfyUI Mask Editor.\n2. Krea2 CcC Paint Prepare receives IMAGE + MASK + VAE. It owns geometry_mode, padding fill, outpaint expansion, fill-holes, grow/shrink, feather, semantic-reference preparation, VAE preparation, and the sampling LATENT.\n3. Krea2 CcC Paint consumes paint_context and builds conditioning/model runtime.\n4. KSampler uses the LATENT from Paint Prepare.\n5. Krea2 CcC Paint Restore receives the decoded result, paint_geometry from Paint Prepare, and generated_mask.\n\nThere is no standalone public Paint Geometry node.\n\nFor outpaint, set expand_left/top/right/bottom directly on Paint Prepare.\n\nRecommended runtime: Krea 2 Turbo + krea2_anypaint_rank32, 8 steps, CFG 1, Euler, simple."
+        "SAM3.1 masks: face + hair chained as a union. The last Mask unloads SAM3 from GPU. Its IMAGE and MASK outputs feed Paint Prepare, then Paint and Restore."
       ]
     },
     {
@@ -845,6 +843,217 @@
       },
       "widgets_values": [],
       "title": "Restore Native Canvas"
+    },
+    {
+      "id": 50,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -750,
+        -950
+      ],
+      "size": [
+        355,
+        105
+      ],
+      "flags": {},
+      "order": 45,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            27,
+            29
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            28,
+            30
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "models": [
+          {
+            "name": "sam3.1_multiplex_fp16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/sam3.1/resolve/main/checkpoints/sam3.1_multiplex_fp16.safetensors",
+            "directory": "checkpoints"
+          }
+        ]
+      },
+      "widgets_values": [
+        "sam3.1_multiplex_fp16.safetensors"
+      ],
+      "title": "SAM 3.1 (Comfy-Org)"
+    },
+    {
+      "id": 51,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        -180,
+        -900
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 33
+        },
+        {
+          "name": "previous_masks",
+          "type": "KREA2_MASK_CHAIN",
+          "link": null
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 27
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 28
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            31
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            32
+          ]
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "face",
+        2,
+        0.5,
+        false
+      ],
+      "title": "Mask: Face"
+    },
+    {
+      "id": 52,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        260,
+        -900
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 31
+        },
+        {
+          "name": "previous_masks",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 32
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 29
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 30
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            34
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            35
+          ]
+        },
+        {
+          "name": "attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": []
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "hair",
+        0.25,
+        0.5,
+        true
+      ],
+      "title": "Mask: Hair"
     }
   ],
   "links": [
@@ -871,22 +1080,6 @@
       13,
       1,
       "CLIP"
-    ],
-    [
-      4,
-      5,
-      0,
-      6,
-      0,
-      "IMAGE"
-    ],
-    [
-      5,
-      5,
-      1,
-      6,
-      2,
-      "MASK"
     ],
     [
       6,
@@ -1047,6 +1240,78 @@
       18,
       0,
       "IMAGE"
+    ],
+    [
+      27,
+      50,
+      0,
+      51,
+      "sam_model",
+      "MODEL"
+    ],
+    [
+      28,
+      50,
+      1,
+      51,
+      "sam_clip",
+      "CLIP"
+    ],
+    [
+      29,
+      50,
+      0,
+      52,
+      "sam_model",
+      "MODEL"
+    ],
+    [
+      30,
+      50,
+      1,
+      52,
+      "sam_clip",
+      "CLIP"
+    ],
+    [
+      31,
+      51,
+      0,
+      52,
+      "image",
+      "IMAGE"
+    ],
+    [
+      32,
+      51,
+      2,
+      52,
+      "previous_masks",
+      "KREA2_MASK_CHAIN"
+    ],
+    [
+      33,
+      5,
+      0,
+      51,
+      "image",
+      "IMAGE"
+    ],
+    [
+      34,
+      52,
+      0,
+      6,
+      "image",
+      "IMAGE"
+    ],
+    [
+      35,
+      52,
+      1,
+      6,
+      "mask",
+      "MASK"
     ]
   ],
   "groups": [
