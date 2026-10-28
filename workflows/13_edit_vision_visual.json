@@ -279,10 +279,12 @@
         true,
         768,
         "semantic",
-        "This is the subject image.",
+        "",
         "full",
         "fixed",
-        0
+        0,
+        "This is the subject image.",
+        0.25
       ],
       "title": "Subject Reference"
     },
@@ -347,7 +349,9 @@
         "Use the visible appearance, clothing, pose, and scene details directly while preserving the subject identity from Image 1.",
         "full",
         "fixed",
-        0
+        0,
+        "",
+        0.25
       ],
       "title": "Reference - Visual"
     },
