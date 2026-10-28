@@ -51,11 +51,10 @@ def build_grounded_positive_user_content(
 
         if ref_path == "edit" and is_appearance:
             label = f"Image {physical_index}"
-            if instruction:
-                annotations.append(f"{label}: {instruction}")
-            elif alias:
-                # Compatibility for older role-based reference nodes.
+            if alias:
                 annotations.append(f"{label}: {alias}")
+            if instruction:
+                annotations.append(f"{label} guidance: {instruction}")
             physical_index += count
             continue
 
@@ -64,12 +63,10 @@ def build_grounded_positive_user_content(
                 label = f"Image {physical_index}"
             else:
                 label = f"Images {physical_index}-{physical_index + count - 1}"
-            if alias and instruction:
-                annotations.append(f"{label} ({alias}): {instruction}")
-            elif alias:
+            if alias:
                 annotations.append(f"{label}: {alias}")
-            else:
-                annotations.append(f"{label}: {instruction}")
+            if instruction:
+                annotations.append(f"{label} guidance: {instruction}")
 
         physical_index += count
 
