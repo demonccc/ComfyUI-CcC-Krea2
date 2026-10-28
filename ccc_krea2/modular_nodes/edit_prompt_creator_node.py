@@ -355,6 +355,27 @@ class CcCKrea2EditPromptCreator:
             thinking_prefilled=thinking_prefilled,
             thinking_enabled=bool(thinking),
         )
+        retried_without_thinking = False
+        if not raw_created_prompt.strip() and thinking_text and thinking:
+            # The model can exhaust its budget inside <think> without ever
+            # emitting </think> and a final response. Retry in non-thinking
+            # mode, rather than treating the unfinished analysis as a prompt.
+            retry_kwargs = dict(tokenize_kwargs)
+            retry_kwargs["thinking"] = False
+            retry_kwargs.pop("llama_template", None)
+            retry_tokens = clip.tokenize(generation_prompt, **retry_kwargs)
+            retry_ids = clip.generate(
+                retry_tokens, do_sample=True, max_length=int(max_tokens),
+                temperature=float(temperature), top_k=64, top_p=float(top_p),
+                min_p=0.05, repetition_penalty=1.05, seed=int(seed),
+            )
+            retry_prompt, _ = _split_generated_text(
+                clip, retry_ids, generation_prompt,
+                thinking_prefilled=False, thinking_enabled=False,
+            )
+            if retry_prompt.strip() and not retry_prompt.lstrip().startswith("<think>"):
+                raw_created_prompt = retry_prompt
+                retried_without_thinking = True
         if not raw_created_prompt.strip() and thinking_text:
             raise RuntimeError(
                 "[Krea2 CcC Edit Prompt Creator] Qwen returned reasoning without a final prompt. "
@@ -369,6 +390,7 @@ class CcCKrea2EditPromptCreator:
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
+            f"Thinking Retry Without Thinking: {retried_without_thinking}",
             f"Thinking Output: {'present' if thinking_text else ('empty (no reasoning delimiters detected in Qwen output)' if thinking else 'disabled')}",
             f"Qwen Decoded Output Prefix: {str(clip.decode(generated_ids))[:200]!r}" if thinking and not thinking_text else "Qwen Decoded Output Prefix: <not needed>",
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
