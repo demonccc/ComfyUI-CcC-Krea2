@@ -101,6 +101,12 @@ def run_krea2_edit_orchestrator(
                 fit_img, fit_mask = process_image_and_mask_geometry(
                     image=src_img, mask=getattr(spec, "attention_mask", None), geom=geom
                 )
+                weight_map = getattr(spec, "attention_weight_map", None)
+                fitted_weights = None
+                if weight_map is not None:
+                    _, fitted_weights = process_image_and_mask_geometry(
+                        image=src_img, mask=weight_map, geom=geom
+                    )
                 encoded = vae.encode(fit_img) if vae is not None else None
                 lat_tokens = None
                 if encoded is not None:
@@ -116,6 +122,7 @@ def run_krea2_edit_orchestrator(
                         "slot": slot,
                         "latent_tokens": lat_tokens,
                         "mask": fit_mask,
+                        "attention_weight_map": fitted_weights,
                         "geom": geom,
                         "spec": spec,
                         "ref_item": ref_item,
@@ -270,6 +277,18 @@ def run_krea2_edit_orchestrator(
         # references are interleaved with appearance references.
         pos_conditioning = _conditioning_set_values(
             pos_conditioning, {"reference_boost_masks": prepared_reference_masks}
+        )
+
+    prepared_weight_maps = [
+        ref.get("attention_weight_map") for ref in vae_ref_specs
+        if ref.get("latent_tokens") is not None
+    ]
+    if any(weight is not None for weight in prepared_weight_maps):
+        pos_conditioning = _conditioning_set_values(
+            pos_conditioning, {"reference_attention_maps": prepared_weight_maps}
+        )
+        neg_conditioning = _conditioning_set_values(
+            neg_conditioning, {"reference_attention_maps": prepared_weight_maps}
         )
 
     # Step 7: Build edit_info report
