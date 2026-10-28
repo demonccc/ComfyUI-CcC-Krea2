@@ -48,6 +48,7 @@ class ReferenceSpec:
     appearance_reference: bool = True
     attention_boost: float = 1.0
     attention_mask: Optional[torch.Tensor] = None
+    attention_weight_map: Optional[torch.Tensor] = None
     visual_reference_fit: str = "native"
     visual_resize_method: str = "lanczos"
     rope_position: str = "inside:center:center"
