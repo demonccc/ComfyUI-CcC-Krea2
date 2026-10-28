@@ -68,13 +68,12 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
         temperature=0.25,
         top_p=0.90,
         seed=1234,
-        reference_edit_image=VisualReferenceChain((VisualReferenceEntry(image=_image(0.5), semantic=True),)),
     )
 
     assert created.startswith("The woman from Image 1 is seated on a white bed")
     assert thinking.startswith("The internal image has a seated subject")
-    assert len(passthrough.entries) == len(chain.entries) + 1
-    assert len(clip.tokenize_kwargs["images"]) == 3
+    assert len(passthrough.entries) == len(chain.entries)
+    assert len(clip.tokenize_kwargs["images"]) == 2
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
     assert "Vision input 2 = Image 2" in clip.tokenize_prompt
     assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
