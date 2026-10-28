@@ -27,6 +27,9 @@ def test_workflow_graph_contract(path):
         assert node["type"] not in RETIRED_TYPES, (path, node["type"])
         if node["type"] in {"CcCKrea2LoRAStack", "CcCKrea2LoRALoader"}:
             assert len(node.get("widgets_values", ())) == 15, (path, node["id"])
+        if node["type"] == "CcCKrea2EditPromptCreator":
+            assert len(node.get("widgets_values", ())) == 7, (path, node["id"])
+            assert not any(socket["name"] == "reference_edit_image" for socket in node.get("inputs", ()))
         if node["type"] == "CcCKrea2Reference":
             assert len(node.get("widgets_values", ())) == 20, (path, node["id"])
         for index, socket in enumerate(node.get("inputs", ())):
