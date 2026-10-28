@@ -286,23 +286,17 @@ SAM 3.1 text inference depends on the native ComfyUI API; upgrading the
 ComfyUI core may be necessary. GPU inference and unload have not yet
 been validated on the user's machine.
 
-### Regional attention preview and geometry
+### Regional attention in Edit RoPE preview
 
-`Krea2 CcC Attention Preview` takes the **source image** and the
-`attention` chain, plus `reference_boost`, `opacity`, and a palette
-(`regions` or `boost_heatmap`). It overlays the final region priority
-and returns an IMAGE and diagnostic STRING. The preview is in **source
-image coordinates**, before Edit's VAE geometry transforms. It is a
-visualization, not a mask required by Paint or Reference.
-
-Edit transforms each reference attention weight map using the **same crop
-and resize geometry** as its reference IMAGE before the VAE encoder;
-the model patch then projects weights to the actual DiT reference-token
-grid. The RoPE positional displacement belongs to these *same* reference
-tokens, so reference weights move with their tokens without performing a
-second independent spatial warp of the masks. This does not imply the
-preview has target-canvas geometry: a target-space preview would require
-projecting tokens into that specific RoPE layout.
+`Krea2 CcC Edit.rope_preview` returns four IMAGE frames:
+(1) RoPE layout, (2) placement boxes, (3) positioned reference images,
+(4) positioned reference images with a heatmap of regional Boost values.
+There is no separate attention-preview node. All four frames share the
+same RoPE positioning layout, and the fourth view applies the same
+VAE-input image crop/resize transformation to each reference's weight
+map. Reference weights remain attached to the same visual tokens
+regardless of the RoPE displacement. The fourth preview is a visual
+debug aid, not a second source of mask conditioning.
 
 `Krea2 CcC Mask.confidence` controls native SAM3.1 detection threshold.
 Native detector refinement remains at 2 iterations. Paint workflows
