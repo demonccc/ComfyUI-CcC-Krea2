@@ -867,7 +867,7 @@
           "link": 27
         },
         {
-          "name": "external_mask",
+          "name": "mask",
           "type": "MASK",
           "link": 28
         }
@@ -888,7 +888,7 @@
           ]
         },
         {
-          "name": "attention",
+          "name": "mask_attention",
           "type": "KREA2_MASK_CHAIN",
           "links": []
         },
@@ -907,7 +907,6 @@
         "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
-        "external_mask",
         "",
         1,
         0.5,
