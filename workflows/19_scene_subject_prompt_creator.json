@@ -294,9 +294,7 @@
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "links": [
-            24
-          ]
+          "links": []
         },
         {
           "name": "reference_info",
@@ -786,11 +784,6 @@
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "link": 25
-        },
-        {
-          "name": "reference_edit_image",
-          "type": "KREA2_REFERENCE_CHAIN",
-          "link": 24
         }
       ],
       "outputs": [
@@ -971,14 +964,6 @@
       9,
       3,
       "LATENT"
-    ],
-    [
-      24,
-      7,
-      0,
-      18,
-      2,
-      "KREA2_REFERENCE_CHAIN"
     ],
     [
       25,
