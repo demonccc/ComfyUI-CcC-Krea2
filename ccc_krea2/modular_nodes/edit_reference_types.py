@@ -18,7 +18,8 @@ class VisualReferenceEntry:
 
     image: Optional[torch.Tensor] = None
     boost: float = 1.0
-    reference_boost_mask: Optional[torch.Tensor] = None
+    reference_boost_mask: Optional[torch.Tensor] = None  # legacy internal contract
+    attention_weight_map: Optional[torch.Tensor] = None
     target_attention_mask: Optional[torch.Tensor] = None
     reference_fit: str = "native"
     rope_mode: str = "spatial"
