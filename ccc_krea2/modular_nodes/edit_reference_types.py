@@ -56,6 +56,8 @@ class VisionReferenceEntry:
     mode: str = "semantic_only"
     instruction: str = ""
     processing: str = "full"
+    reference_annotation: str = ""
+    vision_fidelity: float = 0.25
     guidance_seed_mode: str = "fixed"
     guidance_seed_configured: int = 0
     guidance_seed: int = 0
