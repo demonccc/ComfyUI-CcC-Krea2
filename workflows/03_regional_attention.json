@@ -1010,7 +1010,7 @@
         "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
-        "sam",
+        "sam3",
         "face",
         2,
         0.5,
@@ -1087,7 +1087,7 @@
         "Node name for S&R": "CcCKrea2Mask"
       },
       "widgets_values": [
-        "sam",
+        "sam3",
         "hair",
         0.25,
         0.5,
