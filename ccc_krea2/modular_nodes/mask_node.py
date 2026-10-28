@@ -77,7 +77,7 @@ class CcCKrea2Mask:
     CATEGORY = NODE_CATEGORY
     FUNCTION = "process"
     RETURN_TYPES = ("IMAGE", "MASK", "KREA2_MASK_CHAIN", "IMAGE", "STRING")
-    RETURN_NAMES = ("image", "mask", "attention", "preview", "info")
+    RETURN_NAMES = ("image", "mask", "mask_attention", "preview", "info")
     DESCRIPTION = "Chain union masks for Paint Prepare and region-specific reference boosts for Edit."
 
     @classmethod
@@ -85,45 +85,43 @@ class CcCKrea2Mask:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "source": (["external_mask", "sam3"], {"default": "external_mask"}),
                 "prompt": ("STRING", {"default": "face"}),
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "unload_sam_model": ("BOOLEAN", {"default": False}),
             },
             "optional": {
-                "external_mask": ("MASK",),
+                "mask": ("MASK",),
                 "sam_model": ("MODEL",),
                 "sam_clip": ("CLIP",),
-                "previous_masks": ("KREA2_MASK_CHAIN",),
+                "previous_mask_attention": ("KREA2_MASK_CHAIN",),
             },
         }
 
-    def process(self, image, source="external_mask", prompt="face", boost=1.0,
-                confidence=0.5, external_mask=None, previous_masks=None,
-                sam_model=None, sam_clip=None, unload_sam_model=False):
+    def process(self, image, prompt="face", boost=1.0, confidence=0.5,
+                mask=None, previous_mask_attention=None, sam_model=None,
+                sam_clip=None, unload_sam_model=False):
         if image.ndim != 4:
             raise ValueError("Image must have ComfyUI BHWC dimensions.")
         batch, height, width = image.shape[:3]
         geometry = (batch, height, width)
-        if source == "external_mask":
-            if external_mask is None:
-                raise ValueError("External mask mode requires external_mask.")
-            mask = external_mask
-        elif source == "sam3":
+        # A connected MASK takes precedence. Otherwise segment with SAM3.
+        # No forced "external_mask" mode or mandatory external MASK socket.
+        if mask is not None:
+            source = "mask"
+        else:
+            source = "sam3"
             if not str(prompt).strip():
-                raise ValueError("SAM 3 requires a text prompt.")
+                raise ValueError("SAM 3 requires a text prompt when no mask is connected.")
             mask = _sam31_mask(image, prompt, confidence, sam_model, sam_clip)
             if unload_sam_model:
                 _offload_sam31(sam_model)
-        else:
-            raise ValueError(f"Unknown segmentation source: {source}")
         mask = _normalize_mask(mask, batch, height, width, image.device)
-        if previous_masks is not None:
-            if not isinstance(previous_masks, MaskChain) or previous_masks.geometry != geometry:
+        if previous_mask_attention is not None:
+            if not isinstance(previous_mask_attention, MaskChain) or previous_mask_attention.geometry != geometry:
                 raise ValueError("Chained masks must belong to the same image geometry.")
-            combined = torch.maximum(previous_masks.combined.to(mask.device), mask)
-            regions = previous_masks.regions
+            combined = torch.maximum(previous_mask_attention.combined.to(mask.device), mask)
+            regions = previous_mask_attention.regions
         else:
             combined = mask
             regions = ()
