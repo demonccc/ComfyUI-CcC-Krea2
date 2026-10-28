@@ -109,6 +109,7 @@ def _public_vision_mode(runtime_mode: str) -> str:
         "style_indirect": "style",
         "context_indirect": "context",
         "native": "native",
+        "guided": "native",
     }.get(runtime_mode, runtime_mode)
 
 
