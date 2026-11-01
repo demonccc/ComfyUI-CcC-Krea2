@@ -261,56 +261,6 @@ app.registerExtension({
 
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
-            const restoreReferenceWidgets = (saved) => {
-                const values = saved?.widgets_values;
-                if (!Array.isArray(values)) return null;
-                const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
-                const current = widgets.map(w => w.name);
-                const annotationIndex = current.indexOf("vae_rope_prompt_annotation");
-                const enableIndex = current.indexOf("vision_enable");
-                const resizeIndex = current.indexOf("vision_resize");
-                const edgeIndex = current.indexOf("vision_max_edge");
-                if ([annotationIndex, enableIndex, resizeIndex, edgeIndex].some(i => i < 0)) {
-                    return null;
-                }
-
-                // Old Reference placed the annotation in Vision (before fidelity).
-                // Its positional layout differs from the new schema only by
-                // moving that one STRING widget. Avoid guesses based on scores:
-                // they silently corrupt otherwise valid workflows.
-                const legacy = current.filter(name => name !== "vae_rope_prompt_annotation");
-                const oldAnnotationIndex = legacy.indexOf("vision_vision_fidelity");
-                if (oldAnnotationIndex < 0) return null;
-                legacy.splice(oldAnnotationIndex, 0, "vision_reference_annotation");
-                if (values.length !== current.length || values.length !== legacy.length) return null;
-
-                // Current layout: annotation STRING, attention scope STRING,
-                // then Vision enable BOOLEAN, resize BOOLEAN and edge INT.
-                const currentShape =
-                    typeof values[annotationIndex] === "string" &&
-                    typeof values[enableIndex] === "boolean" &&
-                    typeof values[resizeIndex] === "boolean" &&
-                    Number.isInteger(values[edgeIndex]);
-                if (currentShape) return null;
-
-                const oldEnableIndex = legacy.indexOf("vision_enable");
-                const oldResizeIndex = legacy.indexOf("vision_resize");
-                const oldEdgeIndex = legacy.indexOf("vision_max_edge");
-                const oldAnnotation = legacy.indexOf("vision_reference_annotation");
-                const oldShape =
-                    typeof values[oldEnableIndex] === "boolean" &&
-                    typeof values[oldResizeIndex] === "boolean" &&
-                    Number.isInteger(values[oldEdgeIndex]) &&
-                    typeof values[oldAnnotation] === "string";
-                if (!oldShape) return null;
-
-                return current.map((name, index) => {
-                    const oldName = name === "vae_rope_prompt_annotation"
-                        ? "vision_reference_annotation" : name;
-                    const source = legacy.indexOf(oldName);
-                    return source < 0 ? widgets[index].value : values[source];
-                });
-            };
             const refresh = () => {
                 const currentMode = find("vision_mode");
                 if (currentMode) {
@@ -318,9 +268,6 @@ app.registerExtension({
                     // Keep the visible modes synchronized with the Python schema.
                     const modes = ["reference", "semantic", "visual", "style", "context"];
                     if (currentMode.options) currentMode.options.values = modes;
-                    if (!modes.includes(currentMode.value)) {
-                        currentMode.value = "reference";
-                    }
                 }
                 const visual = find("vae_rope_enable")?.value === true;
                 const vision = find("vision_enable")?.value === true;
@@ -372,14 +319,7 @@ app.registerExtension({
             }
             const configure = node.onConfigure;
             node.onConfigure = function (...args) {
-                const remapped = restoreReferenceWidgets(args[0]);
                 const result = configure?.apply(this, args);
-                if (remapped) {
-                    const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
-                    widgets.forEach((widget, i) => {
-                        if (i < remapped.length) widget.value = remapped[i];
-                    });
-                }
                 refresh();
                 return result;
             };
@@ -536,102 +476,6 @@ app.registerExtension({
             const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
             const visionEnableWidget = node.widgets?.find((w) => w.name === "latent_vision_enable");
 
-            const restoreLatentWidgets = (saved) => {
-                const values = saved?.widgets_values;
-                if (!Array.isArray(values)) return;
-                const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
-                const current = widgets.map(w => w.name);
-                const withoutAnnotation = current.filter(n => n !== "latent_vision_annotation");
-                const modes = ["reference", "semantic", "visual", "style", "context",
-                    "native", "none", "guided"];
-                const seedModes = ["fixed", "random", "increment", "decrement"];
-                const detailModes = ["compact", "balanced", "detailed"];
-                const checks = {
-                    "dimensions": v => ["preset", "fixed", "from_image"].includes(v),
-                    "width": v => Number.isInteger(v) && v > 0,
-                    "height": v => Number.isInteger(v) && v > 0,
-                    "content": v => ["empty", "from_image"].includes(v),
-                    "content_fit": v => ["crop", "contain", "stretch"].includes(v),
-                    "latent_vision_enable": v => typeof v === "boolean",
-                    "latent_vision_resize": v => typeof v === "boolean",
-                    "latent_vision_max_edge": v => Number.isInteger(v) && v >= 384 && v <= 2048,
-                    "latent_vision_mode": v => modes.includes(v),
-                    "latent_vision_instruction": v => typeof v === "string",
-                    "latent_vision_style_processing": v => ["full", "2x2", "4x4"].includes(v),
-                    "latent_vision_guidance_seed_mode": v => seedModes.includes(v),
-                    "latent_vision_guidance_seed": v => Number.isInteger(v) && v >= 0,
-                    "latent_vision_guidance_detail": v => detailModes.includes(v),
-                    "latent_vision_vision_guidance": v => ["conservative", "balanced", "flexible"].includes(v),
-                    "latent_vision_vision_fidelity": v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1,
-                    "latent_vision_annotation": v => typeof v === "string",
-                    "latent_vision_reference_annotation": v => typeof v === "string",
-                    "content_prompt_annotation": v => typeof v === "string",
-                    "batch_size": v => Number.isInteger(v) && v >= 1 && v <= 64,
-                };
-                const layouts = [];
-                const add = names => {
-                    if (!layouts.some(x => x.join("|") === names.join("|"))) layouts.push(names);
-                };
-                add(current);
-                add(withoutAnnotation);
-                // Handle all historic combinations: 0, 1, or 2 guidance
-                // widgets, with an optional legacy Vision annotation.
-                for (const guidance of [
-                    [], ["latent_vision_guidance_detail"],
-                    ["latent_vision_vision_guidance"],
-                    ["latent_vision_guidance_detail", "latent_vision_vision_guidance"]
-                ]) {
-                    for (const alias of [null, "latent_vision_reference_annotation"]) {
-                        const candidate = [...withoutAnnotation];
-                        const at = candidate.indexOf("latent_vision_vision_fidelity");
-                        candidate.splice(at, 0, ...guidance, ...(alias ? [alias] : []));
-                        add(candidate);
-                    }
-                }
-                // Transitional version had a content annotation before Vision.
-                const content = [...withoutAnnotation];
-                content.splice(content.indexOf("latent_vision_enable"), 0,
-                    "content_prompt_annotation");
-                add(content);
-
-                let selected = null;
-                let best = -Infinity;
-                for (const names of layouts) {
-                    if (names.length !== values.length) continue;
-                    let score = 0;
-                    for (let i = 0; i < names.length; i++) {
-                        const test = checks[names[i]];
-                        if (test) score += test(values[i]) ? 3 : -8;
-                        // Values such as "balanced" are preset controls, not
-                        // a user's role description. Detect one-field shifts.
-                        if (names[i].endsWith("_annotation") &&
-                            ["balanced", "compact", "detailed", "conservative", "flexible"]
-                                .includes(values[i])) score -= 10;
-                    }
-                    if (score > best) { best = score; selected = names; }
-                }
-                if (!selected) return;
-                const corrected = current.map((name, index) => {
-                    let sourceName = name;
-                    if (name === "latent_vision_annotation" && !selected.includes(name)) {
-                        sourceName = selected.includes("latent_vision_reference_annotation")
-                            ? "latent_vision_reference_annotation" : "content_prompt_annotation";
-                    }
-                    const source = selected.indexOf(sourceName);
-                    const value = source >= 0 ? values[source]
-                        : name === "latent_vision_annotation" ? "" : widgets[index].value;
-                    return checks[name] && !checks[name](value)
-                        ? (name === "batch_size" ? 1 :
-                           name === "latent_vision_vision_fidelity" ? 0.25 :
-                           name === "latent_vision_mode" ? "reference" :
-                           name === "latent_vision_guidance_seed" ? 0 :
-                           name === "latent_vision_annotation" ? "" : widgets[index].value)
-                        : value;
-                });
-                return selected !== current || corrected.some((v, i) => v !== values[i])
-                    ? corrected : null;
-            };
-
             const setDisabled = (name, disabled) => {
                 const widget = node.widgets?.find((w) => w.name === name);
                 if (widget) widget.disabled = disabled;
@@ -660,13 +504,6 @@ app.registerExtension({
                 if (modeWidget) {
                     const modes = ["reference", "semantic", "visual", "style", "context"];
                     if (modeWidget.options) modeWidget.options.values = modes;
-                    if (["native", "none", "guided"].includes(modeWidget.value)) {
-                        modeWidget.value = "reference";
-                    } else if (!modes.includes(modeWidget.value)) {
-                        // Saved workflows can restore an obsolete numeric combo index.
-                        // Do not silently infer a semantic mode from that index.
-                        modeWidget.value = "reference";
-                    }
                 }
                 const enabled = visionEnableWidget?.value === true && contentWidget?.value === "from_image";
                 // The enable switch must remain interactive when content comes
@@ -706,15 +543,7 @@ app.registerExtension({
 
             const originalConfigure = node.onConfigure;
             node.onConfigure = function (...args) {
-                const remapped = restoreLatentWidgets(args[0]);
                 const result = originalConfigure?.apply(this, args);
-                // LiteGraph already assigned the positional values at this stage.
-                if (remapped) {
-                    const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
-                    widgets.forEach((widget, i) => {
-                        if (i < remapped.length) widget.value = remapped[i];
-                    });
-                }
                 updateDimensionsState();
                 updateContentState();
                 updateVisionState();
