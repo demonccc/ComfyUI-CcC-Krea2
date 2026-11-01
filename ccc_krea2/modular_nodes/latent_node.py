@@ -283,15 +283,12 @@ class CcCKrea2Latent:
         # ComfyUI can restore a stale numeric widget value as a Vision mode.
         # Never activate semantic conditioning with a corrupted preset. Keep the
         # target latent and VAE editing usable, and report the incompatible value.
-        invalid_vision_mode = latent_vision_mode not in CcCKrea2VisionReference.INPUT_TYPES()["required"]["mode"][0] and latent_vision_mode not in ("native", "none", "guided")
-        vision_warning = ""
-        if invalid_vision_mode:
-            vision_warning = (
-                f"Warning: invalid Latent Vision mode {latent_vision_mode!r} from saved workflow; "
-                "semantic conditioning disabled for this execution."
+        allowed_vision_modes = CcCKrea2VisionReference.INPUT_TYPES()["required"]["mode"][0]
+        if latent_vision_mode not in allowed_vision_modes and latent_vision_mode not in ("native", "none", "guided"):
+            raise ValueError(
+                f"[Krea2 CcC Latent] Unsupported Vision mode: {latent_vision_mode!r}"
             )
-            latent_vision_enable = False
-            latent_vision_mode = "reference"
+        vision_warning = ""
 
         # Vision is only meaningful for actual target image content.
         # Disabled controls in ComfyUI may retain true in serialized workflows;
