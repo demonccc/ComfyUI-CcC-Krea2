@@ -549,59 +549,88 @@ app.registerExtension({
                 const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
                 const current = widgets.map(w => w.name);
                 const withoutAnnotation = current.filter(n => n !== "latent_vision_annotation");
-                // Earlier versions placed annotation at the end of the Vision
-                // group, or included two removed guidance controls.
-                const legacy = [...withoutAnnotation];
-                const insertAt = legacy.indexOf("latent_vision_vision_fidelity");
-                if (insertAt < 0) return;
-                legacy.splice(insertAt, 0, "latent_vision_reference_annotation");
-                const original = [...legacy];
-                const beforeAnnotation = original.indexOf("latent_vision_reference_annotation");
-                original.splice(beforeAnnotation, 0,
-                    "latent_vision_guidance_detail", "latent_vision_vision_guidance");
-                const contentAnnotation = [...withoutAnnotation];
-                contentAnnotation.splice(contentAnnotation.indexOf("latent_vision_enable"), 0,
-                    "content_prompt_annotation");
-
                 const modes = ["reference", "semantic", "visual", "style", "context",
                     "native", "none", "guided"];
-                const controls = ["latent_vision_mode", "latent_vision_enable",
-                    "latent_vision_resize", "latent_vision_max_edge",
-                    "latent_vision_guidance_seed", "latent_vision_guidance_seed_mode",
-                    "content", "batch_size"];
-                const valid = (name, value) => {
-                    if (name === "latent_vision_mode") return modes.includes(value);
-                    if (name === "latent_vision_enable" || name === "latent_vision_resize") {
-                        return typeof value === "boolean";
-                    }
-                    if (name === "latent_vision_max_edge") return Number.isInteger(value) && value >= 384 && value <= 2048;
-                    if (name === "latent_vision_guidance_seed") return Number.isInteger(value) && value >= 0;
-                    if (name === "latent_vision_guidance_seed_mode") return ["fixed", "random", "increment", "decrement"].includes(value);
-                    if (name === "content") return ["empty", "from_image"].includes(value);
-                    if (name === "batch_size") return Number.isInteger(value) && value >= 1 && value <= 64;
-                    return true;
+                const seedModes = ["fixed", "random", "increment", "decrement"];
+                const detailModes = ["compact", "balanced", "detailed"];
+                const checks = {
+                    "dimensions": v => ["preset", "fixed", "from_image"].includes(v),
+                    "width": v => Number.isInteger(v) && v > 0,
+                    "height": v => Number.isInteger(v) && v > 0,
+                    "content": v => ["empty", "from_image"].includes(v),
+                    "content_fit": v => ["crop", "contain", "stretch"].includes(v),
+                    "latent_vision_enable": v => typeof v === "boolean",
+                    "latent_vision_resize": v => typeof v === "boolean",
+                    "latent_vision_max_edge": v => Number.isInteger(v) && v >= 384 && v <= 2048,
+                    "latent_vision_mode": v => modes.includes(v),
+                    "latent_vision_instruction": v => typeof v === "string",
+                    "latent_vision_style_processing": v => ["full", "2x2", "4x4"].includes(v),
+                    "latent_vision_guidance_seed_mode": v => seedModes.includes(v),
+                    "latent_vision_guidance_seed": v => Number.isInteger(v) && v >= 0,
+                    "latent_vision_guidance_detail": v => detailModes.includes(v),
+                    "latent_vision_vision_guidance": v => ["conservative", "balanced", "flexible"].includes(v),
+                    "latent_vision_vision_fidelity": v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1,
+                    "latent_vision_annotation": v => typeof v === "string",
+                    "latent_vision_reference_annotation": v => typeof v === "string",
+                    "content_prompt_annotation": v => typeof v === "string",
+                    "batch_size": v => Number.isInteger(v) && v >= 1 && v <= 64,
                 };
-                const layouts = [current, withoutAnnotation, legacy, original, contentAnnotation];
-                let selected = current;
+                const layouts = [];
+                const add = names => {
+                    if (!layouts.some(x => x.join("|") === names.join("|"))) layouts.push(names);
+                };
+                add(current);
+                add(withoutAnnotation);
+                // Handle all historic combinations: 0, 1, or 2 guidance
+                // widgets, with an optional legacy Vision annotation.
+                for (const guidance of [
+                    [], ["latent_vision_guidance_detail"],
+                    ["latent_vision_vision_guidance"],
+                    ["latent_vision_guidance_detail", "latent_vision_vision_guidance"]
+                ]) {
+                    for (const alias of [null, "latent_vision_reference_annotation"]) {
+                        const candidate = [...withoutAnnotation];
+                        const at = candidate.indexOf("latent_vision_vision_fidelity");
+                        candidate.splice(at, 0, ...guidance, ...(alias ? [alias] : []));
+                        add(candidate);
+                    }
+                }
+                // Transitional version had a content annotation before Vision.
+                const content = [...withoutAnnotation];
+                content.splice(content.indexOf("latent_vision_enable"), 0,
+                    "content_prompt_annotation");
+                add(content);
+
+                let selected = null;
                 let best = -Infinity;
                 for (const names of layouts) {
                     if (names.length !== values.length) continue;
-                    const score = controls.reduce((sum, name) => {
-                        const index = names.indexOf(name);
-                        return sum + (index < 0 ? 0 : valid(name, values[index]) ? 2 : -3);
-                    }, 0);
+                    let score = 0;
+                    for (let i = 0; i < names.length; i++) {
+                        const test = checks[names[i]];
+                        if (test) score += test(values[i]) ? 3 : -8;
+                    }
                     if (score > best) { best = score; selected = names; }
                 }
-                if (selected === current) return;
-                return current.map((name, i) => {
-                    const sourceName = name === "latent_vision_annotation"
-                        ? selected.includes("latent_vision_reference_annotation")
-                            ? "latent_vision_reference_annotation"
-                            : "content_prompt_annotation"
-                        : name;
+                if (!selected) return;
+                const corrected = current.map((name, index) => {
+                    let sourceName = name;
+                    if (name === "latent_vision_annotation" && !selected.includes(name)) {
+                        sourceName = selected.includes("latent_vision_reference_annotation")
+                            ? "latent_vision_reference_annotation" : "content_prompt_annotation";
+                    }
                     const source = selected.indexOf(sourceName);
-                    return source >= 0 ? values[source] : widgets[i].value;
+                    const value = source >= 0 ? values[source] : widgets[index].value;
+                    return checks[name] && !checks[name](value)
+                        ? (name === "batch_size" ? 1 :
+                           name === "latent_vision_vision_fidelity" ? 0.25 :
+                           name === "latent_vision_mode" ? "reference" :
+                           name === "latent_vision_guidance_seed" ? 0 :
+                           name === "latent_vision_annotation" ? "" : widgets[index].value)
+                        : value;
                 });
+                return selected !== current || corrected.some((v, i) => v !== values[i])
+                    ? corrected : null;
             };
 
             const setDisabled = (name, disabled) => {
