@@ -261,25 +261,49 @@ app.registerExtension({
 
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
-            const migrateLegacyAnnotation = (saved) => {
+            const restoreReferenceWidgets = (saved) => {
                 const values = saved?.widgets_values;
                 if (!Array.isArray(values)) return;
-                const currentNames = (node.widgets ?? []).filter(w => w.serialize !== false).map(w => w.name);
-                const newIndex = currentNames.indexOf("vae_rope_prompt_annotation");
-                if (newIndex < 0 || typeof values[newIndex] !== "boolean") return;
-                // Old saved workflows have vision_enable at this position;
-                // their reference role text was vision_reference_annotation.
-                const oldNames = currentNames.filter(n => n !== "vae_rope_prompt_annotation");
-                const insertAt = oldNames.indexOf("vision_vision_fidelity");
-                if (insertAt < 0) return;
-                oldNames.splice(insertAt, 0, "vision_reference_annotation");
-                if (values.length !== oldNames.length) return;
-                for (const widget of node.widgets ?? []) {
-                    const legacyName = widget.name === "vae_rope_prompt_annotation"
-                        ? "vision_reference_annotation" : widget.name;
-                    const index = oldNames.indexOf(legacyName);
-                    if (index >= 0) widget.value = values[index];
-                }
+                const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
+                const current = widgets.map(w => w.name);
+                const old = current.filter(n => n !== "vae_rope_prompt_annotation");
+                const annotationIndex = old.indexOf("vision_vision_fidelity");
+                if (annotationIndex < 0) return;
+                old.splice(annotationIndex, 0, "vision_reference_annotation");
+
+                // Saved values are positional, not keyed. The old schema moved
+                // the annotation from Vision to VAE/RoPE without retaining its
+                // original position; detect the layout BEFORE Comfy restores it.
+                const modes = ["reference", "semantic", "visual", "style", "context",
+                    "native", "none", "guided"];
+                const valid = (name, value) => {
+                    if (name === "vision_mode") return modes.includes(value);
+                    if (name === "vision_enable" || name === "vae_rope_enable" ||
+                        name === "vision_resize") return typeof value === "boolean";
+                    if (name === "vision_max_edge") return Number.isInteger(value) && value >= 384 && value <= 2048;
+                    if (name === "vision_guidance_seed") return Number.isInteger(value) && value >= 0;
+                    if (name === "vae_rope_boost") return typeof value === "number" && Number.isFinite(value);
+                    if (name === "vision_guidance_seed_mode") return ["fixed", "random", "increment", "decrement"].includes(value);
+                    return true;
+                };
+                const score = (names) => {
+                    if (values.length !== names.length) return -1;
+                    return ["vision_mode", "vision_enable", "vae_rope_enable", "vision_resize",
+                        "vision_max_edge", "vision_guidance_seed", "vae_rope_boost",
+                        "vision_guidance_seed_mode"].reduce((sum, name) => {
+                            const index = names.indexOf(name);
+                            return sum + (index < 0 ? 0 : valid(name, values[index]) ? 2 : -3);
+                        }, 0);
+                };
+                const layout = score(old) > score(current) ? old : current;
+                if (layout === current) return;
+                const remapped = current.map((name, index) => {
+                    const source = layout.indexOf(
+                        name === "vae_rope_prompt_annotation" ? "vision_reference_annotation" : name
+                    );
+                    return source < 0 ? widgets[index].value : values[source];
+                });
+                return remapped;
             };
             const refresh = () => {
                 const currentMode = find("vision_mode");
@@ -288,7 +312,7 @@ app.registerExtension({
                     // Keep the visible modes synchronized with the Python schema.
                     const modes = ["reference", "semantic", "visual", "style", "context"];
                     if (currentMode.options) currentMode.options.values = modes;
-                    if (["native", "none", "guided"].includes(currentMode.value)) {
+                    if (!modes.includes(currentMode.value)) {
                         currentMode.value = "reference";
                     }
                 }
@@ -342,8 +366,22 @@ app.registerExtension({
             }
             const configure = node.onConfigure;
             node.onConfigure = function (...args) {
+                const remapped = restoreReferenceWidgets(args[0]);
+                if (remapped) {
+                    args[0] = { ...args[0], widgets_values: remapped };
+                }
                 const result = configure?.apply(this, args);
-                migrateLegacyAnnotation(args[0]);
+                const mode = find("vision_mode");
+                if (mode && !["reference", "semantic", "visual", "style", "context",
+                    "native", "none", "guided"].includes(mode.value)) {
+                    mode.value = "reference";
+                }
+                const edge = find("vision_max_edge");
+                if (edge && (!Number.isInteger(edge.value) || edge.value < 384 || edge.value > 2048)) {
+                    edge.value = 768;
+                }
+                const seed = find("vision_guidance_seed");
+                if (seed && (!Number.isInteger(seed.value) || seed.value < 0)) seed.value = 0;
                 refresh();
                 return result;
             };
