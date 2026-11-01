@@ -512,7 +512,7 @@ class CcCKrea2Edit:
             f"Vision References: {len(vision_entries)}",
             f"Semantic/Context text extractions: {len(extracted_guidance)}",
             f"VAE/RoPE attention isolation: {bool(isolate_references)}",
-            f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
+            f"Latent Vision: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
                 "Appearance Transport: CONDITIONING metadata"
