@@ -423,9 +423,9 @@ class CcCKrea2Edit:
                 "latent": ("LATENT",),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
-                "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
             },
             "optional": {
+                "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
                 "references": ("KREA2_REFERENCE_CHAIN",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
             },
