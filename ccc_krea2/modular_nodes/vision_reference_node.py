@@ -15,7 +15,7 @@ from ..qwen_guidance import (
 from .edit_reference_types import VisionReferenceChain, VisionReferenceEntry
 
 
-VISION_MODES = ("semantic", "visual", "style", "context", "none", "guided")
+VISION_MODES = ("reference", "semantic", "visual", "style", "context")
 STYLE_PROCESSING = ("full", "2x2", "4x4")
 
 VISION_RUNTIME_MODES = {
@@ -23,6 +23,7 @@ VISION_RUNTIME_MODES = {
     "visual": "style_direct",
     "style": "style_indirect",
     "context": "context_indirect",
+    "reference": "native",
     "native": "native",  # legacy saved workflows
     "none": "native",
     "guided": "guided",
@@ -56,9 +57,9 @@ class CcCKrea2VisionReference:
                 "mode": (
                     VISION_MODES,
                     {
-                        "default": "semantic",
+                        "default": "reference",
                         "tooltip": (
-                            "semantic = content/meaning; visual = near-copy/full visual blueprint with strong pose/composition anchoring and no subject duplication; "
+                            "reference = Qwen image conditioning without specialized preset; semantic = content/meaning; visual = near-copy/full visual blueprint with strong pose/composition anchoring and no subject duplication; "
                             "style = legacy Visual transfer behavior applied strongly as the dominant visual treatment; "
                             "context = mandatory scene staging with pose, gaze, limbs/hands, gesture, camera/framing, interaction, and spatial relationships."
                         ),
@@ -154,7 +155,7 @@ class CcCKrea2VisionReference:
     def process(
         self,
         image: torch.Tensor,
-        mode: str = "semantic",
+        mode: str = "reference",
         instruction: str = "",
         style_processing: str = "full",
         guidance_seed_mode: str = "fixed",
