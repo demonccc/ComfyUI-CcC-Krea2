@@ -367,10 +367,15 @@ app.registerExtension({
             const configure = node.onConfigure;
             node.onConfigure = function (...args) {
                 const remapped = restoreReferenceWidgets(args[0]);
-                if (remapped) {
-                    args[0] = { ...args[0], widgets_values: remapped };
-                }
                 const result = configure?.apply(this, args);
+                // LiteGraph restores widget values BEFORE invoking onConfigure.
+                // Replacing args[0] alone cannot repair the already-restored UI.
+                if (remapped) {
+                    const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
+                    widgets.forEach((widget, i) => {
+                        if (i < remapped.length) widget.value = remapped[i];
+                    });
+                }
                 const mode = find("vision_mode");
                 if (mode && !["reference", "semantic", "visual", "style", "context",
                     "native", "none", "guided"].includes(mode.value)) {
@@ -674,8 +679,14 @@ app.registerExtension({
             const originalConfigure = node.onConfigure;
             node.onConfigure = function (...args) {
                 const remapped = restoreLatentWidgets(args[0]);
-                if (remapped) args[0] = { ...args[0], widgets_values: remapped };
                 const result = originalConfigure?.apply(this, args);
+                // LiteGraph already assigned the positional values at this stage.
+                if (remapped) {
+                    const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
+                    widgets.forEach((widget, i) => {
+                        if (i < remapped.length) widget.value = remapped[i];
+                    });
+                }
                 updateDimensionsState();
                 updateContentState();
                 updateVisionState();
