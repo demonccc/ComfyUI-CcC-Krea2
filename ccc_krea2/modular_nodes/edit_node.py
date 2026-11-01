@@ -19,6 +19,7 @@ from ..reference_specs import (
 )
 from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 from ..vision_reference_runtime import build_vision_reference_spec
+from ..t2i import _generate_t2i_vision_guidance, _public_vision_mode
 from .rope_position import install_krea2_rope_positioning
 from .rope_preview import render_rope_preview
 
@@ -298,6 +299,58 @@ def _combine_reference_chains(
     return chain
 
 
+def _prepare_edit_vision_text(clip, references, latent, positive_prompt):
+    """Share T2I's Qwen analysis for Semantic/Context; exclude source image rows.
+
+    Keep paired VAE/RoPE appearance entries intact but remove their Qwen image
+    participation. Other Vision modes remain multimodal and can be mixed freely.
+    """
+    source_entries = (references or EditReferenceChain()).entries
+    prepared = []
+    guidance = []
+    target_text = positive_prompt
+    for entry in source_entries:
+        if not isinstance(entry, VisionReferenceEntry) or _public_vision_mode(entry.mode) not in ("semantic", "context"):
+            prepared.append(entry)
+            continue
+        mode = _public_vision_mode(entry.mode)
+        extracted, _, _ = _generate_t2i_vision_guidance(
+            clip=clip, entry=entry, target_prompt=target_text
+        )
+        guidance.append(f"{mode.title()} reference guidance: {extracted}")
+        if entry.paired_visual:
+            if not prepared or not isinstance(prepared[-1], VisualReferenceEntry):
+                raise ValueError("[Krea2 CcC Edit] Semantic/Context pair must follow its VAE/RoPE image.")
+            prepared[-1] = replace(prepared[-1], semantic=False)
+
+    runtime_latent = dict(latent)
+    latent_vision = dict(latent.get("ccc_krea2_latent_semantic") or {})
+    if latent_vision.get("enabled") and latent_vision.get("mode") in ("semantic", "context"):
+        from .vision_reference_node import CcCKrea2VisionReference
+        source = latent_vision.get("image")
+        if source is None:
+            raise ValueError("[Krea2 CcC Edit] Latent Vision is enabled without an image.")
+        entry = CcCKrea2VisionReference().process(
+            image=source,
+            mode=latent_vision["mode"],
+            instruction=str(latent_vision.get("instruction", "")),
+            guidance_seed_mode=latent_vision.get("guidance_seed_mode", "fixed"),
+            guidance_seed=int(latent_vision.get("guidance_seed", 0)),
+            guidance_detail=latent_vision.get("guidance_detail", "balanced"),
+            vision_guidance=latent_vision.get("vision_guidance", "balanced"),
+        )[0].entries[-1]
+        extracted, _, _ = _generate_t2i_vision_guidance(
+            clip=clip, entry=entry, target_prompt=target_text
+        )
+        guidance.append(f"Target {latent_vision['mode']} guidance: {extracted}")
+        latent_vision["enabled"] = False
+        runtime_latent["ccc_krea2_latent_semantic"] = latent_vision
+
+    if guidance:
+        target_text = (target_text + "\n\n" + "\n".join(guidance)).strip()
+    return EditReferenceChain(tuple(prepared)), runtime_latent, target_text, guidance
+
+
 def _conditioning_extras(conditioning):
     if not conditioning:
         return {}
@@ -397,12 +450,15 @@ class CcCKrea2Edit:
         visual_entries = tuple(e for e in all_entries if isinstance(e, VisualReferenceEntry))
         vision_entries = tuple(e for e in all_entries if isinstance(e, VisionReferenceEntry))
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
-        runtime_latent = _runtime_latent(latent)
+        prepared_refs, prepared_latent, positive_prompt, extracted_guidance = _prepare_edit_vision_text(
+            clip, references, latent, positive_prompt
+        )
+        runtime_latent = _runtime_latent(prepared_latent)
 
         chain = _combine_reference_chains(
             clip=clip,
-            references=references,
-            latent=latent,
+            references=prepared_refs,
+            latent=prepared_latent,
         )
 
         # Krea2 CcC Edit prepares geometry, Qwen images and VAE reference latents.
@@ -451,6 +507,7 @@ class CcCKrea2Edit:
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
             f"Vision References: {len(vision_entries)}",
+            f"Semantic/Context text extractions: {len(extracted_guidance)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
