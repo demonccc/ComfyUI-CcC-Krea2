@@ -225,7 +225,9 @@ class CcCKrea2Latent:
                 **{
                     "latent_vision_" + name: spec
                     for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
-                    if name != "image"
+                    if name != "image" and name not in (
+                        "guidance_detail", "vision_guidance", "reference_annotation"
+                    )
                 },
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
