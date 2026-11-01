@@ -122,3 +122,27 @@ def test_vision_only_preserves_original_even_when_qwen_image_is_resized():
     assert len(chain.entries) == 1
     assert chain.entries[0].source_image is source
     assert tuple(chain.entries[0].image.shape) == (1, 576, 768, 3)
+
+
+def test_reference_annotation_owned_by_vae_rope_not_vision():
+    schema = CcCKrea2Reference.INPUT_TYPES()["required"]
+    keys = list(schema)
+    assert "vae_rope_prompt_annotation" in schema
+    assert "vision_reference_annotation" not in schema
+    assert keys.index("vae_rope_prompt_annotation") < keys.index("vision_enable")
+    chain, _ = CcCKrea2Reference().process(
+        image(), vae_rope_enable=True, vision_enable=False,
+        vae_rope_prompt_annotation="This is the subject image.",
+    )
+    assert len(chain.entries) == 1
+    assert chain.entries[0].prompt_annotation == "This is the subject image."
+
+
+def test_reference_legacy_vision_annotation_migrates_to_vae_rope():
+    chain, _ = CcCKrea2Reference().process(
+        image(), vae_rope_enable=True, vision_enable=True,
+        vision_mode="visual",
+        vision_reference_annotation="This is the scene image.",
+    )
+    assert chain.entries[0].prompt_annotation == "This is the scene image."
+    assert not chain.entries[1].reference_annotation
