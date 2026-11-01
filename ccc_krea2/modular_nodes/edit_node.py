@@ -208,10 +208,10 @@ def _combine_reference_chains(
             ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
-                alias=paired.reference_annotation if paired else "",
+                alias=entry.prompt_annotation or (paired.reference_annotation if paired else ""),
                 vision_instruction=(
                     vision_spec.vision_instruction if vision_spec is not None
-                    else entry.prompt_annotation if entry.semantic else ""
+                    else ""
                 ),
                 appearance_reference=True,
                 # Tiled Style contributes its own 4/16 Qwen crops. The
