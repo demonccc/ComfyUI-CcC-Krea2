@@ -610,6 +610,11 @@ app.registerExtension({
                     for (let i = 0; i < names.length; i++) {
                         const test = checks[names[i]];
                         if (test) score += test(values[i]) ? 3 : -8;
+                        // Values such as "balanced" are preset controls, not
+                        // a user's role description. Detect one-field shifts.
+                        if (names[i].endsWith("_annotation") &&
+                            ["balanced", "compact", "detailed", "conservative", "flexible"]
+                                .includes(values[i])) score -= 10;
                     }
                     if (score > best) { best = score; selected = names; }
                 }
