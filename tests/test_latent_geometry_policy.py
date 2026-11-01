@@ -90,7 +90,7 @@ def test_latent_keeps_original_outputs_and_adds_vision_metadata_only():
         vae=FakeVAE(),
         dimensions="fixed", width=1024, height=1024,
         content="from_image", content_image=image,
-        latent_semantic=True,
+        latent_vision_enable=True,
         latent_vision_mode="context",
         latent_vision_instruction="Use the image only as scene context.",
         latent_vision_resize=True,
@@ -101,7 +101,7 @@ def test_latent_keeps_original_outputs_and_adds_vision_metadata_only():
     assert target.shape == (1, 1024, 1024, 3)
     assert latent["ccc_krea2_latent_semantic"]["image"] is image
     assert latent["ccc_krea2_latent_semantic"]["mode"] == "context"
-    assert "Latent Semantic: enabled" in report
+    assert "Latent Vision: enabled" in report
 
 
 def test_latent_vision_fields_match_reference_vision_contract():
@@ -122,3 +122,50 @@ def test_public_node_registry_keeps_target_latent_and_only_unified_reference():
     assert "CcCKrea2Reference" in NODE_CLASS_MAPPINGS
     assert "CcCKrea2VisualReference" not in NODE_CLASS_MAPPINGS
     assert "CcCKrea2VisionReference" not in NODE_CLASS_MAPPINGS
+
+
+def test_target_latent_uses_shared_vision_mode_names():
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+    from ccc_krea2.modular_nodes.vision_reference_node import VISION_MODES
+
+    fields = CcCKrea2Latent.INPUT_TYPES()["required"]
+    assert "latent_semantic" not in fields
+    assert fields["latent_vision_enable"][1]["default"] is False
+    assert fields["latent_vision_mode"][0] == VISION_MODES
+    assert fields["latent_vision_mode"][1]["default"] == "reference"
+
+
+def test_target_latent_accepts_old_semantic_flag_in_python_calls():
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+
+    class DummyVAE:
+        def encode(self, image):
+            return torch.zeros((image.shape[0], 16, image.shape[1] // 8, image.shape[2] // 8))
+
+    image = torch.rand(1, 128, 128, 3)
+    latent, report, _ = CcCKrea2Latent().process(
+        vae=DummyVAE(), dimensions="fixed", width=1024, height=1024,
+        content="from_image", content_image=image,
+        latent_semantic=True, latent_vision_mode="visual",
+    )
+    assert latent["ccc_krea2_latent_semantic"]["enabled"]
+    assert latent["ccc_krea2_latent_semantic"]["mode"] == "visual"
+    assert "Latent Vision: enabled" in report
+
+
+def test_invalid_legacy_numeric_vision_mode_disables_analysis_but_keeps_latent():
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+
+    class DummyVAE:
+        def encode(self, image):
+            return torch.zeros((image.shape[0], 16, image.shape[1] // 8, image.shape[2] // 8))
+
+    image = torch.rand(1, 128, 128, 3)
+    latent, report, _ = CcCKrea2Latent().process(
+        vae=DummyVAE(), dimensions="fixed", width=1024, height=1024,
+        content="from_image", content_image=image,
+        latent_vision_enable=True, latent_vision_mode=1,
+    )
+    assert not latent["ccc_krea2_latent_semantic"]["enabled"]
+    assert latent["ccc_krea2_latent_semantic"]["mode"] == "reference"
+    assert "Warning: invalid Latent Vision mode" in report
