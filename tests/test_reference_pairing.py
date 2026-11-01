@@ -164,3 +164,48 @@ def test_native_preset_keeps_single_unmodified_qwen_reference():
     resolved, _ = resolve_reference_slots_and_aliases(chain)
     assert resolved[0]["physical_qwen_range"] == (1, 1)
     assert resolved[0]["vae_reference_frame"] == 1
+
+
+def test_edit_semantic_extracts_text_and_preserves_vae_without_qwen_image(monkeypatch):
+    from ccc_krea2.modular_nodes.edit_node import _prepare_edit_vision_text
+    import ccc_krea2.modular_nodes.edit_node as mod
+    image = torch.rand((1, 64, 64, 3))
+    refs, _ = CcCKrea2Reference().process(image, vision_mode="semantic")
+    monkeypatch.setattr(
+        mod, "_generate_t2i_vision_guidance",
+        lambda **kwargs: ("A person in a room.", 1, "single-pass")
+    )
+    prepared, latent, prompt, guidance = _prepare_edit_vision_text(
+        object(), refs, {"samples": torch.empty(1, 4, 8, 8)}, "Change the jacket."
+    )
+    assert len(prepared.entries) == 1
+    assert prepared.entries[0].semantic is False
+    assert prepared.entries[0].image is image
+    assert "A person in a room." in prompt
+    with patch("ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+               side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image)):
+        chain = _combine_reference_chains(None, prepared, latent)
+    assert len(chain.references) == 1
+    assert chain.references[0].appearance_reference
+    assert not chain.references[0].include_in_vision
+
+
+def test_edit_mixed_semantic_and_visual_keeps_only_visual_qwen_image(monkeypatch):
+    from ccc_krea2.modular_nodes.edit_node import _prepare_edit_vision_text
+    import ccc_krea2.modular_nodes.edit_node as mod
+    node = CcCKrea2Reference()
+    image = torch.rand(1, 64, 64, 3)
+    refs, _ = node.process(image, vision_mode="semantic")
+    refs, _ = node.process(image, previous_references=refs, vision_mode="visual")
+    monkeypatch.setattr(mod, "_generate_t2i_vision_guidance",
+                        lambda **kwargs: ("A room.", 1, "single-pass"))
+    prepared, latent, prompt, _ = _prepare_edit_vision_text(
+        object(), refs, {"samples": torch.empty(1, 4, 8, 8)}, "One person"
+    )
+    assert len(prepared.entries) == 3
+    assert not prepared.entries[0].semantic
+    assert prepared.entries[1].semantic
+    with patch("ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+               side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image)):
+        chain = _combine_reference_chains(None, prepared, latent)
+    assert sum(bool(s.include_in_vision) for s in chain.references) == 1
