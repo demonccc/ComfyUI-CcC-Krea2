@@ -169,3 +169,22 @@ def test_invalid_legacy_numeric_vision_mode_disables_analysis_but_keeps_latent()
     assert not latent["ccc_krea2_latent_semantic"]["enabled"]
     assert latent["ccc_krea2_latent_semantic"]["mode"] == "reference"
     assert "Warning: invalid Latent Vision mode" in report
+
+
+def test_empty_target_latent_ignores_enabled_vision_from_stale_widget():
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+
+    latent, report, target = CcCKrea2Latent().process(
+        vae=None,
+        dimensions="fixed",
+        width=1024,
+        height=1024,
+        content="empty",
+        latent_vision_enable=True,
+        latent_vision_mode="semantic",
+    )
+    assert latent["samples"].shape == (1, 16, 128, 128)
+    assert target.shape == (1, 1024, 1024, 3)
+    assert latent["ccc_krea2_latent_semantic"]["enabled"] is False
+    assert latent["ccc_krea2_latent_semantic"]["image"] is None
+    assert "Latent Vision: disabled" in report
