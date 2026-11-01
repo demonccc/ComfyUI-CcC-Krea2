@@ -38,7 +38,6 @@ class CcCKrea2Reference:
         for name, spec in visual["required"].items():
             if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px"):
                 required["vae_rope_" + name] = spec
-        required["vae_rope_prompt_annotation"] = visual["required"]["prompt_annotation"]
         required["vision_enable"] = ("BOOLEAN", {"default": True})
         required["vision_resize"] = ("BOOLEAN", {"default": True})
         required["vision_max_edge"] = ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64})
@@ -78,7 +77,13 @@ class CcCKrea2Reference:
         for key in tuple(kwargs):
             if key.startswith("visual_"):
                 kwargs.setdefault("vae_rope_" + key[len("visual_"):], kwargs.pop(key))
-        # Recover annotation from workflows saved before it moved from Vision to VAE/RoPE.\n        annotation = str(kwargs.get("vae_rope_prompt_annotation") or kwargs.get("vision_reference_annotation") or "").strip()\n        chain = previous_references if previous_references is not None else EditReferenceChain()
+        # Recover annotations from workflows saved before the Vision-to-VAE/RoPE move.
+        annotation = str(
+            kwargs.get("vae_rope_prompt_annotation")
+            or kwargs.get("vision_reference_annotation")
+            or ""
+        ).strip()
+        chain = previous_references if previous_references is not None else EditReferenceChain()
         info = ["=== Krea2 CcC Reference ===",
                 f"VAE/RoPE: {'enabled' if vae_rope_enable else 'disabled'}",
                 f"Vision: {'enabled' if vision_enable else 'disabled'}"]
