@@ -538,6 +538,8 @@ class CcCKrea2TextToImage:
             "style_direct": "visual",
             "style_indirect": "style",
             "context_indirect": "context",
+            "native": "reference",
+            "guided": "reference",
         }
         vision_modes = [
             runtime_to_public.get(entry.mode, entry.mode)
@@ -576,8 +578,8 @@ class CcCKrea2TextToImage:
                 [
                     "",
                     "T2I Vision Pipeline:",
-                    "  Vision Analysis: multimodal Qwen generation",
-                    "  Final Conditioning: text-only Krea2 encode",
+                    "  Vision Analysis: multimodal Qwen generation for Semantic/Context only",
+                    "  Final Conditioning: text and/or multimodal Qwen encoding",
                     f"  Direct Vision References: {sum(item['generation_strategy'] == 'direct-qwen-image-conditioning' for item in vision_guidance_items)}",
                     f"  Vision Analysis Images: {vision_analysis_images}",
                     f"  Conditioning Prompt: {conditioning_prompt!r}",
