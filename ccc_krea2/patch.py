@@ -38,6 +38,7 @@ def attach_reference_runtime_to_conditioning(
     reference_boosts: Optional[List[float]] = None,
     reference_target_masks: Optional[List[Any]] = None,
     reference_attention_scopes: Optional[List[str]] = None,
+    isolate_references: bool = False,
 ) -> List[Any]:
     """Attach RoPE, boosts and target masks for ordered visual references."""
     if reference_count <= 0:
@@ -51,6 +52,8 @@ def attach_reference_runtime_to_conditioning(
         values["reference_target_masks"] = list(reference_target_masks)
     if reference_attention_scopes is not None:
         values["reference_attention_scopes"] = list(reference_attention_scopes)
+    if isolate_references:
+        values["reference_attention_isolation"] = True
     return _conditioning_set_values(conditioning, values)
 
 
@@ -124,6 +127,10 @@ def install_krea2_reference_conditioning() -> None:
         attention_scopes = kwargs.get("reference_attention_scopes")
         if attention_scopes is not None:
             out["ccc_ref_attention_scopes"] = comfy.conds.CONDConstant(list(attention_scopes))
+
+        isolation = kwargs.get("reference_attention_isolation")
+        if isolation is not None:
+            out["ccc_ref_attention_isolation"] = comfy.conds.CONDConstant(bool(isolation))
 
         return out
 
@@ -227,7 +234,7 @@ def patch_krea2_model(model: Any) -> Any:
             for key in (
                 "ref_latents", "ref_boosts", "ccc_ref_rope_positions",
                 "ccc_ref_target_masks", "ccc_ref_attention_scopes", "ccc_ref_boost_masks",
-                "ccc_ref_attention_maps",
+                "ccc_ref_attention_maps", "ccc_ref_attention_isolation",
             ):
                 fallback_kwargs.pop(key, None)
             return executor(x, timesteps, context, *wargs, **fallback_kwargs)
@@ -264,6 +271,7 @@ def patch_krea2_model(model: Any) -> Any:
             ref_masks=source_masks,
             ref_attention_maps=attention_maps,
             ref_attention_scopes=attention_scopes,
+            isolate_references=bool(kwargs.get("ccc_ref_attention_isolation", False)),
             transformer_options=transformer_options,
         )
 
@@ -388,6 +396,7 @@ def _compute_ref_attention_bias_patchified(
     ref_attention_scopes: Optional[List[str]] = None,
     target_grid: Optional[Tuple[int, int]] = None,
     batch_size: int = 1,
+    isolate_references: bool = False,
 ) -> Optional[torch.Tensor]:
     """Boost selected reference keys for queries inside the selected target mask.
 
@@ -411,7 +420,7 @@ def _compute_ref_attention_bias_patchified(
         float(boost) != 1.0 or scope == "only in mask" or ref_attention_maps[i] is not None
         for i, (boost, scope) in enumerate(zip(boosts, ref_attention_scopes))
     )
-    if not active:
+    if not active and not isolate_references:
         return None
 
     offsets = [txt_len]
@@ -420,6 +429,15 @@ def _compute_ref_attention_bias_patchified(
     target_start = offsets[-1]
     seq_len = target_start + tgt_len
     bias = torch.zeros((batch_size, 1, seq_len, seq_len), device=device, dtype=dtype)
+
+    if isolate_references:
+        # CliffNodes-inspired optional reference isolation: each reference can
+        # attend only text and itself. Target-to-reference attention remains
+        # controlled separately by boosts and masks below.
+        for index in range(len(ref_token_lens)):
+            a, b = offsets[index], offsets[index + 1]
+            bias[:, :, a:b, txt_len:] = float("-inf")
+            bias[:, :, a:b, a:b] = 0.0
 
     for index, boost in enumerate(boosts):
         scope = ref_attention_scopes[index]
@@ -518,6 +536,7 @@ def krea2_dit_incontext_forward(
     ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
     ref_attention_maps: Optional[List[Optional[torch.Tensor]]] = None,
     ref_attention_scopes: Optional[List[str]] = None,
+    isolate_references: bool = False,
 ) -> torch.Tensor:
     """In-context Krea2 forward with optional Krea2 CcC Edit RoPE displacement."""
     transformer_options = transformer_options or {}
@@ -602,6 +621,7 @@ def krea2_dit_incontext_forward(
         batch_size=batch,
         device=combined.device,
         dtype=combined.dtype,
+        isolate_references=isolate_references,
     )
 
     total_blocks = len(dit_model.blocks)
