@@ -235,6 +235,7 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2Mask") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
+                if (find("source")?.value === "sam") find("source").value = "sam3";
                 const usingMask = find("source")?.value === "mask";
                 setWidgetDisabled(node, "prompt", usingMask);
                 setWidgetDisabled(node, "confidence", usingMask);
@@ -620,7 +621,8 @@ app.registerExtension({
                             ? "latent_vision_reference_annotation" : "content_prompt_annotation";
                     }
                     const source = selected.indexOf(sourceName);
-                    const value = source >= 0 ? values[source] : widgets[index].value;
+                    const value = source >= 0 ? values[source]
+                        : name === "latent_vision_annotation" ? "" : widgets[index].value;
                     return checks[name] && !checks[name](value)
                         ? (name === "batch_size" ? 1 :
                            name === "latent_vision_vision_fidelity" ? 0.25 :
