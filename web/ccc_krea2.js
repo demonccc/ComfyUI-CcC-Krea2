@@ -532,12 +532,16 @@ app.registerExtension({
                     }
                 }
                 const enabled = visionEnableWidget?.value === true && contentWidget?.value === "from_image";
-                setWidgetDisabled(node, "latent_vision_enable", contentWidget?.value !== "from_image");
+                // The enable switch must remain interactive when content comes
+                // from an image. Do not disable it with the dependent controls.
                 for (const widget of node.widgets ?? []) {
-                    if (widget.name.startsWith("latent_vision_")) {
+                    if (widget.name.startsWith("latent_vision_") &&
+                        widget.name !== "latent_vision_enable") {
                         setWidgetDisabled(node, widget.name, !enabled);
                     }
                 }
+                setWidgetDisabled(node, "latent_vision_enable",
+                    contentWidget?.value !== "from_image");
                 setWidgetDisabled(node, "latent_vision_max_edge", !enabled ||
                     node.widgets?.find(w => w.name === "latent_vision_resize")?.value !== true);
                 const mode = node.widgets?.find(w => w.name === "latent_vision_mode")?.value ?? "reference";
