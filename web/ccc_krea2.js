@@ -263,47 +263,53 @@ app.registerExtension({
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const restoreReferenceWidgets = (saved) => {
                 const values = saved?.widgets_values;
-                if (!Array.isArray(values)) return;
+                if (!Array.isArray(values)) return null;
                 const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
                 const current = widgets.map(w => w.name);
-                const old = current.filter(n => n !== "vae_rope_prompt_annotation");
-                const annotationIndex = old.indexOf("vision_vision_fidelity");
-                if (annotationIndex < 0) return;
-                old.splice(annotationIndex, 0, "vision_reference_annotation");
+                const annotationIndex = current.indexOf("vae_rope_prompt_annotation");
+                const enableIndex = current.indexOf("vision_enable");
+                const resizeIndex = current.indexOf("vision_resize");
+                const edgeIndex = current.indexOf("vision_max_edge");
+                if ([annotationIndex, enableIndex, resizeIndex, edgeIndex].some(i => i < 0)) {
+                    return null;
+                }
 
-                // Saved values are positional, not keyed. The old schema moved
-                // the annotation from Vision to VAE/RoPE without retaining its
-                // original position; detect the layout BEFORE Comfy restores it.
-                const modes = ["reference", "semantic", "visual", "style", "context",
-                    "native", "none", "guided"];
-                const valid = (name, value) => {
-                    if (name === "vision_mode") return modes.includes(value);
-                    if (name === "vision_enable" || name === "vae_rope_enable" ||
-                        name === "vision_resize") return typeof value === "boolean";
-                    if (name === "vision_max_edge") return Number.isInteger(value) && value >= 384 && value <= 2048;
-                    if (name === "vision_guidance_seed") return Number.isInteger(value) && value >= 0;
-                    if (name === "vae_rope_boost") return typeof value === "number" && Number.isFinite(value);
-                    if (name === "vision_guidance_seed_mode") return ["fixed", "random", "increment", "decrement"].includes(value);
-                    return true;
-                };
-                const score = (names) => {
-                    if (values.length !== names.length) return -1;
-                    return ["vision_mode", "vision_enable", "vae_rope_enable", "vision_resize",
-                        "vision_max_edge", "vision_guidance_seed", "vae_rope_boost",
-                        "vision_guidance_seed_mode"].reduce((sum, name) => {
-                            const index = names.indexOf(name);
-                            return sum + (index < 0 ? 0 : valid(name, values[index]) ? 2 : -3);
-                        }, 0);
-                };
-                const layout = score(old) > score(current) ? old : current;
-                if (layout === current) return;
-                const remapped = current.map((name, index) => {
-                    const source = layout.indexOf(
-                        name === "vae_rope_prompt_annotation" ? "vision_reference_annotation" : name
-                    );
+                // Old Reference placed the annotation in Vision (before fidelity).
+                // Its positional layout differs from the new schema only by
+                // moving that one STRING widget. Avoid guesses based on scores:
+                // they silently corrupt otherwise valid workflows.
+                const legacy = current.filter(name => name !== "vae_rope_prompt_annotation");
+                const oldAnnotationIndex = legacy.indexOf("vision_vision_fidelity");
+                if (oldAnnotationIndex < 0) return null;
+                legacy.splice(oldAnnotationIndex, 0, "vision_reference_annotation");
+                if (values.length !== current.length || values.length !== legacy.length) return null;
+
+                // Current layout: annotation STRING, attention scope STRING,
+                // then Vision enable BOOLEAN, resize BOOLEAN and edge INT.
+                const currentShape =
+                    typeof values[annotationIndex] === "string" &&
+                    typeof values[enableIndex] === "boolean" &&
+                    typeof values[resizeIndex] === "boolean" &&
+                    Number.isInteger(values[edgeIndex]);
+                if (currentShape) return null;
+
+                const oldEnableIndex = legacy.indexOf("vision_enable");
+                const oldResizeIndex = legacy.indexOf("vision_resize");
+                const oldEdgeIndex = legacy.indexOf("vision_max_edge");
+                const oldAnnotation = legacy.indexOf("vision_reference_annotation");
+                const oldShape =
+                    typeof values[oldEnableIndex] === "boolean" &&
+                    typeof values[oldResizeIndex] === "boolean" &&
+                    Number.isInteger(values[oldEdgeIndex]) &&
+                    typeof values[oldAnnotation] === "string";
+                if (!oldShape) return null;
+
+                return current.map((name, index) => {
+                    const oldName = name === "vae_rope_prompt_annotation"
+                        ? "vision_reference_annotation" : name;
+                    const source = legacy.indexOf(oldName);
                     return source < 0 ? widgets[index].value : values[source];
                 });
-                return remapped;
             };
             const refresh = () => {
                 const currentMode = find("vision_mode");
@@ -368,25 +374,12 @@ app.registerExtension({
             node.onConfigure = function (...args) {
                 const remapped = restoreReferenceWidgets(args[0]);
                 const result = configure?.apply(this, args);
-                // LiteGraph restores widget values BEFORE invoking onConfigure.
-                // Replacing args[0] alone cannot repair the already-restored UI.
                 if (remapped) {
                     const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
                     widgets.forEach((widget, i) => {
                         if (i < remapped.length) widget.value = remapped[i];
                     });
                 }
-                const mode = find("vision_mode");
-                if (mode && !["reference", "semantic", "visual", "style", "context",
-                    "native", "none", "guided"].includes(mode.value)) {
-                    mode.value = "reference";
-                }
-                const edge = find("vision_max_edge");
-                if (edge && (!Number.isInteger(edge.value) || edge.value < 384 || edge.value > 2048)) {
-                    edge.value = 768;
-                }
-                const seed = find("vision_guidance_seed");
-                if (seed && (!Number.isInteger(seed.value) || seed.value < 0)) seed.value = 0;
                 refresh();
                 return result;
             };
