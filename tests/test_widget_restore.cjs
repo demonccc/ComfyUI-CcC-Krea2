@@ -82,7 +82,12 @@ const latentValues = {
 (async () => {
   const referenceExpected = {
     vae_rope_prompt_annotation: referenceValues.vae_rope_prompt_annotation,
-    vision_mode: "visual", vision_max_edge: 768, vision_guidance_seed: 55,
+    vae_rope_boost: 1,
+    vae_rope_reference_fit: "native",
+    vision_enable: true, vision_resize: true,
+    vision_mode: "visual", vision_max_edge: 768,
+    vision_style_processing: "full", vision_guidance_seed: 55,
+    vision_vision_fidelity: 0.25,
   };
   await verify("CcCKrea2Reference", referenceNames, oldReferenceNames,
     referenceValues, referenceExpected);
