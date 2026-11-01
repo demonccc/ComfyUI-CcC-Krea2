@@ -423,6 +423,7 @@ class CcCKrea2Edit:
                 "latent": ("LATENT",),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
+                "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
             },
             "optional": {
                 "references": ("KREA2_REFERENCE_CHAIN",),
@@ -438,6 +439,7 @@ class CcCKrea2Edit:
         latent,
         positive_prompt="",
         apply_krea2_edit_patch=True,
+        isolate_references=False,
         references=None,
         prompt_augmentation=None,
     ):
@@ -485,6 +487,7 @@ class CcCKrea2Edit:
                 reference_boosts=positive_boosts,
                 reference_target_masks=target_masks,
                 reference_attention_scopes=attention_scopes,
+                isolate_references=isolate_references,
             )
             negative = attach_reference_runtime_to_conditioning(
                 negative,
@@ -508,6 +511,7 @@ class CcCKrea2Edit:
             f"Visual References: {len(visual_entries)}",
             f"Vision References: {len(vision_entries)}",
             f"Semantic/Context text extractions: {len(extracted_guidance)}",
+            f"VAE/RoPE attention isolation: {bool(isolate_references)}",
             f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
