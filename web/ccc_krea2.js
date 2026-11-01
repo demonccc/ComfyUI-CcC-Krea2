@@ -261,6 +261,26 @@ app.registerExtension({
 
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
+            const migrateLegacyAnnotation = (saved) => {
+                const values = saved?.widgets_values;
+                if (!Array.isArray(values)) return;
+                const currentNames = (node.widgets ?? []).filter(w => w.serialize !== false).map(w => w.name);
+                const newIndex = currentNames.indexOf("vae_rope_prompt_annotation");
+                if (newIndex < 0 || typeof values[newIndex] !== "boolean") return;
+                // Old saved workflows have vision_enable at this position;
+                // their reference role text was vision_reference_annotation.
+                const oldNames = currentNames.filter(n => n !== "vae_rope_prompt_annotation");
+                const insertAt = oldNames.indexOf("vision_vision_fidelity");
+                if (insertAt < 0) return;
+                oldNames.splice(insertAt, 0, "vision_reference_annotation");
+                if (values.length !== oldNames.length) return;
+                for (const widget of node.widgets ?? []) {
+                    const legacyName = widget.name === "vae_rope_prompt_annotation"
+                        ? "vision_reference_annotation" : widget.name;
+                    const index = oldNames.indexOf(legacyName);
+                    if (index >= 0) widget.value = values[index];
+                }
+            };
             const refresh = () => {
                 const currentMode = find("vision_mode");
                 if (currentMode) {
@@ -294,7 +314,7 @@ app.registerExtension({
                 const visionMode = find("vision_mode")?.value ?? "reference";
                 setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
                 setWidgetDisabled(node, "vision_instruction", !vision);
-                setWidgetDisabled(node, "vision_reference_annotation", !vision);
+                setWidgetDisabled(node, "vae_rope_prompt_annotation", !visual);
                 setWidgetDisabled(node, "vision_vision_fidelity", !vision || !["semantic", "style"].includes(visionMode));
                 if (vision && visionMode !== "style" && find("vision_style_processing")) {
                     find("vision_style_processing").value = "full";
@@ -323,6 +343,7 @@ app.registerExtension({
             const configure = node.onConfigure;
             node.onConfigure = function (...args) {
                 const result = configure?.apply(this, args);
+                migrateLegacyAnnotation(args[0]);
                 refresh();
                 return result;
             };
