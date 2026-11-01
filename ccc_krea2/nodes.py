@@ -2,7 +2,6 @@
 
 from .lora import CcCKrea2LoRAStack, CcCKrea2LoRAStackWithPrompt
 from .lora_loader import CcCKrea2LoRALoader
-from .t2i import CcCKrea2TextToImage
 from .modular_nodes.reference_node import CcCKrea2Reference
 from .modular_nodes.mask_node import CcCKrea2Mask
 from .modular_nodes.size_resolver_node import CcCKrea2SizeResolver
@@ -13,6 +12,7 @@ from .modular_nodes.layout_node import CcCKrea2LayoutCell, CcCKrea2LayoutCompose
 from .modular_nodes.paint_geometry_node import CcCKrea2PaintRestore
 from .modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare
 from .modular_nodes.paint_node import CcCKrea2Paint
+from .t2i import CcCKrea2TextToImage
 
 NODE_CLASS_MAPPINGS = {
     "CcCKrea2Reference": CcCKrea2Reference,
