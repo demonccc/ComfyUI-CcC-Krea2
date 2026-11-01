@@ -89,7 +89,7 @@ Positive conditioning uses each reference's configured boost. The grounded negat
 
 Visual Reference attention supports `global`, `boost in mask`, and `only in mask`. Each Visual Reference accepts an optional `reference_boost_mask` (source-image pixels, transformed with the image) and `target_attention_mask` (final target-image pixels). Masks stay with their owning reference; there are no tags or separate Attention Region nodes. Latent exports `target_image` to provide a mask-painting canvas matching its final geometry.
 
-## Vision Reference
+Target Latent retains its independent image-content Vision path, but its public toggle is now `latent_vision_enable` (formerly `latent_semantic`) and its mode selector uses the same five presets as Reference: `Reference / Semantic / Visual / Style / Context`. This path applies to the target content image when `content=from_image`; it does not alter VAE geometry or replace a dedicated Scene/Subject Reference. Existing positional workflows retain the toggle position, and legacy Python calls using `latent_semantic` are accepted. Invalid saved mode values are reported instead of silently interpreted as a different preset.\n\n## Vision Reference
 
 Vision Reference declares what information a source image represents. It never creates an appearance/VAE reference latent, and it does not prescribe how a consumer must transport that information.
 
