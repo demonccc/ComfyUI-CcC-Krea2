@@ -36,13 +36,14 @@ class CcCKrea2Reference:
         vision = CcCKrea2VisionReference.INPUT_TYPES()
         required = {"image": ("IMAGE",), "vae_rope_enable": ("BOOLEAN", {"default": True})}
         for name, spec in visual["required"].items():
-            if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px", "prompt_annotation"):
+            if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px"):
                 required["vae_rope_" + name] = spec
+        required["vae_rope_prompt_annotation"] = visual["required"]["prompt_annotation"]
         required["vision_enable"] = ("BOOLEAN", {"default": True})
         required["vision_resize"] = ("BOOLEAN", {"default": True})
         required["vision_max_edge"] = ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64})
         for name, spec in vision["required"].items():
-            if name != "image" and name not in ("guidance_detail", "vision_guidance"):
+            if name != "image" and name not in ("guidance_detail", "vision_guidance", "reference_annotation"):
                 required["vision_" + name] = spec
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
@@ -77,7 +78,7 @@ class CcCKrea2Reference:
         for key in tuple(kwargs):
             if key.startswith("visual_"):
                 kwargs.setdefault("vae_rope_" + key[len("visual_"):], kwargs.pop(key))
-        chain = previous_references if previous_references is not None else EditReferenceChain()
+        # Recover annotation from workflows saved before it moved from Vision to VAE/RoPE.\n        annotation = str(kwargs.get("vae_rope_prompt_annotation") or kwargs.get("vision_reference_annotation") or "").strip()\n        chain = previous_references if previous_references is not None else EditReferenceChain()
         info = ["=== Krea2 CcC Reference ===",
                 f"VAE/RoPE: {'enabled' if vae_rope_enable else 'disabled'}",
                 f"Vision: {'enabled' if vision_enable else 'disabled'}"]
@@ -104,9 +105,10 @@ class CcCKrea2Reference:
             visual_kwargs = {
                 name: kwargs["vae_rope_" + name]
                 for name in CcCKrea2VisualReference.INPUT_TYPES()["required"]
-                if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px", "prompt_annotation")
+                if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px")
                 and "vae_rope_" + name in kwargs
             }
+            visual_kwargs["prompt_annotation"] = annotation
             chain, = self._visual.process(
                 image=image, previous_references=chain,
                 semantic=bool(vision_enable),
