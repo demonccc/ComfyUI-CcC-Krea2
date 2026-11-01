@@ -110,6 +110,14 @@ class CcCKrea2VisionReference:
         }
 
     @classmethod
+    def VALIDATE_INPUTS(cls, mode="reference", **kwargs):
+        # ComfyUI validates COMBO widgets before execution. Retain legacy saved
+        # workflows using "none", "native" or the old internal mode labels.
+        if mode not in VISION_RUNTIME_MODES:
+            return f"Unsupported Vision mode: {mode!r}"
+        return True
+
+    @classmethod
     def IS_CHANGED(
         cls,
         guidance_seed_mode: str = "fixed",
