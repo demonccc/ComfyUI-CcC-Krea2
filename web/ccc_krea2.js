@@ -538,6 +538,67 @@ app.registerExtension({
             const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
             const visionEnableWidget = node.widgets?.find((w) => w.name === "latent_vision_enable");
 
+            const restoreLatentWidgets = (saved) => {
+                const values = saved?.widgets_values;
+                if (!Array.isArray(values)) return;
+                const widgets = (node.widgets ?? []).filter(w => w.serialize !== false);
+                const current = widgets.map(w => w.name);
+                const withoutAnnotation = current.filter(n => n !== "latent_vision_annotation");
+                // Earlier versions placed annotation at the end of the Vision
+                // group, or included two removed guidance controls.
+                const legacy = [...withoutAnnotation];
+                const insertAt = legacy.indexOf("latent_vision_vision_fidelity");
+                if (insertAt < 0) return;
+                legacy.splice(insertAt, 0, "latent_vision_reference_annotation");
+                const original = [...legacy];
+                const beforeAnnotation = original.indexOf("latent_vision_reference_annotation");
+                original.splice(beforeAnnotation, 0,
+                    "latent_vision_guidance_detail", "latent_vision_vision_guidance");
+                const contentAnnotation = [...withoutAnnotation];
+                contentAnnotation.splice(contentAnnotation.indexOf("latent_vision_enable"), 0,
+                    "content_prompt_annotation");
+
+                const modes = ["reference", "semantic", "visual", "style", "context",
+                    "native", "none", "guided"];
+                const controls = ["latent_vision_mode", "latent_vision_enable",
+                    "latent_vision_resize", "latent_vision_max_edge",
+                    "latent_vision_guidance_seed", "latent_vision_guidance_seed_mode",
+                    "content", "batch_size"];
+                const valid = (name, value) => {
+                    if (name === "latent_vision_mode") return modes.includes(value);
+                    if (name === "latent_vision_enable" || name === "latent_vision_resize") {
+                        return typeof value === "boolean";
+                    }
+                    if (name === "latent_vision_max_edge") return Number.isInteger(value) && value >= 384 && value <= 2048;
+                    if (name === "latent_vision_guidance_seed") return Number.isInteger(value) && value >= 0;
+                    if (name === "latent_vision_guidance_seed_mode") return ["fixed", "random", "increment", "decrement"].includes(value);
+                    if (name === "content") return ["empty", "from_image"].includes(value);
+                    if (name === "batch_size") return Number.isInteger(value) && value >= 1 && value <= 64;
+                    return true;
+                };
+                const layouts = [current, withoutAnnotation, legacy, original, contentAnnotation];
+                let selected = current;
+                let best = -Infinity;
+                for (const names of layouts) {
+                    if (names.length !== values.length) continue;
+                    const score = controls.reduce((sum, name) => {
+                        const index = names.indexOf(name);
+                        return sum + (index < 0 ? 0 : valid(name, values[index]) ? 2 : -3);
+                    }, 0);
+                    if (score > best) { best = score; selected = names; }
+                }
+                if (selected === current) return;
+                return current.map((name, i) => {
+                    const sourceName = name === "latent_vision_annotation"
+                        ? selected.includes("latent_vision_reference_annotation")
+                            ? "latent_vision_reference_annotation"
+                            : "content_prompt_annotation"
+                        : name;
+                    const source = selected.indexOf(sourceName);
+                    return source >= 0 ? values[source] : widgets[i].value;
+                });
+            };
+
             const setDisabled = (name, disabled) => {
                 const widget = node.widgets?.find((w) => w.name === name);
                 if (widget) widget.disabled = disabled;
@@ -612,6 +673,8 @@ app.registerExtension({
 
             const originalConfigure = node.onConfigure;
             node.onConfigure = function (...args) {
+                const remapped = restoreLatentWidgets(args[0]);
+                if (remapped) args[0] = { ...args[0], widgets_values: remapped };
                 const result = originalConfigure?.apply(this, args);
                 updateDimensionsState();
                 updateContentState();
