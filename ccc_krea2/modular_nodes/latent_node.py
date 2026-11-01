@@ -219,10 +219,10 @@ class CcCKrea2Latent:
                 "geometry_policy": (GEOMETRY_POLICIES, {"default": "preserve_aspect_krea_bounds"}),
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
-                "content_prompt_annotation": ("STRING", {"multiline": True, "default": "", "tooltip": "Target content image role; included in Edit prompt independently of Vision."}),
                 "latent_vision_enable": ("BOOLEAN", {"default": False}),
                 "latent_vision_resize": ("BOOLEAN", {"default": True}),
                 "latent_vision_max_edge": ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64}),
+                "latent_vision_annotation": ("STRING", {"multiline": True, "default": "", "tooltip": "Optional annotation for the target image in Qwen Vision conditioning."}),
                 **{
                     "latent_vision_" + name: spec
                     for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
@@ -248,7 +248,6 @@ class CcCKrea2Latent:
         geometry_policy="preserve_aspect_krea_bounds",
         content="empty",
         content_fit="crop",
-        content_prompt_annotation="",
         latent_vision_enable=False,
         latent_vision_resize=True,
         latent_vision_max_edge=768,
@@ -259,6 +258,7 @@ class CcCKrea2Latent:
         latent_vision_guidance_seed=0,
         latent_vision_guidance_detail="balanced",
         latent_vision_vision_guidance="balanced",
+        latent_vision_annotation="",
         latent_vision_reference_annotation="",
         latent_vision_vision_fidelity=0.25,
         batch_size=1,
@@ -308,10 +308,6 @@ class CcCKrea2Latent:
             batch_size=int(batch_size),
         )
 
-        latent["ccc_krea2_content_prompt_annotation"] = str(
-            content_prompt_annotation or latent_vision_reference_annotation or ""
-        ).strip() if content == "from_image" else ""
-
         latent["ccc_krea2_latent_semantic"] = {
             "enabled": bool(latent_vision_enable),
             "image": content_image if latent_vision_enable else None,
@@ -324,7 +320,7 @@ class CcCKrea2Latent:
             "guidance_seed": int(latent_vision_guidance_seed),
             "guidance_detail": latent_vision_guidance_detail,
             "vision_guidance": latent_vision_vision_guidance,
-            "reference_annotation": "",
+            "reference_annotation": str(latent_vision_annotation or latent_vision_reference_annotation or "").strip(),
             "vision_fidelity": float(latent_vision_vision_fidelity),
         }
 
@@ -337,7 +333,6 @@ class CcCKrea2Latent:
             f"Geometry Policy: {geometry_policy if dimensions != 'preset' else '<preset>'}",
             f"Content: {content}",
             f"Content Fit: {content_fit if content == 'from_image' else '<unused>'}",
-            f"Content Annotation: {latent['ccc_krea2_content_prompt_annotation'] or '<none>'}",
             f"Resize Method: {'bicubic' if content == 'from_image' else '<unused>'}",
             f"Content Placement: {placement}",
             f"Batch Size: {int(batch_size)}",
@@ -350,6 +345,7 @@ class CcCKrea2Latent:
         if latent_vision_enable:
             lines.extend([
                 f"Latent Vision Mode: {latent_vision_mode}",
+                f"Latent Vision Annotation: {latent_vision_annotation or latent_vision_reference_annotation or '<none>'}",
                 f"Latent Vision Resize: {latent_vision_resize}",
                 f"Latent Vision Max Edge: {latent_vision_max_edge}",
             ])
