@@ -209,3 +209,63 @@ def test_edit_mixed_semantic_and_visual_keeps_only_visual_qwen_image(monkeypatch
                side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image)):
         chain = _combine_reference_chains(None, prepared, latent)
     assert sum(bool(s.include_in_vision) for s in chain.references) == 1
+
+
+def test_vae_rope_annotations_are_in_positive_prompt_with_vision_disabled():
+    from ccc_krea2.identity_contract import build_grounded_positive_user_content
+    from ccc_krea2.constants import VISION_PAD_TOKEN
+
+    scene = torch.rand(1, 64, 64, 3)
+    subject = torch.rand(1, 64, 64, 3)
+    node = CcCKrea2Reference()
+    refs, _ = node.process(
+        scene, vae_rope_enable=True, vision_enable=False,
+        vae_rope_prompt_annotation="This is the scene image.",
+    )
+    refs, _ = node.process(
+        subject, previous_references=refs,
+        vae_rope_enable=True, vision_enable=False,
+        vae_rope_prompt_annotation="This is the subject image.",
+    )
+    with patch(
+        "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+        side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
+    ):
+        chain = _combine_reference_chains(
+            None, refs, {"samples": torch.empty(1, 4, 8, 8)}
+        )
+    resolved, _ = resolve_reference_slots_and_aliases(chain)
+    positive = build_grounded_positive_user_content(resolved, "Change the outfit.")
+    assert "VAE/RoPE Image 1: This is the scene image." in positive
+    assert "VAE/RoPE Image 2: This is the subject image." in positive
+    assert positive.endswith("Change the outfit.")
+    assert positive.count(VISION_PAD_TOKEN) == 0
+
+
+def test_vae_rope_only_annotation_does_not_renumber_qwen_images():
+    from ccc_krea2.identity_contract import build_grounded_positive_user_content
+    from ccc_krea2.constants import VISION_PAD_TOKEN
+
+    image = torch.rand(1, 64, 64, 3)
+    node = CcCKrea2Reference()
+    refs, _ = node.process(
+        image, vae_rope_enable=True, vision_enable=False,
+        vae_rope_prompt_annotation="This is the subject image.",
+    )
+    refs, _ = node.process(
+        image, previous_references=refs, vae_rope_enable=True,
+        vision_enable=True, vision_mode="visual",
+        vae_rope_prompt_annotation="This is the scene image.",
+    )
+    with patch(
+        "ccc_krea2.modular_nodes.edit_node._prepare_qwen_image",
+        side_effect=lambda image, **kwargs: prepare_tokenizer_native_image(image),
+    ):
+        chain = _combine_reference_chains(
+            None, refs, {"samples": torch.empty(1, 4, 8, 8)}
+        )
+    resolved, _ = resolve_reference_slots_and_aliases(chain)
+    positive = build_grounded_positive_user_content(resolved, "Edit.")
+    assert "VAE/RoPE Image 1: This is the subject image." in positive
+    assert "Image 1: This is the scene image." in positive
+    assert positive.count(VISION_PAD_TOKEN) == 1
