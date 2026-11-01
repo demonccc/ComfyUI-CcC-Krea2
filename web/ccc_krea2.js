@@ -235,7 +235,6 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2Mask") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
-                if (find("source")?.value === "sam") find("source").value = "sam3";
                 const usingMask = find("source")?.value === "mask";
                 setWidgetDisabled(node, "prompt", usingMask);
                 setWidgetDisabled(node, "confidence", usingMask);
