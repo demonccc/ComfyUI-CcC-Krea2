@@ -293,10 +293,11 @@ class CcCKrea2Latent:
             latent_vision_enable = False
             latent_vision_mode = "reference"
 
-        if latent_vision_enable and (content != "from_image" or content_image is None):
-            raise ValueError(
-                "[Krea2 CcC Edit] latent_vision_enable requires content='from_image' and content_image."
-            )
+        # Vision is only meaningful for actual target image content.
+        # Disabled controls in ComfyUI may retain true in serialized workflows;
+        # treat them as inactive rather than failing the entire latent node.
+        if content != "from_image" or content_image is None:
+            latent_vision_enable = False
 
         latent, placement = _build_target_latent(
             vae=vae,
