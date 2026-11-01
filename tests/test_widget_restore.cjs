@@ -95,6 +95,15 @@ const latentValues = {
   };
   await verify("CcCKrea2Latent", latentNames, oldLatentNames,
     latentValues, latentExpected);
+  // An intermediate schema exposed both guidance controls without annotation.
+  // Its 'balanced' value used to land in the FLOAT fidelity input.
+  const twoGuidance = latentNames.filter(name => name !== "latent_vision_annotation");
+  twoGuidance.splice(twoGuidance.indexOf("latent_vision_vision_fidelity"), 0,
+    "latent_vision_guidance_detail", "latent_vision_vision_guidance");
+  await verify("CcCKrea2Latent", latentNames, twoGuidance, latentValues, {
+    latent_vision_annotation: "", latent_vision_mode: "context",
+    latent_vision_vision_fidelity: 0.25, batch_size: 1,
+  });
   await verify("CcCKrea2Latent", latentNames, latentNames,
     latentValues, latentExpected);
   console.log("Reference and Latent widget migration: PASS");
