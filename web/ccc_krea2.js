@@ -519,6 +519,11 @@ app.registerExtension({
             };
 
             const updateVisionState = () => {
+                // Empty target latents have no source image for Vision analysis.
+                // Clear the switch, rather than just greying it out while true.
+                if (contentWidget?.value !== "from_image" && visionEnableWidget) {
+                    visionEnableWidget.value = false;
+                }
                 const modeWidget = node.widgets?.find(w => w.name === "latent_vision_mode");
                 if (modeWidget) {
                     const modes = ["reference", "semantic", "visual", "style", "context"];
