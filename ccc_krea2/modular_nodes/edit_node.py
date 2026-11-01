@@ -455,12 +455,6 @@ class CcCKrea2Edit:
         prepared_refs, prepared_latent, positive_prompt, extracted_guidance = _prepare_edit_vision_text(
             clip, references, latent, positive_prompt
         )
-        # The target image role is independent of whether Latent Vision is enabled.
-        content_annotation = str(latent.get("ccc_krea2_content_prompt_annotation") or "").strip()
-        if content_annotation:
-            positive_prompt = (
-                "Target image: " + content_annotation + "\n" + positive_prompt
-            )
         runtime_latent = _runtime_latent(prepared_latent)
 
         chain = _combine_reference_chains(
