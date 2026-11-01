@@ -53,9 +53,7 @@ class CcCKrea2Reference:
 
     @classmethod
     def VALIDATE_INPUTS(cls, vision_mode="reference", **kwargs):
-        # Saved workflows may restore an empty legacy combo before UI migration.
-        # Treat an empty mode as the default; non-empty unsupported presets stay invalid.
-        return CcCKrea2VisionReference.VALIDATE_INPUTS(mode=vision_mode or "reference")
+        return CcCKrea2VisionReference.VALIDATE_INPUTS(mode=vision_mode)
 
     @classmethod
     def IS_CHANGED(cls, vision_enable=True, vision_guidance_seed_mode="fixed",
@@ -128,8 +126,6 @@ class CcCKrea2Reference:
                     replace(chain.entries[-1], attention_weight_map=attention_weight_map),
                 ))
         if vision_enable:
-            if not kwargs.get("vision_mode"):
-                kwargs["vision_mode"] = "reference"
             vision_kwargs = {
                 name: kwargs["vision_" + name]
                 for name in CcCKrea2VisionReference.INPUT_TYPES()["required"]
