@@ -52,6 +52,10 @@ class CcCKrea2Reference:
         return {"required": required, "optional": optional}
 
     @classmethod
+    def VALIDATE_INPUTS(cls, vision_mode="reference", **kwargs):
+        return CcCKrea2VisionReference.VALIDATE_INPUTS(mode=vision_mode)
+
+    @classmethod
     def IS_CHANGED(cls, vision_enable=True, vision_guidance_seed_mode="fixed",
                    vision_guidance_seed=0, vision_guidance_detail="balanced",
                    vision_vision_guidance="balanced", **kwargs):
