@@ -498,7 +498,7 @@ app.registerExtension({
             const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
             const contentWidget = node.widgets?.find((w) => w.name === "content");
             const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
-            const semanticWidget = node.widgets?.find((w) => w.name === "latent_semantic");
+            const visionEnableWidget = node.widgets?.find((w) => w.name === "latent_vision_enable");
 
             const setDisabled = (name, disabled) => {
                 const widget = node.widgets?.find((w) => w.name === name);
@@ -518,9 +518,21 @@ app.registerExtension({
                 setDisabled("content_fit", !fromImage);
             };
 
-            const updateSemanticState = () => {
-                const enabled = semanticWidget?.value === true && contentWidget?.value === "from_image";
-                setWidgetDisabled(node, "latent_semantic", contentWidget?.value !== "from_image");
+            const updateVisionState = () => {
+                const modeWidget = node.widgets?.find(w => w.name === "latent_vision_mode");
+                if (modeWidget) {
+                    const modes = ["reference", "semantic", "visual", "style", "context"];
+                    if (modeWidget.options) modeWidget.options.values = modes;
+                    if (["native", "none", "guided"].includes(modeWidget.value)) {
+                        modeWidget.value = "reference";
+                    } else if (!modes.includes(modeWidget.value)) {
+                        // Saved workflows can restore an obsolete numeric combo index.
+                        // Do not silently infer a semantic mode from that index.
+                        modeWidget.value = "reference";
+                    }
+                }
+                const enabled = visionEnableWidget?.value === true && contentWidget?.value === "from_image";
+                setWidgetDisabled(node, "latent_vision_enable", contentWidget?.value !== "from_image");
                 for (const widget of node.widgets ?? []) {
                     if (widget.name.startsWith("latent_vision_")) {
                         setWidgetDisabled(node, widget.name, !enabled);
@@ -528,7 +540,7 @@ app.registerExtension({
                 }
                 setWidgetDisabled(node, "latent_vision_max_edge", !enabled ||
                     node.widgets?.find(w => w.name === "latent_vision_resize")?.value !== true);
-                const mode = node.widgets?.find(w => w.name === "latent_vision_mode")?.value ?? "semantic";
+                const mode = node.widgets?.find(w => w.name === "latent_vision_mode")?.value ?? "reference";
                 setWidgetDisabled(node, "latent_vision_style_processing", !enabled || mode !== "style");
                 const seedMode = node.widgets?.find(w => w.name === "latent_vision_guidance_seed_mode")?.value ?? "fixed";
                 setWidgetDisabled(node, "latent_vision_guidance_seed", !enabled || seedMode !== "fixed");
@@ -537,11 +549,11 @@ app.registerExtension({
 
             for (const [widget, callback] of [
                 [dimensionsWidget, updateDimensionsState],
-                [contentWidget, () => { updateContentState(); updateSemanticState(); }],
+                [contentWidget, () => { updateContentState(); updateVisionState(); }],
                 [contentFitWidget, updateContentState],
-                [semanticWidget, updateSemanticState],
+                [visionEnableWidget, updateVisionState],
                 ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
-                    .map(name => [node.widgets?.find(w => w.name === name), updateSemanticState]),
+                    .map(name => [node.widgets?.find(w => w.name === name), updateVisionState]),
             ]) {
                 if (!widget) continue;
                 const originalCallback = widget.callback;
@@ -556,14 +568,14 @@ app.registerExtension({
                 const result = originalConfigure?.apply(this, args);
                 updateDimensionsState();
                 updateContentState();
-                updateSemanticState();
+                updateVisionState();
                 return result;
             };
 
             setTimeout(() => {
                 updateDimensionsState();
                 updateContentState();
-                updateSemanticState();
+                updateVisionState();
             }, 20);
         }
 
