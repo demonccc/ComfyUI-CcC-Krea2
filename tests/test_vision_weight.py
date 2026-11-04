@@ -59,8 +59,8 @@ def test_out_of_range_weight_is_rejected(weight):
 def test_reference_widget_schema_places_weight_after_existing_controls():
     required = CcCKrea2Reference.INPUT_TYPES()["required"]
     assert required["vision_weight"][1]["default"] == 1.0
-    assert required["vision_vision_weight"][1]["min"] == 0.0
-    assert required["vision_vision_weight"][1]["max"] == 2.0
+    assert required["vision_weight"][1]["min"] == 0.0
+    assert required["vision_weight"][1]["max"] == 2.0
     assert list(required)[-1] == "vision_weight"
 
 
