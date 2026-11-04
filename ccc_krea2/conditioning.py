@@ -283,6 +283,53 @@ def extract_vision_spans_from_tokens(
     return adjusted_spans, warnings, stream_key, template_end
 
 
+def apply_vision_weights_to_conditioning(
+    conditioning: List[Any],
+    physical_image_map: List[Dict[str, Any]],
+    vision_row_spans: List[Tuple[int, int]],
+    removed_row_indices: List[int] = None,
+) -> List[Any]:
+    """Scale only image-token rows, never prompt text or reference annotations.
+
+    Operate after any Style/Semantic span transform so 0.0 always leaves that
+    image's surviving Qwen rows zero. Keep negative and positive branches
+    consistent; a neutral weight is an exact no-op.
+    """
+    if len(physical_image_map) != len(vision_row_spans):
+        raise ValueError("[Krea2 CcC] Vision weight requires aligned image spans.")
+    operations = []
+    for (start, end), item in zip(vision_row_spans, physical_image_map):
+        weight = float(getattr(item.get("spec"), "vision_weight", 1.0))
+        if not 0.0 <= weight <= 2.0:
+            raise ValueError("[Krea2 CcC] vision_weight must be in [0, 2].")
+        if weight != 1.0:
+            operations.append((start, end, weight))
+    if not operations or not conditioning:
+        return conditioning
+
+    removed = sorted(removed_row_indices or [])
+    removed_set = set(removed)
+    result = []
+    for cond_entry in conditioning:
+        if not isinstance(cond_entry, (list, tuple)) or not isinstance(cond_entry[0], torch.Tensor):
+            result.append(cond_entry)
+            continue
+        tensor = cond_entry[0].clone()
+        for start, end, weight in operations:
+            # Style/semantic operations can remove rows; map source indices to
+            # the surviving sequence rather than assuming unchanged positions.
+            indices = [
+                i - sum(1 for removed_idx in removed if removed_idx < i)
+                for i in range(start, end) if i not in removed_set
+            ]
+            if indices:
+                if max(indices) >= tensor.shape[1]:
+                    raise ValueError("[Krea2 CcC] Vision weight span exceeds conditioning rows.")
+                tensor[:, indices, :] *= weight
+        result.append([tensor, cond_entry[1] if len(cond_entry) > 1 else {}])
+    return result
+
+
 def encode_krea2_qwen_context(
     clip: Any,
     prompt: str,
@@ -443,6 +490,12 @@ def encode_krea2_qwen_context(
                 else:
                     new_conditioning.append(cond_entry)
             conditioning = new_conditioning
+
+    # Qwen Vision Weight belongs only to the image token spans and is applied
+    # after any per-mode Vision transform, never to text or VAE/RoPE latents.
+    conditioning = apply_vision_weights_to_conditioning(
+        conditioning, physical_image_map, vision_row_spans, removed_row_indices
+    )
 
     neg_rows = 0
     if not is_positive and conditioning and isinstance(conditioning, list) and len(conditioning) > 0:
