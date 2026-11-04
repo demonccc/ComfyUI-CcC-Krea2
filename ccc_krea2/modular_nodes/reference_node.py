@@ -130,11 +130,9 @@ class CcCKrea2Reference:
                 ))
         if vision_enable:
             vision_kwargs = {
-                name: kwargs[prefix + name]
+                name: kwargs["vision_" + name]
                 for name in CcCKrea2VisionReference.INPUT_TYPES()["required"]
-                if name != "image"
-                for prefix in (("",) if name == "weight" else ("vision_",))
-                if prefix + name in kwargs
+                if name not in ("image", "weight") and "vision_" + name in kwargs
             }
             if "vision_weight" in kwargs:
                 vision_kwargs["weight"] = kwargs["vision_weight"]
