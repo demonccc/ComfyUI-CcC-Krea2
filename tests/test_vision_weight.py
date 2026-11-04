@@ -1,4 +1,6 @@
 """Per-reference Qwen Vision token weighting without changing text or VAE/RoPE."""
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -74,3 +76,27 @@ def test_public_vision_node_preserves_weight_in_entry():
         img, mode="reference", weight=0.0
     )
     assert chain.entries[0].vision_weight == 0.0
+
+def test_example_workflows_match_reference_widget_schema():
+    fields = list(CcCKrea2Reference.INPUT_TYPES()["required"])
+    widgets = [name for name in fields if name != "image"]
+    examples = Path(__file__).resolve().parents[1] / "workflows"
+    checked = 0
+    for workflow_path in examples.glob("*.json"):
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        for node in workflow.get("nodes", []):
+            if node.get("type") != "CcCKrea2Reference":
+                continue
+            values = node["widgets_values"]
+            assert len(values) == len(widgets), workflow_path.name
+            data = dict(zip(widgets, values))
+            assert isinstance(data["vision_enable"], bool), workflow_path.name
+            assert isinstance(data["vision_weight"], (int, float)), workflow_path.name
+            assert 0.0 <= data["vision_weight"] <= 2.0, workflow_path.name
+            assert data["vision_mode"] in ("reference", "semantic", "visual", "style", "context"), workflow_path.name
+            assert data["vision_style_processing"] in ("full", "2x2", "4x4"), workflow_path.name
+            assert isinstance(data["vision_fidelity"], (int, float)), workflow_path.name
+            assert data["vision_guidance_seed_mode"] in ("fixed", "random", "incremental"), workflow_path.name
+            assert isinstance(data["vision_guidance_seed"], int), workflow_path.name
+            checked += 1
+    assert checked > 0
