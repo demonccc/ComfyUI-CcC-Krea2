@@ -58,15 +58,15 @@ def test_out_of_range_weight_is_rejected(weight):
 
 def test_reference_widget_schema_places_weight_after_existing_controls():
     required = CcCKrea2Reference.INPUT_TYPES()["required"]
-    assert required["vision_vision_weight"][1]["default"] == 1.0
+    assert required["vision_weight"][1]["default"] == 1.0
     assert required["vision_vision_weight"][1]["min"] == 0.0
     assert required["vision_vision_weight"][1]["max"] == 2.0
-    assert list(required)[-1] == "vision_vision_weight"
+    assert list(required)[-1] == "vision_weight"
 
 
 def test_public_vision_node_preserves_weight_in_entry():
     img = torch.ones((1, 16, 16, 3))
     chain, _ = CcCKrea2VisionReference().process(
-        img, mode="reference", vision_weight=0.0
+        img, mode="reference", weight=0.0
     )
     assert chain.entries[0].vision_weight == 0.0
