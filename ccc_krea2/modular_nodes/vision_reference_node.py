@@ -191,7 +191,7 @@ class CcCKrea2VisionReference:
             instruction="" if runtime_mode == "native" else instruction.strip(),
             reference_annotation=reference_annotation.strip(),
             vision_fidelity=float(vision_fidelity),
-            vision_weight=float(vision_weight),
+            vision_weight=float(weight),
             processing=effective_processing,
             guidance_seed_mode=guidance_seed_mode,
             guidance_seed_configured=int(guidance_seed),
