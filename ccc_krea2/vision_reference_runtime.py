@@ -70,6 +70,7 @@ def build_vision_reference_spec(entry: VisionReferenceEntry):
             alias=entry.reference_annotation,
             appearance_reference=False,
             include_in_vision=True,
+            vision_weight=entry.vision_weight,
             vision_reference_mode="native",
             vision_summary_rows=0,
             vision_indirect=False,
