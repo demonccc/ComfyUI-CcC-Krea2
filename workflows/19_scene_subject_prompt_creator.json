@@ -317,17 +317,17 @@
         "spatial",
         "overlay",
         "latent",
-        "global",
+        "This is the scene image.",
         true,
+        1,
         true,
         768,
         "semantic",
         "",
         "full",
+        0.25,
         "fixed",
-        0,
-        "This is the scene image.",
-        0.25
+        0
       ],
       "title": "Scene Reference"
     },
@@ -384,17 +384,17 @@
         "spatial",
         "overlay",
         "latent",
-        "global",
+        "This is the subject image.",
         true,
+        1,
         true,
         768,
         "semantic",
         "",
         "full",
+        0.25,
         "fixed",
-        0,
-        "This is the subject image.",
-        0.25
+        0
       ],
       "title": "Subject Reference"
     },
