@@ -36,14 +36,17 @@ class CcCKrea2Reference:
         vision = CcCKrea2VisionReference.INPUT_TYPES()
         required = {"image": ("IMAGE",), "vae_rope_enable": ("BOOLEAN", {"default": True})}
         for name, spec in visual["required"].items():
-            if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px"):
+            if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px", "attention_scope"):
                 required["vae_rope_" + name] = spec
         required["vision_enable"] = ("BOOLEAN", {"default": True})
+        required["vision_weight"] = vision["required"]["weight"]
         required["vision_resize"] = ("BOOLEAN", {"default": True})
         required["vision_max_edge"] = ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64})
         for name, spec in vision["required"].items():
-            if name != "image" and name not in ("guidance_detail", "vision_guidance", "reference_annotation"):
+            if name not in ("image", "guidance_detail", "vision_guidance", "reference_annotation", "weight", "vision_fidelity"):
                 required["vision_" + name] = spec
+                if name == "style_processing":
+                    required["vision_fidelity"] = vision["required"]["vision_fidelity"]
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
             "mask_attention": ("KREA2_MASK_CHAIN",),
@@ -110,7 +113,7 @@ class CcCKrea2Reference:
             visual_kwargs = {
                 name: kwargs["vae_rope_" + name]
                 for name in CcCKrea2VisualReference.INPUT_TYPES()["required"]
-                if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px")
+                if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px", "attention_scope")
                 and "vae_rope_" + name in kwargs
             }
             visual_kwargs["prompt_annotation"] = annotation
@@ -127,10 +130,14 @@ class CcCKrea2Reference:
                 ))
         if vision_enable:
             vision_kwargs = {
-                name: kwargs["vision_" + name]
+                name: kwargs[prefix + name]
                 for name in CcCKrea2VisionReference.INPUT_TYPES()["required"]
-                if name != "image" and "vision_" + name in kwargs
+                if name != "image"
+                for prefix in (("",) if name == "weight" else ("vision_",))
+                if prefix + name in kwargs
             }
+            if "vision_weight" in kwargs:
+                vision_kwargs["weight"] = kwargs["vision_weight"]
             vision_image = image
             resize = bool(kwargs.get("vision_resize", True))
             max_edge = int(kwargs.get("vision_max_edge", 768))
