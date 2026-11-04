@@ -44,6 +44,8 @@ class CcCKrea2Reference:
         for name, spec in vision["required"].items():
             if name != "image" and name not in ("guidance_detail", "vision_guidance", "reference_annotation"):
                 required["vision_" + name] = spec
+        # Append new widget after all established fields to preserve workflow positions.
+        # vision_weight comes from CcCKrea2VisionReference.INPUT_TYPES above.
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
             "mask_attention": ("KREA2_MASK_CHAIN",),
