@@ -103,7 +103,7 @@ class CcCKrea2VisionReference:
                 ),
                 "reference_annotation": ("STRING", {"multiline": True, "default": ""}),
                 "vision_fidelity": ("FLOAT", {"default": 0.25, "min": 0.0, "max": 1.0, "step": 0.05}),
-                "vision_weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Multiply only this reference image\u0027s Qwen vision tokens: 0 disables their embeddings, 1 preserves, 2 doubles."}),
+                "weight": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Multiply only this reference image\u0027s Qwen vision tokens: 0 disables their embeddings, 1 preserves, 2 doubles."}),
             },
             "optional": {
                 "previous_references": ("KREA2_REFERENCE_CHAIN",),
@@ -174,7 +174,7 @@ class CcCKrea2VisionReference:
         previous_references: Optional[VisionReferenceChain] = None,
         reference_annotation: str = "",
         vision_fidelity: float = 0.25,
-        vision_weight: float = 1.0,
+        weight: float = 1.0,
     ) -> Tuple[VisionReferenceChain, str]:
         chain = previous_references if previous_references is not None else VisionReferenceChain()
         runtime_mode = VISION_RUNTIME_MODES.get(mode, mode)
@@ -183,7 +183,7 @@ class CcCKrea2VisionReference:
             guidance_seed_mode,
             guidance_seed,
         )
-        if not 0.0 <= float(vision_weight) <= 2.0:
+        if not 0.0 <= float(weight) <= 2.0:
             raise ValueError("[Krea2 CcC Vision Reference] vision_weight must be in [0, 2].")
         entry = VisionReferenceEntry(
             image=image,
