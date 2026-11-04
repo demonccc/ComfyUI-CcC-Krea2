@@ -164,7 +164,7 @@ The node uses one editable `instructions` field and seven selector choices: six 
 
 Each pair uses one shared template with a `{kind}` placeholder for `text-to-image` or `image-to-image`. Every mode appends the common Krea2 guidelines; the effective full prompt sent to Qwen is available in `creator_info`. The old visible `system_prompt` widget and preset graying behavior have been removed.
 
-thinking uses the Qwen3-VL thinking convention and pre-fills the assistant turn with <think> when enabled. The reasoning before </think> is returned separately on the thinking output, while only the final edit text remains in created_prompt. An unfinished thinking block raises an error instead of producing an empty/invalid final prompt.
+`thinking=true` uses the Qwen3-VL thinking convention and pre-fills the assistant turn with `<think>`. Text before `</think>` is returned separately on `thinking`; only the text after the closing delimiter becomes `created_prompt`. If the delimiter is missing, or thinking closes without a final answer, **`created_prompt` is an empty string**, any partial reasoning is preserved in `thinking`, and `creator_info` begins with `ERROR:` explaining the failure. There is **no retry with thinking disabled**, no silent fallback, and no automatic repair. With the explicit thinking prefill, text generated without a `</think>` terminator is treated as unfinished reasoning, not as a valid final prompt. Downstream consumers must not treat an empty prompt as success.
 
 All preset modes enforce final edit text with no system/meta preamble. Downstream visible references are named Image 1, Image 2, etc.; accidental "Krea Image N" wording is normalized to "Image N".
 
@@ -307,4 +307,4 @@ Mask node in `external_mask` mode. Outpaint workflow
 `15_paint_outpaint` intentionally uses no external segmentation:
 Paint Prepare generates the expansion mask based on canvas geometry.
 
-When Prompt Creator thinking fills the output budget without producing a final prompt, it attempts one generation with thinking disabled, preserving the original reasoning output. If this retry also yields no final prompt, the error is retained rather than passing unfinished reasoning as an edit prompt.
+Prompt Creator `max_tokens` (32–32768) is forwarded unchanged as `max_length` to ComfyUI `CLIP.generate`. In the native ComfyUI Qwen3-VL backend, `max_length` limits **newly generated tokens** (generation loop `range(max_length)`), not the combined prompt-plus-output length. Thinking and the final answer share this budget. If generation ends before a complete `</think>` and final prompt, the Creator returns empty `created_prompt`, preserves any partial `thinking`, and puts `ERROR:` at the start of `creator_info`. Increasing `max_tokens` may help when the thinking budget was exhausted, but does not fix incorrect template/model behavior. No automatic non-thinking retry is performed.
