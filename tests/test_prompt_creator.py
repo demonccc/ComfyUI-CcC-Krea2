@@ -220,13 +220,13 @@ def test_preset_is_sent_as_qwen_system_prompt_not_embedded_in_user_text():
 
 
 def test_thinking_enabled_passes_explicit_think_prefill_to_qwen():
-    clip = _FakeClip("The woman from Image 2 is standing beside a window.")
+    clip = _FakeClip("I have analyzed the scene.</think>The woman from Image 2 is standing beside a window.")
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, references=_chain(), mode="create_from_image_i2i",
         instructions="Describe a new scene.", thinking=True,
     )
     assert created == "The woman from Image 2 is standing beside a window."
-    assert reasoning == ""
+    assert reasoning == "I have analyzed the scene."
     assert clip.tokenize_kwargs["thinking"] is True
     assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
 
