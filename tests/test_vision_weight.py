@@ -56,12 +56,16 @@ def test_out_of_range_weight_is_rejected(weight):
         )
 
 
-def test_reference_widget_schema_places_weight_after_existing_controls():
+def test_reference_widget_schema_places_weight_below_enable_and_fidelity_below_style():
     required = CcCKrea2Reference.INPUT_TYPES()["required"]
     assert required["vision_weight"][1]["default"] == 1.0
     assert required["vision_weight"][1]["min"] == 0.0
     assert required["vision_weight"][1]["max"] == 2.0
-    assert list(required)[-1] == "vision_weight"
+    keys = list(required)
+    assert keys.index("vision_weight") == keys.index("vision_enable") + 1
+    assert keys.index("vision_fidelity") == keys.index("vision_style_processing") + 1
+    assert "vision_vision_fidelity" not in required
+    assert "vae_rope_attention_scope" not in required
 
 
 def test_public_vision_node_preserves_weight_in_entry():
