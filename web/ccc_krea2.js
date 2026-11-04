@@ -281,21 +281,12 @@ app.registerExtension({
                 const fit = find("vae_rope_reference_fit")?.value ?? "native";
                 setWidgetDisabled(node, "vae_rope_placement_grid", !visual || fit === "crop");
                 setWidgetDisabled(node, "vae_rope_rope_geometry", !visual || fit === "native");
-                if (visual && fit === "crop" && find("vae_rope_placement_grid")) {
-                    find("vae_rope_placement_grid").value = "inside";
-                }
-                if (visual && fit === "native" && find("vae_rope_rope_geometry")) {
-                    find("vae_rope_rope_geometry").value = "source";
-                }
                 setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
                 const visionMode = find("vision_mode")?.value ?? "reference";
                 setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
                 setWidgetDisabled(node, "vision_instruction", !vision);
                 setWidgetDisabled(node, "vae_rope_prompt_annotation", !visual);
-                setWidgetDisabled(node, "vision_vision_fidelity", !vision || !["semantic", "style"].includes(visionMode));
-                if (vision && visionMode !== "style" && find("vision_style_processing")) {
-                    find("vision_style_processing").value = "full";
-                }
+                setWidgetDisabled(node, "vision_fidelity", !vision || !["semantic", "style"].includes(visionMode));
                 setWidgetDisabled(node, "vision_guidance_seed",
                     !vision || (find("vision_guidance_seed_mode")?.value ?? "fixed") !== "fixed");
                 node.setDirtyCanvas?.(true, true);
@@ -306,12 +297,6 @@ app.registerExtension({
                 if (!widget) continue;
                 const original = widget.callback;
                 widget.callback = function (...args) {
-                    if (name === "vision_mode") {
-                        const mode = find("vision_mode")?.value;
-                        const fidelity = find("vision_vision_fidelity");
-                        if (fidelity && mode === "style") fidelity.value = 0.0;
-                        else if (fidelity && mode === "semantic") fidelity.value = 0.25;
-                    }
                     const result = original?.apply(this, args);
                     refresh();
                     return result;
