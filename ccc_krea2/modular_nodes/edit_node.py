@@ -226,6 +226,7 @@ def _combine_reference_chains(
                 visual_resize_method="bicubic",
                 rope_position=entry.rope_position,
                 vision_reference_mode=vision_spec.vision_reference_mode if vision_spec else "",
+                vision_weight=vision_spec.vision_weight if vision_spec else 1.0,
                 vision_summary_rows=vision_spec.vision_summary_rows if vision_spec else 0,
                 vision_indirect=vision_spec.vision_indirect if vision_spec else False,
                 semantic_extract=vision_spec.semantic_extract if vision_spec else "none",
