@@ -163,11 +163,15 @@ def test_image_preset_receives_reference_mapping_without_automatic_roles():
 
 def test_thinking_truncation_reports_generated_reasoning_without_retry():
     clip = _FakeClip("<think>I am still reasoning when max tokens end.")
-    with pytest.raises(RuntimeError, match="Decoded reasoning length:"):
-        CcCKrea2EditPromptCreator().create(
-            clip=clip, references=_chain(), mode="enhance_t2i",
-            instructions="Improve this edit.", thinking=True,
-        )
+    created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
+        clip=clip, references=_chain(), mode="enhance_t2i",
+        instructions="Improve this edit.", thinking=True,
+    )
+    assert created == ""
+    assert reasoning == "I am still reasoning when max tokens end."
+    assert info.startswith("ERROR: Qwen thinking did not finish")
+    assert "missing </think>" in info
+    assert "Thinking Retry Without Thinking: disabled (no fallback)" in info
 
 
 def test_high_token_budget_is_passed_unmodified_to_qwen():
@@ -226,27 +230,44 @@ def test_thinking_enabled_passes_explicit_think_prefill_to_qwen():
     assert clip.tokenize_kwargs["thinking"] is True
     assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
 
-def test_thinking_without_final_retries_with_thinking_disabled():
-    class RetryClip(_FakeClip):
+def test_thinking_without_final_does_not_retry():
+    class TrackingClip(_FakeClip):
         def __init__(self):
-            super().__init__()
+            super().__init__("<think>The image contains an outfit, but I have not finished.")
             self.calls = []
 
         def tokenize(self, prompt, **kwargs):
             self.calls.append(kwargs.get("thinking"))
             return super().tokenize(prompt, **kwargs)
 
-        def decode(self, generated_ids):
-            if self.calls[-1]:
-                return "<think>The image contains an outfit, but I have not finished."
-            return "The woman wears a blue dress with gold buttons."
-
-    clip = RetryClip()
+    clip = TrackingClip()
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
         thinking=True,
     )
-    assert created == "The woman wears a blue dress with gold buttons."
-    assert clip.calls == [True, False]
-    assert "Thinking Retry Without Thinking: True" in info
+    assert created == ""
+    assert clip.calls == [True]
+    assert info.startswith("ERROR:")
     assert "The image contains an outfit" in reasoning
+
+
+def test_thinking_closed_without_final_prompt_returns_error_and_reasoning():
+    clip = _FakeClip("<think>Reasoning is complete.</think>")
+    created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
+        clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
+        thinking=True,
+    )
+    assert created == ""
+    assert info.startswith("ERROR: Qwen thinking finished but returned no final prompt")
+    assert reasoning == "Reasoning is complete."
+
+
+def test_thinking_enabled_without_delimiters_does_not_accept_prompt():
+    clip = _FakeClip("The woman wears a blue dress.")
+    created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
+        clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
+        thinking=True,
+    )
+    assert created == ""
+    assert info.startswith("ERROR: Qwen thinking did not finish")
+    assert reasoning == "The woman wears a blue dress."
