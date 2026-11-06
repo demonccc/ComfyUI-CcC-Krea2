@@ -377,9 +377,10 @@ class CcCKrea2EditPromptCreator:
         if thinking and not str(clip.decode(generated_ids)).strip().count("</think>"):
             error = (
                 "Qwen thinking did not finish: missing </think> delimiter. "
-                "The generation may have reached max_tokens before the final "
-                "answer; increase max_tokens or inspect the Qwen model/template. "
-                "The partial reasoning is returned on the thinking output."
+                "The model did not close its reasoning block. This can indicate "
+                "a checkpoint/chat-template mismatch or a generation truncated by "
+                "max_tokens. At 32768 tokens, do not assume increasing the budget "
+                "will fix the issue. Partial output is available on thinking."
             )
         elif thinking and not raw_created_prompt.strip():
             error = (
