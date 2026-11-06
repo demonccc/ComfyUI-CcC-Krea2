@@ -53,34 +53,20 @@ def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[s
     return "\n\n".join(parts)
 
 
-def _thinking_llama_template(image_count: int) -> str:
-    vision_block = "<|vision_start|><|image_pad|><|vision_end|>"
-    images = vision_block * max(0, int(image_count))
-    return (
-        "<|im_start|>user\n"
-        f"{images}{{}}"
-        "<|im_end|>\n"
-        "<|im_start|>assistant\n"
-        "<think>"
-    )
-
-
 def _split_generated_text(
     clip: Any,
     generated_ids: Any,
     raw_prompt: str,
-    thinking_prefilled: bool = False,
-    thinking_enabled: bool = False,
 ) -> Tuple[str, str]:
     generated_text = str(clip.decode(generated_ids)).strip()
     reasoning, separator, text = generated_text.partition("</think>")
 
     has_reasoning_prefix = reasoning.lstrip().startswith("<think>")
-    if separator and (thinking_enabled or thinking_prefilled or has_reasoning_prefix or raw_prompt.rstrip().endswith("<think>")):
+    if separator and (has_reasoning_prefix or raw_prompt.rstrip().endswith("<think>")):
         cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
         return text.strip(), cleaned_reasoning
 
-    if not separator and (thinking_prefilled or has_reasoning_prefix):
+    if not separator and has_reasoning_prefix:
         cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
         return "", cleaned_reasoning
 
