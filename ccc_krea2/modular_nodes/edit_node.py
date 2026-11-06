@@ -1,6 +1,7 @@
 """Krea2 CcC Edit node."""
 
 from typing import Any, Optional
+from dataclasses import replace
 
 import torch
 
@@ -16,8 +17,9 @@ from ..reference_specs import (
     StyleReferenceSpec,
     VisionPrepSpec,
 )
-from .edit_reference_types import EditReferenceChain, VisualReferenceEntry, VisionReferenceEntry
+from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 from ..vision_reference_runtime import build_vision_reference_spec
+from ..t2i import _generate_t2i_vision_guidance, _public_vision_mode
 from .rope_position import install_krea2_rope_positioning
 from .rope_preview import render_rope_preview
 
@@ -155,15 +157,38 @@ def _combine_reference_chains(
 ) -> ReferenceChain:
     """Translate the split public nodes into the common orchestrator ReferenceChain."""
     chain = ReferenceChain()
+    pending_styles = []
 
-    for index, entry in enumerate((references or EditReferenceChain()).entries, start=1):
+    entries = (references or EditReferenceChain()).entries
+    for index, entry in enumerate(entries, start=1):
+        if isinstance(entry, ImageReferenceEntry):
+            continue  # Raw image is intentionally not an Edit conditioning source.
         if isinstance(entry, VisionReferenceEntry):
-            chain = chain.append(build_vision_reference_spec(entry))
+            if entry.paired_visual:
+                if index < 2 or not isinstance(entries[index - 2], VisualReferenceEntry):
+                    raise ValueError("[Krea2 CcC Edit] Paired Vision must immediately follow its Visual source.")
+                if entry.mode == "style_indirect" and entry.processing != "full":
+                    # Tiled style needs separate Qwen image spans (4/16 crops).
+                    # Preserve those crops instead of silently losing tiling.
+                    pending_styles.append(build_vision_reference_spec(entry))
+                continue
+            vision_spec = build_vision_reference_spec(entry)
+            if isinstance(vision_spec, StyleReferenceSpec):
+                pending_styles.append(vision_spec)
+            else:
+                chain = chain.append(vision_spec)
             continue
         if not isinstance(entry, VisualReferenceEntry):
             raise TypeError(f"Unexpected edit reference type: {type(entry).__name__}")
         if entry.image is None:
             raise ValueError(f"[Krea2 CcC Edit] Visual reference {index} has no IMAGE.")
+        paired = (
+            entries[index]
+            if index < len(entries)
+            and isinstance(entries[index], VisionReferenceEntry)
+            and entries[index].paired_visual
+            else None
+        )
         prep = _prepare_qwen_image(
             image=entry.image,
             clip=clip,
@@ -171,19 +196,44 @@ def _combine_reference_chains(
             semantic_resize=entry.semantic_resize if entry.semantic else False,
             resize_method="bicubic",
         )
+        # A tiled style reference is multiple distinct Qwen crops, not one
+        # image; retain it as an additional style span after the Visual frame.
+        tiled_style = bool(paired and paired.mode == "style_indirect" and paired.processing != "full")
+        vision_spec = build_vision_reference_spec(paired) if paired and not tiled_style else None
+        if vision_spec is not None:
+            # Keep the untouched original image for VAE geometry while taking
+            # the Vision path's resized image and per-mode extraction policy.
+            prep = replace(prep, vision_image=vision_spec.prepared_image.vision_image)
         chain = chain.append(
             ReferenceSpec(
                 reference_path="edit",
                 prepared_image=prep,
-                alias="",
-                vision_instruction=entry.prompt_annotation if entry.semantic else "",
+                alias=entry.prompt_annotation or (paired.reference_annotation if paired else ""),
+                vision_instruction=(
+                    vision_spec.vision_instruction if vision_spec is not None
+                    else ""
+                ),
                 appearance_reference=True,
-                include_in_vision=entry.semantic,
+                # Tiled Style contributes its own 4/16 Qwen crops. The
+                # appearance frame remains in VAE/RoPE but must not add a
+                # second full-sized Qwen image.
+                include_in_vision=entry.semantic and not tiled_style,
+                negative_vision_only=tiled_style,
                 attention_boost=float(entry.boost),
                 attention_mask=entry.reference_boost_mask,
+                attention_weight_map=entry.attention_weight_map,
                 visual_reference_fit=entry.resolved_fit_mode,
                 visual_resize_method="bicubic",
                 rope_position=entry.rope_position,
+                vision_reference_mode=vision_spec.vision_reference_mode if vision_spec else "",
+                vision_weight=vision_spec.vision_weight if vision_spec else 1.0,
+                vision_summary_rows=vision_spec.vision_summary_rows if vision_spec else 0,
+                vision_indirect=vision_spec.vision_indirect if vision_spec else False,
+                semantic_extract=vision_spec.semantic_extract if vision_spec else "none",
+                semantic_strength=vision_spec.semantic_strength if vision_spec else 1.0,
+                style_fidelity=vision_spec.style_fidelity if vision_spec else 0.5,
+                style_processing=vision_spec.style_processing if vision_spec else "full",
+                indirect_style_transfer=vision_spec.indirect_style_transfer if vision_spec else False,
             )
         )
 
@@ -192,16 +242,114 @@ def _combine_reference_chains(
         latent_image = latent_semantic.get("image")
         if latent_image is None:
             raise ValueError("[Krea2 CcC Edit] Latent semantic metadata is enabled but does not contain an image.")
-        chain = _append_semantic(
-            chain=chain,
-            image=latent_image,
-            clip=clip,
+        # Reuse the same Vision Reference implementation and runtime modes as Reference.
+        from .vision_reference_node import CcCKrea2VisionReference
+        from ..geometry import resize_tensor
+        source = latent_image
+        vision_image = source
+        resize = bool(latent_semantic.get("vision_resize", True))
+        edge = int(latent_semantic.get("vision_max_edge", 768))
+        mode = latent_semantic.get("mode", "semantic")
+        processing = latent_semantic.get("style_processing", "full")
+        tiled = mode == "style" and processing != "full"
+        if resize and not tiled:
+            h, w = int(source.shape[-3]), int(source.shape[-2])
+            if max(h, w) > edge:
+                scale = edge / float(max(h, w))
+                vision_image = resize_tensor(source, max(1, round(h * scale)), max(1, round(w * scale)), "bicubic")
+        node = CcCKrea2VisionReference()
+        vision_chain, _ = node.process(
+            image=vision_image,
+            mode=mode,
             instruction=str(latent_semantic.get("instruction", "")),
-            grounding_px=int(latent_semantic.get("grounding_px", 768)),
-            alias="target image",
+            style_processing=processing,
+            guidance_seed_mode=latent_semantic.get("guidance_seed_mode", "fixed"),
+            guidance_seed=int(latent_semantic.get("guidance_seed", 0)),
+            guidance_detail=latent_semantic.get("guidance_detail", "balanced"),
+            vision_guidance=latent_semantic.get("vision_guidance", "balanced"),
+            reference_annotation=str(latent_semantic.get("reference_annotation", "")),
+            vision_fidelity=float(latent_semantic.get("vision_fidelity", 0.25)),
         )
+        vision_entry = vision_chain.entries[-1]
+        if mode == "semantic":
+            # Restore the target-content preservation directive used before
+            # the Latent Vision refactor. Unlike a generic semantic reference,
+            # the target image defines the scene being edited.
+            user_instruction = vision_entry.instruction.strip()
+            semantic_instruction = (
+                f"{SEMANTIC_SUBJECT_DIRECTIVE} {user_instruction}".strip()
+                if user_instruction else SEMANTIC_SUBJECT_DIRECTIVE
+            )
+            vision_entry = replace(vision_entry, instruction=semantic_instruction)
+        entry = replace(
+            vision_entry,
+            source_image=source,
+            tile_resize=resize and tiled,
+            tile_max_edge=edge,
+        )
+        vision_spec = build_vision_reference_spec(entry)
+        if isinstance(vision_spec, StyleReferenceSpec):
+            pending_styles.append(vision_spec)
+        else:
+            chain = chain.append(vision_spec)
 
+    # Style tiles expand into multiple physical images and must follow all
+    # normal/appearance references to preserve Qwen image slot numbering.
+    for style_spec in pending_styles:
+        chain = chain.append(style_spec)
     return chain
+
+
+def _prepare_edit_vision_text(clip, references, latent, positive_prompt):
+    """Share T2I's Qwen analysis for Semantic/Context; exclude source image rows.
+
+    Keep paired VAE/RoPE appearance entries intact but remove their Qwen image
+    participation. Other Vision modes remain multimodal and can be mixed freely.
+    """
+    source_entries = (references or EditReferenceChain()).entries
+    prepared = []
+    guidance = []
+    target_text = positive_prompt
+    for entry in source_entries:
+        if not isinstance(entry, VisionReferenceEntry) or _public_vision_mode(entry.mode) not in ("semantic", "context"):
+            prepared.append(entry)
+            continue
+        mode = _public_vision_mode(entry.mode)
+        extracted, _, _ = _generate_t2i_vision_guidance(
+            clip=clip, entry=entry, target_prompt=target_text
+        )
+        guidance.append(f"{mode.title()} reference guidance: {extracted}")
+        if entry.paired_visual:
+            if not prepared or not isinstance(prepared[-1], VisualReferenceEntry):
+                raise ValueError("[Krea2 CcC Edit] Semantic/Context pair must follow its VAE/RoPE image.")
+            prepared[-1] = replace(prepared[-1], semantic=False)
+
+    runtime_latent = dict(latent)
+    latent_vision = dict(latent.get("ccc_krea2_latent_semantic") or {})
+    if latent_vision.get("enabled") and latent_vision.get("mode") in ("semantic", "context"):
+        from .vision_reference_node import CcCKrea2VisionReference
+        source = latent_vision.get("image")
+        if source is None:
+            raise ValueError("[Krea2 CcC Edit] Latent Vision is enabled without an image.")
+        entry = CcCKrea2VisionReference().process(
+            image=source,
+            mode=latent_vision["mode"],
+            instruction=str(latent_vision.get("instruction", "")),
+            guidance_seed_mode=latent_vision.get("guidance_seed_mode", "fixed"),
+            guidance_seed=int(latent_vision.get("guidance_seed", 0)),
+            guidance_detail=latent_vision.get("guidance_detail", "balanced"),
+            vision_guidance=latent_vision.get("vision_guidance", "balanced"),
+        )[0].entries[-1]
+        extracted, _, _ = _generate_t2i_vision_guidance(
+            clip=clip, entry=entry, target_prompt=target_text
+        )
+        guidance.append(f"Target {latent_vision['mode']} guidance: {extracted}")
+        latent_vision["enabled"] = False
+        runtime_latent["ccc_krea2_latent_semantic"] = latent_vision
+
+    if guidance:
+        target_text = (target_text + "\n\n" + "\n".join(guidance)).strip()
+    return EditReferenceChain(tuple(prepared)), runtime_latent, target_text, guidance
 
 
 def _conditioning_extras(conditioning):
@@ -278,6 +426,7 @@ class CcCKrea2Edit:
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
                 "references": ("KREA2_REFERENCE_CHAIN",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
             },
@@ -291,6 +440,7 @@ class CcCKrea2Edit:
         latent,
         positive_prompt="",
         apply_krea2_edit_patch=True,
+        isolate_references=False,
         references=None,
         prompt_augmentation=None,
     ):
@@ -303,12 +453,15 @@ class CcCKrea2Edit:
         visual_entries = tuple(e for e in all_entries if isinstance(e, VisualReferenceEntry))
         vision_entries = tuple(e for e in all_entries if isinstance(e, VisionReferenceEntry))
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
-        runtime_latent = _runtime_latent(latent)
+        prepared_refs, prepared_latent, positive_prompt, extracted_guidance = _prepare_edit_vision_text(
+            clip, references, latent, positive_prompt
+        )
+        runtime_latent = _runtime_latent(prepared_latent)
 
         chain = _combine_reference_chains(
             clip=clip,
-            references=references,
-            latent=latent,
+            references=prepared_refs,
+            latent=prepared_latent,
         )
 
         # Krea2 CcC Edit prepares geometry, Qwen images and VAE reference latents.
@@ -335,6 +488,7 @@ class CcCKrea2Edit:
                 reference_boosts=positive_boosts,
                 reference_target_masks=target_masks,
                 reference_attention_scopes=attention_scopes,
+                isolate_references=isolate_references,
             )
             negative = attach_reference_runtime_to_conditioning(
                 negative,
@@ -357,7 +511,9 @@ class CcCKrea2Edit:
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
             f"Vision References: {len(vision_entries)}",
-            f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
+            f"Semantic/Context text extractions: {len(extracted_guidance)}",
+            f"VAE/RoPE attention isolation: {bool(isolate_references)}",
+            f"Latent Vision: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
                 "Appearance Transport: CONDITIONING metadata"

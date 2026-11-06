@@ -38,6 +38,7 @@ def attach_reference_runtime_to_conditioning(
     reference_boosts: Optional[List[float]] = None,
     reference_target_masks: Optional[List[Any]] = None,
     reference_attention_scopes: Optional[List[str]] = None,
+    isolate_references: bool = False,
 ) -> List[Any]:
     """Attach RoPE, boosts and target masks for ordered visual references."""
     if reference_count <= 0:
@@ -51,6 +52,8 @@ def attach_reference_runtime_to_conditioning(
         values["reference_target_masks"] = list(reference_target_masks)
     if reference_attention_scopes is not None:
         values["reference_attention_scopes"] = list(reference_attention_scopes)
+    if isolate_references:
+        values["reference_attention_isolation"] = True
     return _conditioning_set_values(conditioning, values)
 
 
@@ -117,9 +120,17 @@ def install_krea2_reference_conditioning() -> None:
         if source_masks is not None:
             out["ccc_ref_boost_masks"] = comfy.conds.CONDConstant(list(source_masks))
 
+        attention_maps = kwargs.get("reference_attention_maps")
+        if attention_maps is not None:
+            out["ccc_ref_attention_maps"] = comfy.conds.CONDConstant(list(attention_maps))
+
         attention_scopes = kwargs.get("reference_attention_scopes")
         if attention_scopes is not None:
             out["ccc_ref_attention_scopes"] = comfy.conds.CONDConstant(list(attention_scopes))
+
+        isolation = kwargs.get("reference_attention_isolation")
+        if isolation is not None:
+            out["ccc_ref_attention_isolation"] = comfy.conds.CONDConstant(bool(isolation))
 
         return out
 
@@ -223,6 +234,7 @@ def patch_krea2_model(model: Any) -> Any:
             for key in (
                 "ref_latents", "ref_boosts", "ccc_ref_rope_positions",
                 "ccc_ref_target_masks", "ccc_ref_attention_scopes", "ccc_ref_boost_masks",
+                "ccc_ref_attention_maps", "ccc_ref_attention_isolation",
             ):
                 fallback_kwargs.pop(key, None)
             return executor(x, timesteps, context, *wargs, **fallback_kwargs)
@@ -241,6 +253,7 @@ def patch_krea2_model(model: Any) -> Any:
         ]
         target_masks = _normalize_runtime_list(kwargs.get("ccc_ref_target_masks"), count, None)
         source_masks = _normalize_runtime_list(kwargs.get("ccc_ref_boost_masks"), count, None)
+        attention_maps = _normalize_runtime_list(kwargs.get("ccc_ref_attention_maps"), count, None)
         attention_scopes = [
             str(v)
             for v in _normalize_runtime_list(kwargs.get("ccc_ref_attention_scopes"), count, "global")
@@ -256,7 +269,9 @@ def patch_krea2_model(model: Any) -> Any:
             ref_rope_positions=rope_positions,
             ref_target_masks=target_masks,
             ref_masks=source_masks,
+            ref_attention_maps=attention_maps,
             ref_attention_scopes=attention_scopes,
+            isolate_references=bool(kwargs.get("ccc_ref_attention_isolation", False)),
             transformer_options=transformer_options,
         )
 
@@ -374,12 +389,14 @@ def _compute_ref_attention_bias_patchified(
     tgt_len: int,
     ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
     ref_token_grids: Optional[List[Tuple[int, int]]] = None,
+    ref_attention_maps: Optional[List[Optional[torch.Tensor]]] = None,
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
     ref_target_masks: Optional[List[Optional[torch.Tensor]]] = None,
     ref_attention_scopes: Optional[List[str]] = None,
     target_grid: Optional[Tuple[int, int]] = None,
     batch_size: int = 1,
+    isolate_references: bool = False,
 ) -> Optional[torch.Tensor]:
     """Boost selected reference keys for queries inside the selected target mask.
 
@@ -392,6 +409,7 @@ def _compute_ref_attention_bias_patchified(
     device = device or torch.device("cpu")
     dtype = dtype or torch.float32
     ref_masks = list(ref_masks or [None] * len(boosts))
+    ref_attention_maps = list(ref_attention_maps or [None] * len(boosts))
     ref_target_masks = list(ref_target_masks or [None] * len(boosts))
     ref_token_grids = list(ref_token_grids or [(1, n) for n in ref_token_lens])
     ref_attention_scopes = list(ref_attention_scopes or ["global"] * len(boosts))
@@ -399,10 +417,10 @@ def _compute_ref_attention_bias_patchified(
         raise ValueError("[Krea2 CcC Edit] Reference tokens, grids and boosts must be aligned.")
 
     active = any(
-        float(boost) != 1.0 or scope == "only in mask"
-        for boost, scope in zip(boosts, ref_attention_scopes)
+        float(boost) != 1.0 or scope == "only in mask" or ref_attention_maps[i] is not None
+        for i, (boost, scope) in enumerate(zip(boosts, ref_attention_scopes))
     )
-    if not active:
+    if not active and not isolate_references:
         return None
 
     offsets = [txt_len]
@@ -411,6 +429,15 @@ def _compute_ref_attention_bias_patchified(
     target_start = offsets[-1]
     seq_len = target_start + tgt_len
     bias = torch.zeros((batch_size, 1, seq_len, seq_len), device=device, dtype=dtype)
+
+    if isolate_references:
+        # CliffNodes-inspired optional reference isolation: each reference can
+        # attend only text and itself. Target-to-reference attention remains
+        # controlled separately by boosts and masks below.
+        for index in range(len(ref_token_lens)):
+            a, b = offsets[index], offsets[index + 1]
+            bias[:, :, a:b, txt_len:] = float("-inf")
+            bias[:, :, a:b, a:b] = 0.0
 
     for index, boost in enumerate(boosts):
         scope = ref_attention_scopes[index]
@@ -444,7 +471,24 @@ def _compute_ref_attention_bias_patchified(
             )
 
         block = bias[:, :, target_start:, ref_start:ref_end]
-        if float(boost) != 1.0:
+        regional = ref_attention_maps[index] if index < len(ref_attention_maps) else None
+        if regional is not None:
+            if regional.ndim == 2:
+                regional = regional.unsqueeze(0)
+            if regional.ndim != 3:
+                raise ValueError("Reference weight map must be [B,H,W].")
+            weights = F.interpolate(
+                regional.to(device=device, dtype=torch.float32).unsqueeze(1),
+                size=(gh, gw), mode="area"
+            )[:, 0].flatten(1).to(dtype=dtype)
+            weights = weights.expand(batch_size, -1)
+            if torch.any(weights < 0):
+                raise ValueError("Reference attention weights must be nonnegative.")
+            block += (weights.clamp_min(1e-12).log().unsqueeze(1)
+                      * tgt_weight.unsqueeze(-1)).unsqueeze(1)
+            zero = (weights <= 0).unsqueeze(1) & (tgt_weight > 0).unsqueeze(-1)
+            block.masked_fill_(zero.unsqueeze(1), float("-inf"))
+        elif float(boost) != 1.0:
             score = math.log(max(float(boost), 1e-4))
             block += (score * tgt_weight.unsqueeze(-1) * ref_weight.unsqueeze(1)).unsqueeze(1)
         if scope == "only in mask":
@@ -490,7 +534,9 @@ def krea2_dit_incontext_forward(
     ref_rope_positions: Optional[List[str]] = None,
     ref_target_masks: Optional[List[Optional[torch.Tensor]]] = None,
     ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
+    ref_attention_maps: Optional[List[Optional[torch.Tensor]]] = None,
     ref_attention_scopes: Optional[List[str]] = None,
+    isolate_references: bool = False,
 ) -> torch.Tensor:
     """In-context Krea2 forward with optional Krea2 CcC Edit RoPE displacement."""
     transformer_options = transformer_options or {}
@@ -499,6 +545,7 @@ def krea2_dit_incontext_forward(
     rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
     target_masks = _normalize_runtime_list(ref_target_masks, n_refs, None)
     source_masks = _normalize_runtime_list(ref_masks, n_refs, None)
+    attention_maps = _normalize_runtime_list(ref_attention_maps, n_refs, None)
     attention_scopes = [str(v) for v in _normalize_runtime_list(ref_attention_scopes, n_refs, "global")]
 
     temporal = x.ndim == 5
@@ -567,12 +614,14 @@ def krea2_dit_incontext_forward(
         tgt_len=target_len,
         ref_token_grids=source_grids,
         ref_masks=source_masks,
+        ref_attention_maps=attention_maps,
         ref_target_masks=target_masks,
         ref_attention_scopes=attention_scopes,
         target_grid=(target_gh, target_gw),
         batch_size=batch,
         device=combined.device,
         dtype=combined.dtype,
+        isolate_references=isolate_references,
     )
 
     total_blocks = len(dit_model.blocks)

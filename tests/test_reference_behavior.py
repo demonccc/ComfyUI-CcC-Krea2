@@ -120,3 +120,14 @@ def test_visual_reference_rejects_missing_mask_and_unaligned_source_mask():
     with pytest.raises(ValueError, match="reference_boost_mask"):
         node.process(image=torch.zeros((1, 64, 64, 3)),
                      reference_boost_mask=torch.zeros((1, 63, 64)))
+
+
+def test_latent_accepts_extended_vision_widgets():
+    from inspect import signature
+    from ccc_krea2.modular_nodes.latent_node import CcCKrea2Latent
+    required = CcCKrea2Latent.INPUT_TYPES()["required"]
+    params = signature(CcCKrea2Latent.process).parameters
+    for name in required:
+        assert name in params, f"Missing Latent process parameter: {name}"
+    assert "latent_vision_reference_annotation" in params
+    assert "latent_vision_vision_fidelity" in params

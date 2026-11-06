@@ -82,7 +82,7 @@ class CcCKrea2VisualReference:
                     {
                         "multiline": True,
                         "default": "",
-                        "tooltip": "Optional text appended as 'Image N: <annotation>' for this Qwen image.",
+                        "tooltip": "Optional label describing this VAE/RoPE reference (scene, subject, etc.). Used for Image N grounding when this reference is visible to Qwen.",
                     },
                 ),
                 "attention_scope": (
@@ -152,7 +152,7 @@ class CcCKrea2VisualReference:
             semantic=semantic_enabled,
             semantic_resize=bool(semantic_resize) if semantic_enabled else False,
             semantic_grounding_px=int(semantic_grounding_px),
-            prompt_annotation=prompt_annotation.strip() if semantic_enabled else "",
+            prompt_annotation=prompt_annotation.strip(),
             attention_scope=attention_scope,
         )
         return (chain.append(entry),)

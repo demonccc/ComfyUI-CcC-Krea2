@@ -148,11 +148,6 @@
           "links": [
             2
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -167,9 +162,10 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
         "Krea2/krea2_anypaint_rank32.safetensors",
+        1,
+        false,
+        "None",
         1,
         false,
         "None",
