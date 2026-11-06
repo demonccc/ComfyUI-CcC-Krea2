@@ -77,9 +77,9 @@ def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
     assert "Vision input 2 = Image 2" in clip.tokenize_prompt
     assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
-    assert clip.tokenize_kwargs["thinking"] is True
-    assert clip.tokenize_kwargs["system_prompt"]
-    assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
+    assert "thinking" not in clip.tokenize_kwargs
+    assert "llama_template" not in clip.tokenize_kwargs
+    assert "Generation Calls: 2" in info
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
     assert "Thinking Output: present" in info
@@ -161,17 +161,33 @@ def test_image_preset_receives_reference_mapping_without_automatic_roles():
     assert "Role:" not in clip.tokenize_prompt
 
 
-def test_thinking_truncation_reports_generated_reasoning_without_retry():
-    clip = _FakeClip("<think>I am still reasoning when max tokens end.")
+def test_explicit_analysis_without_native_delimiters_produces_final_prompt():
+    class TwoPassClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def generate(self, tokens, **kwargs):
+            self.calls.append(kwargs["max_length"])
+            return len(self.calls)
+
+        def decode(self, generated_ids):
+            if generated_ids == 1:
+                return "The first reference shows a red dress and a seated pose."
+            return "The woman wears a red dress while seated."
+
+    clip = TwoPassClip()
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
-        clip=clip, references=_chain(), mode="enhance_t2i",
-        instructions="Improve this edit.", thinking=True,
+        clip=clip, references=_chain(), mode="create_from_image_i2i",
+        instructions="Preserve clothing from Image 1.", thinking=True,
+        max_tokens=32768,
     )
-    assert created == ""
-    assert reasoning == "I am still reasoning when max tokens end."
-    assert info.startswith("ERROR: Qwen thinking did not finish")
-    assert "missing </think>" in info
-    assert "Thinking Retry Without Thinking: disabled (no fallback)" in info
+    assert created == "The woman wears a red dress while seated."
+    assert reasoning == "The first reference shows a red dress and a seated pose."
+    assert clip.calls == [4096, 32768]
+    assert "Generation Calls: 2" in info
+    assert not info.startswith("ERROR:")
+    assert "llama_template" not in clip.tokenize_kwargs
 
 
 def test_high_token_budget_is_passed_unmodified_to_qwen():
@@ -219,55 +235,103 @@ def test_preset_is_sent_as_qwen_system_prompt_not_embedded_in_user_text():
     assert "INSTRUCTIONS:" in clip.tokenize_prompt
 
 
-def test_thinking_enabled_passes_explicit_think_prefill_to_qwen():
-    clip = _FakeClip("I have analyzed the scene.</think>The woman from Image 2 is standing beside a window.")
+def test_thinking_requires_two_explicit_stages_with_no_forced_prefix():
+    class TwoPassClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.outputs = ["An analysis of the two people in the scene.",
+                            "A woman stands beside a window."]
+
+        def generate(self, tokens, **kwargs):
+            return len(self.outputs) - (2 if not hasattr(self, "generated") else 1)
+
+        def decode(self, ids):
+            return self.outputs[ids]
+
+    # A fixture with independently numbered generation outputs.
+    class TrackingClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+            self.tokenize_calls = []
+
+        def tokenize(self, prompt, **kwargs):
+            self.tokenize_calls.append((prompt, kwargs))
+            return super().tokenize(prompt, **kwargs)
+
+        def generate(self, tokens, **kwargs):
+            self.calls += 1
+            return self.calls
+
+        def decode(self, ids):
+            return ("The original scene contains a seated woman." if ids == 1
+                    else "A woman is seated in a warmly lit room.")
+
+    clip = TrackingClip()
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, references=_chain(), mode="create_from_image_i2i",
         instructions="Describe a new scene.", thinking=True,
     )
-    assert created == "The woman from Image 2 is standing beside a window."
-    assert reasoning == "I have analyzed the scene."
-    assert clip.tokenize_kwargs["thinking"] is True
-    assert clip.tokenize_kwargs["llama_template"].endswith("<think>")
+    assert created == "A woman is seated in a warmly lit room."
+    assert reasoning == "The original scene contains a seated woman."
+    assert clip.calls == 2
+    assert "PREVIOUS VISUAL ANALYSIS:" in clip.tokenize_calls[1][0]
+    assert "llama_template" not in clip.tokenize_calls[0][1]
+    assert "llama_template" not in clip.tokenize_calls[1][1]
+    assert "Thinking Strategy: explicit analysis then final generation" in info
 
-def test_thinking_without_final_does_not_retry():
-    class TrackingClip(_FakeClip):
+
+def test_empty_analysis_returns_error_without_final_stage():
+    class EmptyAnalysis(_FakeClip):
         def __init__(self):
-            super().__init__("<think>The image contains an outfit, but I have not finished.")
-            self.calls = []
+            super().__init__("")
+            self.calls = 0
 
-        def tokenize(self, prompt, **kwargs):
-            self.calls.append(kwargs.get("thinking"))
-            return super().tokenize(prompt, **kwargs)
+        def generate(self, tokens, **kwargs):
+            self.calls += 1
+            return tokens
 
-    clip = TrackingClip()
+    clip = EmptyAnalysis()
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
         thinking=True,
     )
     assert created == ""
-    assert clip.calls == [True]
-    assert info.startswith("ERROR:")
-    assert "The image contains an outfit" in reasoning
+    assert reasoning == ""
+    assert clip.calls == 1
+    assert info.startswith("ERROR: Qwen analysis stage produced no usable text")
 
 
-def test_thinking_closed_without_final_prompt_returns_error_and_reasoning():
-    clip = _FakeClip("<think>Reasoning is complete.</think>")
+def test_empty_final_returns_error_and_keeps_analysis():
+    class EmptyFinal(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        def generate(self, tokens, **kwargs):
+            self.calls += 1
+            return self.calls
+
+        def decode(self, ids):
+            return "The woman is wearing a red coat." if ids == 1 else ""
+
+    clip = EmptyFinal()
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
         thinking=True,
     )
     assert created == ""
-    assert info.startswith("ERROR: Qwen thinking finished but returned no final prompt")
-    assert reasoning == "Reasoning is complete."
+    assert reasoning == "The woman is wearing a red coat."
+    assert clip.calls == 2
+    assert info.startswith("ERROR: Qwen final stage returned no prompt")
 
 
-def test_thinking_enabled_without_delimiters_does_not_accept_prompt():
+def test_instruct_checkpoint_plain_text_with_thinking_is_accepted_in_second_stage():
     clip = _FakeClip("The woman wears a blue dress.")
     created, _, info, reasoning = CcCKrea2EditPromptCreator().create(
         clip=clip, mode="enhance_t2i", instructions="Describe the outfit.",
         thinking=True,
     )
-    assert created == ""
-    assert info.startswith("ERROR: Qwen thinking did not finish")
+    assert created == "The woman wears a blue dress."
     assert reasoning == "The woman wears a blue dress."
+    assert "Generation Calls: 2" in info
