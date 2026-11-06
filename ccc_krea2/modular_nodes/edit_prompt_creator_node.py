@@ -392,6 +392,8 @@ class CcCKrea2EditPromptCreator:
             created_prompt = _normalize_created_prompt(raw_created_prompt)
             created_prompt, analysis_only_mentions = _remap_created_image_labels(created_prompt, slot_map)
 
+        generated_token_count = len(generated_ids) if isinstance(generated_ids, (list, tuple, torch.Tensor)) else "<unknown>"
+        last_token_id = int(generated_ids[-1]) if isinstance(generated_ids, (list, tuple)) and generated_ids else "<unknown>"
         info_lines = ([f"ERROR: {error}", ""] if error else []) + [
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
@@ -399,8 +401,8 @@ class CcCKrea2EditPromptCreator:
             "Thinking Strategy: one-pass explicit ANALYSIS / FINAL PROMPT (no fallback)",
             f"Thinking Output: {'present' if thinking_text else ('empty' if thinking else 'disabled')}",
             f"Qwen Decoded Output Prefix: {raw_output[:200]!r}",
-            f"Generated Tokens: {len(generated_ids) if hasattr(generated_ids, '__len__') else '<unknown>'}",
-            f"Last Generated Token ID: {int(generated_ids[-1]) if len(generated_ids) else '<none>'}",
+            f"Generated Tokens: {generated_token_count}",
+            f"Last Generated Token ID: {last_token_id}",
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
