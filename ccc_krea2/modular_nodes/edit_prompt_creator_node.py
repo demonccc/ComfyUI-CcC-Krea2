@@ -320,58 +320,74 @@ class CcCKrea2EditPromptCreator:
                 "in the final prompt. Any Image N in your final prompt must refer only to "
                 "a reference actually provided to Krea2 Edit. The analysis image numbering "
                 "is not necessarily the Edit conditioning numbering.")
-        tokenize_kwargs = {
-            "images": images,
-            "min_length": 1,
-            "thinking": bool(thinking),
-            "system_prompt": system_prompt,
-        }
-        # Restore explicit Qwen thinking prefill when requested.
-        # The opening <think> is supplied by the chat template and the
-        # generated continuation is split at </think>.
-        thinking_prefilled = bool(thinking)
-        if thinking_prefilled:
-            tokenize_kwargs["llama_template"] = _thinking_llama_template(len(images))
-
-        tokens = clip.tokenize(
-            generation_prompt,
-            **tokenize_kwargs,
-        )
-        generated_ids = clip.generate(
-            tokens,
-            do_sample=True,
-            max_length=int(max_tokens),
-            temperature=float(temperature),
-            top_k=64,
-            top_p=float(top_p),
-            min_p=0.05,
-            repetition_penalty=1.05,
-            seed=int(seed),
-        )
-        raw_created_prompt, thinking_text = _split_generated_text(
-            clip,
-            generated_ids,
-            generation_prompt,
-            thinking_prefilled=thinking_prefilled,
-            thinking_enabled=bool(thinking),
-        )
-        # Never retry with thinking disabled. If Qwen exhausts the response
-        # budget inside <think> (or omits the closing delimiter), expose the
-        # partial reasoning and keep the prompt empty, so downstream nodes do
-        # not consume an unverified or non-thinking answer.
+        # Qwen3-VL ComfyUI ignores thinking=True as a chat-template switch.
+        # A forced <think> prefix makes an Instruct checkpoint put its final
+        # description into an unterminated pseudo-reasoning block.
+        # Use two EXPLICIT analysis/final passes rather than a fallback.
+        analysis_budget = min(int(max_tokens), 4096)
+        thinking_text = ""
         error = ""
-        if thinking and not str(clip.decode(generated_ids)).strip().count("</think>"):
-            error = (
-                "Qwen thinking did not finish: missing </think> delimiter. "
-                "The generation may have reached max_tokens before the final "
-                "answer; increase max_tokens or inspect the Qwen model/template. "
-                "The partial reasoning is returned on the thinking output."
+        generation_calls = 0
+        decoded_prefix = ""
+        if thinking:
+            analysis_tokens = clip.tokenize(
+                generation_prompt,
+                images=images, min_length=1,
+                system_prompt=(
+                    "Analyze the supplied images and the instructions carefully. "
+                    "Describe the relevant visual details and relationships, "
+                    "the role of each image, and what the final prompt must preserve "
+                    "or change. This is the analysis stage, not the final prompt. "
+                    "Return the analysis as plain English."
+                ),
             )
-        elif thinking and not raw_created_prompt.strip():
-            error = (
-                "Qwen thinking finished but returned no final prompt after </think>. "
-                "Increase max_tokens or inspect Qwen output."
+            analysis_ids = clip.generate(
+                analysis_tokens, do_sample=True, max_length=analysis_budget,
+                temperature=float(temperature), top_k=64, top_p=float(top_p),
+                min_p=0.05, repetition_penalty=1.05, seed=int(seed),
             )
+            generation_calls += 1
+            analysis_answer, analysis_reasoning = _split_generated_text(
+                clip, analysis_ids, generation_prompt
+            )
+            thinking_text = (analysis_answer or analysis_reasoning).strip()
+            if not thinking_text:
+                error = (
+                    "Qwen analysis stage produced no usable text. "
+                    "No final-prompt generation was attempted."
+                )
+
+        if not error:
+            final_user_prompt = generation_prompt
+            if thinking:
+                final_user_prompt += (
+                    "\n\nPREVIOUS VISUAL ANALYSIS:\n" + thinking_text +
+                    "\n\nUsing this analysis, generate only the final image "
+                    "description as directed by the system prompt and instructions. "
+                    "Do not repeat the analysis or explain your decisions."
+                )
+            final_tokens = clip.tokenize(
+                final_user_prompt, images=images, min_length=1,
+                system_prompt=system_prompt,
+            )
+            generated_ids = clip.generate(
+                final_tokens, do_sample=True, max_length=int(max_tokens),
+                temperature=float(temperature), top_k=64,
+                top_p=float(top_p), min_p=0.05,
+                repetition_penalty=1.05, seed=int(seed),
+            )
+            generation_calls += 1
+            decoded_prefix = str(clip.decode(generated_ids))[:200]
+            raw_created_prompt, extra_reasoning = _split_generated_text(
+                clip, generated_ids, final_user_prompt
+            )
+            if extra_reasoning and not thinking_text:
+                thinking_text = extra_reasoning
+            if not raw_created_prompt.strip():
+                error = "Qwen final stage returned no prompt. Check model output and generation settings."
+        else:
+            raw_created_prompt = ""
+
         if error:
             created_prompt = ""
             analysis_only_mentions = []
@@ -383,9 +399,11 @@ class CcCKrea2EditPromptCreator:
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
-            "Thinking Retry Without Thinking: disabled (no fallback)",
-            f"Thinking Output: {'present' if thinking_text else ('empty (no reasoning delimiters detected in Qwen output)' if thinking else 'disabled')}",
-            f"Qwen Decoded Output Prefix: {str(clip.decode(generated_ids))[:200]!r}" if thinking and not thinking_text else "Qwen Decoded Output Prefix: <not needed>",
+            "Thinking Strategy: explicit analysis then final generation" if thinking else "Thinking Strategy: disabled",
+            f"Generation Calls: {generation_calls}",
+            f"Analysis Max Tokens: {analysis_budget if thinking else 0}",
+            f"Thinking Output: {'present (explicit Qwen analysis)' if thinking_text else ('empty' if thinking else 'disabled')}",
+            f"Qwen Decoded Output Prefix: {decoded_prefix!r}" if decoded_prefix else "Qwen Decoded Output Prefix: <not available>",
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
