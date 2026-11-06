@@ -50,39 +50,44 @@ def _chain():
 
 
 def test_create_from_image_uses_generic_scene_preset_thinking_and_passthrough():
-    # The model emits a reasoning block, which should remain separate from the final prompt.
-    clip = _FakeClip(
-        "The internal image has a seated subject, another person nearby, and a white bed.</think>"
-        "The woman from Krea Image 1 is seated on a white bed with her body angled slightly to the side, "
-        "while another person remains beside the bed."
-    )
+    class StagedClip(_FakeClip):
+        def __init__(self):
+            super().__init__()
+            self.stage = 0
+
+        def generate(self, tokens, **kwargs):
+            self.generate_kwargs = kwargs
+            self.stage += 1
+            return self.stage
+
+        def decode(self, generated_ids):
+            if generated_ids == 1:
+                return "The internal image contains a seated subject and another person nearby."
+            return (
+                "The woman from Krea Image 1 is seated on a white bed with her body angled "
+                "slightly to the side, while another person remains beside the bed."
+            )
+
+    clip = StagedClip()
     chain = _chain()
-
     created, passthrough, info, thinking = CcCKrea2EditPromptCreator().create(
-        clip=clip,
-        references=chain,
-        mode="create_from_image_i2i",
+        clip=clip, references=chain, mode="create_from_image_i2i",
         instructions="Use the subject from Image 1 in the situation shown by the reference edit image.",
-        thinking=True,
-        max_tokens=2048,
-        temperature=0.25,
-        top_p=0.90,
-        seed=1234,
+        thinking=True, max_tokens=2048, temperature=0.25,
+        top_p=0.90, seed=1234,
     )
-
     assert created.startswith("The woman from Image 1 is seated on a white bed")
-    assert thinking.startswith("The internal image has a seated subject")
+    assert thinking.startswith("The internal image contains a seated subject")
+    assert clip.stage == 2
     assert len(passthrough.entries) == len(chain.entries)
     assert len(clip.tokenize_kwargs["images"]) == 2
     assert "Vision input 1 = Image 1" in clip.tokenize_prompt
     assert "Vision input 2 = Image 2" in clip.tokenize_prompt
     assert "Return only the final image description" in clip.tokenize_kwargs["system_prompt"]
-    assert "thinking" not in clip.tokenize_kwargs
     assert "llama_template" not in clip.tokenize_kwargs
-    assert "Generation Calls: 2" in info
     assert clip.generate_kwargs["max_length"] == 2048
     assert clip.generate_kwargs["seed"] == 1234
-    assert "Thinking Output: present" in info
+    assert "Thinking Output: present (explicit Qwen analysis)" in info
     assert "Effective Qwen System Prompt" in info
     assert "Effective Qwen User Prompt" in info
     assert "Thinking:" in info
@@ -236,19 +241,6 @@ def test_preset_is_sent_as_qwen_system_prompt_not_embedded_in_user_text():
 
 
 def test_thinking_requires_two_explicit_stages_with_no_forced_prefix():
-    class TwoPassClip(_FakeClip):
-        def __init__(self):
-            super().__init__()
-            self.outputs = ["An analysis of the two people in the scene.",
-                            "A woman stands beside a window."]
-
-        def generate(self, tokens, **kwargs):
-            return len(self.outputs) - (2 if not hasattr(self, "generated") else 1)
-
-        def decode(self, ids):
-            return self.outputs[ids]
-
-    # A fixture with independently numbered generation outputs.
     class TrackingClip(_FakeClip):
         def __init__(self):
             super().__init__()
