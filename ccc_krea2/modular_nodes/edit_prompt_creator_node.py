@@ -53,38 +53,34 @@ def _build_generation_prompt(mode: str, instructions: str, mapping_lines: List[s
     return "\n\n".join(parts)
 
 
-def _thinking_llama_template(image_count: int) -> str:
-    vision_block = "<|vision_start|><|image_pad|><|vision_end|>"
-    images = vision_block * max(0, int(image_count))
-    return (
-        "<|im_start|>user\n"
-        f"{images}{{}}"
-        "<|im_end|>\n"
-        "<|im_start|>assistant\n"
-        "<think>"
-    )
-
-
 def _split_generated_text(
     clip: Any,
     generated_ids: Any,
     raw_prompt: str,
-    thinking_prefilled: bool = False,
     thinking_enabled: bool = False,
 ) -> Tuple[str, str]:
+    """Separate explicit ANALYSIS and FINAL PROMPT sections in one generation.
+
+    Qwen3-VL Instruct does not provide a native ComfyUI thinking toggle. Avoid
+    forcing <think> into the assistant prefix: the checkpoint can put its full
+    answer there and terminate. Never accept an unlabelled final answer when
+    thinking was requested.
+    """
     generated_text = str(clip.decode(generated_ids)).strip()
-    reasoning, separator, text = generated_text.partition("</think>")
+    if not thinking_enabled:
+        return generated_text, ""
 
-    has_reasoning_prefix = reasoning.lstrip().startswith("<think>")
-    if separator and (thinking_enabled or thinking_prefilled or has_reasoning_prefix or raw_prompt.rstrip().endswith("<think>")):
-        cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
-        return text.strip(), cleaned_reasoning
-
-    if not separator and (thinking_prefilled or has_reasoning_prefix):
-        cleaned_reasoning = reasoning.replace("<think>", "", 1).strip()
-        return "", cleaned_reasoning
-
-    return generated_text, ""
+    analysis_match = re.search(r"(?im)^\s*ANALYSIS\s*:\s*", generated_text)
+    final_match = re.search(r"(?im)^\s*FINAL PROMPT\s*:\s*", generated_text)
+    if final_match and analysis_match and analysis_match.start() < final_match.start():
+        analysis = generated_text[analysis_match.end():final_match.start()].strip()
+        final_prompt = generated_text[final_match.end():].strip()
+        return final_prompt, analysis
+    # Preserve any partial text on the thinking output, but never reinterpret
+    # that text as a successful final prompt.
+    if analysis_match:
+        return "", generated_text[analysis_match.end():].strip()
+    return "", generated_text
 
 
 def _normalize_created_prompt(text: str) -> str:
@@ -321,31 +317,36 @@ class CcCKrea2EditPromptCreator:
                 "a reference actually provided to Krea2 Edit. The analysis image numbering "
                 "is not necessarily the Edit conditioning numbering.")
         if thinking:
-            # Proven single-pass contract from the advanced-control branch:
-            # require actual multi-image reasoning before the final prompt.
+            # Explicit structured analysis in a SINGLE generation. Qwen3-VL
+            # Instruct has no native thinking=True switch in ComfyUI.
+            system_prompt = system_prompt.replace(
+                "Return only the final image description as one cohesive English paragraph.",
+                "Return exactly two sections, ANALYSIS and FINAL PROMPT. "
+                "ANALYSIS explains the reference roles and constraints; "
+                "FINAL PROMPT contains one cohesive English paragraph describing "
+                "the desired final image and no analysis.",
+            )
             generation_prompt += (
-                "\n\nTHINKING MODE IS ENABLED:\n"
-                "Before the final image prompt, analyze each image independently "
-                "and compare its role with the user instructions. Explain which "
-                "image supplies identity, outfit, pose, scene, composition and "
-                "interactions, as applicable. Check constraints and possible "
-                "reference conflicts. Put this analysis inside <think>...</think>, "
-                "close the block with </think>, then return only the complete "
-                "final image description. Do not put the final description "
-                "inside the thinking block."
+                "\n\nOUTPUT FORMAT (REQUIRED):\n"
+                "ANALYSIS:\n"
+                "First, analyze Image 1 and Image 2 separately when present. "
+                "For each image, identify its visible subjects and relevant details. "
+                "Compare the user instructions with the observations and explicitly "
+                "decide which image supplies identity, clothing, pose, scene, "
+                "composition, and interactions. Note conflicts or uncertain "
+                "details. This analysis must not be just a generic description "
+                "of one image.\n\n"
+                "FINAL PROMPT:\n"
+                "Provide the complete final image description resulting from the "
+                "decisions above, following all user instructions. No explanations "
+                "or extra formatting in this section.\n\n"
+                "Write both sections using the exact headings ANALYSIS: and FINAL PROMPT:."
             )
         tokenize_kwargs = {
             "images": images,
             "min_length": 1,
-            "thinking": bool(thinking),
             "system_prompt": system_prompt,
         }
-        # Restore explicit Qwen thinking prefill when requested.
-        # The opening <think> is supplied by the chat template and the
-        # generated continuation is split at </think>.
-        thinking_prefilled = bool(thinking)
-        if thinking_prefilled:
-            tokenize_kwargs["llama_template"] = _thinking_llama_template(len(images))
 
         tokens = clip.tokenize(
             generation_prompt,
@@ -362,30 +363,27 @@ class CcCKrea2EditPromptCreator:
             repetition_penalty=1.05,
             seed=int(seed),
         )
+        raw_output = str(clip.decode(generated_ids)).strip()
         raw_created_prompt, thinking_text = _split_generated_text(
-            clip,
-            generated_ids,
-            generation_prompt,
-            thinking_prefilled=thinking_prefilled,
-            thinking_enabled=bool(thinking),
+            clip, generated_ids, generation_prompt, thinking_enabled=bool(thinking)
         )
-        # Never retry with thinking disabled. If Qwen exhausts the response
-        # budget inside <think> (or omits the closing delimiter), expose the
-        # partial reasoning and keep the prompt empty, so downstream nodes do
-        # not consume an unverified or non-thinking answer.
         error = ""
-        if thinking and not str(clip.decode(generated_ids)).strip().count("</think>"):
+        if thinking and not re.search(r"(?im)^\s*ANALYSIS\s*:\s*", raw_output):
             error = (
-                "Qwen thinking did not finish: missing </think> delimiter. "
-                "The model did not close its reasoning block. This can indicate "
-                "a checkpoint/chat-template mismatch or a generation truncated by "
-                "max_tokens. At 32768 tokens, do not assume increasing the budget "
-                "will fix the issue. Partial output is available on thinking."
+                "Qwen did not produce the required ANALYSIS: section. "
+                "The raw output is preserved on thinking. "
+                "Check model and prompt format; max_tokens may not be the cause."
+            )
+        elif thinking and not re.search(r"(?im)^\s*FINAL PROMPT\s*:\s*", raw_output):
+            error = (
+                "Qwen produced analysis but did not produce the required "
+                "FINAL PROMPT: section. The partial output is preserved on thinking. "
+                "This can be a format compliance failure or early EOS."
             )
         elif thinking and not raw_created_prompt.strip():
             error = (
-                "Qwen thinking finished but returned no final prompt after </think>. "
-                "Increase max_tokens or inspect Qwen output."
+                "Qwen produced the FINAL PROMPT: heading but no final text. "
+                "The partial analysis is preserved on thinking."
             )
         if error:
             created_prompt = ""
@@ -398,9 +396,11 @@ class CcCKrea2EditPromptCreator:
             "=== Krea2 CcC Edit Prompt Creator ===",
             f"Mode: {mode}",
             f"Thinking: {'enabled' if thinking else 'disabled'}",
-            "Thinking Retry Without Thinking: disabled (no fallback)",
-            f"Thinking Output: {'present' if thinking_text else ('empty (no reasoning delimiters detected in Qwen output)' if thinking else 'disabled')}",
-            f"Qwen Decoded Output Prefix: {str(clip.decode(generated_ids))[:200]!r}" if thinking and not thinking_text else "Qwen Decoded Output Prefix: <not needed>",
+            "Thinking Strategy: one-pass explicit ANALYSIS / FINAL PROMPT (no fallback)",
+            f"Thinking Output: {'present' if thinking_text else ('empty' if thinking else 'disabled')}",
+            f"Qwen Decoded Output Prefix: {raw_output[:200]!r}",
+            f"Generated Tokens: {len(generated_ids) if hasattr(generated_ids, '__len__') else '<unknown>'}",
+            f"Last Generated Token ID: {int(generated_ids[-1]) if len(generated_ids) else '<none>'}",
             f"Preset: {_resolve_preset(str(mode)) or 'none'}",
             f"Visual Reference Chain Entries: {len(references.entries)}",
             f"Images Analyzed: {len(images)}",
