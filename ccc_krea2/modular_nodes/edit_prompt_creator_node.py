@@ -324,7 +324,7 @@ class CcCKrea2EditPromptCreator:
             # Proven single-pass contract from the advanced-control branch:
             # require actual multi-image reasoning before the final prompt.
             generation_prompt += (
-                "\\n\\nTHINKING MODE IS ENABLED:\\n"
+                "\n\nTHINKING MODE IS ENABLED:\n"
                 "Before the final image prompt, analyze each image independently "
                 "and compare its role with the user instructions. Explain which "
                 "image supplies identity, outfit, pose, scene, composition and "
