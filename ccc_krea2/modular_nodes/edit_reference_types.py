@@ -20,7 +20,6 @@ class VisualReferenceEntry:
     boost: float = 1.0
     reference_boost_mask: Optional[torch.Tensor] = None  # legacy internal contract
     attention_weight_map: Optional[torch.Tensor] = None
-    target_attention_mask: Optional[torch.Tensor] = None
     reference_fit: str = "native"
     rope_mode: str = "spatial"
     reference_stack: str = "overlay"
@@ -32,7 +31,6 @@ class VisualReferenceEntry:
     semantic_resize: bool = True
     semantic_grounding_px: int = 768
     prompt_annotation: str = ""
-    attention_scope: str = "global"
 
     @property
     def rope_position(self) -> str:
