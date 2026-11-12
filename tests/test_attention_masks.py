@@ -110,3 +110,54 @@ def test_missing_target_mask_and_wrong_batch_fail_clearly():
     bad = torch.ones((3, 16, 16))
     with pytest.raises(ValueError, match="batch"):
         bias_for(boosts=[2.0], source_masks=[bad], batch_size=2)
+
+
+def test_zero_boost_hard_blocks_target_attention_to_reference():
+    bias = bias_for(boosts=[0.0])
+    assert torch.isneginf(bias[0, 0, 7:, 3:7]).all()
+    assert (bias[0, 0, :7, :] == 0).all()
+    assert (bias[0, 0, 7:, :3] == 0).all()
+    assert (bias[0, 0, 7:, 7:] == 0).all()
+
+
+def test_zero_boost_blocks_only_masked_source_tokens():
+    source_mask = torch.tensor([[[1., 0.], [0., 1.]]])
+    bias = bias_for(boosts=[0.0], source_masks=[source_mask])
+    selected = bias[0, 0, 7:, 3:7]
+    assert torch.isneginf(selected[:, [0, 3]]).all()
+    assert (selected[:, [1, 2]] == 0).all()
+
+
+def test_zero_boost_respects_target_mask():
+    target = torch.tensor([[[1., 0., 0., 0.], [1., 0., 0., 0.]]])
+    bias = bias_for(boosts=[0.0], target_masks=[target], scopes=["boost in mask"])
+    selected = bias[0, 0, 7:, 3:7]
+    assert torch.isneginf(selected[[0, 4]]).all()
+    assert (selected[[1, 2, 3, 5, 6, 7]] == 0).all()
+
+
+def test_zero_boost_only_affects_its_reference_when_others_use_ten():
+    bias = bias_for(boosts=[0.0, 10.0])
+    assert torch.isneginf(bias[0, 0, 11:, 3:7]).all()
+    torch.testing.assert_close(
+        bias[0, 0, 11:, 7:11],
+        torch.full((8, 4), math.log(10.0)),
+    )
+
+
+def test_zero_boost_with_region_map_blocks_zero_regions():
+    weight_map = torch.tensor([[[0., 10.], [1., 0.]]])
+    bias = _compute_ref_attention_bias_patchified(
+        boosts=[1.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
+        ref_token_grids=[(2, 2)], ref_attention_maps=[weight_map],
+        target_grid=(2, 4), device=torch.device("cpu"), dtype=torch.float32,
+    )
+    selected = bias[0, 0, 7:, 3:7]
+    assert torch.isneginf(selected[:, [0, 3]]).all()
+    torch.testing.assert_close(selected[:, 1], torch.full((8,), math.log(10.0)))
+    assert (selected[:, 2] == 0).all()
+
+
+def test_negative_boost_is_rejected():
+    with pytest.raises(ValueError, match="nonnegative"):
+        bias_for(boosts=[-0.5])
