@@ -371,7 +371,6 @@ def _compute_ref_attention_bias_patchified(
     ref_attention_maps: Optional[List[Optional[torch.Tensor]]] = None,
     device: Optional[torch.device] = None,
     dtype: Optional[torch.dtype] = None,
-    target_grid: Optional[Tuple[int, int]] = None,
     batch_size: int = 1,
     isolate_references: bool = False,
 ) -> Optional[torch.Tensor]:
@@ -575,7 +574,6 @@ def krea2_dit_incontext_forward(
         ref_token_grids=source_grids,
         ref_masks=source_masks,
         ref_attention_maps=attention_maps,
-        target_grid=(target_gh, target_gw),
         batch_size=batch,
         device=combined.device,
         dtype=combined.dtype,
