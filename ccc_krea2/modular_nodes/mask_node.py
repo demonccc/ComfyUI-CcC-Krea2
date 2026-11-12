@@ -122,7 +122,7 @@ class CcCKrea2Mask:
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "unload_sam_model": ("BOOLEAN", {"default": False}),
-                "composite_color": ("STRING", {"default": "#000000", "tooltip": "RGB hex color used to cover low-Boost regions in composite_image."}),
+                "composite_color": ("COLOR", {"default": "#000000", "tooltip": "Pick the overlay color applied to low-Boost regions in composite_image."}),
             },
             "optional": {
                 "mask": ("MASK",),
