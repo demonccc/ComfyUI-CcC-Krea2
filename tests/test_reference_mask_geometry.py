@@ -1,6 +1,5 @@
 """Reference boost masks follow the reference pixels through geometry processing."""
 
-import pytest
 import torch
 
 from ccc_krea2.krea2edit_geometry import (
