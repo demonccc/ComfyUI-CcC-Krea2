@@ -101,6 +101,12 @@ def run_krea2_edit_orchestrator(
                 fit_img, fit_mask = process_image_and_mask_geometry(
                     image=src_img, mask=getattr(spec, "attention_mask", None), geom=geom
                 )
+                weight_map = getattr(spec, "attention_weight_map", None)
+                fitted_weights = None
+                if weight_map is not None:
+                    _, fitted_weights = process_image_and_mask_geometry(
+                        image=src_img, mask=weight_map, geom=geom
+                    )
                 encoded = vae.encode(fit_img) if vae is not None else None
                 lat_tokens = None
                 if encoded is not None:
@@ -116,6 +122,7 @@ def run_krea2_edit_orchestrator(
                         "slot": slot,
                         "latent_tokens": lat_tokens,
                         "mask": fit_mask,
+                        "attention_weight_map": fitted_weights,
                         "geom": geom,
                         "spec": spec,
                         "ref_item": ref_item,
@@ -134,6 +141,27 @@ def run_krea2_edit_orchestrator(
                 )
 
             if not getattr(spec, "include_in_vision", True):
+                if is_appearance and getattr(spec, "negative_vision_only", False):
+                    # Tiled Style uses only crops in positive Qwen, while the
+                    # unconditional branch still needs the unmodified
+                    # appearance reference for grounded Krea2 Edit.
+                    neg_idx = len(neg_qwen_images) + 1
+                    neg_img = spec.prepared_image.vision_image
+                    neg_qwen_images.append(neg_img)
+                    neg_qwen_image_map.append(
+                        {
+                            "role": ref_role,
+                            "slot": slot,
+                            "logical_reference_id": slot,
+                            "logical_role": ref_role,
+                            "logical_vision_slot": slot,
+                            "physical_qwen_image_index": neg_idx,
+                            "style_group_id": None,
+                            "crop_tile_index": None,
+                            "image": neg_img,
+                            "spec": spec,
+                        }
+                    )
                 continue
 
             if spec.prepared_image is None:
@@ -249,6 +277,18 @@ def run_krea2_edit_orchestrator(
         # references are interleaved with appearance references.
         pos_conditioning = _conditioning_set_values(
             pos_conditioning, {"reference_boost_masks": prepared_reference_masks}
+        )
+
+    prepared_weight_maps = [
+        ref.get("attention_weight_map") for ref in vae_ref_specs
+        if ref.get("latent_tokens") is not None
+    ]
+    if any(weight is not None for weight in prepared_weight_maps):
+        pos_conditioning = _conditioning_set_values(
+            pos_conditioning, {"reference_attention_maps": prepared_weight_maps}
+        )
+        neg_conditioning = _conditioning_set_values(
+            neg_conditioning, {"reference_attention_maps": prepared_weight_maps}
         )
 
     # Step 7: Build edit_info report

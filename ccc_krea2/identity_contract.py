@@ -38,7 +38,18 @@ def build_grounded_positive_user_content(
 
     for item in resolved_references:
         spec = item.get("spec")
-        if spec is None or not getattr(spec, "include_in_vision", True):
+        if spec is None:
+            continue
+
+        # A VAE/RoPE reference has a role annotation even when the Qwen Vision
+        # path is disabled. Preserve that label as prompt text without adding
+        # any image-pad tokens or changing physical Qwen image numbering.
+        if not getattr(spec, "include_in_vision", True):
+            alias = _alias_for(item, spec).strip()
+            if alias and getattr(spec, "appearance_reference", True):
+                frame = item.get("vae_reference_frame")
+                label = f"VAE/RoPE Image {frame}" if frame is not None else "VAE/RoPE reference"
+                annotations.append(f"{label}: {alias}")
             continue
 
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
@@ -51,11 +62,10 @@ def build_grounded_positive_user_content(
 
         if ref_path == "edit" and is_appearance:
             label = f"Image {physical_index}"
-            if instruction:
-                annotations.append(f"{label}: {instruction}")
-            elif alias:
-                # Compatibility for older role-based reference nodes.
+            if alias:
                 annotations.append(f"{label}: {alias}")
+            if instruction:
+                annotations.append(f"{label} guidance: {instruction}")
             physical_index += count
             continue
 
@@ -64,12 +74,10 @@ def build_grounded_positive_user_content(
                 label = f"Image {physical_index}"
             else:
                 label = f"Images {physical_index}-{physical_index + count - 1}"
-            if alias and instruction:
-                annotations.append(f"{label} ({alias}): {instruction}")
-            elif alias:
+            if alias:
                 annotations.append(f"{label}: {alias}")
-            else:
-                annotations.append(f"{label}: {instruction}")
+            if instruction:
+                annotations.append(f"{label} guidance: {instruction}")
 
         physical_index += count
 
@@ -91,7 +99,10 @@ def build_grounded_negative_user_content(
     blocks = []
     for item in resolved_references:
         spec = item.get("spec")
-        if spec is None or not getattr(spec, "include_in_vision", True):
+        if spec is None or not (
+            getattr(spec, "include_in_vision", True)
+            or getattr(spec, "negative_vision_only", False)
+        ):
             continue
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
         if ref_path == "style" or not getattr(spec, "appearance_reference", True):

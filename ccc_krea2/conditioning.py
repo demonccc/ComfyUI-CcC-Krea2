@@ -30,6 +30,16 @@ except ImportError:
     KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
 
 
+# Upstream comfyui-krea2edit / Krea2EditGroundedEncode training-matched
+# system instruction. The generic Krea2 template is not equivalent for Edit.
+KREA2_EDIT_GROUNDED_TEMPLATE = (
+    "<|im_start|>system\\n"
+    "Describe the image by detailing the color, shape, size, "
+    "texture, quantity, text, spatial relationships of the objects and background:"
+    "<|im_end|>\\n<|im_start|>user\\n{}<|im_end|>\\n<|im_start|>assistant\\n"
+)
+
+
 def attach_reference_latents_to_conditioning(
     conditioning: List[Any], reference_latents: List[torch.Tensor]
 ) -> List[Any]:
@@ -273,6 +283,53 @@ def extract_vision_spans_from_tokens(
     return adjusted_spans, warnings, stream_key, template_end
 
 
+def apply_vision_weights_to_conditioning(
+    conditioning: List[Any],
+    physical_image_map: List[Dict[str, Any]],
+    vision_row_spans: List[Tuple[int, int]],
+    removed_row_indices: List[int] = None,
+) -> List[Any]:
+    """Scale only image-token rows, never prompt text or reference annotations.
+
+    Operate after any Style/Semantic span transform so 0.0 always leaves that
+    image's surviving Qwen rows zero. Keep negative and positive branches
+    consistent; a neutral weight is an exact no-op.
+    """
+    if len(physical_image_map) != len(vision_row_spans):
+        raise ValueError("[Krea2 CcC] Vision weight requires aligned image spans.")
+    operations = []
+    for (start, end), item in zip(vision_row_spans, physical_image_map):
+        weight = float(getattr(item.get("spec"), "vision_weight", 1.0))
+        if not 0.0 <= weight <= 2.0:
+            raise ValueError("[Krea2 CcC] vision_weight must be in [0, 2].")
+        if weight != 1.0:
+            operations.append((start, end, weight))
+    if not operations or not conditioning:
+        return conditioning
+
+    removed = sorted(removed_row_indices or [])
+    removed_set = set(removed)
+    result = []
+    for cond_entry in conditioning:
+        if not isinstance(cond_entry, (list, tuple)) or not isinstance(cond_entry[0], torch.Tensor):
+            result.append(cond_entry)
+            continue
+        tensor = cond_entry[0].clone()
+        for start, end, weight in operations:
+            # Style/semantic operations can remove rows; map source indices to
+            # the surviving sequence rather than assuming unchanged positions.
+            indices = [
+                i - sum(1 for removed_idx in removed if removed_idx < i)
+                for i in range(start, end) if i not in removed_set
+            ]
+            if indices:
+                if max(indices) >= tensor.shape[1]:
+                    raise ValueError("[Krea2 CcC] Vision weight span exceeds conditioning rows.")
+                tensor[:, indices, :] *= weight
+        result.append([tensor, cond_entry[1] if len(cond_entry) > 1 else {}])
+    return result
+
+
 def encode_krea2_qwen_context(
     clip: Any,
     prompt: str,
@@ -288,9 +345,16 @@ def encode_krea2_qwen_context(
 
     warnings_list: List[str] = []
     try:
-        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_TEMPLATE)
-    except TypeError:
-        tokens = clip.tokenize(prompt or "", images=physical_images)
+        tokens = clip.tokenize(
+            prompt or "", images=physical_images,
+            llama_template=KREA2_EDIT_GROUNDED_TEMPLATE,
+        )
+    except TypeError as e:
+        raise TypeError(
+            f"{LOGGER_PREFIX} Qwen encoder does not accept llama_template; "
+            "Krea2Edit's grounded system instruction cannot be guaranteed. "
+            "Use a compatible Qwen3-VL encoder."
+        ) from e
     except Exception as e:
         raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
@@ -341,7 +405,12 @@ def encode_krea2_qwen_context(
             summary_rows = int(getattr(spec, "vision_summary_rows", 0) or 0)
 
             vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
-            if vision_mode == "semantic":
+            if vision_mode == "native":
+                # Training-style Krea2Edit Qwen conditioning: preserve vision rows.
+                extract = None
+                fidelity = 1.0
+                indirect = False
+            elif vision_mode == "semantic":
                 extract = "subject"
                 fidelity = getattr(spec, "semantic_strength", 0.25)
                 indirect = False
@@ -354,8 +423,13 @@ def encode_krea2_qwen_context(
                 fidelity = getattr(spec, "style_fidelity", 0.0)
                 indirect = False
             elif vision_mode == "context":
-                extract = "context"
-                fidelity = getattr(spec, "semantic_strength", 0.0)
+                # Spatial relations, pose, gaze and hand placement are encoded in
+                # ordered Qwen vision rows. Whitening and sampling those rows
+                # is not a reliable context extractor and destroys geometry.
+                # Keep rows intact; mode-specific instructions constrain the
+                # reference to scene/context rather than subject identity.
+                extract = None
+                fidelity = 1.0
                 indirect = False
             elif str(role_val).lower() == "style":
                 extract = "style"
@@ -416,6 +490,12 @@ def encode_krea2_qwen_context(
                 else:
                     new_conditioning.append(cond_entry)
             conditioning = new_conditioning
+
+    # Qwen Vision Weight belongs only to the image token spans and is applied
+    # after any per-mode Vision transform, never to text or VAE/RoPE latents.
+    conditioning = apply_vision_weights_to_conditioning(
+        conditioning, physical_image_map, vision_row_spans, removed_row_indices
+    )
 
     neg_rows = 0
     if not is_positive and conditioning and isinstance(conditioning, list) and len(conditioning) > 0:

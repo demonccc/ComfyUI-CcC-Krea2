@@ -42,17 +42,20 @@ class ReferenceSpec:
     parsed_aliases: Tuple[str, ...] = ()
     vision_instruction: str = ""
     include_in_vision: bool = True
+    negative_vision_only: bool = False
 
     # Visual/edit path
     appearance_reference: bool = True
     attention_boost: float = 1.0
     attention_mask: Optional[torch.Tensor] = None
+    attention_weight_map: Optional[torch.Tensor] = None
     visual_reference_fit: str = "native"
     visual_resize_method: str = "lanczos"
     rope_position: str = "inside:center:center"
 
     # Qwen-only Vision Reference processing
     vision_reference_mode: str = ""
+    vision_weight: float = 1.0
     vision_summary_rows: int = 0
     vision_indirect: bool = False
     semantic_extract: str = "none"
@@ -62,6 +65,8 @@ class ReferenceSpec:
     # Style path
     style_fidelity: float = 0.5
     style_processing: str = "2x2"
+    style_tile_resize: bool = False
+    style_tile_max_edge: int = 768
     indirect_style_transfer: bool = True
 
     @property

@@ -14,6 +14,7 @@ from ..krea_geometry import (
     resolve_krea_geometry,
 )
 from ..target_latent import get_image_dims, normalize_vae_output
+from .vision_reference_node import CcCKrea2VisionReference
 
 
 DIMENSION_MODES = ("from_image", "fixed", "preset")
@@ -218,9 +219,17 @@ class CcCKrea2Latent:
                 "geometry_policy": (GEOMETRY_POLICIES, {"default": "preserve_aspect_krea_bounds"}),
                 "content": (CONTENT_MODES, {"default": "empty"}),
                 "content_fit": (CONTENT_FIT_MODES, {"default": "crop"}),
-                "latent_semantic": ("BOOLEAN", {"default": False}),
-                "latent_semantic_instruction": ("STRING", {"multiline": True, "default": ""}),
-                "latent_grounding_px": ("INT", {"default": 768, "min": 0, "max": 4096, "step": 32}),
+                "latent_vision_enable": ("BOOLEAN", {"default": False}),
+                "latent_vision_resize": ("BOOLEAN", {"default": True}),
+                "latent_vision_max_edge": ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64}),
+                "latent_vision_annotation": ("STRING", {"multiline": True, "default": "", "tooltip": "Optional annotation for the target image in Qwen Vision conditioning."}),
+                **{
+                    "latent_vision_" + name: spec
+                    for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
+                    if name != "image" and name not in (
+                        "guidance_detail", "vision_guidance", "reference_annotation", "weight"
+                    )
+                },
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
@@ -239,13 +248,29 @@ class CcCKrea2Latent:
         geometry_policy="preserve_aspect_krea_bounds",
         content="empty",
         content_fit="crop",
-        latent_semantic=False,
-        latent_semantic_instruction="",
-        latent_grounding_px=768,
+        latent_vision_enable=False,
+        latent_vision_resize=True,
+        latent_vision_max_edge=768,
+        latent_vision_mode="reference",
+        latent_vision_instruction="",
+        latent_vision_style_processing="full",
+        latent_vision_guidance_seed_mode="fixed",
+        latent_vision_guidance_seed=0,
+        latent_vision_guidance_detail="balanced",
+        latent_vision_vision_guidance="balanced",
+        latent_vision_annotation="",
+        latent_vision_reference_annotation="",
+        latent_vision_vision_fidelity=0.25,
         batch_size=1,
         dimensions_image=None,
         content_image=None,
+        **legacy_kwargs,
     ):
+        # Legacy API workflows may still send the previous activation key.
+        if "latent_semantic" in legacy_kwargs and not latent_vision_enable:
+            latent_vision_enable = bool(legacy_kwargs.pop("latent_semantic"))
+        if legacy_kwargs:
+            raise TypeError(f"Unknown latent inputs: {sorted(legacy_kwargs)}")
         target_w, target_h, dimensions_label = _resolve_dimensions(
             dimensions=dimensions,
             dimensions_image=dimensions_image,
@@ -255,10 +280,21 @@ class CcCKrea2Latent:
             geometry_policy=geometry_policy,
         )
 
-        if latent_semantic and (content != "from_image" or content_image is None):
+        # ComfyUI can restore a stale numeric widget value as a Vision mode.
+        # Never activate semantic conditioning with a corrupted preset. Keep the
+        # target latent and VAE editing usable, and report the incompatible value.
+        allowed_vision_modes = CcCKrea2VisionReference.INPUT_TYPES()["required"]["mode"][0]
+        if latent_vision_mode not in allowed_vision_modes and latent_vision_mode not in ("native", "none", "guided"):
             raise ValueError(
-                "[Krea2 CcC Edit] latent_semantic requires content='from_image' and content_image."
+                f"[Krea2 CcC Latent] Unsupported Vision mode: {latent_vision_mode!r}"
             )
+        vision_warning = ""
+
+        # Vision is only meaningful for actual target image content.
+        # Disabled controls in ComfyUI may retain true in serialized workflows;
+        # treat them as inactive rather than failing the entire latent node.
+        if content != "from_image" or content_image is None:
+            latent_vision_enable = False
 
         latent, placement = _build_target_latent(
             vae=vae,
@@ -271,10 +307,19 @@ class CcCKrea2Latent:
         )
 
         latent["ccc_krea2_latent_semantic"] = {
-            "enabled": bool(latent_semantic),
-            "image": content_image if latent_semantic else None,
-            "instruction": latent_semantic_instruction.strip() if latent_semantic else "",
-            "grounding_px": int(latent_grounding_px),
+            "enabled": bool(latent_vision_enable),
+            "image": content_image if latent_vision_enable else None,
+            "vision_resize": bool(latent_vision_resize),
+            "vision_max_edge": int(latent_vision_max_edge),
+            "mode": latent_vision_mode,
+            "instruction": latent_vision_instruction,
+            "style_processing": latent_vision_style_processing,
+            "guidance_seed_mode": latent_vision_guidance_seed_mode,
+            "guidance_seed": int(latent_vision_guidance_seed),
+            "guidance_detail": latent_vision_guidance_detail,
+            "vision_guidance": latent_vision_vision_guidance,
+            "reference_annotation": str(latent_vision_annotation or latent_vision_reference_annotation or "").strip(),
+            "vision_fidelity": float(latent_vision_vision_fidelity),
         }
 
         lines = [
@@ -289,14 +334,19 @@ class CcCKrea2Latent:
             f"Resize Method: {'bicubic' if content == 'from_image' else '<unused>'}",
             f"Content Placement: {placement}",
             f"Batch Size: {int(batch_size)}",
-            f"Latent Semantic: {'enabled' if latent_semantic else 'disabled'}",
+            f"Latent Vision: {'enabled' if latent_vision_enable else 'disabled'}",
         ]
         if dimensions == "preset":
             lines.append(f"Preset: {preset_size}")
-        if latent_semantic:
-            lines.append(f"Latent Grounding: {int(latent_grounding_px)} px")
-            if latent_semantic_instruction.strip():
-                lines.append(f"Latent Semantic Instruction: {latent_semantic_instruction.strip()}")
+        if vision_warning:
+            lines.append(vision_warning)
+        if latent_vision_enable:
+            lines.extend([
+                f"Latent Vision Mode: {latent_vision_mode}",
+                f"Latent Vision Annotation: {latent_vision_annotation or latent_vision_reference_annotation or '<none>'}",
+                f"Latent Vision Resize: {latent_vision_resize}",
+                f"Latent Vision Max Edge: {latent_vision_max_edge}",
+            ])
 
         latent_info = "\n".join(lines)
         latent["ccc_krea2_latent_info"] = latent_info
