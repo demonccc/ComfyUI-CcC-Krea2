@@ -1,6 +1,6 @@
 """Krea2 CcC Edit runtime using conditioning-transported reference latents.
 
-Prepared reference latents, source/target attention masks, boosts and RoPE placement travel with CONDITIONING.
+Prepared reference latents, source attention masks, boosts and RoPE placement travel with CONDITIONING.
 """
 
 import math
@@ -450,7 +450,7 @@ def _compute_ref_attention_bias_patchified(
             if float(boost) == 0.0:
                 # True exclusion: unlike log(1e-4), -inf gives zero
                 # target-to-reference attention probability after softmax.
-                # Honor source/target masks; do not suppress unselected cells.
+                # Honor source masks; do not suppress unselected cells.
                 block.masked_fill_(selected.unsqueeze(1), float("-inf"))
             else:
                 block += (
