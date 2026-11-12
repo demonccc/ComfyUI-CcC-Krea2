@@ -73,11 +73,43 @@ def _normalize_mask(mask, batch, height, width, device):
     return mask.to(device=device, dtype=torch.float32).clamp(0, 1)
 
 
+
+def _composite_color_rgb(value, device, dtype):
+    """Parse an RGB hex color for compositing without changing mask data."""
+    color = str(value).strip().lstrip("#")
+    if len(color) != 6 or any(ch not in "0123456789abcdefABCDEF" for ch in color):
+        raise ValueError("[Krea2 CcC Mask] composite_color must be a 6-digit RGB hex color (for example #000000).")
+    return torch.tensor(
+        [int(color[i:i + 2], 16) / 255.0 for i in (0, 2, 4)],
+        device=device, dtype=dtype,
+    )
+
+
+def _composite_attention_image(image, regions, composite_color="#000000"):
+    """Last Mask Wins in pixel space; 0 darkens 90%, 10 darkens 5%.
+
+    Outside all regions the effective Boost is 0. This is a Vision-friendly
+    rendered IMAGE, not a modification to the VAE/RoPE attention chain.
+    """
+    if image.ndim != 4 or image.shape[-1] < 3:
+        raise ValueError("[Krea2 CcC Mask] composite image must be BHWC RGB.")
+    effective = torch.zeros(image.shape[:3], device=image.device, dtype=torch.float32)
+    for region in regions:
+        if not 0.0 <= float(region.boost) <= 10.0:
+            raise ValueError("[Krea2 CcC Mask] regional Boost must be in [0, 10].")
+        selection = region.mask.to(image.device) > 0.5
+        effective = torch.where(selection, float(region.boost), effective)
+    opacity = (0.90 - 0.85 * (effective / 10.0)).unsqueeze(-1)
+    rgb = image[..., :3]
+    color = _composite_color_rgb(composite_color, rgb.device, rgb.dtype)
+    return (rgb * (1.0 - opacity) + color * opacity).clamp(0.0, 1.0)
+
+
 class CcCKrea2Mask:
     CATEGORY = NODE_CATEGORY
     FUNCTION = "process"
     RETURN_TYPES = ("IMAGE", "MASK", "KREA2_MASK_CHAIN", "IMAGE", "STRING")
-    RETURN_NAMES = ("image", "mask", "mask_attention", "preview", "info")
+    RETURN_NAMES = ("image", "mask", "mask_attention", "composite_image", "info")
     DESCRIPTION = "Chain union masks for Paint Prepare and region-specific reference boosts for Edit."
 
     @classmethod
@@ -90,6 +122,7 @@ class CcCKrea2Mask:
                 "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "unload_sam_model": ("BOOLEAN", {"default": False}),
+                "composite_color": ("STRING", {"default": "#000000", "tooltip": "RGB hex color used to cover low-Boost regions in composite_image."}),
             },
             "optional": {
                 "mask": ("MASK",),
@@ -101,7 +134,7 @@ class CcCKrea2Mask:
 
     def process(self, image, source="sam3", prompt="face", boost=1.0, confidence=0.5,
                 mask=None, previous_mask_attention=None, sam_model=None,
-                sam_clip=None, unload_sam_model=False):
+                sam_clip=None, unload_sam_model=False, composite_color="#000000"):
         if image.ndim != 4:
             raise ValueError("Image must have ComfyUI BHWC dimensions.")
         batch, height, width = image.shape[:3]
@@ -127,9 +160,6 @@ class CcCKrea2Mask:
             combined = mask
             regions = ()
         chain = MaskChain(geometry, combined, regions + (AttentionRegion(mask, float(boost)),))
-        overlay = image[..., :3].clone()
-        overlay = overlay * (1 - combined.unsqueeze(-1) * 0.4)
-        overlay[..., 0] += combined * 0.4
-        overlay = overlay.clamp(0, 1)
-        info = f"Mask source: {source}; regions: {len(chain.regions)}; last boost: {boost:.2f}"
-        return image, combined, chain, overlay, info
+        composite_image = _composite_attention_image(image, chain.regions, composite_color)
+        info = f"Mask source: {source}; regions: {len(chain.regions)}; last boost: {boost:.2f}; composite: {composite_color}"
+        return image, combined, chain, composite_image, info
