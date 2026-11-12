@@ -269,7 +269,7 @@ standard `mask` socket and disables irrelevant SAM controls in the UI. Feed the 
 into the next `previous_mask_attention`, and feed the prior `image` into its
 `image` input. Outputs are the unchanged image, the union of all masks,
 the regional-attention chain, `composite_image` and diagnostic info.
-`composite_color` accepts a six-digit RGB hex color (default `#000000`).
+`composite_color` uses ComfyUI’s native color picker (default black, `#000000`); the saved value is a six-digit RGB hex color.
 The `composite_image` output replaces the former `preview` at the **same output
 index** and may be connected directly to a Reference's `image` input
 (including Vision). It is a real composited IMAGE, not an attention-weight
