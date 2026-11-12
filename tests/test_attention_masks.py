@@ -161,3 +161,53 @@ def test_zero_boost_with_region_map_blocks_zero_regions():
 def test_negative_boost_is_rejected():
     with pytest.raises(ValueError, match="nonnegative"):
         bias_for(boosts=[-0.5])
+
+
+def test_mask_composite_effective_boost_last_region_wins():
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+    source = torch.ones((1, 4, 4, 3))
+    full = torch.ones((1, 4, 4))
+    left = torch.zeros((1, 4, 4))
+    left[:, :, :2] = 1.0
+    center = torch.zeros((1, 4, 4))
+    center[:, 1:3, 1:3] = 1.0
+    node = CcCKrea2Mask()
+    _, _, first, _, _ = node.process(source, source="mask", mask=full, boost=2.0)
+    _, _, second, _, _ = node.process(
+        source, source="mask", mask=left, boost=10.0,
+        previous_mask_attention=first,
+    )
+    original, union, third, composite, _ = node.process(
+        source, source="mask", mask=center, boost=0.0,
+        previous_mask_attention=second, composite_color="#000000",
+    )
+    torch.testing.assert_close(original, source)
+    assert torch.all(union == 1)
+    assert len(third.regions) == 3
+    # The last region overrides even Boost 10; outside it is Boost 2 or 10.
+    assert composite[0, 1, 1, 0].item() == pytest.approx(0.10)
+    assert composite[0, 0, 0, 0].item() == pytest.approx(0.95)
+    assert composite[0, 0, 3, 0].item() == pytest.approx(0.27)
+
+
+def test_mask_composite_color_and_unselected_pixels():
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+    source = torch.ones((1, 2, 2, 3))
+    selection = torch.zeros((1, 2, 2))
+    selection[0, 0, 0] = 1.0
+    _, _, _, composite, _ = CcCKrea2Mask().process(
+        source, source="mask", mask=selection, boost=10,
+        composite_color="#FF0000",
+    )
+    # Selected Boost 10 remains nearly original; unselected defaults Boost 0.
+    torch.testing.assert_close(composite[0, 0, 0], torch.ones(3))
+    torch.testing.assert_close(composite[0, 1, 1], torch.tensor([1.0, 0.1, 0.1]))
+
+
+def test_mask_composite_rejects_invalid_hex():
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+    with pytest.raises(ValueError, match="composite_color"):
+        CcCKrea2Mask().process(
+            torch.ones((1, 2, 2, 3)), source="mask",
+            mask=torch.ones((1, 2, 2)), composite_color="red",
+        )
