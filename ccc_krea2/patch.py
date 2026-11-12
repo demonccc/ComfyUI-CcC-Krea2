@@ -489,8 +489,18 @@ def _compute_ref_attention_bias_patchified(
             zero = (weights <= 0).unsqueeze(1) & (tgt_weight > 0).unsqueeze(-1)
             block.masked_fill_(zero.unsqueeze(1), float("-inf"))
         elif float(boost) != 1.0:
-            score = math.log(max(float(boost), 1e-4))
-            block += (score * tgt_weight.unsqueeze(-1) * ref_weight.unsqueeze(1)).unsqueeze(1)
+            if float(boost) < 0.0:
+                raise ValueError("[Krea2 CcC Edit] Reference boost must be nonnegative.")
+            selected = (tgt_weight > 0).unsqueeze(-1) & (ref_weight > 0).unsqueeze(1)
+            if float(boost) == 0.0:
+                # True exclusion: unlike log(1e-4), -inf gives zero
+                # target-to-reference attention probability after softmax.
+                # Honor source/target masks; do not suppress unselected cells.
+                block.masked_fill_(selected.unsqueeze(1), float("-inf"))
+            else:
+                block += (
+                    math.log(float(boost)) * tgt_weight.unsqueeze(-1) * ref_weight.unsqueeze(1)
+                ).unsqueeze(1)
         if scope == "only in mask":
             block.masked_fill_((tgt_weight <= 0.5).view(batch_size, 1, tgt_len, 1), float("-inf"))
 
