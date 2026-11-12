@@ -1,6 +1,5 @@
 """RoPE geometry views including regional attention weights attached to references."""
 
-import math
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
@@ -40,50 +39,18 @@ def _boost_visibility_preview(image, weights):
     return Image.fromarray(np.rint(visible).astype(np.uint8), "RGB")
 
 
-def _render_boost_gallery(size, boosted_images, boost_ranges):
-    """Independent tiled reference panels; overlapping RoPE cannot hide refs."""
-    width, height = size
-    canvas = Image.new("RGB", size, (30, 34, 43))
-    if not boosted_images:
-        ImageDraw.Draw(canvas).text((12, 12), "NO VAE/RoPE REFERENCES", fill="white")
-        return canvas
-
-    count = len(boosted_images)
-    columns = min(3, math.ceil(math.sqrt(count)))
-    rows = math.ceil(count / columns)
-    gap = 12
-    header = 38
-    cell_w = max(1, (width - gap * (columns + 1)) // columns)
-    cell_h = max(1, (height - gap * (rows + 1)) // rows)
-    for index, (image, (low, high)) in enumerate(zip(boosted_images, boost_ranges)):
-        column, row = index % columns, index // columns
-        left = gap + column * (cell_w + gap)
-        top = gap + row * (cell_h + gap)
-        panel = Image.new("RGB", (cell_w, cell_h), (45, 49, 60))
-        source = image.copy()
-        source.thumbnail((max(1, cell_w - 10), max(1, cell_h - header - 6)), Image.Resampling.LANCZOS)
-        panel.paste(source, ((cell_w - source.width) // 2,
-                             header + max(0, (cell_h - header - source.height) // 2)))
-        draw = ImageDraw.Draw(panel)
-        draw.rectangle((0, 0, cell_w - 1, header - 3), fill=(45, 49, 60))
-        draw.text((7, 6), f"REF {index + 1}  /  BOOST {low:g}-{high:g}", fill="white")
-        draw.rectangle((0, 0, cell_w - 1, cell_h - 1),
-                       outline=PALETTE[index % len(PALETTE)], width=2)
-        canvas.paste(panel, (left, top))
-    return canvas
-
-
 def render_rope_preview(visual_entries, target_latent, max_side=1024):
-    """Return IMAGE batch [layout, overlay_boxes, overlay_visuals, attention_boosts] as BHWC floats.
+    """Return spatial views [layout, boxes, visuals, boosts, per-ref boosts...] as BHWC floats.
 
     The visual references are pixel-processed with the production geometry
     implementation. Layout is calculated with the same planner as runtime RoPE.
-    Collapsed references are always displayed as a point, never as an image.
+    Collapsed references are always displayed as a point. Per-reference
+    boost views retain the shared RoPE coordinates while avoiding occlusion.
     """
     samples = target_latent["samples"]
     target_h, target_w = int(samples.shape[-2]) // 2, int(samples.shape[-1]) // 2
     target_image = _rgb(target_latent.get("ccc_krea2_target_preview_image"))
-    ref_grids, ref_images, ref_boost_images, boost_ranges = [], [], [], []
+    ref_grids, ref_images, ref_boost_images = [], [], []
     for entry in visual_entries:
         if entry.image is None:
             raise ValueError("RoPE preview requires a Visual Reference image.")
@@ -108,7 +75,6 @@ def render_rope_preview(visual_entries, target_latent, max_side=1024):
         # Use the effective weight map composed with Last Mask Wins upstream.
         boost_image = _boost_visibility_preview(base.convert("RGB"), weights)
         ref_boost_images.append(boost_image)
-        boost_ranges.append((float(np.min(weights)), float(np.max(weights))))
         ref_grids.append((geom.vae_latent_grid_size[1] // 2,
                           geom.vae_latent_grid_size[0] // 2))
     layout = plan_rope_positions(ref_grids, (target_h, target_w),
@@ -125,11 +91,6 @@ def render_rope_preview(visual_entries, target_latent, max_side=1024):
                 (max_side - 2 * padding) / max(1, max_y - min_y), 8.0)
     width = max(240, int((max_x - min_x) * scale + 2 * padding))
     height = max(160, int((max_y - min_y) * scale + 2 * padding))
-    # Every IMAGE batch item has identical dimensions; reserve gallery room.
-    gallery_cols = min(3, math.ceil(math.sqrt(len(ref_images)))) if ref_images else 1
-    gallery_rows = math.ceil(len(ref_images) / gallery_cols) if ref_images else 1
-    width = max(width, min(max_side, 250 * gallery_cols))
-    height = max(height, min(max_side, 215 * gallery_rows))
     size = (width, height)
 
     def point(x, y):
@@ -137,12 +98,10 @@ def render_rope_preview(visual_entries, target_latent, max_side=1024):
 
     target_box = (*point(0, 0), *point(target_w, target_h))
     views = []
-    for view_index in range(4):
-        if view_index == 3:
-            # A RoPE overlay can conceal earlier references; show all separately.
-            gallery = _render_boost_gallery(size, ref_boost_images, boost_ranges)
-            views.append(torch.from_numpy(np.asarray(gallery).copy()).float() / 255.)
-            continue
+    # Four canonical views followed by one spatial boost view per reference.
+    # Independent spatial frames prevent overlapping references from hiding
+    # each other, without losing the RoPE position on the shared canvas.
+    for view_index in range(4 + len(ref_images)):
         canvas = Image.new("RGB", size, (30, 34, 43))
         draw = ImageDraw.Draw(canvas)
         draw.rectangle(target_box, fill=(58, 66, 78), outline=(240, 240, 240), width=3)
@@ -155,9 +114,16 @@ def render_rope_preview(visual_entries, target_latent, max_side=1024):
         draw.text((target_box[0] + 5, target_box[1] + 5),
                   f"TARGET {target_w}x{target_h} tokens", fill="white")
 
+        isolated_reference = view_index - 4 if view_index >= 4 else None
         for index, (entry, ref, image) in enumerate(zip(visual_entries, layout, ref_images)):
+            if isolated_reference is not None and index != isolated_reference:
+                continue
             color = PALETTE[index % len(PALETTE)]
             label = f"REF {index + 1} / {entry.reference_fit} / {entry.rope_mode} / {entry.reference_stack}"
+            if view_index >= 3:
+                label += f" / BOOST {entry.boost:g}"
+                if entry.attention_weight_map is not None:
+                    label += " / REGIONAL"
             if ref.collapsed:
                 cx, cy = point(ref.x + ref.width / 2, ref.y + ref.height / 2)
                 draw.ellipse((cx - 7, cy - 7, cx + 7, cy + 7), fill=color)
@@ -171,11 +137,12 @@ def render_rope_preview(visual_entries, target_latent, max_side=1024):
                 overlay = Image.new("RGBA", size, (0, 0, 0, 0))
                 ImageDraw.Draw(overlay).rectangle((a, b, c, d), fill=(*color, 65))
                 canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
-            elif view_index == 2 and image is not None:
+            elif view_index >= 2 and image is not None:
                 w, h = max(1, c - a), max(1, d - b)
-                rgba = image.resize((w, h), Image.Resampling.BICUBIC).convert("RGBA")
-                rgba.putalpha(120)
-                canvas.paste(rgba, (a, b), rgba)
+                selected = ref_boost_images[index] if view_index >= 3 else image
+                # Don't alpha-blend the selected image into the canvas: doing
+                # so applies a second attenuation, destroying fine detail.
+                canvas.paste(selected.resize((w, h), Image.Resampling.LANCZOS), (a, b))
             draw = ImageDraw.Draw(canvas)
             draw.rectangle((a, b, c, d), outline=color, width=3)
             draw.text((a + 5, b + 18), label, fill=color)
