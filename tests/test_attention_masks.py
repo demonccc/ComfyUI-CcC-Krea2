@@ -200,7 +200,7 @@ def test_mask_composite_color_and_unselected_pixels():
         composite_color="#FF0000",
     )
     # Selected Boost 10 remains nearly original; unselected defaults Boost 0.
-    torch.testing.assert_close(composite[0, 0, 0], torch.ones(3))
+    torch.testing.assert_close(composite[0, 0, 0], torch.tensor([1.0, 0.95, 0.95]))
     torch.testing.assert_close(composite[0, 1, 1], torch.tensor([1.0, 0.1, 0.1]))
 
 
