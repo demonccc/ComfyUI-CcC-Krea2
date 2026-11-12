@@ -36,7 +36,7 @@ class CcCKrea2Reference:
         vision = CcCKrea2VisionReference.INPUT_TYPES()
         required = {"image": ("IMAGE",), "vae_rope_enable": ("BOOLEAN", {"default": True})}
         for name, spec in visual["required"].items():
-            if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px", "attention_scope"):
+            if name != "image" and name not in ("semantic", "semantic_resize", "semantic_grounding_px"):
                 required["vae_rope_" + name] = spec
         required["vision_enable"] = ("BOOLEAN", {"default": True})
         required["vision_weight"] = vision["required"]["weight"]
@@ -112,7 +112,7 @@ class CcCKrea2Reference:
             visual_kwargs = {
                 name: kwargs["vae_rope_" + name]
                 for name in CcCKrea2VisualReference.INPUT_TYPES()["required"]
-                if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px", "attention_scope")
+                if name not in ("image", "semantic", "semantic_resize", "semantic_grounding_px")
                 and "vae_rope_" + name in kwargs
             }
             visual_kwargs["prompt_annotation"] = annotation
