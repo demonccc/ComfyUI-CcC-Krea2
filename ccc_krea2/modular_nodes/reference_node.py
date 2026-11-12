@@ -50,7 +50,6 @@ class CcCKrea2Reference:
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
             "mask_attention": ("KREA2_MASK_CHAIN",),
-            "target_attention_mask": visual["optional"]["target_attention_mask"],
         }
         return {"required": required, "optional": optional}
 
@@ -73,7 +72,7 @@ class CcCKrea2Reference:
 
     def process(self, image: torch.Tensor, vae_rope_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
-                reference_boost_mask=None, mask_attention=None, target_attention_mask=None, **kwargs):
+                reference_boost_mask=None, mask_attention=None, **kwargs):
         # Accept saved workflows with the previous visual control spelling.
         if "visual_enable" in kwargs:
             vae_rope_enable = bool(kwargs.pop("visual_enable"))
@@ -123,7 +122,7 @@ class CcCKrea2Reference:
                 semantic_resize=bool(kwargs.get("vision_resize", True)),
                 semantic_grounding_px=int(kwargs.get("vision_max_edge", 768)),
                 reference_boost_mask=reference_boost_mask,
-                target_attention_mask=target_attention_mask, **visual_kwargs)
+                **visual_kwargs)
             if attention_weight_map is not None:
                 chain = EditReferenceChain(chain.entries[:-1] + (
                     replace(chain.entries[-1], attention_weight_map=attention_weight_map),
