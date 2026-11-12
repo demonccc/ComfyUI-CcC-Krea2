@@ -248,7 +248,7 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
 
-**RoPE preview:** Edit emits one `IMAGE` batch containing four annotated views in order: `layout`, `overlay_boxes`, `overlay_visuals`, and `regional_boosts`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point, and Qwen-only Vision References are not shown.
+**RoPE preview:** Edit emits one `IMAGE` batch containing four annotated views in order: `layout`, `overlay_boxes`, `overlay_visuals`, and `regional_boosts`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point in the layout views, and Qwen-only Vision References are not shown. The fourth view (`regional_boosts`) uses an **independent panel for every VAE/RoPE reference**, so overlapping RoPE positions cannot hide earlier references. Every panel shows its prepared source image darkened using the final, Last-Mask-Wins effective boost map: **Boost 0 = 90% black overlay, Boost 10 = 5% black overlay**, with intermediate values scaled linearly. Panel labels show reference order and effective min/max boost. These are preview-only visual effects, not changes to attention weights.
 
 
 **Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts one ordered `references` chain, analyzes its images once in chain order and forwards that same chain unchanged. To use a scene and a subject, connect Scene Reference to Subject Reference via `previous_references`, then connect Subject Reference to Prompt Creator. Both VAE/RoPE and Vision enable states are preserved. Existing workflows using the former IMAGE socket/widget names require migration.
@@ -294,7 +294,7 @@ been validated on the user's machine.
 
 `Krea2 CcC Edit.rope_preview` returns four IMAGE frames:
 (1) RoPE layout, (2) placement boxes, (3) positioned reference images,
-(4) positioned reference images with a heatmap of regional Boost values.
+(4) a separate per-reference gallery of effective regional Boost maps, with darkening inversely proportional to Boost (`0` nearly black, `10` nearly unchanged), preventing reference overlap from concealing masks.
 There is no separate attention-preview node. All four frames share the
 same RoPE positioning layout, and the fourth view applies the same
 VAE-input image crop/resize transformation to each reference's weight
