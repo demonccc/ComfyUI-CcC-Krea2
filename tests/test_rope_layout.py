@@ -9,7 +9,7 @@ from ccc_krea2.modular_nodes.rope_position import (
     build_incontext_3d_rope_pos_ids, plan_rope_positions, parse_rope_position,
 )
 from ccc_krea2.modular_nodes.edit_reference_types import VisualReferenceEntry
-from ccc_krea2.modular_nodes.rope_preview import render_rope_preview, _boost_visibility_preview, _render_boost_gallery
+from ccc_krea2.modular_nodes.rope_preview import render_rope_preview, _boost_visibility_preview
 
 
 def position(grid, h, v, stack="overlay", mode="spatial", geometry="latent", source=None):
@@ -62,7 +62,7 @@ def test_preview_is_rgb_and_draws_only_visual_entries():
     latent = {"samples": torch.zeros((1, 16, 16, 16))}
     entry = VisualReferenceEntry(image=torch.zeros((1, 256, 256, 3)))
     img = render_rope_preview([entry], latent)
-    assert img.ndim == 4 and img.shape[-1] == 3 and img.shape[0] == 4
+    assert img.ndim == 4 and img.shape[-1] == 3 and img.shape[0] == 5
     assert img.min().item() >= 0 and img.max().item() <= 1
     assert torch.unique(img).numel() > 3
 
@@ -73,7 +73,7 @@ def test_three_views_keep_identical_canvas_and_use_processed_target_content():
     }
     reference = VisualReferenceEntry(image=torch.zeros((1, 128, 128, 3)), reference_fit="native")
     preview = render_rope_preview([reference], latent)
-    assert preview.shape[0] == 4
+    assert preview.shape[0] == 5
     assert preview.shape[1:] == render_rope_preview([reference], {
         "samples": latent["samples"]
     }).shape[1:]
@@ -92,36 +92,47 @@ def test_preview_inverse_opacity_0_to_10():
     assert pixels[0, 2, 0] == 190  # 5 percent black at Boost 10.
 
 
-def test_regional_gallery_displays_all_four_refs_when_rope_overlaps():
+def test_boost_preview_uses_rope_coordinates_and_isolated_views():
+    # Two overlapping references: each isolated view must preserve the same
+    # RoPE coordinates and neither reference disappears behind the other.
+    latent = {"samples": torch.zeros((1, 16, 16, 16))}
+    left = VisualReferenceEntry(
+        image=torch.ones((1, 128, 128, 3)),
+        boost=10.0, reference_fit="native",
+        placement_grid="outside", grid_horizontal_position="left",
+        rope_position=position("outside", "left", "center", geometry="source"),
+    )
+    right = VisualReferenceEntry(
+        image=torch.ones((1, 128, 128, 3)),
+        boost=0.0, reference_fit="native",
+        placement_grid="outside", grid_horizontal_position="right",
+        rope_position=position("outside", "right", "center", geometry="source"),
+    )
+    frames = render_rope_preview([left, right], latent)
+    assert frames.shape[0] == 6  # four canonical views and two isolated frames
+    # Same image proportions and the same target location in all views.
+    assert frames.shape[1:] == render_rope_preview([left], latent).shape[1:]
+    assert (frames[4] - frames[5]).abs().sum() > 0
+    assert (frames[3] - frames[2]).abs().sum() > 0
+
+
+def test_multiple_overlapping_boost_references_preserve_each_identity_in_spatial_views():
     latent = {"samples": torch.zeros((1, 16, 16, 16))}
     entries = [
         VisualReferenceEntry(
-            image=torch.full((1, 128, 128, 3), 1.0),
-            boost=10.0 if index == 3 else float(index),
+            image=torch.full((1, 128, 128, 3), value),
+            boost=10.0,
             reference_fit="native",
         )
-        for index in range(4)
+        for value in (0.2, 0.5, 0.8, 1.0)
     ]
     preview = render_rope_preview(entries, latent)
-    assert preview.shape[0] == 4
-    assert preview.shape[-1] == 3
-    # The fourth view is a separate 2x2 gallery rather than a RoPE overlap.
-    regional = preview[3]
-    assert regional.shape[0] >= 430
-    assert regional.shape[1] >= 500
-    # Ref 4 uses Boost 10 and remains much brighter than Ref 1 Boost 0.
-    h, w = regional.shape[:2]
-    top_left = regional[70:min(h // 2 - 5, 100), 30:70].mean().item()
-    bottom_right = regional[h // 2 + 55:h // 2 + 85, w // 2 + 40:w // 2 + 80].mean().item()
-    assert bottom_right > top_left + 0.3
-
-
-def test_gallery_accepts_three_independent_regional_maps():
-    previews = [
-        _boost_visibility_preview(Image.new("RGB", (64, 64), (200, 200, 200)),
-                                  np.full((64, 64), boost))
-        for boost in (0, 5, 10)
-    ]
-    gallery = _render_boost_gallery((600, 450), previews, [(v, v) for v in (0, 5, 10)])
-    assert gallery.size == (600, 450)
-    assert len(np.unique(np.asarray(gallery).reshape(-1, 3), axis=0)) > 4
+    assert preview.shape[0] == 8
+    # Each isolated frame renders its own reference at the same RoPE position.
+    # Boost 10 must remain close to original brightness, without 120/255
+    # extra alpha attenuation.
+    h, w = preview.shape[1:3]
+    center = (h // 2, w // 2)
+    values = [preview[4 + idx, center[0], center[1]].mean().item() for idx in range(4)]
+    assert values == sorted(values)
+    assert values[-1] > 0.90
