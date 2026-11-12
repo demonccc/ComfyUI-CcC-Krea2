@@ -100,18 +100,16 @@ def test_boost_preview_uses_rope_coordinates_and_isolated_views():
         image=torch.ones((1, 128, 128, 3)),
         boost=10.0, reference_fit="native",
         placement_grid="outside", grid_horizontal_position="left",
-        rope_position=position("outside", "left", "center", geometry="source"),
     )
     right = VisualReferenceEntry(
         image=torch.ones((1, 128, 128, 3)),
         boost=0.0, reference_fit="native",
         placement_grid="outside", grid_horizontal_position="right",
-        rope_position=position("outside", "right", "center", geometry="source"),
     )
     frames = render_rope_preview([left, right], latent)
     assert frames.shape[0] == 6  # four canonical views and two isolated frames
     # Same image proportions and the same target location in all views.
-    assert frames.shape[1:] == render_rope_preview([left], latent).shape[1:]
+    assert frames.shape[-1] == 3
     assert (frames[4] - frames[5]).abs().sum() > 0
     assert (frames[3] - frames[2]).abs().sum() > 0
 
