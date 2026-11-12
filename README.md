@@ -247,7 +247,7 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
 
-**RoPE preview:** Edit emits one `IMAGE` batch containing four annotated views in order: `layout`, `overlay_boxes`, `overlay_visuals`, and `regional_boosts`. When target Latent content is `from_image`, the VAE-prepared target image is used; when `empty`, a neutral rectangle is used. Visual Reference images are prepared with the same pixel-space geometry as the VAE. `collapsed` references show a point in the layout views, and Qwen-only Vision References are not shown. The fourth view (`regional_boosts`) uses an **independent panel for every VAE/RoPE reference**, so overlapping RoPE positions cannot hide earlier references. Every panel shows its prepared source image darkened using the final, Last-Mask-Wins effective boost map: **Boost 0 = 90% black overlay, Boost 10 = 5% black overlay**, with intermediate values scaled linearly. Panel labels show reference order and effective min/max boost. These are preview-only visual effects, not changes to attention weights.
+**RoPE preview:** Edit emits an `IMAGE` batch with four canonical views (`layout`, `overlay_boxes`, `overlay_visuals`, `regional_boosts`) followed by **one separate spatial Boost view per VAE/RoPE reference**. Every view uses the same coordinates computed by the runtime RoPE planner; the fourth no longer uses a centered gallery. When references overlap, the fourth view shows the actual overlay order; the additional per-reference frames preserve each image and mask at its own RoPE position so no reference disappears behind another. Target content is shown if available. All reference previews use the same source geometry as VAE preparation; collapsed references are displayed as points. Vision-only references do not appear. Boost 0 darkens the image by 90%, Boost 10 by 5%, with intermediate values interpolated linearly. The source image is not alpha-blended a second time into the preview, preserving visible detail. This is preview rendering only and does not change generation attention.
 
 
 **Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts one ordered `references` chain, analyzes its images once in chain order and forwards that same chain unchanged. To use a scene and a subject, connect Scene Reference to Subject Reference via `previous_references`, then connect Subject Reference to Prompt Creator. Both VAE/RoPE and Vision enable states are preserved. Existing workflows using the former IMAGE socket/widget names require migration.
@@ -301,15 +301,17 @@ been validated on the user's machine.
 
 ### Regional attention in Edit RoPE preview
 
-`Krea2 CcC Edit.rope_preview` returns four IMAGE frames:
+`Krea2 CcC Edit.rope_preview` produces four initial IMAGE frames:
 (1) RoPE layout, (2) placement boxes, (3) positioned reference images,
-(4) a separate per-reference gallery of effective regional Boost maps, with darkening inversely proportional to Boost (`0` nearly black, `10` nearly unchanged), preventing reference overlap from concealing masks.
-There is no separate attention-preview node. All four frames share the
-same RoPE positioning layout, and the fourth view applies the same
-VAE-input image crop/resize transformation to each reference's weight
-map. Reference weights remain attached to the same visual tokens
-regardless of the RoPE displacement. The fourth preview is a visual
-debug aid, not a second source of mask conditioning.
+(4) positioned effective regional Boost masks. It then appends one frame
+per VAE/RoPE reference showing only that reference's masked source image
+**at its actual RoPE position**. These extra frames prevent one reference
+from concealing another when RoPE positions overlap. Every frame shares
+one canvas and RoPE coordinate system. Boost darkness is applied once
+to the reference image (0 nearly black, 10 almost unchanged), and the
+result is pasted without a second transparency layer. All images and
+regional maps follow the same VAE-input crop/resize geometry. This is
+a preview-only change; reference tokens and attention remain unchanged.
 
 `Krea2 CcC Mask.confidence` controls native SAM3.1 detection threshold.
 Native detector refinement remains at 2 iterations. Paint workflows
