@@ -361,32 +361,6 @@ def _conditioning_extras(conditioning):
     return {}
 
 
-def _resolve_reference_target_masks(visual_entries, latent):
-    """Read masks from their owning Visual References, never from a parallel chain."""
-    samples = latent["samples"]
-    target_h, target_w = (int(samples.shape[-2]) * 8, int(samples.shape[-1]) * 8)
-    batch = int(samples.shape[0])
-    masks, scopes = [], []
-    for index, entry in enumerate(visual_entries, start=1):
-        scope = entry.attention_scope
-        mask = entry.target_attention_mask
-        if scope != "global" and mask is None:
-            raise ValueError(f"[Krea2 CcC Edit] Visual Reference {index} requires a target_attention_mask.")
-        if mask is not None:
-            if mask.ndim == 2:
-                mask = mask.unsqueeze(0)
-            if mask.ndim != 3 or tuple(mask.shape[-2:]) != (target_h, target_w):
-                raise ValueError(
-                    f"[Krea2 CcC Edit] Visual Reference {index} target_attention_mask must match "
-                    f"the prepared target {target_w}x{target_h}; received {tuple(mask.shape)}."
-                )
-            if mask.shape[0] not in (1, batch):
-                raise ValueError(f"[Krea2 CcC Edit] Visual Reference {index} target mask batch must be 1 or {batch}.")
-        masks.append(mask if scope != "global" else None)
-        scopes.append(scope)
-    return masks, scopes
-
-
 def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     extras = _conditioning_extras(conditioning)
     refs = list(extras.get("reference_latents") or [])
@@ -478,7 +452,6 @@ class CcCKrea2Edit:
         reference_count = len(visual_entries)
         rope_positions = [entry.rope_position for entry in visual_entries]
         positive_boosts = [float(entry.boost) for entry in visual_entries]
-        target_masks, attention_scopes = _resolve_reference_target_masks(visual_entries, latent)
 
         if reference_count:
             positive = attach_reference_runtime_to_conditioning(
@@ -486,8 +459,6 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=positive_boosts,
-                reference_target_masks=target_masks,
-                reference_attention_scopes=attention_scopes,
                 isolate_references=isolate_references,
             )
             negative = attach_reference_runtime_to_conditioning(
@@ -495,8 +466,6 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=None,
-                reference_target_masks=target_masks,
-                reference_attention_scopes=attention_scopes,
             )
 
         if apply_krea2_edit_patch and reference_count:
@@ -547,7 +516,7 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"rope={entry.rope_position}, semantic={entry.semantic}, "
-                f"attention_scope={entry.attention_scope}, reference_boost_mask={entry.reference_boost_mask is not None}, target_attention_mask={entry.target_attention_mask is not None}, "
+                f"reference_boost_mask={entry.reference_boost_mask is not None}, "
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method=bicubic, prompt_annotation={annotation}"
             )
