@@ -269,7 +269,17 @@ Each Mask accepts an IMAGE and a `source` selector (`sam3` or `mask`).
 standard `mask` socket and disables irrelevant SAM controls in the UI. Feed the prior `mask_attention`
 into the next `previous_mask_attention`, and feed the prior `image` into its
 `image` input. Outputs are the unchanged image, the union of all masks,
-the regional-attention chain, a preview and diagnostic info.
+the regional-attention chain, `composite_image` and diagnostic info.
+`composite_color` accepts a six-digit RGB hex color (default `#000000`).
+The `composite_image` output replaces the former `preview` at the **same output
+index** and may be connected directly to a Reference's `image` input
+(including Vision). It is a real composited IMAGE, not an attention-weight
+input. Compositing uses the full ordered Mask chain: the **last mask wins**
+where regions overlap. Pixels outside all masks are treated as Boost 0;
+Boost 0 is 90% composite color and Boost 10 is 5% composite color, with
+linear interpolation. The untouched `image`, union `mask`, and
+`mask_attention` outputs retain their prior behavior. The Reference's
+own global VAE/RoPE Boost remains independent of the image composite.
 
 For Paint, connect the **last** Mask's `image` and `mask` to
 `Krea2 CcC Paint Prepare`; Paint consumes Paint Prepare's context.
