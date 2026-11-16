@@ -274,9 +274,10 @@ The `composite_image` output replaces the former `preview` at the **same output
 index** and may be connected directly to a Reference's `image` input
 (including Vision). It is a real composited IMAGE, not an attention-weight
 input. Compositing uses the full ordered Mask chain: the **last mask wins**
-where regions overlap. Pixels outside all masks are treated as Boost 0;
-Boost 0 is 90% composite color and Boost 10 is 5% composite color, with
-linear interpolation. The untouched `image`, union `mask`, and
+where regions overlap. Pixels outside all masks remain unchanged in
+`composite_image`. Only masked pixels receive the selected overlay:
+Boost 0 is 90% composite color and Boost 10 is 5% composite color,
+with linear interpolation. The untouched `image`, union `mask`, and
 `mask_attention` outputs retain their prior behavior. The Reference's
 own global VAE/RoPE Boost remains independent of the image composite.
 
