@@ -92,7 +92,7 @@ def test_zero_boost_with_region_map_blocks_zero_regions():
     bias = _compute_ref_attention_bias_patchified(
         boosts=[1.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
         ref_token_grids=[(2, 2)], ref_attention_maps=[weight_map],
-        target_grid=(2, 4), device=torch.device("cpu"), dtype=torch.float32,
+        device=torch.device("cpu"), dtype=torch.float32,
     )
     selected = bias[0, 0, 7:, 3:7]
     assert torch.isneginf(selected[:, [0, 3]]).all()
@@ -141,9 +141,9 @@ def test_mask_composite_color_and_unselected_pixels():
         source, source="mask", mask=selection, boost=10,
         composite_color="#FF0000",
     )
-    # Selected Boost 10 remains nearly original; unselected defaults Boost 0.
+    # Selected Boost 10 is tinted slightly; unselected pixels remain original.
     torch.testing.assert_close(composite[0, 0, 0], torch.tensor([1.0, 0.95, 0.95]))
-    torch.testing.assert_close(composite[0, 1, 1], torch.tensor([1.0, 0.1, 0.1]))
+    torch.testing.assert_close(composite[0, 1, 1], torch.ones(3))
 
 
 def test_mask_composite_rejects_invalid_hex():
@@ -153,3 +153,15 @@ def test_mask_composite_rejects_invalid_hex():
             torch.ones((1, 2, 2, 3)), source="mask",
             mask=torch.ones((1, 2, 2)), composite_color="red",
         )
+
+
+def test_composite_unselected_pixels_remain_exact_for_zero_boost():
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+    source = torch.tensor([[[[0.2, 0.3, 0.4], [0.7, 0.6, 0.5]]]])
+    selection = torch.tensor([[[1.0, 0.0]]])
+    original, _, _, composite, _ = CcCKrea2Mask().process(
+        source, source="mask", mask=selection, boost=0,
+        composite_color="#000000",
+    )
+    torch.testing.assert_close(composite[0, 0, 1], original[0, 0, 1])
+    torch.testing.assert_close(composite[0, 0, 0], source[0, 0, 0] * 0.10)
