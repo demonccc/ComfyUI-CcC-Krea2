@@ -88,18 +88,20 @@ def _composite_color_rgb(value, device, dtype):
 def _composite_attention_image(image, regions, composite_color="#000000"):
     """Last Mask Wins in pixel space; 0 darkens 90%, 10 darkens 5%.
 
-    Outside all regions the effective Boost is 0. This is a Vision-friendly
-    rendered IMAGE, not a modification to the VAE/RoPE attention chain.
+    Pixels outside all regions remain unchanged. This is a Vision-friendly
+    rendered IMAGE, independent of the Reference node global Boost.
     """
     if image.ndim != 4 or image.shape[-1] < 3:
         raise ValueError("[Krea2 CcC Mask] composite image must be BHWC RGB.")
     effective = torch.zeros(image.shape[:3], device=image.device, dtype=torch.float32)
+    selected_any = torch.zeros(image.shape[:3], device=image.device, dtype=torch.bool)
     for region in regions:
         if not 0.0 <= float(region.boost) <= 10.0:
             raise ValueError("[Krea2 CcC Mask] regional Boost must be in [0, 10].")
         selection = region.mask.to(image.device) > 0.5
         effective = torch.where(selection, float(region.boost), effective)
-    opacity = (0.90 - 0.85 * (effective / 10.0)).unsqueeze(-1)
+        selected_any |= selection
+    opacity = ((0.90 - 0.85 * (effective / 10.0)) * selected_any).unsqueeze(-1)
     rgb = image[..., :3]
     color = _composite_color_rgb(composite_color, rgb.device, rgb.dtype)
     return (rgb * (1.0 - opacity) + color * opacity).clamp(0.0, 1.0)
