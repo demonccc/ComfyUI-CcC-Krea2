@@ -395,21 +395,16 @@ def _compute_ref_attention_bias_patchified(
             weights = weights.expand(batch_size, -1)
             if torch.any(weights < 0):
                 raise ValueError("Reference attention weights must be nonnegative.")
-            block += (weights.clamp_min(1e-12).log().unsqueeze(1)
+            # Boost 0 suppresses reference attention strongly but does not
+            # remove a token entirely; retain pre-30c7229 behavior.
+            block += (weights.clamp_min(1e-4).log().unsqueeze(1)
                       * tgt_weight.unsqueeze(-1)).unsqueeze(1)
-            zero = (weights <= 0).unsqueeze(1) & (tgt_weight > 0).unsqueeze(-1)
-            block.masked_fill_(zero.unsqueeze(1), float("-inf"))
         elif float(boost) != 1.0:
             if float(boost) < 0.0:
                 raise ValueError("[Krea2 CcC Edit] Reference boost must be nonnegative.")
-            if float(boost) == 0.0:
-                # True exclusion: unlike log(1e-4), -inf gives zero
-                # target-to-reference attention probability after softmax.
-                block.fill_(float("-inf"))
-            else:
-                block += (
-                    math.log(float(boost)) * tgt_weight.unsqueeze(-1)
-                ).unsqueeze(1)
+            block += (
+                math.log(max(float(boost), 1e-4)) * tgt_weight.unsqueeze(-1)
+            ).unsqueeze(1)
 
     return bias
 
