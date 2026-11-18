@@ -4,7 +4,7 @@
 
 Node ID: `CcCKrea2Reference`. This is the recommended reference node for new workflows.
 
-The required inputs start with `image`, then `visual_enable` and the complete `visual_*` group, then `vision_enable` and the complete `vision_*` group. Optional inputs are `previous_references`, `reference_boost_mask`, and `target_attention_mask`. Disabled groups are greyed out and ignored. At least one path must be enabled.
+The required inputs start with `image`, then `vae_rope_enable` and its `vae_rope_*` controls, followed by `vision_enable`, `vision_weight`, resize, mode and optional instruction. Optional inputs are `previous_references` and `mask_attention`. Disabled groups are ignored. At least one path must be enabled.
 
 The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
 
@@ -54,7 +54,6 @@ IMAGE --> Visual Reference --> Vision Reference --> Visual Reference
                                                       |
                                                       v
                                                 Edit.references
-Latent.target_image --> MASK editor --> Visual Reference.target_attention_mask
 Latent -------------------------------> Edit.latent
 Size Resolver ---------> Latent
 ~~~
@@ -118,22 +117,20 @@ source image
           reference latent
           boost
           RoPE placement
-          optional target attention scope
+          source reference masks / regional Boost
 ~~~
 
 The Qwen copy does not need to match target pixel geometry. Appearance preparation resolves against the target geometry before VAE encoding.
 
 The positive branch uses configured reference boosts. The grounded negative branch uses the same appearance-image vision blocks, fixed empty negative text, no role annotation text, and neutral boost 1.0.
 
-### Attention masks owned by Visual Reference
+### Reference-side attention masks
 
-- `reference_boost_mask`: optional MASK on the source reference image. It follows the exact same pixel crop/resize as the reference before VAE encoding. Its selected tokens receive the configured reference `boost`.
-- `target_attention_mask`: optional MASK on `Latent.target_image`, i.e. the final target canvas, **after** all content-fit geometry. Edit rejects wrong target dimensions instead of silently warping the mask.
-- `attention_scope=global`: boost from all target queries to selected source tokens.
-- `attention_scope=boost in mask`: boost only from target queries selected by the target mask.
-- `attention_scope=only in mask`: also deny direct target queries outside the target mask from attending to this reference.
-
-Each Visual Reference may carry a source attention mask in its chain entry. The source mask is transformed alongside that reference and projected onto its DiT tokens. Masks do not affect VAE/RoPE position or require refitting the latent after VAE.
+`reference_boost_mask` is optional and selects source tokens to which the
+VAE/RoPE Boost applies. In the unified Reference, the `mask_attention`
+chain can override the reference Boost regionally, with the latest mask
+taking precedence. Areas outside the masks keep the Reference's Boost.
+There is no target-attention mask or attention-scope mode.
 
 ## Vision Reference
 
