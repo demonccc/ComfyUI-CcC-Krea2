@@ -96,8 +96,8 @@ def run_krea2_edit_orchestrator(
                     resize_method=getattr(spec, "visual_resize_method", "bicubic"),
                 )
 
-                fit_img, fit_mask = process_image_and_mask_geometry(
-                    image=src_img, mask=getattr(spec, "attention_mask", None), geom=geom
+                fit_img, _ = process_image_and_mask_geometry(
+                    image=src_img, mask=None, geom=geom
                 )
                 weight_map = getattr(spec, "attention_weight_map", None)
                 fitted_weights = None
@@ -119,7 +119,6 @@ def run_krea2_edit_orchestrator(
                         "role": ref_role,
                         "slot": slot,
                         "latent_tokens": lat_tokens,
-                        "mask": fit_mask,
                         "attention_weight_map": fitted_weights,
                         "geom": geom,
                         "spec": spec,
@@ -211,9 +210,6 @@ def run_krea2_edit_orchestrator(
     vae_latents_for_transport: List[torch.Tensor] = [
         ref["latent_tokens"] for ref in vae_ref_specs if ref.get("latent_tokens") is not None
     ]
-    prepared_reference_masks = [ref["mask"] for ref in vae_ref_specs if ref.get("latent_tokens") is not None]
-    if len(prepared_reference_masks) != len(vae_latents_for_transport):
-        raise ValueError("[Krea2 CcC Edit] Reference masks and VAE latents are out of alignment.")
     patched_model = model
     pos_conditioning = attach_reference_latents_to_conditioning(
         pos_qwen_context.conditioning, vae_latents_for_transport
@@ -221,13 +217,6 @@ def run_krea2_edit_orchestrator(
     neg_conditioning = attach_reference_latents_to_conditioning(
         neg_qwen_context.conditioning, vae_latents_for_transport
     )
-
-    if any(mask is not None for mask in prepared_reference_masks):
-        # Each source mask follows its corresponding VAE latent, even when vision-only
-        # references are interleaved with appearance references.
-        pos_conditioning = _conditioning_set_values(
-            pos_conditioning, {"reference_boost_masks": prepared_reference_masks}
-        )
 
     prepared_weight_maps = [
         ref.get("attention_weight_map") for ref in vae_ref_specs
