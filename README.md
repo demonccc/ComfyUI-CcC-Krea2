@@ -49,7 +49,7 @@ Visual Reference --> Vision Reference --> Visual Reference
 Size Resolver -------> Latent --------------^
 ~~~
 
-Each Visual Reference may receive `reference_boost_mask` (painted on the reference image), selecting source-reference tokens for its Boost. The mask shares its reference-image geometry and dimensions; mismatches are errors. The unified Reference also accepts chained `mask_attention` regional Boosts, with **Last Mask Wins** priority. These are reference-side attention controls, not Paint/Inpaint pixel replacement.
+The unified Reference accepts chained `mask_attention` regional Boosts, with **Last Mask Wins** priority. Masks must match the reference image geometry. These are reference-side attention controls, not Paint/Inpaint pixel replacement.
 
 The reference nodes can be chained in any order using `previous_references`; they expose one shared `references` output. Edit accepts a single `references` input. Appearance references go through VAE and (optionally) Qwen; Vision references are Qwen-only.
 
@@ -88,7 +88,7 @@ Positive conditioning uses each reference's configured boost. The grounded negat
 
 **VAE/RoPE Boost semantics:** `vae_rope_boost` in the unified Reference (or `boost` in the standalone Visual Reference) spans **0.0–10.0** with a **1.0 neutral** value. **0.0 hard-blocks direct target-to-reference attention** using a `-inf` attention bias, instead of merely reducing it to `log(1e-4)`. Values between 0 and 1 attenuate; values greater than 1 amplify (including 10.0). When a source reference mask restricts the selected region, zero blocking applies only to those selected reference tokens. A Krea2 CcC Mask regional `boost=0` likewise hard-blocks the corresponding region; regional weights override the global value. This affects direct attention to VAE/RoPE reference tokens, **not** Qwen Vision or indirect paths through other references; it does not remove the reference latent. No negative Boost values are supported. The grounded negative conditioning branch uses neutral Boost 1.0 and receives **neither regional Boost maps nor source Boost masks**; those are applied only in the positive branch.
 
-The unified Reference uses `mask_attention` regional Boosts to override its global Boost. The unified Reference also exposes the optional `reference_boost_mask` source-image selector; its mask follows the reference through VAE geometry. The legacy standalone Visual helper accepts the same input. There is no separate target-attention mask or attention-scope selector. Latent still exports `target_image` for workflows that need a target-image painting canvas.
+The unified Reference uses `mask_attention` regional Boosts to override its global Boost. There is no separate target-attention mask or attention-scope selector. Latent still exports `target_image` for workflows that need a target-image painting canvas.
 
 Target Latent retains its independent image-content Vision path, but its public toggle is now `latent_vision_enable` (formerly `latent_semantic`) and its mode selector uses the same two presets as Reference: `Visual / Semantic`. This path applies to the target content image when `content=from_image`; it does not alter VAE geometry or replace a dedicated Scene/Subject Reference. Existing positional workflows retain the toggle position, and legacy Python calls using `latent_semantic` are accepted. Invalid saved mode values are reported instead of silently interpreted as a different preset.\n\n## Vision Reference
 
