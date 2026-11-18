@@ -388,10 +388,10 @@ def encode_krea2_qwen_context(
                     )
 
     # Encode both modes with exactly the same multimodal Qwen input.
-    # Semantic removes only its image rows from the final conditioning.
+    # Semantic removes only its image rows from either conditioning branch.
     # Text rows (including the user's prompt and optional instruction) are
     # preserved after Qwen has processed the image. No text generation occurs.
-    if is_positive and conditioning and physical_image_map:
+    if conditioning and physical_image_map:
         semantic_indices = []
         for (start, end), item in zip(vision_row_spans, physical_image_map):
             spec = item.get("spec")
