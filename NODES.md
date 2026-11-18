@@ -7,8 +7,8 @@ This document describes the **15 registered nodes registered in ccc_krea2/nodes.
 | Display name | Node id |
 | --- | --- |
 | Krea2 CcC Reference | CcCKrea2Reference |
-| Krea2 CcC Visual Reference | CcCKrea2VisualReference |
-| Krea2 CcC Vision Reference | CcCKrea2VisionReference |
+| Visual Reference helper (internal) | CcCKrea2VisualReference |
+| Vision Reference helper (internal) | CcCKrea2VisionReference |
 | Krea2 CcC Size Resolver | CcCKrea2SizeResolver |
 | Krea2 CcC Latent | CcCKrea2Latent |
 | Krea2 CcC Edit Prompt Creator | CcCKrea2EditPromptCreator |
@@ -33,7 +33,7 @@ The required inputs start with `image`, then `vae_rope_enable` and the `vae_rope
 
 The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
 
-The previous Visual Reference and Vision Reference node IDs are retained for existing workflows; do not use them for new workflows.
+Standalone Visual and Vision classes remain internal helpers and are not independently registered. Saved workflows must use the unified Reference and valid Vision modes.
 
 ## Krea2 CcC Visual Reference
 
