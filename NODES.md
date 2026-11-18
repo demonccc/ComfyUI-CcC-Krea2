@@ -44,7 +44,7 @@ Required controls:
 | Control | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | image | IMAGE | — | Source reference. |
-| boost | 0..10 | 1.0 | Positive target-to-reference attention boost. |
+| boost | -5.0..+5.0, step 0.1 | 0.0 | Signed target-to-reference attention boost: -5 blocks, 0 neutral, positive values amplify. |
 | reference_fit | native, crop, contain, fit | native | Appearance/VAE pixel fit. |
 | placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. Outside + center + center is invalid. |
 | grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
@@ -56,13 +56,8 @@ Required controls:
 | semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
-| attention_scope | global, boost in mask, only in mask | global | Scope on the prepared target; no tags. |
 
-Optional inputs: `previous_references` and `reference_boost_mask` on the original reference, transformed alongside the source image.
-
-`global` applies boost to selected reference tokens from the entire target; `boost in mask` limits the boost to white pixels in the target mask; `only in mask` additionally blocks direct target-to-reference attention outside the target mask. `reference_boost_mask` limits boost to selected reference tokens and combines with the target mask when both are connected.
-
-The source mask must match the reference image, follows the reference crop/resize before VAE, and selects its DiT reference tokens.
+Reference exposes `mask_attention` for ordered regional Boost masks. Every masked region replaces the global Boost in its selected pixels; later overlapping regions take priority. The mask follows the reference image through VAE geometry. `reference_boost_mask` and the earlier target-attention-scope controls have been removed.
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
@@ -77,7 +72,7 @@ Qwen preparation is independent from appearance/VAE fit. Image resizing uses bic
 
 prompt_annotation is identification only, for example: This is the subject image. Edit instructions belong in Edit's positive_prompt.
 
-The positive branch uses the configured boost. The grounded negative branch uses the same appearance-image vision blocks with no role annotation text, fixed empty negative text, and neutral boost 1.0.
+The positive branch uses the configured boost. The grounded negative branch uses the same appearance-image vision blocks with no role annotation text, fixed empty negative text, and neutral boost 0.0.
 
 ## Krea2 CcC Vision Reference
 
