@@ -49,29 +49,16 @@ class VisualReferenceEntry:
 
 @dataclass(frozen=True)
 class VisionReferenceEntry:
-    """One Qwen-only Vision Reference before vision preparation."""
+    """Qwen image and optional user instruction; mode controls token retention only."""
 
     image: torch.Tensor
-    mode: str = "semantic_only"
+    mode: str = "visual"
     instruction: str = ""
-    processing: str = "full"
-    reference_annotation: str = ""
-    vision_fidelity: float = 0.25
     vision_weight: float = 1.0
-    guidance_seed_mode: str = "fixed"
-    guidance_seed_configured: int = 0
-    guidance_seed: int = 0
-    guidance_detail: str = "balanced"
-    vision_guidance: str = "balanced"
-    # True when this Vision entry belongs to the immediately preceding Visual
-    # entry from the unified Reference node, not an extra logical image.
+    # Paired with the preceding VAE/RoPE appearance reference in unified Reference.
     paired_visual: bool = False
-    # Original source image, independent from the optional Qwen resize.
+    # Original source image (before the optional Qwen downscale).
     source_image: Optional[torch.Tensor] = None
-    # For tiled Style, resize each crop after slicing instead of downscaling
-    # the entire image before slicing and losing high-frequency details.
-    tile_resize: bool = False
-    tile_max_edge: int = 768
 
 
 @dataclass(frozen=True)
