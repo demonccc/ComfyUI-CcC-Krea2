@@ -106,10 +106,6 @@ def install_krea2_reference_conditioning() -> None:
         if rope_positions is not None:
             out["ccc_ref_rope_positions"] = comfy.conds.CONDConstant(list(rope_positions))
 
-        source_masks = kwargs.get("reference_boost_masks")
-        if source_masks is not None:
-            out["ccc_ref_boost_masks"] = comfy.conds.CONDConstant(list(source_masks))
-
         attention_maps = kwargs.get("reference_attention_maps")
         if attention_maps is not None:
             out["ccc_ref_attention_maps"] = comfy.conds.CONDConstant(list(attention_maps))
@@ -219,7 +215,6 @@ def patch_krea2_model(model: Any) -> Any:
             fallback_kwargs = dict(kwargs)
             for key in (
                 "ref_latents", "ref_boosts", "ccc_ref_rope_positions",
-                "ccc_ref_boost_masks",
                 "ccc_ref_attention_maps", "ccc_ref_attention_isolation",
             ):
                 fallback_kwargs.pop(key, None)
@@ -237,7 +232,6 @@ def patch_krea2_model(model: Any) -> Any:
             str(v)
             for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
         ]
-        source_masks = _normalize_runtime_list(kwargs.get("ccc_ref_boost_masks"), count, None)
         attention_maps = _normalize_runtime_list(kwargs.get("ccc_ref_attention_maps"), count, None)
 
         return krea2_dit_incontext_forward(
@@ -248,7 +242,6 @@ def patch_krea2_model(model: Any) -> Any:
             ref_latents=ref_latents,
             ref_boosts=boosts,
             ref_rope_positions=rope_positions,
-            ref_masks=source_masks,
             ref_attention_maps=attention_maps,
             isolate_references=bool(kwargs.get("ccc_ref_attention_isolation", False)),
             transformer_options=transformer_options,
@@ -333,40 +326,11 @@ def _timestep_embedding(timesteps: torch.Tensor, dim: int, max_period: int = 100
         return torch.cat([emb, torch.zeros_like(emb[:, :1])], dim=-1) if dim % 2 else emb
 
 
-def _mask_to_flat(
-    spatial_mask: torch.Tensor,
-    grid_h: int,
-    grid_w: int,
-    batch_size: int,
-    device: torch.device,
-    dtype: torch.dtype,
-) -> torch.Tensor:
-    """Project an IMAGE-space mask onto its actual DiT token grid, per batch item."""
-    if spatial_mask.ndim == 2:
-        spatial_mask = spatial_mask.unsqueeze(0)
-    if spatial_mask.ndim != 3:
-        raise ValueError(f"[Krea2 CcC Edit] Attention mask must be H,W or B,H,W, got {tuple(spatial_mask.shape)}.")
-    if spatial_mask.shape[0] not in (1, batch_size):
-        raise ValueError(
-            f"[Krea2 CcC Edit] Attention mask batch {spatial_mask.shape[0]} "
-            f"does not match target batch {batch_size}."
-        )
-    # Area projection conserves how much of each token is selected. Original
-    # Krea2Edit uses a hard > 0.5 threshold for source ref_boost_mask.
-    values = F.interpolate(
-        spatial_mask.to(device=device, dtype=torch.float32).unsqueeze(1),
-        size=(grid_h, grid_w),
-        mode="area",
-    )[:, 0]
-    return (values > 0.5).to(dtype=dtype).reshape(values.shape[0], -1).expand(batch_size, -1)
-
-
 def _compute_ref_attention_bias_patchified(
     boosts: List[float],
     txt_len: int,
     ref_token_lens: List[int],
     tgt_len: int,
-    ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
     ref_token_grids: Optional[List[Tuple[int, int]]] = None,
     ref_attention_maps: Optional[List[Optional[torch.Tensor]]] = None,
     device: Optional[torch.device] = None,
@@ -374,12 +338,11 @@ def _compute_ref_attention_bias_patchified(
     batch_size: int = 1,
     isolate_references: bool = False,
 ) -> Optional[torch.Tensor]:
-    """Apply per-reference boosts to target queries, optionally selecting source tokens."""
+    """Apply global and regional boosts to target-to-reference attention."""
     if not boosts:
         return None
     device = device or torch.device("cpu")
     dtype = dtype or torch.float32
-    ref_masks = list(ref_masks or [None] * len(boosts))
     ref_attention_maps = list(ref_attention_maps or [None] * len(boosts))
     ref_token_grids = list(ref_token_grids or [(1, n) for n in ref_token_lens])
     if not (len(ref_token_lens) == len(ref_token_grids) == len(boosts)):
@@ -409,8 +372,6 @@ def _compute_ref_attention_bias_patchified(
             bias[:, :, a:b, a:b] = 0.0
 
     for index, boost in enumerate(boosts):
-        source_mask = ref_masks[index] if index < len(ref_masks) else None
-
         ref_start = offsets[index]
         ref_end = offsets[index + 1]
         ref_len = ref_token_lens[index]
@@ -418,11 +379,6 @@ def _compute_ref_attention_bias_patchified(
         if gh * gw != ref_len:
             raise ValueError("[Krea2 CcC Edit] Reference mask token grid does not match reference tokens.")
 
-        ref_weight = (
-            _mask_to_flat(source_mask, gh, gw, batch_size, device, dtype)
-            if source_mask is not None
-            else torch.ones((batch_size, ref_len), device=device, dtype=dtype)
-        )
         tgt_weight = torch.ones((batch_size, tgt_len), device=device, dtype=dtype)
 
         block = bias[:, :, target_start:, ref_start:ref_end]
@@ -446,15 +402,13 @@ def _compute_ref_attention_bias_patchified(
         elif float(boost) != 1.0:
             if float(boost) < 0.0:
                 raise ValueError("[Krea2 CcC Edit] Reference boost must be nonnegative.")
-            selected = (tgt_weight > 0).unsqueeze(-1) & (ref_weight > 0).unsqueeze(1)
             if float(boost) == 0.0:
                 # True exclusion: unlike log(1e-4), -inf gives zero
                 # target-to-reference attention probability after softmax.
-                # Honor source masks; do not suppress unselected cells.
-                block.masked_fill_(selected.unsqueeze(1), float("-inf"))
+                block.fill_(float("-inf"))
             else:
                 block += (
-                    math.log(float(boost)) * tgt_weight.unsqueeze(-1) * ref_weight.unsqueeze(1)
+                    math.log(float(boost)) * tgt_weight.unsqueeze(-1)
                 ).unsqueeze(1)
 
     return bias
@@ -495,7 +449,6 @@ def krea2_dit_incontext_forward(
     ref_boosts: Optional[List[float]] = None,
     transformer_options: Optional[Dict[str, Any]] = None,
     ref_rope_positions: Optional[List[str]] = None,
-    ref_masks: Optional[List[Optional[torch.Tensor]]] = None,
     ref_attention_maps: Optional[List[Optional[torch.Tensor]]] = None,
     isolate_references: bool = False,
 ) -> torch.Tensor:
@@ -504,7 +457,6 @@ def krea2_dit_incontext_forward(
     n_refs = len(ref_latents)
     boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
     rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
-    source_masks = _normalize_runtime_list(ref_masks, n_refs, None)
     attention_maps = _normalize_runtime_list(ref_attention_maps, n_refs, None)
 
     temporal = x.ndim == 5
@@ -572,7 +524,6 @@ def krea2_dit_incontext_forward(
         ref_token_lens=source_lens,
         tgt_len=target_len,
         ref_token_grids=source_grids,
-        ref_masks=source_masks,
         ref_attention_maps=attention_maps,
         batch_size=batch,
         device=combined.device,
