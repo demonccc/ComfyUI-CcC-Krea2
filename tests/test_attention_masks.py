@@ -1,4 +1,4 @@
-"""Behavioral tests for source masks and regional boosts on visual references."""
+"""Behavioral tests for global boosts and regional attention masks."""
 
 import math
 
@@ -8,7 +8,7 @@ import torch
 from ccc_krea2.patch import _compute_ref_attention_bias_patchified
 
 
-def bias_for(*, boosts, source_masks=None, grids=None,
+def bias_for(*, boosts, grids=None,
              target_grid=(2, 4), batch_size=1):
     grids = grids or [(2, 2)] * len(boosts)
     return _compute_ref_attention_bias_patchified(
@@ -16,7 +16,6 @@ def bias_for(*, boosts, source_masks=None, grids=None,
         txt_len=3,
         ref_token_lens=[h * w for h, w in grids],
         tgt_len=target_grid[0] * target_grid[1],
-        ref_masks=source_masks,
         ref_token_grids=grids,
         device=torch.device("cpu"),
         dtype=torch.float32,
@@ -33,49 +32,12 @@ def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
     )
 
 
-def test_reference_mask_boosts_only_selected_reference_tokens():
-    # Reference image: 16x16, select its left half, keeping the VAE geometry.
-    source_mask = torch.zeros((1, 16, 16))
-    source_mask[:, :, :8] = 1.0
-    bias = bias_for(boosts=[4.0], source_masks=[source_mask])
-    selected = bias[0, 0, 7:, 3:7]
-    torch.testing.assert_close(selected[:, [0, 2]], torch.full((8, 2), math.log(4.0)))
-    assert torch.count_nonzero(selected[:, [1, 3]]) == 0
-
-
-def test_source_masks_match_their_own_reference_blocks():
-    source_one = torch.tensor([[[1., 0.], [0., 0.]]])
-    source_two = torch.tensor([[[0., 0.], [0., 1.]]])
-    bias = bias_for(boosts=[2.0, 3.0], source_masks=[source_one, source_two])
-    # text 0..2, first ref 3..6, second ref 7..10, target from 11 onward
-    block1 = bias[0, 0, 11:, 3:7]
-    block2 = bias[0, 0, 11:, 7:11]
-    torch.testing.assert_close(block1[:, 0], torch.full((8,), math.log(2.0)))
-    assert torch.count_nonzero(block1[:, 1:]) == 0
-    torch.testing.assert_close(block2[:, 3], torch.full((8,), math.log(3.0)))
-    assert torch.count_nonzero(block2[:, :3]) == 0
-
-
-def test_wrong_source_mask_batch_fails_clearly():
-    bad = torch.ones((3, 16, 16))
-    with pytest.raises(ValueError, match="batch"):
-        bias_for(boosts=[2.0], source_masks=[bad], batch_size=2)
-
-
 def test_zero_boost_hard_blocks_target_attention_to_reference():
     bias = bias_for(boosts=[0.0])
     assert torch.isneginf(bias[0, 0, 7:, 3:7]).all()
     assert (bias[0, 0, :7, :] == 0).all()
     assert (bias[0, 0, 7:, :3] == 0).all()
     assert (bias[0, 0, 7:, 7:] == 0).all()
-
-
-def test_zero_boost_blocks_only_masked_source_tokens():
-    source_mask = torch.tensor([[[1., 0.], [0., 1.]]])
-    bias = bias_for(boosts=[0.0], source_masks=[source_mask])
-    selected = bias[0, 0, 7:, 3:7]
-    assert torch.isneginf(selected[:, [0, 3]]).all()
-    assert (selected[:, [1, 2]] == 0).all()
 
 
 def test_zero_boost_only_affects_its_reference_when_others_use_ten():
@@ -178,7 +140,8 @@ def test_unified_reference_boost_regions_override_global_only_inside_masks():
         image, source="mask", mask=selected, boost=0,
     )[2]
     node = CcCKrea2Reference()
-    assert "reference_boost_mask" in node.INPUT_TYPES()["optional"]
+    assert "mask_attention" in node.INPUT_TYPES()["optional"]
+    assert "reference_boost_mask" not in node.INPUT_TYPES()["optional"]
     refs, _ = node.process(
         image=image, vae_rope_enable=True, vision_enable=False,
         vae_rope_boost=5.0, mask_attention=mask_chain,
@@ -189,7 +152,7 @@ def test_unified_reference_boost_regions_override_global_only_inside_masks():
     assert entry.attention_weight_map[0, 1, 1].item() == pytest.approx(0.0)
 
 
-def test_unified_reference_regional_masks_last_wins_and_keep_source_mask():
+def test_unified_reference_regional_masks_last_wins():
     from ccc_krea2.modular_nodes.reference_node import CcCKrea2Reference
     from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
 
@@ -206,10 +169,9 @@ def test_unified_reference_regional_masks_last_wins_and_keep_source_mask():
     )[2]
     refs, _ = CcCKrea2Reference().process(
         image=image, vae_rope_enable=True, vision_enable=False,
-        vae_rope_boost=4, mask_attention=latest, reference_boost_mask=left,
+        vae_rope_boost=4, mask_attention=latest,
     )
     entry = refs.entries[0]
-    assert entry.reference_boost_mask is not None
     effective = entry.attention_weight_map[0]
     assert effective[0, 0].item() == pytest.approx(9)
     assert effective[1, 1].item() == pytest.approx(2)
