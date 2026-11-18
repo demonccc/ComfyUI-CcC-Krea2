@@ -165,3 +165,52 @@ def test_composite_unselected_pixels_remain_exact_for_zero_boost():
     )
     torch.testing.assert_close(composite[0, 0, 1], original[0, 0, 1])
     torch.testing.assert_close(composite[0, 0, 0], source[0, 0, 0] * 0.10)
+
+
+def test_unified_reference_boost_regions_override_global_only_inside_masks():
+    from ccc_krea2.modular_nodes.reference_node import CcCKrea2Reference
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+
+    image = torch.ones((1, 4, 4, 3))
+    selected = torch.zeros((1, 4, 4))
+    selected[:, 1:3, 1:3] = 1
+    mask_chain = CcCKrea2Mask().process(
+        image, source="mask", mask=selected, boost=0,
+    )[2]
+    node = CcCKrea2Reference()
+    assert "reference_boost_mask" in node.INPUT_TYPES()["optional"]
+    refs, _ = node.process(
+        image=image, vae_rope_enable=True, vision_enable=False,
+        vae_rope_boost=5.0, mask_attention=mask_chain,
+    )
+    entry = refs.entries[0]
+    assert entry.boost == pytest.approx(5.0)
+    assert entry.attention_weight_map[0, 0, 0].item() == pytest.approx(5.0)
+    assert entry.attention_weight_map[0, 1, 1].item() == pytest.approx(0.0)
+
+
+def test_unified_reference_regional_masks_last_wins_and_keep_source_mask():
+    from ccc_krea2.modular_nodes.reference_node import CcCKrea2Reference
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+
+    image = torch.ones((1, 4, 4, 3))
+    left = torch.zeros((1, 4, 4))
+    left[:, :, :2] = 1
+    center = torch.zeros((1, 4, 4))
+    center[:, 1:3, 1:3] = 1
+    mask_node = CcCKrea2Mask()
+    earlier = mask_node.process(image, source="mask", mask=left, boost=9)[2]
+    latest = mask_node.process(
+        image, source="mask", mask=center, boost=2,
+        previous_mask_attention=earlier,
+    )[2]
+    refs, _ = CcCKrea2Reference().process(
+        image=image, vae_rope_enable=True, vision_enable=False,
+        vae_rope_boost=4, mask_attention=latest, reference_boost_mask=left,
+    )
+    entry = refs.entries[0]
+    assert entry.reference_boost_mask is not None
+    effective = entry.attention_weight_map[0]
+    assert effective[0, 0].item() == pytest.approx(9)
+    assert effective[1, 1].item() == pytest.approx(2)
+    assert effective[0, 3].item() == pytest.approx(4)
