@@ -32,6 +32,26 @@ def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
     )
 
 
+def test_boost_inputs_are_signed_and_increment_by_tenth():
+    from ccc_krea2.modular_nodes.visual_reference_node import CcCKrea2VisualReference
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+
+    for spec in (
+        CcCKrea2VisualReference.INPUT_TYPES()["required"]["boost"],
+        CcCKrea2Mask.INPUT_TYPES()["required"]["boost"],
+    ):
+        assert spec[1]["default"] == 0.0
+        assert spec[1]["min"] == -5.0
+        assert spec[1]["max"] == 5.0
+        assert spec[1]["step"] == 0.1
+
+    bias = bias_for(boosts=[0.1])
+    torch.testing.assert_close(
+        bias[0, 0, 7:, 3:7],
+        torch.full((8, 4), math.log(10.0) / 20.0),
+    )
+
+
 def test_minus_five_boost_blocks_direct_reference_attention():
     bias = bias_for(boosts=[-5.0])
     assert torch.isneginf(bias[0, 0, 7:, 3:7]).all()
@@ -122,7 +142,7 @@ def test_mask_composite_rejects_invalid_hex():
         )
 
 
-def test_composite_unselected_pixels_remain_exact_for_zero_boost():
+def test_composite_unselected_pixels_remain_exact_for_minus_five_boost():
     from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
     source = torch.tensor([[[[0.2, 0.3, 0.4], [0.7, 0.6, 0.5]]]])
     selection = torch.tensor([[[1.0, 0.0]]])
