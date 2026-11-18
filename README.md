@@ -86,7 +86,7 @@ Image scaling uses bicubic interpolation with antialiasing. Native and crop avoi
 
 Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
 
-**VAE/RoPE Boost semantics:** `vae_rope_boost` in the unified Reference (or `boost` in the standalone Visual Reference) spans **0.0–10.0** with a **1.0 neutral** value. **0.0 hard-blocks direct target-to-reference attention** using a `-inf` attention bias, instead of merely reducing it to `log(1e-4)`. Values between 0 and 1 attenuate; values greater than 1 amplify (including 10.0). When a source reference mask restricts the selected region, zero blocking applies only to those selected reference tokens. A Krea2 CcC Mask regional `boost=0` likewise hard-blocks the corresponding region; regional weights override the global value. This affects direct attention to VAE/RoPE reference tokens, **not** Qwen Vision or indirect paths through other references; it does not remove the reference latent. No negative Boost values are supported. The grounded negative conditioning branch uses neutral Boost 1.0 and receives **neither regional Boost maps nor source Boost masks**; those are applied only in the positive branch.
+**VAE/RoPE Boost semantics:** `vae_rope_boost` in the unified Reference spans **0.0–10.0**, with **1.0 neutral**. A Boost of **0.0 strongly suppresses**, but does not completely block, direct target-to-reference attention (finite `log(1e-4)` bias), restoring the behavior before commit `30c7229`. Values between 0 and 1 attenuate; values above 1 amplify. Krea2 CcC Mask regional Boosts override the global Boost within their selected pixels, with **Last Mask Wins** priority. This affects direct attention to VAE/RoPE reference tokens, not Qwen Vision; it does not remove the reference latent. Negative Boost values are invalid. Regional Boost maps apply only to positive conditioning; the grounded negative branch remains neutral (Boost 1.0).
 
 The unified Reference uses `mask_attention` regional Boosts to override its global Boost. There is no separate target-attention mask or attention-scope selector. Latent still exports `target_image` for workflows that need a target-image painting canvas.
 
@@ -300,7 +300,7 @@ For Edit, connect the **last** Mask's `mask_attention` into
 the corresponding Reference image. Pixels outside regional masks retain
 Reference's global `boost`, whereas masked pixels take their own
 **absolute** `boost` (last-overlapping region wins). A regional boost
-of zero blocks direct target-to-reference attention for that region.
+of zero strongly suppresses direct target-to-reference attention for that region without hard-blocking it.
 
 To release SAM's GPU weights, set `unload_sam_model=true` **only in the
 last SAM3 Mask** of a sequential chain. This requests a targeted offload
