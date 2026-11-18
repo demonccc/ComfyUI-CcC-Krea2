@@ -47,9 +47,6 @@ class CcCKrea2Reference:
                 required["vision_" + name] = spec
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
-            "reference_boost_mask": ("MASK", {
-                "tooltip": "Optional source-image mask selecting VAE/RoPE reference tokens for global Boost."
-            }),
             "mask_attention": ("KREA2_MASK_CHAIN",),
         }
         return {"required": required, "optional": optional}
@@ -60,7 +57,7 @@ class CcCKrea2Reference:
 
     def process(self, image: torch.Tensor, vae_rope_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
-                reference_boost_mask=None, mask_attention=None, **kwargs):
+                mask_attention=None, **kwargs):
         # Accept saved workflows with the previous visual control spelling.
         if "visual_enable" in kwargs:
             vae_rope_enable = bool(kwargs.pop("visual_enable"))
@@ -109,7 +106,6 @@ class CcCKrea2Reference:
                 semantic=bool(vision_enable),
                 semantic_resize=bool(kwargs.get("vision_resize", True)),
                 semantic_grounding_px=int(kwargs.get("vision_max_edge", 768)),
-                reference_boost_mask=reference_boost_mask,
                 **visual_kwargs)
             if attention_weight_map is not None:
                 chain = EditReferenceChain(chain.entries[:-1] + (
