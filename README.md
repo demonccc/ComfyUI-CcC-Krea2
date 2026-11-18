@@ -15,7 +15,7 @@ The public surface currently contains **15 registered nodes** (including the uni
 
 Edit exposes an optional `isolate_references` switch (off by default): when enabled, each VAE/RoPE reference can attend to text and itself but not to another reference or the target. Target-to-reference attention remains controlled by existing masks and Boost; this does not constitute full subject/region ownership and requires compatible attention backends.\n\nThe Krea2 Edit LoRA remains attached to the model as before. Its image-reference attention is provided by the enabled Visual path; the Vision path supplies separate Qwen conditioning and is **not** a substitute for the LoRA's spatial reference mechanism. Fidelity of the Vision modes with the LoRA still needs image-generation testing.
 
-Legacy `Krea2 CcC Visual Reference` and `Krea2 CcC Vision Reference` nodes remain registered solely so saved workflows are not broken; new workflows should use **Krea2 CcC Reference**. The checked-in `workflows/` examples are migrated to the current Reference widgets, including separate labels.
+The standalone Visual and Vision classes are internal implementation helpers, not independently registered public nodes. Use **Krea2 CcC Reference** for new workflows. Saved workflows with removed Vision mode values must be explicitly migrated; workflow JSON files have not been modified.
 
 ## Public Nodes
 
