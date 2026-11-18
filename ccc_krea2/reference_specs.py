@@ -45,7 +45,7 @@ class ReferenceSpec:
 
     # Visual/edit path
     appearance_reference: bool = True
-    attention_boost: float = 1.0
+    attention_boost: float = 0.0
     attention_weight_map: Optional[torch.Tensor] = None
     visual_reference_fit: str = "native"
     visual_resize_method: str = "lanczos"
