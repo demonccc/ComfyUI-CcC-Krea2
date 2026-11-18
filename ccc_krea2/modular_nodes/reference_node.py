@@ -82,7 +82,7 @@ class CcCKrea2Reference:
             if mask_attention.geometry != (int(image.shape[0]), height, width):
                 raise ValueError("Reference attention masks must match reference image geometry.")
             # Region weights override the global reference boost; last region wins.
-            global_boost = float(kwargs.get("vae_rope_boost", 1.0))
+            global_boost = float(kwargs.get("vae_rope_boost", 0.0))
             attention_weight_map = torch.full(
                 (int(image.shape[0]), height, width),
                 global_boost, dtype=torch.float32, device=image.device
