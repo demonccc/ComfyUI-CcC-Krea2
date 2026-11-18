@@ -135,7 +135,6 @@ def _combine_reference_chains(clip, references, latent):
             appearance_reference=True,
             include_in_vision=entry.semantic,
             attention_boost=float(entry.boost),
-            attention_mask=entry.reference_boost_mask,
             attention_weight_map=entry.attention_weight_map,
             visual_reference_fit=entry.resolved_fit_mode,
             visual_resize_method="bicubic",
@@ -323,7 +322,6 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"rope={entry.rope_position}, semantic={entry.semantic}, "
-                f"reference_boost_mask={entry.reference_boost_mask is not None}, "
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method=bicubic, prompt_annotation={annotation}"
             )
