@@ -68,7 +68,7 @@ def test_negative_boost_reduces_attention():
 
 
 def test_out_of_range_boost_is_rejected():
-    with pytest.raises(ValueError, match="[-5, 5]",):
+    with pytest.raises(ValueError, match=r"\[-5, 5\]"):
         bias_for(boosts=[-5.1])
 
 
