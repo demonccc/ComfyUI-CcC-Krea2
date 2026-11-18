@@ -196,11 +196,11 @@ class CcCKrea2TextToImage:
         )
 
         vision_entries = tuple(e for e in (references or VisionReferenceChain()).entries if isinstance(e, VisionReferenceEntry))
-        vision_guidance_items = []
+        vision_items = []
         conditioning_prompt = eff_pos
         vision_analysis_images = 0
         if vision_entries:
-            positive, vision_guidance_items, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
+            positive, vision_items, conditioning_prompt, vision_analysis_images = _encode_t2i_vision(
                 clip=clip,
                 prompt=eff_pos,
                 references=references,
@@ -248,13 +248,13 @@ class CcCKrea2TextToImage:
                     "",
                     "T2I Vision Pipeline:",
                     "  Vision Analysis: no text generation; Semantic removes Qwen image rows",
-                    "  Final Conditioning: text and/or multimodal Qwen encoding",
-                    f"  Direct Vision References: {sum(item['generation_strategy'] == 'direct-qwen-image-conditioning' for item in vision_guidance_items)}",
-                    f"  Vision Analysis Images: {vision_analysis_images}",
+                    "  Final Conditioning: multimodal Qwen encoding with optional Semantic row removal",
+                    f"  Visual Token References: {sum(item['mode'] == 'visual' for item in vision_items)}",
+                    f"  Generated Vision Descriptions: {vision_analysis_images}",
                     f"  Conditioning Prompt: {conditioning_prompt!r}",
                 ]
             )
-            for item in vision_guidance_items:
+            for item in vision_items:
                 info_lines.extend(
                     [
                         f"  Vision Reference {item['index']}:",
