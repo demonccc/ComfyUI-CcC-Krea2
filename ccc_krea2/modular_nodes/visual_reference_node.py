@@ -33,7 +33,7 @@ class CcCKrea2VisualReference:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "boost": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.05}),
+                "boost": ("FLOAT", {"default": 0.0, "min": -5.0, "max": 5.0, "step": 0.1}),
                 "reference_fit": (REFERENCE_FIT, {"default": "native"}),
                 "placement_grid": (
                     PLACEMENT_GRIDS,
@@ -82,7 +82,7 @@ class CcCKrea2VisualReference:
     def process(
         self,
         image: torch.Tensor,
-        boost: float = 1.0,
+        boost: float = 0.0,
         reference_fit: str = "native",
         placement_grid: str = "inside",
         grid_horizontal_position: str = "center",
