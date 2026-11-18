@@ -8,7 +8,7 @@ The required inputs start with `image`, then `vae_rope_enable` and its `vae_rope
 
 The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
 
-The previous Visual Reference and Vision Reference node IDs are retained for existing workflows; do not use them for new workflows.
+Visual and Vision classes are internal helpers of the registered unified Reference; their old standalone node IDs are not public. Migrating saved workflows is explicit.
 
 ## Public Surface
 
