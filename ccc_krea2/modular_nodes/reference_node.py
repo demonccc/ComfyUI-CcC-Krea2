@@ -47,6 +47,9 @@ class CcCKrea2Reference:
                 required["vision_" + name] = spec
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
+            "reference_boost_mask": ("MASK", {
+                "tooltip": "Optional source-image mask selecting VAE/RoPE reference tokens for global Boost."
+            }),
             "mask_attention": ("KREA2_MASK_CHAIN",),
         }
         return {"required": required, "optional": optional}
