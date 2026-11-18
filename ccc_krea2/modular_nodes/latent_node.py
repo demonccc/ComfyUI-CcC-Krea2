@@ -227,7 +227,7 @@ class CcCKrea2Latent:
                     "latent_vision_" + name: spec
                     for name, spec in CcCKrea2VisionReference.INPUT_TYPES()["required"].items()
                     if name != "image" and name not in (
-                        "guidance_detail", "vision_guidance", "reference_annotation", "weight"
+                        "weight"
                     )
                 },
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
@@ -251,16 +251,9 @@ class CcCKrea2Latent:
         latent_vision_enable=False,
         latent_vision_resize=True,
         latent_vision_max_edge=768,
-        latent_vision_mode="reference",
+        latent_vision_mode="visual",
         latent_vision_instruction="",
-        latent_vision_style_processing="full",
-        latent_vision_guidance_seed_mode="fixed",
-        latent_vision_guidance_seed=0,
-        latent_vision_guidance_detail="balanced",
-        latent_vision_vision_guidance="balanced",
         latent_vision_annotation="",
-        latent_vision_reference_annotation="",
-        latent_vision_vision_fidelity=0.25,
         batch_size=1,
         dimensions_image=None,
         content_image=None,
@@ -284,7 +277,7 @@ class CcCKrea2Latent:
         # Never activate semantic conditioning with a corrupted preset. Keep the
         # target latent and VAE editing usable, and report the incompatible value.
         allowed_vision_modes = CcCKrea2VisionReference.INPUT_TYPES()["required"]["mode"][0]
-        if latent_vision_mode not in allowed_vision_modes and latent_vision_mode not in ("native", "none", "guided"):
+        if latent_vision_mode not in allowed_vision_modes:
             raise ValueError(
                 f"[Krea2 CcC Latent] Unsupported Vision mode: {latent_vision_mode!r}"
             )
@@ -313,13 +306,7 @@ class CcCKrea2Latent:
             "vision_max_edge": int(latent_vision_max_edge),
             "mode": latent_vision_mode,
             "instruction": latent_vision_instruction,
-            "style_processing": latent_vision_style_processing,
-            "guidance_seed_mode": latent_vision_guidance_seed_mode,
-            "guidance_seed": int(latent_vision_guidance_seed),
-            "guidance_detail": latent_vision_guidance_detail,
-            "vision_guidance": latent_vision_vision_guidance,
-            "reference_annotation": str(latent_vision_annotation or latent_vision_reference_annotation or "").strip(),
-            "vision_fidelity": float(latent_vision_vision_fidelity),
+            "reference_annotation": str(latent_vision_annotation or "").strip(),
         }
 
         lines = [
