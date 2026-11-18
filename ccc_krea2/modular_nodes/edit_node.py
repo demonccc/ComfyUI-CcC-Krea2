@@ -24,7 +24,7 @@ from .rope_preview import render_rope_preview
 
 # Krea2 Edit uses a grounded unconditional branch rather than a classic SD-style
 # negative prompt. Keep the negative text empty by contract; visual references remain
-# attached to both branches and negative reference boosts stay neutral at 1.0.
+# attached to both branches and negative reference boosts stay neutral at 0.0.
 KREA2_EDIT_NEGATIVE_PROMPT = ""
 
 
@@ -182,7 +182,7 @@ def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     rope = list(extras.get("reference_rope_positions") or [])
     boosts = extras.get("reference_boosts")
     if boosts is None:
-        boosts = [1.0] * reference_count
+        boosts = [0.0] * reference_count
     else:
         boosts = [float(v) for v in boosts]
     return f"refs={len(refs)} shapes={shapes}, boosts={boosts}, rope={rope}"
