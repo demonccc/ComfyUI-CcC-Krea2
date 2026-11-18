@@ -29,7 +29,7 @@ The Reference Cache implementation has been removed. There are no cache nodes an
 
 Node ID: `CcCKrea2Reference`. This is the recommended reference node for new workflows.
 
-The required inputs start with `image`, then `visual_enable` and the complete `visual_*` group, then `vision_enable` and the complete `vision_*` group. Optional inputs are `previous_references`, `reference_boost_mask`, and `target_attention_mask`. Disabled groups are greyed out and ignored. At least one path must be enabled.
+The required inputs start with `image`, then `vae_rope_enable` and the `vae_rope_*` controls, followed by `vision_enable`, `vision_weight`, resize, mode, and optional instruction. Optional inputs are `previous_references` and `mask_attention`. Disabled groups are ignored. At least one path must be enabled.
 
 The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
 
@@ -462,7 +462,11 @@ Examples are historical fixtures and have not been migrated in this cleanup; a w
 
 ### Edit RoPE annotated preview
 
-`rope_preview` returns a three-image `IMAGE` batch in fixed order: **layout**, **overlay_boxes**, **overlay_visuals**. All three share the same spatial extent and layout planner. `layout` draws the target and colored reference boxes. `overlay_boxes` draws the target's VAE-prepared image when the input Latent was created `from_image` (otherwise a neutral canvas), with translucent reference boxes. `overlay_visuals` draws the same opaque target with VAE-prepared Visual Reference images overlaid transparently. `collapsed` references are points in all three views, not image thumbnails. Qwen-only Vision References are excluded. The target image is preserved as Latent metadata and exported as `target_image` for mask painting and RoPE preview; it is the original post-fit pixel canvas, not a VAE decode of latent samples.
+The `rope_preview` IMAGE batch contains four spatial views: layout, overlay_boxes,
+overlay_visuals and regional_boosts, followed by one RoPE-positioned Boost view
+per appearance reference. All frames share one coordinate system. Collapsed
+references appear as points and Qwen-only Vision References are excluded.
+Latent exports the post-fit target image as `target_image`.
 
 
 ### Reference image transport (updated)
