@@ -6,7 +6,7 @@ Node ID: `CcCKrea2Reference`. This is the recommended reference node for new wor
 
 The required inputs start with `image`, then `visual_enable` and the complete `visual_*` group, then `vision_enable` and the complete `vision_*` group. Optional inputs are `previous_references`, `reference_boost_mask`, and `target_attention_mask`. Disabled groups are greyed out and ignored. At least one path must be enabled.
 
-The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Qwen-specific Semantic, Visual, Style, or Context guidance without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
+The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
 
 The previous Visual Reference and Vision Reference node IDs are retained for existing workflows; do not use them for new workflows.
 
@@ -133,20 +133,25 @@ The positive branch uses configured reference boosts. The grounded negative bran
 - `attention_scope=boost in mask`: boost only from target queries selected by the target mask.
 - `attention_scope=only in mask`: also deny direct target queries outside the target mask from attending to this reference.
 
-Each Visual Reference carries both optional masks in its own chain entry, so no independent mask ordering, separate Attention Region node or tag lookup exists. The source and target masks are downsampled to the actual reference/target DiT token grids in the attention computation; **latents are never refit after VAE**. Masks are batched independently.
+Each Visual Reference may carry a source attention mask in its chain entry. The source mask is transformed alongside that reference and projected onto its DiT tokens. Masks do not affect VAE/RoPE position or require refitting the latent after VAE.
 
 ## Vision Reference
 
-Vision References declare Qwen/Vision information and do not create appearance latents. The declaration is consumer-neutral:
+Vision Reference has only two presets: **Visual** and **Semantic**. Both are
+encoded multimodally by the same Qwen processor, using the same image preparation
+and optionally supplied free-form `instruction`.
 
-- **Semantic** -> content/meaning, pose/action, objects, composition, and spatial relationships.
-- **Visual** -> near-copy/full visual blueprint. Balanced/Detailed treat pose, gaze, framing, composition, appearance, and subject count as anchors; Flexible may adapt pose/composition but never duplicates or multiplies subjects.
-- **Style** -> exact legacy Visual guidance behavior, retained because that preset produced the desired style-transfer result; the resulting guidance is applied strongly as the dominant visual treatment; only this mode exposes full / 2x2 / 4x4 processing.
-- **Context** -> mandatory scene staging: environment, viewpoint/framing, exact pose and limb placement, head orientation, gaze target, gesture, action/interaction, object placement, composition, crop, depth, and spatial relationships are treated as constraints without copying identity, clothing, or style.
+- **Visual** retains the image's encoded visual rows.
+- **Semantic** removes those image rows from the final conditioning tensor,
+  retaining the encoded text rows.
 
-Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. Guidance Detail changes extraction depth, not only token ceiling, and Vision Guidance intentionally uses widely separated conservative/balanced/flexible sampling presets. The consumer still owns how the declared information is transformed into conditioning.
-
-The public Latent node, not the retired legacy target builder, owns target geometry. The runtime receives only the sampling latent and current reference metadata; no disabled target-vision-context path is transported. Masks belong to individual Visual References and must be painted at the final target dimensions.
+Neither preset uses a hidden system directive, extracts descriptive text with
+`clip.generate`, or appends generated guidance to the positive prompt.
+Instructions are added as Image N guidance only if nonempty; an empty instruction
+adds nothing. Other than image-row retention the pipeline is identical.
+VAE/RoPE image conditioning remains a separate mechanism and is not removed
+by choosing Semantic. Previously saved Style, Context, Reference and internal
+mode identifiers require explicit workflow migration.
 
 ## Target Geometry
 
@@ -220,7 +225,7 @@ Paint Restore uses paint_geometry from Paint Prepare:
 
 LoRA Stack and LoRA Stack Sliders each apply 10 MODEL-only LoRAs. LoRA Stack with Prompt applies 5 MODEL-only LoRAs and emits optional positive prompt augmentation.
 
-Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
+Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns unchanged MODEL plus conditioning and LATENT. Visual retains Qwen image rows; Semantic removes them after the same multimodal encoding. Neither mode generates analysis text. A nonempty user instruction is passed as Qwen image guidance. The explicit negative prompt remains text-only.
 
 The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
 
