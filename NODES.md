@@ -31,7 +31,7 @@ Node ID: `CcCKrea2Reference`. This is the recommended reference node for new wor
 
 The required inputs start with `image`, then `visual_enable` and the complete `visual_*` group, then `vision_enable` and the complete `vision_*` group. Optional inputs are `previous_references`, `reference_boost_mask`, and `target_attention_mask`. Disabled groups are greyed out and ignored. At least one path must be enabled.
 
-The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Qwen-specific Semantic, Visual, Style, or Context guidance without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
+The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
 
 The previous Visual Reference and Vision Reference node IDs are retained for existing workflows; do not use them for new workflows.
 
@@ -58,11 +58,11 @@ Required controls:
 | prompt_annotation | text | empty | Role-only Image N annotation. |
 | attention_scope | global, boost in mask, only in mask | global | Scope on the prepared target; no tags. |
 
-Optional inputs: `previous_references`, `reference_boost_mask` (MASK on the original reference, transformed alongside the image), and `target_attention_mask` (MASK drawn on the final target canvas, required for regional attention). Each Visual Reference owns both masks; no separate tags or mask ordering is needed.
+Optional inputs: `previous_references` and `reference_boost_mask` on the original reference, transformed alongside the source image.
 
 `global` applies boost to selected reference tokens from the entire target; `boost in mask` limits the boost to white pixels in the target mask; `only in mask` additionally blocks direct target-to-reference attention outside the target mask. `reference_boost_mask` limits boost to selected reference tokens and combines with the target mask when both are connected.
 
-Masks must be aligned to their own images: `reference_boost_mask` must match the original Visual Reference image pixel dimensions; `target_attention_mask` must match the final `Latent.target_image` dimensions. ComfyUI MASK inputs accept one mask shared by the batch or one per item. Mismatched sizes raise an error, not an implicit resize. The source mask follows the reference's crop/resize **before** VAE; at runtime both masks are projected to the DiT token grids using area reduction and a >0.5 threshold. `only in mask` restricts *direct attention*, not image editing/pixel preservation (use Paint for inpainting).
+The source mask must match the reference image, follows the reference crop/resize before VAE, and selects its DiT reference tokens.
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
@@ -81,33 +81,28 @@ The positive branch uses the configured boost. The grounded negative branch uses
 
 ## Krea2 CcC Vision Reference
 
-Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
+Adds a Qwen-only reference without an appearance VAE latent. There are **only
+two modes**:
 
 | Control | Values | Default | Meaning |
 | --- | --- | --- | --- |
-| image | IMAGE | — | Source image shown to Qwen Vision. |
-| mode | semantic, visual, style, context | semantic | Chooses what the reference contributes. |
-| instruction | text | empty | Optional extra instruction for this reference. |
-| style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
-| guidance_seed_mode | fixed, incremental, random | fixed | Seed behavior for Qwen text guidance generation. |
-| guidance_seed | integer | 0 | Base/fixed Qwen guidance seed; editable only in fixed mode. |
-| guidance_detail | compact, balanced, detailed | balanced | Extraction-depth policy plus max-length budget: compact keeps only highest-impact facts (256), balanced keeps major + secondary facts (512), detailed is exhaustive within the selected mode (1024). |
-| vision_guidance | conservative, balanced, flexible | balanced | Qwen sampling preset. Conservative = temp 0.05 / top_p 0.70 / top_k 32 / min_p 0.10; balanced = 0.25 / 0.90 / 64 / 0.05; flexible = 0.70 / 0.99 / 128 / 0.01. |
+| image | IMAGE | — | Image provided to Qwen for multimodal encoding. |
+| mode | visual, semantic | visual | Visual keeps image rows; Semantic drops image rows after multimodal encoding. |
+| instruction | text | empty | Free user instruction for Qwen. Omitted entirely when empty. |
+| weight | 0.0..2.0 | 1.0 | Multiplier for retained Visual image rows only. |
 | previous_references | KREA2_REFERENCE_CHAIN | optional | Previous mixed reference chain. |
 
-Outputs:
+Outputs: `references` and `vision_info`.
 
-- `references` (`KREA2_REFERENCE_CHAIN`)
-- `vision_info` (`STRING`) with consumer-neutral declaration metadata including mode, processing, Qwen guidance preset/seed, source resolution, and chain size.
+Both modes use the **same image preparation**, Qwen encoder, and user-provided
+instruction, without hidden prompts or preset-dependent guidance generation.
+Neither mode invokes `clip.generate()` or appends an automatically generated
+description to Edit/T2I's positive prompt. Semantic removes its image rows from
+the final conditioning tensor; the Qwen-encoded text rows remain. The general
+reference VAE/RoPE path is independent of this selection.
 
-Vision Reference defines information semantics rather than a transport algorithm:
-
-- **Semantic**: content/meaning, pose, action, objects, composition, and spatial relationships.
-- **Visual**: near-copy/full visual blueprint. Balanced/Detailed strongly anchor pose, gaze, framing, composition, and appearance; Flexible may adapt pose/composition while retaining visual identity. Subject count is always locked and must not be expanded into clones, variants, panels, or repeated subjects.
-- **Style**: intentionally reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior, and its final conditioning explicitly treats that guidance as the dominant visual treatment. Supports full, 2x2, or 4x4 analysis.
-- **Context**: mandatory scene staging including setting, viewpoint, exact pose and limb placement, head orientation, gaze target, gesture, action, interaction, crop/framing, composition, object placement, depth, and spatial relationships while excluding identity, clothing, and visual style.
-
-There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, Context, and Native. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
+Old mode values including `reference`, `style`, and `context` must be
+migrated explicitly. Outdated saved widgets are not reinterpreted.
 
 ## Krea2 CcC Size Resolver
 
@@ -462,8 +457,8 @@ Examples are historical fixtures and have not been migrated in this cleanup; a w
 
 - workflows/12_edit_vision_semantic.json — Vision Reference / Semantic.
 - workflows/13_edit_vision_visual.json — Vision Reference / Visual.
-- workflows/14_edit_vision_style.json — Vision Reference / Style.
-- workflows/18_edit_vision_context.json — Vision Reference / Context.
+- workflows/14_edit_vision_style.json — obsolete Style example; requires explicit migration.
+- workflows/18_edit_vision_context.json — obsolete Context example; requires explicit migration.
 
 ### Edit RoPE annotated preview
 
