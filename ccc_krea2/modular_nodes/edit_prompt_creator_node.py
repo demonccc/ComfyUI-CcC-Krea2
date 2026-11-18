@@ -163,7 +163,6 @@ def _edit_image_slot_map(references: EditReferenceChain) -> List[Optional[int]]:
     """Map analyzed images to Edit's physical Qwen slots, preserving chain order."""
     entries = references.entries
     active = []
-    deferred_styles = []
     analysis_positions = []
     for index, entry in enumerate(entries):
         if isinstance(entry, VisionReferenceEntry) and entry.paired_visual:
@@ -171,28 +170,11 @@ def _edit_image_slot_map(references: EditReferenceChain) -> List[Optional[int]]:
         if isinstance(entry, (ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry)) and entry.image is not None:
             analysis_positions.append(index)
     for index, entry in enumerate(entries):
-        if isinstance(entry, ImageReferenceEntry):
-            continue
-        if isinstance(entry, VisualReferenceEntry):
-            paired = (entries[index + 1] if index + 1 < len(entries)
-                      and isinstance(entries[index + 1], VisionReferenceEntry)
-                      and entries[index + 1].paired_visual else None)
-            tiled = paired is not None and paired.mode == "style_indirect" and paired.processing != "full"
-            if entry.semantic and not tiled:
-                active.append(index)
-            continue
-        if isinstance(entry, VisionReferenceEntry):
-            if entry.mode == "style_indirect":
-                deferred_styles.append((index, 1 if entry.processing == "full" else
-                                        16 if entry.processing == "4x4" else 4))
-            elif not entry.paired_visual:
-                active.append(index)
+        if isinstance(entry, VisualReferenceEntry) and entry.semantic:
+            active.append(index)
+        elif isinstance(entry, VisionReferenceEntry) and not entry.paired_visual:
+            active.append(index)
     slot_map = {index: slot for slot, index in enumerate(active, start=1)}
-    next_slot = len(active) + 1
-    for index, count in deferred_styles:
-        if count == 1:
-            slot_map[index] = next_slot
-        next_slot += count
     return [slot_map.get(index) for index in analysis_positions]
 
 
