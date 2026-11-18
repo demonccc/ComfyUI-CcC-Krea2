@@ -237,9 +237,8 @@ def run_krea2_edit_orchestrator(
         pos_conditioning = _conditioning_set_values(
             pos_conditioning, {"reference_attention_maps": prepared_weight_maps}
         )
-        neg_conditioning = _conditioning_set_values(
-            neg_conditioning, {"reference_attention_maps": prepared_weight_maps}
-        )
+        # Keep the grounded negative branch neutral: regional Boost maps
+        # belong only to positive target-to-reference attention.
 
     # Step 7: Build edit_info report
     info_lines = [
