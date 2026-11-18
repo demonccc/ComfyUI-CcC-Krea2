@@ -14,17 +14,6 @@ GRID_HORIZONTAL = ("center", "left", "right")
 GRID_VERTICAL = ("center", "up", "down")
 
 
-def _validate_mask(mask: torch.Tensor, height: int, width: int, name: str, batch_size: int) -> torch.Tensor:
-    """Masks share the image pixel grid; never silently resize to disguise misalignment."""
-    if mask.ndim == 2:
-        mask = mask.unsqueeze(0)
-    if mask.ndim != 3 or tuple(mask.shape[-2:]) != (height, width):
-        raise ValueError(f"[Krea2 CcC Visual Reference] {name} must match its image {width}x{height}; received {tuple(mask.shape)}.")
-    if mask.shape[0] not in (1, batch_size):
-        raise ValueError(f"[Krea2 CcC Visual Reference] {name} batch must be 1 or {batch_size}, got {mask.shape[0]}.")
-    return mask
-
-
 class CcCKrea2VisualReference:
     """Declare one ordered visual reference for Krea2 Edit."""
 
@@ -87,7 +76,6 @@ class CcCKrea2VisualReference:
             },
             "optional": {
                 "previous_references": ("KREA2_REFERENCE_CHAIN",),
-                "reference_boost_mask": ("MASK", {"tooltip": "Optional mask drawn on this reference image. White pixels select reference tokens receiving boost; image geometry is applied to the mask before VAE."}),
             },
         }
 
@@ -107,13 +95,10 @@ class CcCKrea2VisualReference:
         semantic_grounding_px: int = 768,
         prompt_annotation: str = "",
         previous_references: Optional[VisualReferenceChain] = None,
-        reference_boost_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[VisualReferenceChain]:
         chain = previous_references if previous_references is not None else VisualReferenceChain()
 
         semantic_enabled = bool(semantic)
-        if reference_boost_mask is not None:
-            reference_boost_mask = _validate_mask(reference_boost_mask, int(image.shape[1]), int(image.shape[2]), "reference_boost_mask", int(image.shape[0]))
 
         from .rope_position import parse_rope_position
         effective_grid = "inside" if reference_fit == "crop" else placement_grid
@@ -122,7 +107,6 @@ class CcCKrea2VisualReference:
         entry = VisualReferenceEntry(
             image=image,
             boost=float(boost),
-            reference_boost_mask=reference_boost_mask,
             reference_fit=reference_fit,
             placement_grid=effective_grid,
             rope_mode=rope_mode,
