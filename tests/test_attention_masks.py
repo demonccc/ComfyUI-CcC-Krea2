@@ -32,9 +32,9 @@ def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
     )
 
 
-def test_zero_boost_hard_blocks_target_attention_to_reference():
+def test_zero_boost_strongly_suppresses_but_does_not_block_reference():
     bias = bias_for(boosts=[0.0])
-    assert torch.isneginf(bias[0, 0, 7:, 3:7]).all()
+    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(1e-4)))
     assert (bias[0, 0, :7, :] == 0).all()
     assert (bias[0, 0, 7:, :3] == 0).all()
     assert (bias[0, 0, 7:, 7:] == 0).all()
@@ -42,14 +42,14 @@ def test_zero_boost_hard_blocks_target_attention_to_reference():
 
 def test_zero_boost_only_affects_its_reference_when_others_use_ten():
     bias = bias_for(boosts=[0.0, 10.0])
-    assert torch.isneginf(bias[0, 0, 11:, 3:7]).all()
+    torch.testing.assert_close(bias[0, 0, 11:, 3:7], torch.full((8, 4), math.log(1e-4)))
     torch.testing.assert_close(
         bias[0, 0, 11:, 7:11],
         torch.full((8, 4), math.log(10.0)),
     )
 
 
-def test_zero_boost_with_region_map_blocks_zero_regions():
+def test_zero_boost_with_region_map_softly_suppresses_zero_regions():
     weight_map = torch.tensor([[[0., 10.], [1., 0.]]])
     bias = _compute_ref_attention_bias_patchified(
         boosts=[1.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
@@ -57,7 +57,7 @@ def test_zero_boost_with_region_map_blocks_zero_regions():
         device=torch.device("cpu"), dtype=torch.float32,
     )
     selected = bias[0, 0, 7:, 3:7]
-    assert torch.isneginf(selected[:, [0, 3]]).all()
+    torch.testing.assert_close(selected[:, [0, 3]], torch.full((8, 2), math.log(1e-4)))
     torch.testing.assert_close(selected[:, 1], torch.full((8,), math.log(10.0)))
     assert (selected[:, 2] == 0).all()
 
