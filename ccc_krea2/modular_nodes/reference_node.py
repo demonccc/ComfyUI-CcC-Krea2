@@ -43,10 +43,8 @@ class CcCKrea2Reference:
         required["vision_resize"] = ("BOOLEAN", {"default": True})
         required["vision_max_edge"] = ("INT", {"default": 768, "min": 384, "max": 2048, "step": 64})
         for name, spec in vision["required"].items():
-            if name not in ("image", "guidance_detail", "vision_guidance", "reference_annotation", "weight", "vision_fidelity"):
+            if name not in ("image", "weight"):
                 required["vision_" + name] = spec
-                if name == "style_processing":
-                    required["vision_fidelity"] = vision["required"]["vision_fidelity"]
         optional = {
             "previous_references": ("KREA2_REFERENCE_CHAIN",),
             "mask_attention": ("KREA2_MASK_CHAIN",),
@@ -54,21 +52,8 @@ class CcCKrea2Reference:
         return {"required": required, "optional": optional}
 
     @classmethod
-    def VALIDATE_INPUTS(cls, vision_mode="reference", **kwargs):
+    def VALIDATE_INPUTS(cls, vision_mode="visual", **kwargs):
         return CcCKrea2VisionReference.VALIDATE_INPUTS(mode=vision_mode)
-
-    @classmethod
-    def IS_CHANGED(cls, vision_enable=True, vision_guidance_seed_mode="fixed",
-                   vision_guidance_seed=0, vision_guidance_detail="balanced",
-                   vision_vision_guidance="balanced", **kwargs):
-        if not vision_enable:
-            return "vision-disabled"
-        return CcCKrea2VisionReference.IS_CHANGED(
-            guidance_seed_mode=vision_guidance_seed_mode,
-            guidance_seed=vision_guidance_seed,
-            guidance_detail=vision_guidance_detail,
-            vision_guidance=vision_vision_guidance,
-        )
 
     def process(self, image: torch.Tensor, vae_rope_enable=True, vision_enable=True,
                 previous_references: Optional[EditReferenceChain] = None,
@@ -138,11 +123,7 @@ class CcCKrea2Reference:
             vision_image = image
             resize = bool(kwargs.get("vision_resize", True))
             max_edge = int(kwargs.get("vision_max_edge", 768))
-            tiled_style = (
-                kwargs.get("vision_mode", "semantic") == "style"
-                and kwargs.get("vision_style_processing", "full") != "full"
-            )
-            if resize and not tiled_style:
+            if resize:
                 if max_edge < 1:
                     raise ValueError("[Krea2 CcC Reference] vision_max_edge must be positive.")
                 height, width = (int(image.shape[-3]), int(image.shape[-2]))
@@ -156,15 +137,9 @@ class CcCKrea2Reference:
             if vae_rope_enable:
                 # One source image and one logical reference: the Vision preset
                 # augments the immediately preceding Visual entry in Edit.
-                paired_entry = replace(chain.entries[-1], paired_visual=True, source_image=image,
-                                       tile_resize=resize and tiled_style,
-                                       tile_max_edge=max_edge)
+                paired_entry = replace(chain.entries[-1], paired_visual=True, source_image=image)
                 chain = EditReferenceChain(chain.entries[:-1] + (paired_entry,))
-            elif tiled_style:
-                tiled_entry = replace(chain.entries[-1], source_image=image, tile_resize=resize,
-                                      tile_max_edge=max_edge)
-                chain = EditReferenceChain(chain.entries[:-1] + (tiled_entry,))
-            if not vae_rope_enable and not tiled_style:
+            if not vae_rope_enable:
                 chain = EditReferenceChain(chain.entries[:-1] + (
                     replace(chain.entries[-1], source_image=image),
                 ))
