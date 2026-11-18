@@ -84,9 +84,9 @@ The Qwen path is controlled by semantic. When enabled, the same image can be dow
 
 Image scaling uses bicubic interpolation with antialiasing. Native and crop avoid image scaling.
 
-Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 1.0.
+Positive conditioning uses each reference's configured boost. The grounded negative branch uses the same appearance images, no negative text, no role annotations, and neutral reference boost 0.0.
 
-**VAE/RoPE Boost semantics:** `vae_rope_boost` in the unified Reference spans **0.0–10.0**, with **1.0 neutral**. A Boost of **0.0 strongly suppresses**, but does not completely block, direct target-to-reference attention (finite `log(1e-4)` bias), restoring the behavior before commit `30c7229`. Values between 0 and 1 attenuate; values above 1 amplify. Krea2 CcC Mask regional Boosts override the global Boost within their selected pixels, with **Last Mask Wins** priority. This affects direct attention to VAE/RoPE reference tokens, not Qwen Vision; it does not remove the reference latent. Negative Boost values are invalid. Regional Boost maps apply only to positive conditioning; the grounded negative branch remains neutral (Boost 1.0).
+**VAE/RoPE Boost semantics:** `vae_rope_boost` in Reference and `boost` in Mask use **-5.0 to +5.0, step 0.1, default 0.0**. Zero is neutral; negative values attenuate and positive values amplify direct target-to-reference attention. Values are mapped internally to an attention multiplier `10^(boost/2)`; **-5.0** is a special case that hard-blocks direct attention with `-inf`. This is not a guaranteed identity preservation or exact-copy strength. Regional Mask Boost values override the global Boost inside selected pixels, with **Last Mask Wins** priority. The mechanism affects VAE/RoPE attention, not Qwen Vision. Only positive conditioning receives regional Boost maps; the grounded negative branch is neutral (0.0). Workflows saved under the previous 0–10 scale need their Boost values reviewed; the new values are not automatically migrated.
 
 The unified Reference uses `mask_attention` regional Boosts to override its global Boost. There is no separate target-attention mask or attention-scope selector. Latent still exports `target_image` for workflows that need a target-image painting canvas.
 
@@ -259,7 +259,7 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
 
-**RoPE preview:** Edit emits an `IMAGE` batch with four canonical views (`layout`, `overlay_boxes`, `overlay_visuals`, `regional_boosts`) followed by **one separate spatial Boost view per VAE/RoPE reference**. Every view uses the same coordinates computed by the runtime RoPE planner; the fourth no longer uses a centered gallery. When references overlap, the fourth view shows the actual overlay order; the additional per-reference frames preserve each image and mask at its own RoPE position so no reference disappears behind another. Target content is shown if available. All reference previews use the same source geometry as VAE preparation; collapsed references are displayed as points. Vision-only references do not appear. Boost 0 darkens the image by 90%, Boost 10 by 5%, with intermediate values interpolated linearly. The source image is not alpha-blended a second time into the preview, preserving visible detail. This is preview rendering only and does not change generation attention.
+**RoPE preview:** Edit emits an `IMAGE` batch with four canonical views (`layout`, `overlay_boxes`, `overlay_visuals`, `regional_boosts`) followed by **one separate spatial Boost view per VAE/RoPE reference**. Every view uses the same coordinates computed by the runtime RoPE planner; the fourth no longer uses a centered gallery. When references overlap, the fourth view shows the actual overlay order; the additional per-reference frames preserve each image and mask at its own RoPE position so no reference disappears behind another. Target content is shown if available. All reference previews use the same source geometry as VAE preparation; collapsed references are displayed as points. Vision-only references do not appear. Boost -5 darkens the image by 90%, Boost +5 by 5%, with intermediate values interpolated linearly. The source image is not alpha-blended a second time into the preview, preserving visible detail. This is preview rendering only and does not change generation attention.
 
 
 **Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts one ordered `references` chain, analyzes its images once in chain order and forwards that same chain unchanged. To use a scene and a subject, connect Scene Reference to Subject Reference via `previous_references`, then connect Subject Reference to Prompt Creator. Both VAE/RoPE and Vision enable states are preserved. Existing workflows using the former IMAGE socket/widget names require migration.
@@ -288,7 +288,7 @@ index** and may be connected directly to a Reference's `image` input
 input. Compositing uses the full ordered Mask chain: the **last mask wins**
 where regions overlap. Pixels outside all masks remain unchanged in
 `composite_image`. Only masked pixels receive the selected overlay:
-Boost 0 is 90% composite color and Boost 10 is 5% composite color,
+Boost -5 is 90% composite color and Boost +5 is 5% composite color,
 with linear interpolation. The untouched `image`, union `mask`, and
 `mask_attention` outputs retain their prior behavior. The Reference's
 own global VAE/RoPE Boost remains independent of the image composite.
@@ -300,7 +300,7 @@ For Edit, connect the **last** Mask's `mask_attention` into
 the corresponding Reference image. Pixels outside regional masks retain
 Reference's global `boost`, whereas masked pixels take their own
 **absolute** `boost` (last-overlapping region wins). A regional boost
-of zero strongly suppresses direct target-to-reference attention for that region without hard-blocking it.
+of -5 hard-blocks direct target-to-reference attention for that region; zero is neutral.
 
 To release SAM's GPU weights, set `unload_sam_model=true` **only in the
 last SAM3 Mask** of a sequential chain. This requests a targeted offload
