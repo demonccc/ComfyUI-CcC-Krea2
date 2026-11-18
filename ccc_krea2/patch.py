@@ -44,7 +44,7 @@ def attach_reference_runtime_to_conditioning(
     values: Dict[str, Any] = {
         "reference_rope_positions": list(rope_positions or ["none"] * reference_count),
     }
-    if reference_boosts is not None and any(float(v) != 1.0 for v in reference_boosts):
+    if reference_boosts is not None and any(float(v) != 0.0 for v in reference_boosts):
         values["reference_boosts"] = [float(v) for v in reference_boosts]
     if isolate_references:
         values["reference_attention_isolation"] = True
@@ -227,7 +227,7 @@ def patch_krea2_model(model: Any) -> Any:
             transformer_options = {}
 
         count = len(ref_latents)
-        boosts = [float(v) for v in _normalize_runtime_list(kwargs.get("ref_boosts"), count, 1.0)]
+        boosts = [float(v) for v in _normalize_runtime_list(kwargs.get("ref_boosts"), count, 0.0)]
         rope_positions = [
             str(v)
             for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
@@ -349,7 +349,7 @@ def _compute_ref_attention_bias_patchified(
         raise ValueError("[Krea2 CcC Edit] Reference tokens, grids and boosts must be aligned.")
 
     active = any(
-        float(boost) != 1.0 or ref_attention_maps[i] is not None
+        float(boost) != 0.0 or ref_attention_maps[i] is not None
         for i, boost in enumerate(boosts)
     )
     if not active and not isolate_references:
@@ -393,18 +393,20 @@ def _compute_ref_attention_bias_patchified(
                 size=(gh, gw), mode="area"
             )[:, 0].flatten(1).to(dtype=dtype)
             weights = weights.expand(batch_size, -1)
-            if torch.any(weights < 0):
-                raise ValueError("Reference attention weights must be nonnegative.")
-            # Boost 0 suppresses reference attention strongly but does not
-            # remove a token entirely; retain pre-30c7229 behavior.
-            block += (weights.clamp_min(1e-4).log().unsqueeze(1)
+            if not torch.isfinite(weights).all() or torch.any((weights < -5.0) | (weights > 5.0)):
+                raise ValueError("[Krea2 CcC Edit] Regional attention boost must be in [-5, 5].")
+            # Signed user-facing scale: 0 neutral, negative attenuates,
+            # positive amplifies, -5 strictly excludes direct attention.
+            block += (weights * (math.log(10.0) / 2.0)
                       * tgt_weight.unsqueeze(-1)).unsqueeze(1)
-        elif float(boost) != 1.0:
-            if float(boost) < 0.0:
-                raise ValueError("[Krea2 CcC Edit] Reference boost must be nonnegative.")
-            block += (
-                math.log(max(float(boost), 1e-4)) * tgt_weight.unsqueeze(-1)
-            ).unsqueeze(1)
+            block.masked_fill_((weights <= -5.0).unsqueeze(1).unsqueeze(1), float("-inf"))
+        elif float(boost) != 0.0:
+            if not math.isfinite(float(boost)) or not -5.0 <= float(boost) <= 5.0:
+                raise ValueError("[Krea2 CcC Edit] Attention boost must be in [-5, 5].")
+            if float(boost) == -5.0:
+                block.fill_(float("-inf"))
+            else:
+                block += float(boost) * (math.log(10.0) / 2.0)
 
     return bias
 
@@ -450,7 +452,7 @@ def krea2_dit_incontext_forward(
     """In-context Krea2 forward with optional Krea2 CcC Edit RoPE displacement."""
     transformer_options = transformer_options or {}
     n_refs = len(ref_latents)
-    boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 1.0)]
+    boosts = [float(v) for v in _normalize_runtime_list(ref_boosts, n_refs, 0.0)]
     rope_positions = [str(v) for v in _normalize_runtime_list(ref_rope_positions, n_refs, "none")]
     attention_maps = _normalize_runtime_list(ref_attention_maps, n_refs, None)
 
