@@ -28,7 +28,7 @@ def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
     bias = bias_for(boosts=[2.0])
     # Three text tokens, four reference tokens, eight target tokens.
     torch.testing.assert_close(
-        bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(10.0))
+        bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(4.6))
     )
 
 
@@ -48,8 +48,21 @@ def test_boost_inputs_are_signed_and_increment_by_tenth():
     bias = bias_for(boosts=[0.1])
     torch.testing.assert_close(
         bias[0, 0, 7:, 3:7],
-        torch.full((8, 4), math.log(10.0) / 20.0),
+        torch.full((8, 4), math.log(1.18)),
     )
+
+
+def test_signed_boost_preserves_previous_multiplier_range():
+    # Signed controls reparameterize the former multiplier range 0..10.
+    for value, expected in [(-4.0, 0.2), (-2.0, 0.6), (0.0, 1.0), (1.0, 2.8), (5.0, 10.0)]:
+        bias = bias_for(boosts=[value])
+        if value == 0:
+            assert bias is None
+        else:
+            torch.testing.assert_close(
+                bias[0, 0, 7:, 3:7],
+                torch.full((8, 4), math.log(expected)),
+            )
 
 
 def test_minus_five_boost_blocks_direct_reference_attention():
@@ -65,7 +78,7 @@ def test_minus_five_blocks_only_its_reference():
     assert torch.isneginf(bias[0, 0, 11:, 3:7]).all()
     torch.testing.assert_close(
         bias[0, 0, 11:, 7:11],
-        torch.full((8, 4), math.log(10.0)),
+        torch.full((8, 4), math.log(4.6)),
     )
 
 
@@ -78,13 +91,13 @@ def test_regional_minus_five_blocks_while_zero_remains_neutral():
     )
     selected = bias[0, 0, 7:, 3:7]
     assert torch.isneginf(selected[:, [0, 3]]).all()
-    torch.testing.assert_close(selected[:, 1], torch.full((8,), math.log(10.0)))
+    torch.testing.assert_close(selected[:, 1], torch.full((8,), math.log(4.6)))
     assert (selected[:, 2] == 0).all()
 
 
 def test_negative_boost_reduces_attention():
     bias = bias_for(boosts=[-2.0])
-    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), -math.log(10.0)))
+    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(0.6)))
 
 
 def test_out_of_range_boost_is_rejected():
