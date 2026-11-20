@@ -28,7 +28,7 @@ def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
     bias = bias_for(boosts=[2.0])
     # Three text tokens, four reference tokens, eight target tokens.
     torch.testing.assert_close(
-        bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(4.6))
+        bias[0, 0, 7:, 3:7], torch.full((8, 4), 2.0 * math.log(10.0) / 5.0)
     )
 
 
@@ -48,13 +48,14 @@ def test_boost_inputs_are_signed_and_increment_by_tenth():
     bias = bias_for(boosts=[0.1])
     torch.testing.assert_close(
         bias[0, 0, 7:, 3:7],
-        torch.full((8, 4), math.log(1.18)),
+        torch.full((8, 4), 0.1 * math.log(10.0) / 5.0),
     )
 
 
 def test_signed_boost_preserves_previous_multiplier_range():
-    # Signed controls reparameterize the former multiplier range 0..10.
-    for value, expected in [(-4.0, 0.2), (-2.0, 0.6), (0.0, 1.0), (1.0, 2.8), (5.0, 10.0)]:
+    # Check the agreed symmetric exponential mapping at every integer step.
+    for value in range(-4, 6):
+        expected = 10.0 ** (value / 5.0)
         bias = bias_for(boosts=[value])
         if value == 0:
             assert bias is None
@@ -78,7 +79,7 @@ def test_minus_five_blocks_only_its_reference():
     assert torch.isneginf(bias[0, 0, 11:, 3:7]).all()
     torch.testing.assert_close(
         bias[0, 0, 11:, 7:11],
-        torch.full((8, 4), math.log(4.6)),
+        torch.full((8, 4), 2.0 * math.log(10.0) / 5.0),
     )
 
 
@@ -91,13 +92,28 @@ def test_regional_minus_five_blocks_while_zero_remains_neutral():
     )
     selected = bias[0, 0, 7:, 3:7]
     assert torch.isneginf(selected[:, [0, 3]]).all()
-    torch.testing.assert_close(selected[:, 1], torch.full((8,), math.log(4.6)))
+    torch.testing.assert_close(selected[:, 1], torch.full((8,), 2.0 * math.log(10.0) / 5.0))
     assert (selected[:, 2] == 0).all()
+
+
+@pytest.mark.parametrize("boost", [-5.0, -4.9, -4.0, -3.0, -2.0, -1.0, 0.0, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0])
+def test_uniform_regional_boost_matches_global(boost):
+    regional = _compute_ref_attention_bias_patchified(
+        boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
+        ref_token_grids=[(2, 2)],
+        ref_attention_maps=[torch.full((1, 2, 2), boost)],
+        device=torch.device("cpu"), dtype=torch.float32,
+    )
+    global_bias = bias_for(boosts=[boost])
+    if global_bias is None:
+        assert (regional == 0).all()
+    else:
+        torch.testing.assert_close(regional, global_bias)
 
 
 def test_negative_boost_reduces_attention():
     bias = bias_for(boosts=[-2.0])
-    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(0.6)))
+    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), -2.0 * math.log(10.0) / 5.0))
 
 
 def test_out_of_range_boost_is_rejected():
