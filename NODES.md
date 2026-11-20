@@ -44,7 +44,7 @@ Required controls:
 | Control | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | image | IMAGE | — | Source reference. |
-| boost | -5.0..+5.0, step 0.1 | 0.0 | Signed boost: -5 blocks, 0 neutral (1×), +5 amplifies to 10×; step 0.1. |
+| boost | -5.0..+5.0, step 0.1 | 0.0 | Signed boost: multiplier `10^(boost/5)`; -5 blocks, 0 neutral (1×), +5 amplifies to 10×. |
 | reference_fit | native, crop, contain, fit | native | Appearance/VAE pixel fit. |
 | placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. Outside + center + center is invalid. |
 | grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
