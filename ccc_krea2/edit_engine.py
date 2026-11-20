@@ -257,7 +257,7 @@ def run_krea2_edit_orchestrator(
     for ref in vae_ref_specs:
         sp = ref["spec"]
         ref_item = ref["ref_item"]
-        b_boost = getattr(sp, "attention_boost", 1.0)
+        b_boost = getattr(sp, "attention_boost", 0.0)
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_range = ref_item.get("physical_qwen_range")
         phys_idx = phys_range[0] if phys_range else None
