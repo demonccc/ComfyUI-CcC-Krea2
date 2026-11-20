@@ -395,15 +395,9 @@ def _compute_ref_attention_bias_patchified(
             weights = weights.expand(batch_size, -1)
             if not torch.isfinite(weights).all() or torch.any((weights < -5.0) | (weights > 5.0)):
                 raise ValueError("[Krea2 CcC Edit] Regional attention boost must be in [-5, 5].")
-            # Preserve the old 0..10 multiplier range with a signed UI:
-            # [-5, 0] -> [0, 1] and [0, 5] -> [1, 10].
+            # Symmetric logarithmic scale: multiplier = 10 ** (boost / 5).
             # -5 is a deliberate hard exclusion; all other values are finite.
-            multipliers = torch.where(
-                weights < 0.0,
-                1.0 + weights.clamp(max=0.0) / 5.0,
-                1.0 + weights.clamp(min=0.0) * (9.0 / 5.0),
-            )
-            block += (multipliers.clamp_min(1e-4).log().unsqueeze(1)
+            block += (weights * (math.log(10.0) / 5.0)
                       * tgt_weight.unsqueeze(-1)).unsqueeze(1)
             block.masked_fill_((weights <= -5.0).unsqueeze(1).unsqueeze(1), float("-inf"))
         elif float(boost) != 0.0:
@@ -412,8 +406,7 @@ def _compute_ref_attention_bias_patchified(
             if float(boost) == -5.0:
                 block.fill_(float("-inf"))
             else:
-                multiplier = (1.0 + float(boost) / 5.0) if boost < 0 else (1.0 + float(boost) * 9.0 / 5.0)
-                block += math.log(multiplier)
+                block += float(boost) * (math.log(10.0) / 5.0)
 
     return bias
 
