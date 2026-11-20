@@ -1,6 +1,7 @@
 """Krea2 CcC Edit node."""
 
 from typing import Any, Optional
+from dataclasses import replace
 
 import torch
 
@@ -13,10 +14,9 @@ from ..reference_specs import (
     PreparedVisionImage,
     ReferenceChain,
     ReferenceSpec,
-    StyleReferenceSpec,
     VisionPrepSpec,
 )
-from .edit_reference_types import EditReferenceChain, VisualReferenceEntry, VisionReferenceEntry
+from .edit_reference_types import EditReferenceChain, ImageReferenceEntry, VisualReferenceEntry, VisionReferenceEntry
 from ..vision_reference_runtime import build_vision_reference_spec
 from .rope_position import install_krea2_rope_positioning
 from .rope_preview import render_rope_preview
@@ -24,15 +24,8 @@ from .rope_preview import render_rope_preview
 
 # Krea2 Edit uses a grounded unconditional branch rather than a classic SD-style
 # negative prompt. Keep the negative text empty by contract; visual references remain
-# attached to both branches and negative reference boosts stay neutral at 1.0.
+# attached to both branches and negative reference boosts stay neutral at 0.0.
 KREA2_EDIT_NEGATIVE_PROMPT = ""
-
-SEMANTIC_SUBJECT_DIRECTIVE = (
-    "Use this reference image as a content and composition guide. Preserve its pose, action, "
-    "clothing, surrounding people, interactions, objects, background, environment, framing, "
-    "and spatial composition. Do not use the reference subject's identity as the target identity; "
-    "identity is controlled by the edit identity references."
-)
 
 
 # Visual references are positional in the Krea2 grounding contract.
@@ -91,56 +84,6 @@ def _prepare_qwen_image(
     )
 
 
-def _append_semantic(
-    chain: ReferenceChain,
-    image: torch.Tensor,
-    clip: Any,
-    instruction: str,
-    grounding_px: int,
-    mode: str = "semantic_only",
-    processing: str = "2x2",
-    fidelity: float = 1.0,
-    alias: str = "",
-) -> ReferenceChain:
-    prep = _prepare_qwen_image(
-        image=image,
-        clip=clip,
-        grounding_px=grounding_px,
-        semantic_resize=True,
-        resize_method="lanczos",
-    )
-    if mode == "semantic_only":
-        user_instruction = instruction.strip()
-        semantic_instruction = (
-            f"{SEMANTIC_SUBJECT_DIRECTIVE} {user_instruction}".strip()
-            if user_instruction
-            else SEMANTIC_SUBJECT_DIRECTIVE
-        )
-        spec = ReferenceSpec(
-            reference_path="edit",
-            prepared_image=prep,
-            alias=alias,
-            vision_instruction=semantic_instruction,
-            appearance_reference=False,
-            include_in_vision=True,
-            semantic_extract="subject",
-            semantic_strength=float(fidelity),
-        )
-    else:
-        spec = StyleReferenceSpec(
-            reference_path="style",
-            prepared_image=prep,
-            alias=alias,
-            vision_instruction=instruction.strip(),
-            appearance_reference=False,
-            include_in_vision=True,
-            style_processing=processing,
-            style_fidelity=fidelity,
-            indirect_style_transfer=(mode == "style_indirect"),
-        )
-    return chain.append(spec)
-
-
 def _runtime_latent(latent: dict) -> dict:
     runtime = {"samples": latent["samples"]}
     if latent.get("batch_index") is not None:
@@ -148,59 +91,78 @@ def _runtime_latent(latent: dict) -> dict:
     return runtime
 
 
-def _combine_reference_chains(
-    clip: Any,
-    references: Optional[EditReferenceChain],
-    latent: dict,
-) -> ReferenceChain:
-    """Translate the split public nodes into the common orchestrator ReferenceChain."""
-    chain = ReferenceChain()
+def _combine_reference_chains(clip, references, latent):
+    """Build the same Qwen image route for Visual and Semantic.
 
-    for index, entry in enumerate((references or EditReferenceChain()).entries, start=1):
+    Semantic image rows are removed by conditioning.py after image encoding.
+    No generated guidance, directive or hidden prompt is added.
+    """
+    chain = ReferenceChain()
+    entries = (references or EditReferenceChain()).entries
+    for index, entry in enumerate(entries):
+        if isinstance(entry, ImageReferenceEntry):
+            continue
         if isinstance(entry, VisionReferenceEntry):
+            if entry.paired_visual:
+                if index == 0 or not isinstance(entries[index - 1], VisualReferenceEntry):
+                    raise ValueError("[Krea2 CcC Edit] Paired Vision must follow its Visual source.")
+                continue
             chain = chain.append(build_vision_reference_spec(entry))
             continue
         if not isinstance(entry, VisualReferenceEntry):
             raise TypeError(f"Unexpected edit reference type: {type(entry).__name__}")
         if entry.image is None:
-            raise ValueError(f"[Krea2 CcC Edit] Visual reference {index} has no IMAGE.")
+            raise ValueError("[Krea2 CcC Edit] Visual reference has no IMAGE.")
+        paired = (
+            entries[index + 1] if index + 1 < len(entries)
+            and isinstance(entries[index + 1], VisionReferenceEntry)
+            and entries[index + 1].paired_visual else None
+        )
         prep = _prepare_qwen_image(
-            image=entry.image,
-            clip=clip,
+            image=entry.image, clip=clip,
             grounding_px=entry.semantic_grounding_px,
             semantic_resize=entry.semantic_resize if entry.semantic else False,
             resize_method="bicubic",
         )
-        chain = chain.append(
-            ReferenceSpec(
-                reference_path="edit",
-                prepared_image=prep,
-                alias="",
-                vision_instruction=entry.prompt_annotation if entry.semantic else "",
-                appearance_reference=True,
-                include_in_vision=entry.semantic,
-                attention_boost=float(entry.boost),
-                attention_mask=entry.reference_boost_mask,
-                visual_reference_fit=entry.resolved_fit_mode,
-                visual_resize_method="bicubic",
-                rope_position=entry.rope_position,
-            )
-        )
+        vision_spec = build_vision_reference_spec(paired) if paired else None
+        if vision_spec is not None:
+            prep = replace(prep, vision_image=vision_spec.prepared_image.vision_image)
+        chain = chain.append(ReferenceSpec(
+            reference_path="edit",
+            prepared_image=prep,
+            alias=entry.prompt_annotation,
+            vision_instruction=vision_spec.vision_instruction if vision_spec else "",
+            appearance_reference=True,
+            include_in_vision=entry.semantic,
+            attention_boost=float(entry.boost),
+            attention_weight_map=entry.attention_weight_map,
+            visual_reference_fit=entry.resolved_fit_mode,
+            visual_resize_method="bicubic",
+            rope_position=entry.rope_position,
+            vision_reference_mode=vision_spec.vision_reference_mode if vision_spec else "visual",
+            vision_weight=vision_spec.vision_weight if vision_spec else 1.0,
+        ))
 
-    latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
-    if latent_semantic.get("enabled"):
-        latent_image = latent_semantic.get("image")
-        if latent_image is None:
-            raise ValueError("[Krea2 CcC Edit] Latent semantic metadata is enabled but does not contain an image.")
-        chain = _append_semantic(
-            chain=chain,
-            image=latent_image,
-            clip=clip,
-            instruction=str(latent_semantic.get("instruction", "")),
-            grounding_px=int(latent_semantic.get("grounding_px", 768)),
-            alias="target image",
-        )
-
+    latent_vision = latent.get("ccc_krea2_latent_semantic") or {}
+    if latent_vision.get("enabled"):
+        source = latent_vision.get("image")
+        if source is None:
+            raise ValueError("[Krea2 CcC Edit] Latent Vision enabled without image.")
+        image = source
+        if latent_vision.get("vision_resize", True):
+            edge = int(latent_vision.get("vision_max_edge", 768))
+            height, width = int(image.shape[1]), int(image.shape[2])
+            if max(height, width) > edge:
+                scale = edge / float(max(height, width))
+                image = resize_tensor(image, max(1, round(height * scale)),
+                                      max(1, round(width * scale)), "bicubic")
+        from .vision_reference_node import CcCKrea2VisionReference
+        vision_entry = CcCKrea2VisionReference().process(
+            image=image,
+            mode=str(latent_vision.get("mode", "visual")),
+            instruction=str(latent_vision.get("instruction", "")),
+        )[0].entries[-1]
+        chain = chain.append(build_vision_reference_spec(vision_entry))
     return chain
 
 
@@ -213,32 +175,6 @@ def _conditioning_extras(conditioning):
     return {}
 
 
-def _resolve_reference_target_masks(visual_entries, latent):
-    """Read masks from their owning Visual References, never from a parallel chain."""
-    samples = latent["samples"]
-    target_h, target_w = (int(samples.shape[-2]) * 8, int(samples.shape[-1]) * 8)
-    batch = int(samples.shape[0])
-    masks, scopes = [], []
-    for index, entry in enumerate(visual_entries, start=1):
-        scope = entry.attention_scope
-        mask = entry.target_attention_mask
-        if scope != "global" and mask is None:
-            raise ValueError(f"[Krea2 CcC Edit] Visual Reference {index} requires a target_attention_mask.")
-        if mask is not None:
-            if mask.ndim == 2:
-                mask = mask.unsqueeze(0)
-            if mask.ndim != 3 or tuple(mask.shape[-2:]) != (target_h, target_w):
-                raise ValueError(
-                    f"[Krea2 CcC Edit] Visual Reference {index} target_attention_mask must match "
-                    f"the prepared target {target_w}x{target_h}; received {tuple(mask.shape)}."
-                )
-            if mask.shape[0] not in (1, batch):
-                raise ValueError(f"[Krea2 CcC Edit] Visual Reference {index} target mask batch must be 1 or {batch}.")
-        masks.append(mask if scope != "global" else None)
-        scopes.append(scope)
-    return masks, scopes
-
-
 def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     extras = _conditioning_extras(conditioning)
     refs = list(extras.get("reference_latents") or [])
@@ -246,7 +182,7 @@ def _format_conditioning_runtime(conditioning, reference_count: int) -> str:
     rope = list(extras.get("reference_rope_positions") or [])
     boosts = extras.get("reference_boosts")
     if boosts is None:
-        boosts = [1.0] * reference_count
+        boosts = [0.0] * reference_count
     else:
         boosts = [float(v) for v in boosts]
     return f"refs={len(refs)} shapes={shapes}, boosts={boosts}, rope={rope}"
@@ -278,6 +214,7 @@ class CcCKrea2Edit:
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
                 "references": ("KREA2_REFERENCE_CHAIN",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
             },
@@ -291,6 +228,7 @@ class CcCKrea2Edit:
         latent,
         positive_prompt="",
         apply_krea2_edit_patch=True,
+        isolate_references=False,
         references=None,
         prompt_augmentation=None,
     ):
@@ -304,12 +242,7 @@ class CcCKrea2Edit:
         vision_entries = tuple(e for e in all_entries if isinstance(e, VisionReferenceEntry))
         latent_semantic = latent.get("ccc_krea2_latent_semantic") or {}
         runtime_latent = _runtime_latent(latent)
-
-        chain = _combine_reference_chains(
-            clip=clip,
-            references=references,
-            latent=latent,
-        )
+        chain = _combine_reference_chains(clip=clip, references=references, latent=latent)
 
         # Krea2 CcC Edit prepares geometry, Qwen images and VAE reference latents.
         _, positive, negative, latent_out, pipeline_info = edit_engine_runtime.run_krea2_edit_orchestrator(
@@ -325,7 +258,6 @@ class CcCKrea2Edit:
         reference_count = len(visual_entries)
         rope_positions = [entry.rope_position for entry in visual_entries]
         positive_boosts = [float(entry.boost) for entry in visual_entries]
-        target_masks, attention_scopes = _resolve_reference_target_masks(visual_entries, latent)
 
         if reference_count:
             positive = attach_reference_runtime_to_conditioning(
@@ -333,16 +265,13 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=positive_boosts,
-                reference_target_masks=target_masks,
-                reference_attention_scopes=attention_scopes,
+                isolate_references=isolate_references,
             )
             negative = attach_reference_runtime_to_conditioning(
                 negative,
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=None,
-                reference_target_masks=target_masks,
-                reference_attention_scopes=attention_scopes,
             )
 
         if apply_krea2_edit_patch and reference_count:
@@ -357,7 +286,9 @@ class CcCKrea2Edit:
             "Target Latent: external Krea2 CcC Latent",
             f"Visual References: {len(visual_entries)}",
             f"Vision References: {len(vision_entries)}",
-            f"Latent Semantic: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
+            "Generated Vision text extractions: 0",
+            f"VAE/RoPE attention isolation: {bool(isolate_references)}",
+            f"Latent Vision: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
                 "Appearance Transport: CONDITIONING metadata"
@@ -391,7 +322,6 @@ class CcCKrea2Edit:
                 f"Visual Reference {index}: "
                 f"boost={entry.boost}, fit={entry.reference_fit}, "
                 f"rope={entry.rope_position}, semantic={entry.semantic}, "
-                f"attention_scope={entry.attention_scope}, reference_boost_mask={entry.reference_boost_mask is not None}, target_attention_mask={entry.target_attention_mask is not None}, "
                 f"semantic_resize={entry.semantic_resize}, semantic_grounding_px={entry.semantic_grounding_px}, "
                 f"semantic_resize_method=bicubic, prompt_annotation={annotation}"
             )

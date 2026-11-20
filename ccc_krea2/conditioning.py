@@ -4,7 +4,6 @@ import torch
 from dataclasses import dataclass, field
 from typing import List, Tuple, Any, Dict
 from .constants import LOGGER_PREFIX
-from .style_processing import apply_statistical_style_fidelity, StyleSpanOperation
 from .vision_prep import resolve_qwen_encoder_config, calculate_native_qwen_geometry
 
 
@@ -28,6 +27,16 @@ try:
     from comfy.text_encoders.krea2 import KREA2_TEMPLATE
 except ImportError:
     KREA2_TEMPLATE = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
+
+
+# Upstream comfyui-krea2edit / Krea2EditGroundedEncode training-matched
+# system instruction. The generic Krea2 template is not equivalent for Edit.
+KREA2_EDIT_GROUNDED_TEMPLATE = (
+    "<|im_start|>system\\n"
+    "Describe the image by detailing the color, shape, size, "
+    "texture, quantity, text, spatial relationships of the objects and background:"
+    "<|im_end|>\\n<|im_start|>user\\n{}<|im_end|>\\n<|im_start|>assistant\\n"
+)
 
 
 def attach_reference_latents_to_conditioning(
@@ -273,6 +282,53 @@ def extract_vision_spans_from_tokens(
     return adjusted_spans, warnings, stream_key, template_end
 
 
+def apply_vision_weights_to_conditioning(
+    conditioning: List[Any],
+    physical_image_map: List[Dict[str, Any]],
+    vision_row_spans: List[Tuple[int, int]],
+    removed_row_indices: List[int] = None,
+) -> List[Any]:
+    """Scale only image-token rows, never prompt text or reference annotations.
+
+    Operate after Semantic rows are removed so 0.0 always leaves that
+    image's surviving Qwen rows zero. Keep negative and positive branches
+    consistent; a neutral weight is an exact no-op.
+    """
+    if len(physical_image_map) != len(vision_row_spans):
+        raise ValueError("[Krea2 CcC] Vision weight requires aligned image spans.")
+    operations = []
+    for (start, end), item in zip(vision_row_spans, physical_image_map):
+        weight = float(getattr(item.get("spec"), "vision_weight", 1.0))
+        if not 0.0 <= weight <= 2.0:
+            raise ValueError("[Krea2 CcC] vision_weight must be in [0, 2].")
+        if weight != 1.0:
+            operations.append((start, end, weight))
+    if not operations or not conditioning:
+        return conditioning
+
+    removed = sorted(removed_row_indices or [])
+    removed_set = set(removed)
+    result = []
+    for cond_entry in conditioning:
+        if not isinstance(cond_entry, (list, tuple)) or not isinstance(cond_entry[0], torch.Tensor):
+            result.append(cond_entry)
+            continue
+        tensor = cond_entry[0].clone()
+        for start, end, weight in operations:
+            # Semantic processing can remove image rows; map source indices to
+            # the surviving sequence rather than assuming unchanged positions.
+            indices = [
+                i - sum(1 for removed_idx in removed if removed_idx < i)
+                for i in range(start, end) if i not in removed_set
+            ]
+            if indices:
+                if max(indices) >= tensor.shape[1]:
+                    raise ValueError("[Krea2 CcC] Vision weight span exceeds conditioning rows.")
+                tensor[:, indices, :] *= weight
+        result.append([tensor, cond_entry[1] if len(cond_entry) > 1 else {}])
+    return result
+
+
 def encode_krea2_qwen_context(
     clip: Any,
     prompt: str,
@@ -288,9 +344,16 @@ def encode_krea2_qwen_context(
 
     warnings_list: List[str] = []
     try:
-        tokens = clip.tokenize(prompt or "", images=physical_images, llama_template=KREA2_TEMPLATE)
-    except TypeError:
-        tokens = clip.tokenize(prompt or "", images=physical_images)
+        tokens = clip.tokenize(
+            prompt or "", images=physical_images,
+            llama_template=KREA2_EDIT_GROUNDED_TEMPLATE,
+        )
+    except TypeError as e:
+        raise TypeError(
+            f"{LOGGER_PREFIX} Qwen encoder does not accept llama_template; "
+            "Krea2Edit's grounded system instruction cannot be guaranteed. "
+            "Use a compatible Qwen3-VL encoder."
+        ) from e
     except Exception as e:
         raise ValueError(f"{LOGGER_PREFIX} Failed to tokenize prompt with Qwen CLIP text encoder: {e}") from e
 
@@ -324,98 +387,44 @@ def encode_krea2_qwen_context(
                         f"exceeds encoded conditioning sequence length ({pos_rows_before})."
                     )
 
-    # Apply Krea2 CcC Vision Reference processing to positive Qwen vision spans.
-    # Vision Reference presets retain compact extracted rows for Semantic/Style/Context.
-    # Visual keeps the raw Qwen vision rows unchanged.
-    if is_positive and conditioning and physical_image_map:
-        spans_info: List[StyleSpanOperation] = []
-        for idx, item in enumerate(physical_image_map):
-            if idx >= len(vision_row_spans):
-                continue
-
+    # Encode both modes with exactly the same multimodal Qwen input.
+    # Semantic removes only its image rows from either conditioning branch.
+    # Text rows (including the user's prompt and optional instruction) are
+    # preserved after Qwen has processed the image. No text generation occurs.
+    if conditioning and physical_image_map:
+        semantic_indices = []
+        for (start, end), item in zip(vision_row_spans, physical_image_map):
             spec = item.get("spec")
-            role_val = item.get("role", "") or item.get("logical_role", "")
-            extract = None
-            fidelity = 1.0
-            indirect = False
-            summary_rows = int(getattr(spec, "vision_summary_rows", 0) or 0)
-
-            vision_mode = str(getattr(spec, "vision_reference_mode", "") or "")
-            if vision_mode == "semantic":
-                extract = "subject"
-                fidelity = getattr(spec, "semantic_strength", 0.25)
-                indirect = False
-            elif vision_mode == "visual":
-                extract = None
-                fidelity = 1.0
-                indirect = False
-            elif vision_mode == "style":
-                extract = "style"
-                fidelity = getattr(spec, "style_fidelity", 0.0)
-                indirect = False
-            elif vision_mode == "context":
-                extract = "context"
-                fidelity = getattr(spec, "semantic_strength", 0.0)
-                indirect = False
-            elif str(role_val).lower() == "style":
-                extract = "style"
-                fidelity = getattr(spec, "style_fidelity", 1.0)
-                indirect = getattr(spec, "indirect_style_transfer", False)
-            elif getattr(spec, "semantic_extract", "none") == "subject":
-                extract = "subject"
-                fidelity = getattr(spec, "semantic_strength", 1.0)
-                indirect = False
-            elif getattr(spec, "indirect_vision_context", False):
-                extract = "context"
-                fidelity = getattr(spec, "semantic_strength", 0.0)
-                indirect = True
-
-            if extract is not None:
-                s_start, s_end = vision_row_spans[idx]
-                spans_info.append(
-                    StyleSpanOperation(
-                        logical_reference_id=item.get("logical_reference_id", extract),
-                        logical_vision_slot=item.get("logical_vision_slot", idx + 1),
-                        physical_qwen_index=item.get("physical_qwen_image_index", idx + 1),
-                        row_start=s_start,
-                        row_end=s_end,
-                        style_fidelity=fidelity,
-                        indirect_style_transfer=indirect,
-                        extract=extract,
-                        summary_rows=summary_rows,
-                    )
-                )
-
-        if spans_info:
+            mode = str(getattr(spec, "vision_reference_mode", "visual") or "visual")
+            if mode == "semantic":
+                semantic_indices.extend(range(start, end))
+            elif mode not in ("visual", ""):
+                raise ValueError(f"[Krea2 CcC] Unsupported Vision mode: {mode!r}.")
+        if semantic_indices:
+            removed_row_indices = sorted(set(semantic_indices))
             new_conditioning = []
             for cond_entry in conditioning:
-                if isinstance(cond_entry, (list, tuple)) and len(cond_entry) > 0:
-                    cond_tensor = cond_entry[0]
-                    extras = cond_entry[1] if len(cond_entry) > 1 else {}
-                    new_extras = extras.copy() if isinstance(extras, dict) else extras
-
-                    if isinstance(cond_tensor, torch.Tensor):
-                        transformed_tensor, indirect_applied, removed_indices = apply_statistical_style_fidelity(
-                            cond_tensor=cond_tensor, spans_info=spans_info
-                        )
-                        removed_row_indices = removed_indices
-                        pos_rows_after = transformed_tensor.shape[1]
-
-                        if indirect_applied and isinstance(new_extras, dict):
-                            att_mask = new_extras.get("attention_mask")
-                            if isinstance(att_mask, torch.Tensor) and att_mask.shape[-1] == cond_tensor.shape[1]:
-                                keep = torch.ones(cond_tensor.shape[1], dtype=torch.bool, device=att_mask.device)
-                                keep[removed_indices] = False
-                                new_extras["attention_mask"] = att_mask[..., keep]
-                            else:
-                                new_extras.pop("attention_mask", None)
-
-                        new_conditioning.append([transformed_tensor, new_extras])
-                    else:
-                        new_conditioning.append(list(cond_entry))
-                else:
+                if not isinstance(cond_entry, (list, tuple)) or not isinstance(cond_entry[0], torch.Tensor):
                     new_conditioning.append(cond_entry)
+                    continue
+                tensor = cond_entry[0]
+                keep = torch.ones(tensor.shape[1], dtype=torch.bool, device=tensor.device)
+                keep[removed_row_indices] = False
+                extras = dict(cond_entry[1]) if len(cond_entry) > 1 and isinstance(cond_entry[1], dict) else {}
+                mask = extras.get("attention_mask")
+                if isinstance(mask, torch.Tensor) and mask.shape[-1] == tensor.shape[1]:
+                    extras["attention_mask"] = mask[..., keep.to(mask.device)]
+                else:
+                    extras.pop("attention_mask", None)
+                new_conditioning.append([tensor[:, keep, :], extras])
+                pos_rows_after = int(keep.sum().item())
             conditioning = new_conditioning
+
+    # Qwen Vision Weight belongs only to the image token spans and is applied
+    # after any per-mode Vision transform, never to text or VAE/RoPE latents.
+    conditioning = apply_vision_weights_to_conditioning(
+        conditioning, physical_image_map, vision_row_spans, removed_row_indices
+    )
 
     neg_rows = 0
     if not is_positive and conditioning and isinstance(conditioning, list) and len(conditioning) > 0:

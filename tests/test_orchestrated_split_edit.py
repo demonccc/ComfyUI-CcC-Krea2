@@ -70,3 +70,11 @@ def test_split_edit_uses_single_ccc_runtime():
     assert "patch_krea2_model" in source
     assert 'runtime_mode = "ccc"' in source
     assert "_external_" not in source
+
+
+def test_latent_semantic_preserves_target_composition_directive_after_vision_refactor():
+    source = inspect.getsource(edit_node._combine_reference_chains)
+    assert "SEMANTIC_SUBJECT_DIRECTIVE" in source
+    assert 'if mode == "semantic":' in source
+    assert "instruction=semantic_instruction" in source
+    assert "build_vision_reference_spec(entry)" in source

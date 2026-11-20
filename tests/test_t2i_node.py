@@ -199,46 +199,59 @@ def test_t2i_vision_reference_enriches_positive_conditioning(monkeypatch):
     assert "Consumer Processing: deferred to connected node" in vision_info
     assert "Vision References: 1" in info
     assert "Vision Modes: semantic" in info
-    assert "Positive Conditioning: text-only with Qwen Vision-derived guidance" in info
+    assert "Positive Conditioning: text and/or Qwen visual tokens according to Vision mode" in info
     assert "T2I Vision Pipeline:" in info
-    assert "Final Conditioning: text-only Krea2 encode" in info
-    assert "Direct Vision Rows in Final Conditioning: 0" in info
+    assert "Final Conditioning: text and/or multimodal Qwen encoding" in info
+    assert "Direct Vision References: 0" in info
     assert "The same target subject is standing in a city street." in info
 
 
-def test_t2i_vision_guidance_is_encoded_as_text_only(monkeypatch):
+def test_t2i_visual_preserves_direct_qwen_image_tokens(monkeypatch):
     image = torch.zeros((1, 64, 64, 3))
-    vision_chain, _ = CcCKrea2VisionReference().process(
-        image=image,
-        mode="visual",
-        instruction="Use the visible character design.",
+    chain, _ = CcCKrea2VisionReference().process(
+        image=image, mode="visual", instruction="Keep the outfit."
     )
     clip = FakeCLIP()
+    def no_extraction(*args, **kwargs):
+        raise AssertionError("Visual must not run semantic extraction.")
+    monkeypatch.setattr("ccc_krea2.t2i._generate_t2i_vision_guidance", no_extraction)
+    conditioning, items, prompt, analysis_images = _encode_t2i_vision(
+        clip=clip, prompt="One person.", references=chain,
+    )
+    assert analysis_images == 0
+    assert items[0]["generation_strategy"] == "direct-qwen-image-conditioning"
+    assert "Keep the outfit." in prompt
+    assert len(clip.tokenize_calls[0][1]["images"]) == 1
+    assert torch.equal(clip.tokenize_calls[0][1]["images"][0], image)
+    assert conditioning
 
-    def fake_generate_guidance(clip, entry, target_prompt):
-        assert target_prompt == "Only one manga girl facing forward."
-        assert entry.guidance_seed == 0
-        return "Give the same target girl long black hair and a red jacket.", 1, "blueprint-user-prompt"
 
+def test_t2i_semantic_removes_visual_tokens_from_final_conditioning(monkeypatch):
+    image = torch.zeros((1, 64, 64, 3))
+    chain, _ = CcCKrea2VisionReference().process(image=image, mode="semantic")
+    clip = FakeCLIP()
     monkeypatch.setattr(
         "ccc_krea2.t2i._generate_t2i_vision_guidance",
-        fake_generate_guidance,
+        lambda **kwargs: ("A person walking under trees.", 1, "single-pass"),
     )
-
-    conditioning, guidance_items, conditioning_prompt, analysis_images = _encode_t2i_vision(
-        clip=clip,
-        prompt="Only one manga girl facing forward.",
-        references=vision_chain,
+    conditioning, items, prompt, analysis_images = _encode_t2i_vision(
+        clip=clip, prompt="One person.", references=chain,
     )
-
     assert analysis_images == 1
-    assert len(guidance_items) == 1
-    assert guidance_items[0]["mode"] == "visual"
-    assert "MANDATORY VISUAL BLUEPRINT" in conditioning_prompt
-    assert "NEVER clone, repeat, mirror, tile, panelize" in conditioning_prompt
-    assert "long black hair and a red jacket" in conditioning_prompt
-    assert clip.tokenize_calls == [(conditioning_prompt, {})]
-    assert conditioning == [f"conditioning_for_tokens_for_{conditioning_prompt}"]
+    assert "A person walking under trees." in prompt
+    assert clip.tokenize_calls[0][1] == {}
+    assert conditioning
+
+
+def test_t2i_reference_mode_default_keeps_visual_tokens():
+    image = torch.zeros((1, 64, 64, 3))
+    chain, _ = CcCKrea2VisionReference().process(image=image)
+    assert CcCKrea2VisionReference.INPUT_TYPES()["required"]["mode"][1]["default"] == "reference"
+    assert chain.entries[0].mode == "native"
+    clip = FakeCLIP()
+    _, items, _, _ = _encode_t2i_vision(clip, "A portrait.", chain)
+    assert items[0]["mode"] == "reference"
+    assert len(clip.tokenize_calls[0][1]["images"]) == 1
 
 
 class FakeGenerativeCLIP(FakeCLIP):

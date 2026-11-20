@@ -67,7 +67,7 @@ class SlotLoraLoader:
 
 
 class CcCKrea2LoRAStack:
-    """Apply up to ten model-only LoRAs, in order, without prompt processing."""
+    """Apply up to five model-only LoRAs, in order, without prompt processing."""
 
     RETURN_TYPES = ("MODEL",)
     RETURN_NAMES = ("model",)
@@ -75,13 +75,13 @@ class CcCKrea2LoRAStack:
     CATEGORY = NODE_CATEGORY
 
     def __init__(self):
-        self.loaders = [SlotLoraLoader(i) for i in range(1, 11)]
+        self.loaders = [SlotLoraLoader(i) for i in range(1, 6)]
 
     @classmethod
     def INPUT_TYPES(cls):
         names = get_lora_names()
         required = {"model": ("MODEL",)}
-        for i in range(1, 11):
+        for i in range(1, 6):
             required[f"lora_{i}_enabled"] = ("BOOLEAN", {"default": False})
             required[f"lora_{i}_name"] = (names, {"default": "None"})
             required[f"lora_{i}_strength"] = (

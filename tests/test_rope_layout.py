@@ -1,13 +1,15 @@
 """Functional tests for RoPE layout, coordinates and annotated preview."""
 
+import numpy as np
 import pytest
 import torch
+from PIL import Image
 
 from ccc_krea2.modular_nodes.rope_position import (
     build_incontext_3d_rope_pos_ids, plan_rope_positions, parse_rope_position,
 )
 from ccc_krea2.modular_nodes.edit_reference_types import VisualReferenceEntry
-from ccc_krea2.modular_nodes.rope_preview import render_rope_preview
+from ccc_krea2.modular_nodes.rope_preview import render_rope_preview, _boost_visibility_preview
 
 
 def position(grid, h, v, stack="overlay", mode="spatial", geometry="latent", source=None):
@@ -60,7 +62,7 @@ def test_preview_is_rgb_and_draws_only_visual_entries():
     latent = {"samples": torch.zeros((1, 16, 16, 16))}
     entry = VisualReferenceEntry(image=torch.zeros((1, 256, 256, 3)))
     img = render_rope_preview([entry], latent)
-    assert img.ndim == 4 and img.shape[-1] == 3 and img.shape[0] == 3
+    assert img.ndim == 4 and img.shape[-1] == 3 and img.shape[0] == 5
     assert img.min().item() >= 0 and img.max().item() <= 1
     assert torch.unique(img).numel() > 3
 
@@ -71,9 +73,64 @@ def test_three_views_keep_identical_canvas_and_use_processed_target_content():
     }
     reference = VisualReferenceEntry(image=torch.zeros((1, 128, 128, 3)), reference_fit="native")
     preview = render_rope_preview([reference], latent)
-    assert preview.shape[0] == 3
+    assert preview.shape[0] == 5
     assert preview.shape[1:] == render_rope_preview([reference], {
         "samples": latent["samples"]
     }).shape[1:]
     # White source target is visible in both overlay views but not the layout.
     assert float(preview[1].mean()) > float(preview[0].mean())
+
+
+
+def test_preview_inverse_opacity_0_to_10():
+    source = Image.new("RGB", (3, 1), (200, 200, 200))
+    output = _boost_visibility_preview(source, np.array([[0.0, 5.0, 10.0]]))
+    pixels = np.asarray(output)
+    assert pixels.shape == (1, 3, 3)
+    assert pixels[0, 0, 0] == 20  # 90 percent black at Boost 0.
+    assert pixels[0, 1, 0] > pixels[0, 0, 0]
+    assert pixels[0, 2, 0] == 190  # 5 percent black at Boost 10.
+
+
+def test_boost_preview_uses_rope_coordinates_and_isolated_views():
+    # Two overlapping references: each isolated view must preserve the same
+    # RoPE coordinates and neither reference disappears behind the other.
+    latent = {"samples": torch.zeros((1, 16, 16, 16))}
+    left = VisualReferenceEntry(
+        image=torch.ones((1, 128, 128, 3)),
+        boost=10.0, reference_fit="native",
+        placement_grid="outside", grid_horizontal_position="left",
+    )
+    right = VisualReferenceEntry(
+        image=torch.ones((1, 128, 128, 3)),
+        boost=0.0, reference_fit="native",
+        placement_grid="outside", grid_horizontal_position="right",
+    )
+    frames = render_rope_preview([left, right], latent)
+    assert frames.shape[0] == 6  # four canonical views and two isolated frames
+    # Same image proportions and the same target location in all views.
+    assert frames.shape[-1] == 3
+    assert (frames[4] - frames[5]).abs().sum() > 0
+    assert (frames[3] - frames[2]).abs().sum() > 0
+
+
+def test_multiple_overlapping_boost_references_preserve_each_identity_in_spatial_views():
+    latent = {"samples": torch.zeros((1, 16, 16, 16))}
+    entries = [
+        VisualReferenceEntry(
+            image=torch.full((1, 128, 128, 3), value),
+            boost=10.0,
+            reference_fit="native",
+        )
+        for value in (0.2, 0.5, 0.8, 1.0)
+    ]
+    preview = render_rope_preview(entries, latent)
+    assert preview.shape[0] == 8
+    # Each isolated frame renders its own reference at the same RoPE position.
+    # Boost 10 must remain close to original brightness, without 120/255
+    # extra alpha attenuation.
+    h, w = preview.shape[1:3]
+    center = (h // 2, w // 2)
+    values = [preview[4 + idx, center[0], center[1]].mean().item() for idx in range(4)]
+    assert values == sorted(values)
+    assert values[-1] > 0.90
