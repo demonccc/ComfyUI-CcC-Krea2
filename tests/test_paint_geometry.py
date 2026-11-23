@@ -76,7 +76,9 @@ def test_explicit_outpaint_expansion_is_separate_from_temporary_krea_padding():
     assert torch.all(expansion[:, :, 1472:] == 0)
     assert torch.all(krea_padding[:, :, :1472] == 0)
     assert torch.all(krea_padding[:, :, 1472:] == 1)
-    assert torch.equal(prepared_mask, torch.maximum(expansion, krea_padding))
+    # Working mask must include explicit outpaint but NOT temporary Krea pad.
+    assert torch.equal(prepared_mask, expansion)
+    assert torch.all(prepared_mask[:, :, 1472:] == 0)
 
 
 def test_padding_fill_modes_are_available_and_edge_is_non_destructive():
@@ -100,6 +102,21 @@ def test_pad_preserves_complete_source_and_mask():
     x, y = context["transform"]["pad_left"], context["transform"]["pad_top"]
     torch.testing.assert_close(prepared[:, y:y + 800, x:x + 800], image)
     torch.testing.assert_close(prepared_mask[:, y:y + 800, x:x + 800], mask)
+
+
+def test_inpainting_mask_does_not_generate_temporary_krea_padding():
+    image = _image(800, 800)
+    user_mask = torch.zeros((1, 800, 800))
+    user_mask[:, 200:280, 350:430] = 1.0
+    context, _, generated = _prepare(image, mask=user_mask)
+
+    left = context["transform"]["pad_left"]
+    top = context["transform"]["pad_top"]
+    expected = torch.zeros_like(generated)
+    expected[:, top:top + 800, left:left + 800] = user_mask
+    torch.testing.assert_close(generated, expected)
+    assert torch.any(context["working_krea_padding_mask"] > 0.5)
+    assert torch.all(generated[context["working_krea_padding_mask"] > 0.5] == 0)
 
 
 def test_pad_restore_removes_only_temporary_krea_padding():
