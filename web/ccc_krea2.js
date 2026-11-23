@@ -241,6 +241,24 @@ app.registerExtension({
             setTimeout(refresh, 20);
         }
 
+        if (node.comfyClass === "CcCKrea2PaintPrepare") {
+            // Saved Paint Prepare workflows used to start with geometry_mode.
+            // Geometry is now always padding; shift the saved values by one.
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (info, ...rest) {
+                const result = originalConfigure?.call(this, info, ...rest);
+                const saved = info?.widgets_values;
+                if (Array.isArray(saved) && (saved[0] === "pad" || saved[0] === "crop")) {
+                    const values = saved.slice(1);
+                    for (let i = 0; i < (node.widgets?.length ?? 0) && i < values.length; i++) {
+                        node.widgets[i].value = values[i];
+                    }
+                    node.setDirtyCanvas?.(true, true);
+                }
+                return result;
+            };
+        }
+
         if (node.comfyClass === "CcCKrea2Mask") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
@@ -260,8 +278,20 @@ app.registerExtension({
                 };
             }
             const originalConfigure = node.onConfigure;
-            node.onConfigure = function (...args) {
-                const result = originalConfigure?.apply(this, args);
+            node.onConfigure = function (info, ...rest) {
+                const result = originalConfigure?.call(this, info, ...rest);
+                const saved = info?.widgets_values;
+                if (Array.isArray(saved) && typeof saved[4] === "boolean" &&
+                    typeof saved[5] === "string") {
+                    // Previous order: unload, composite_color, [invert].
+                    // Current order: composite_color, invert, unload (last).
+                    const color = find("composite_color");
+                    const invert = find("invert");
+                    const unload = find("unload_sam_model");
+                    if (color) color.value = saved[5];
+                    if (invert) invert.value = typeof saved[6] === "boolean" ? saved[6] : false;
+                    if (unload) unload.value = saved[4];
+                }
                 refresh();
                 return result;
             };
