@@ -262,13 +262,6 @@
           ]
         },
         {
-          "name": "prepared_image",
-          "type": "IMAGE",
-          "links": [
-            10
-          ]
-        },
-        {
           "name": "generated_mask",
           "type": "MASK",
           "links": [
@@ -280,6 +273,13 @@
           "type": "KREA2_PAINT_GEOMETRY",
           "links": [
             24
+          ]
+        },
+        {
+          "name": "prepared_image",
+          "type": "IMAGE",
+          "links": [
+            10
           ]
         },
         {
@@ -793,7 +793,7 @@
     [
       10,
       6,
-      2,
+      4,
       7,
       0,
       "IMAGE"
@@ -801,7 +801,7 @@
     [
       12,
       6,
-      3,
+      2,
       9,
       0,
       "MASK"
@@ -881,7 +881,7 @@
     [
       24,
       6,
-      4,
+      3,
       21,
       1,
       "KREA2_PAINT_GEOMETRY"
