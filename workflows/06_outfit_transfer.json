@@ -1074,7 +1074,8 @@
         3,
         0.5,
         false,
-        "#000000"
+        "#000000",
+        false
       ],
       "title": "Face fidelity"
     },
@@ -1154,7 +1155,8 @@
         3,
         0.5,
         false,
-        "#000000"
+        "#000000",
+        false
       ],
       "title": "Outfit fabric and colors"
     },
