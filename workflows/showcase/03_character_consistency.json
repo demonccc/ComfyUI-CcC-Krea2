@@ -446,8 +446,11 @@
         "empty",
         "crop",
         false,
-        "",
+        true,
         768,
+        "",
+        "visual",
+        "",
         1
       ],
       "title": "Target Latent - Fixed 1024x1024"
@@ -962,13 +965,13 @@
       },
       "widgets_values": [
         "sam3",
-        "face,hair",
-        3,
+        "body",
+        1,
         0.5,
         false,
         "#000000"
       ],
-      "title": "Face details"
+      "title": "Body proportions — gentle influence"
     },
     {
       "id": 72,
@@ -1042,13 +1045,13 @@
       },
       "widgets_values": [
         "sam3",
-        "body",
-        1,
+        "face,hair",
+        3,
         0.5,
         true,
         "#000000"
       ],
-      "title": "Body shape"
+      "title": "Face and hair — final priority"
     },
     {
       "type": "PreviewAny",
