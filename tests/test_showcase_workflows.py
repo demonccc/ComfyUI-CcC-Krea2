@@ -66,7 +66,9 @@ def test_showcase_uses_current_custom_controls(filename):
             values = node["widgets_values"]
             assert len(values) == 7
             assert -5.0 <= values[2] <= 5.0
-            assert isinstance(values[6], bool)  # invert (appended for backward compatibility)
+            assert isinstance(values[4], str)  # composite_color
+            assert isinstance(values[5], bool)  # invert
+            assert isinstance(values[6], bool)  # unload_sam_model must be last
             assert node["outputs"][3]["name"] == "composite_image"
         if node["type"] == "CcCKrea2Latent":
             values = node["widgets_values"]
