@@ -446,8 +446,11 @@
         "empty",
         "crop",
         false,
-        "",
+        true,
         768,
+        "",
+        "visual",
+        "",
         1
       ],
       "title": "Target Latent - Fixed 1024x1024"
