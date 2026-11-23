@@ -275,7 +275,8 @@ Each Mask accepts an IMAGE and a `source` selector (`sam3` or `mask`).
 `unload_sam_model` at the end of the chain); `mask` uses the connected
 standard `mask` socket and disables irrelevant SAM controls in the UI. Feed the prior `mask_attention`
 into the next `previous_mask_attention`, and feed the prior `image` into its
-`image` input. Outputs are the unchanged image, the union of all masks,
+`image` input. The required `invert` boolean (default `false`) flips the normalized selected mask (`1 - mask`) **before** applying its regional Boost, merging with `previous_mask_attention`, calculating the union MASK output, and rendering `composite_image`. It works with both `sam3` and external `mask` sources. The original `image` output is unchanged. `invert` is the last widget to preserve positional compatibility with older saved workflows.
+Outputs are the unchanged image, the union of all effective masks,
 the regional-attention chain, `composite_image` and diagnostic info.
 `composite_color` uses ComfyUI’s native color picker (default black, `#000000`); the saved value is a six-digit RGB hex color.
 The `composite_image` output replaces the former `preview` at the **same output
