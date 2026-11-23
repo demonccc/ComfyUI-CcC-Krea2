@@ -31,7 +31,7 @@ class TemplateCheckingClip:
     def encode_from_tokens_scheduled(self, tokens):
         # The Krea2 system and user opening (9 rows) are stripped.
         # Image is represented by 4 visual rows in this synthetic case.
-        return [[torch.ones((1, 21, 8)), {}]]
+        return [[torch.ones((1, 12, 8)), {}]]
 
 
 def test_t2i_vision_uses_krea2_template_and_preserves_visual_spans(monkeypatch):
@@ -49,7 +49,7 @@ def test_t2i_vision_uses_krea2_template_and_preserves_visual_spans(monkeypatch):
     )
     assert clip.seen_template == conditioning.KREA2_TEMPLATE
     assert prompt == VISION_PAD_TOKEN + "A fictional seaside city."
-    assert conditioning_out[0][0].shape[1] == 21
+    assert conditioning_out[0][0].shape[1] == 12
     assert items[0]["mode"] == "visual"
     assert analyzed == 0
 
@@ -67,4 +67,4 @@ def test_t2i_vision_semantic_removes_only_image_rows(monkeypatch):
     conditioning_out, _, _, _ = _encode_t2i_vision(
         clip=clip, prompt="A fictional seaside city.", references=chain,
     )
-    assert conditioning_out[0][0].shape[1] == 17
+    assert conditioning_out[0][0].shape[1] == 8
