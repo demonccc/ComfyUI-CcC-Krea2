@@ -973,8 +973,8 @@
         "person",
         -2,
         0.5,
-        false,
         "#000000",
+        false,
         false
       ],
       "title": "Scene person — reduce identity"
@@ -1054,8 +1054,8 @@
         "face",
         3,
         0.5,
-        false,
         "#000000",
+        false,
         false
       ],
       "title": "Subject face — preserve identity"
