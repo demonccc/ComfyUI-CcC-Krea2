@@ -972,8 +972,8 @@
         "person",
         0,
         0.5,
-        false,
         "#000000",
+        false,
         false
       ],
       "title": "SAM: select subject"
@@ -1053,9 +1053,9 @@
         "hair",
         0,
         0.5,
-        true,
         "#000000",
-        false
+        false,
+        true
       ],
       "title": "SAM: include hair"
     },
