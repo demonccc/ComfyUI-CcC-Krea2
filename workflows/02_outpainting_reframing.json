@@ -269,24 +269,10 @@
           ]
         },
         {
-          "name": "semantic_reference",
-          "type": "IMAGE",
-          "links": [
-            11
-          ]
-        },
-        {
           "name": "generated_mask",
           "type": "MASK",
           "links": [
             12
-          ]
-        },
-        {
-          "name": "keep_mask",
-          "type": "MASK",
-          "links": [
-            14
           ]
         },
         {
@@ -350,34 +336,6 @@
       "title": "Prepared Canvas"
     },
     {
-      "id": 8,
-      "type": "PreviewImage",
-      "pos": [
-        1760,
-        430
-      ],
-      "size": [
-        300,
-        250
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 11
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": [],
-      "title": "Semantic Reference"
-    },
-    {
       "id": 9,
       "type": "MaskToImage",
       "pos": [
@@ -432,69 +390,6 @@
           "name": "images",
           "type": "IMAGE",
           "link": 13
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 11,
-      "type": "MaskToImage",
-      "pos": [
-        1420,
-        860
-      ],
-      "size": [
-        230,
-        80
-      ],
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 14
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            15
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "MaskToImage"
-      },
-      "widgets_values": [],
-      "title": "Keep Mask"
-    },
-    {
-      "id": 12,
-      "type": "PreviewImage",
-      "pos": [
-        1680,
-        980
-      ],
-      "size": [
-        300,
-        250
-      ],
-      "flags": {},
-      "order": 11,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 15
         }
       ],
       "outputs": [],
@@ -904,17 +799,9 @@
       "IMAGE"
     ],
     [
-      11,
-      6,
-      3,
-      8,
-      0,
-      "IMAGE"
-    ],
-    [
       12,
       6,
-      4,
+      3,
       9,
       0,
       "MASK"
@@ -924,22 +811,6 @@
       9,
       0,
       10,
-      0,
-      "IMAGE"
-    ],
-    [
-      14,
-      6,
-      5,
-      11,
-      0,
-      "MASK"
-    ],
-    [
-      15,
-      11,
-      0,
-      12,
       0,
       "IMAGE"
     ],
@@ -1010,7 +881,7 @@
     [
       24,
       6,
-      6,
+      4,
       21,
       1,
       "KREA2_PAINT_GEOMETRY"
