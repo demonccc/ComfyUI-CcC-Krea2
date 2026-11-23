@@ -70,5 +70,35 @@ async function verifyUnmodified(comfyClass, entries) {
   await verifyUnmodified("CcCKrea2VisionReference", [
     ["mode", "style"], ["instruction", "Preserve the color palette."],
   ]);
+  // Saved Mask graphs used unload / composite / invert order. Ensure migration
+  // produces the new composite / invert / unload order without losing values.
+  {
+    const saved = ["sam3", "face", 2, 0.5, true, "#FF00AA", true];
+    const names = ["source", "prompt", "boost", "confidence",
+      "composite_color", "invert", "unload_sam_model"];
+    const widgets = names.map((name, i) => ({ name, value: saved[i] }));
+    const node = { comfyClass: "CcCKrea2Mask", widgets, setDirtyCanvas() {} };
+    await extension.nodeCreated(node);
+    node.onConfigure({ widgets_values: saved });
+    assert.equal(widgets[4].value, "#FF00AA");
+    assert.equal(widgets[5].value, true);
+    assert.equal(widgets[6].value, true);
+  }
+  // Previous Paint Prepare graphs stored geometry_mode in first position.
+  {
+    const saved = ["crop", "edge", "center", "center", 0, 0, 0, 0,
+      false, 0, "gaussian_sigma", 0, "outside"];
+    const names = ["padding_fill", "horizontal_position", "vertical_position",
+      "expand_left", "expand_top", "expand_right", "expand_bottom",
+      "fill_holes", "mask_grow", "mask_blur_mode", "mask_blur_amount",
+      "mask_blur_direction"];
+    const widgets = names.map((name, i) => ({ name, value: saved[i] }));
+    const node = { comfyClass: "CcCKrea2PaintPrepare", widgets, setDirtyCanvas() {} };
+    await extension.nodeCreated(node);
+    node.onConfigure({ widgets_values: saved });
+    assert.equal(widgets[0].value, "edge");
+    assert.equal(widgets[11].value, "outside");
+  }
+  console.log("Mask unload-last and Paint padding widget migration: PASS");
   console.log("Vision modes limited to Visual / Semantic: PASS");
 })().catch(error => { console.error(error); process.exitCode = 1; });
