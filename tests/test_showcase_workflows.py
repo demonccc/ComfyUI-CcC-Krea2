@@ -12,13 +12,13 @@ import pytest
 
 WORKFLOWS_DIR = Path(__file__).resolve().parents[1] / "workflows"
 SCENARIOS = (
-    "01_identity_scene_transfer.json",
-    "02_outfit_transfer.json",
-    "03_character_consistency.json",
-    "04_scene_composition.json",
-    "05_local_image_editing.json",
-    "06_outpainting_reframing.json",
-    "07_creative_generation.json",
+    "01_creative_generation.json",
+    "02_outpainting_reframing.json",
+    "03_local_image_editing.json",
+    "04_identity_scene_transfer.json",
+    "05_character_consistency.json",
+    "06_outfit_transfer.json",
+    "07_scene_composition.json",
 )
 
 
@@ -76,7 +76,7 @@ def test_showcase_uses_current_custom_controls(filename):
 
 def test_studio_workflow_paints_background_not_subject():
     graph = json.loads(
-        (WORKFLOWS_DIR / SCENARIOS[4]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / SCENARIOS[2]).read_text(encoding="utf-8")
     )
     nodes = {n["id"]: n for n in graph["nodes"]}
     assert nodes[62]["type"] == "InvertMask"
@@ -88,7 +88,7 @@ def test_studio_workflow_paints_background_not_subject():
 
 def test_creative_t2i_uses_native_prompt_input():
     graph = json.loads(
-        (WORKFLOWS_DIR / SCENARIOS[6]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / SCENARIOS[0]).read_text(encoding="utf-8")
     )
     creator = next(n for n in graph["nodes"] if n["type"] == "CcCKrea2EditPromptCreator")
     t2i = next(n for n in graph["nodes"] if n["type"] == "CcCKrea2TextToImage")
@@ -99,7 +99,7 @@ def test_creative_t2i_uses_native_prompt_input():
 
 def test_character_identity_mask_has_final_priority():
     graph = json.loads(
-        (WORKFLOWS_DIR / SCENARIOS[2]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / SCENARIOS[4]).read_text(encoding="utf-8")
     )
     nodes = {n["id"]: n for n in graph["nodes"]}
     assert nodes[71]["widgets_values"][1] == "body"

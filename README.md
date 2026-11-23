@@ -185,7 +185,7 @@ The Visual Reference chain is returned unchanged.
 
 ## Image Layout
 
-`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), crop-only positive `resize_percent` (default 100%), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/20_layout_composer_2x2_1x1_1x1.json` demonstrates four columns: two stacked images in each of the first two columns, and one full-height image in each remaining column.
+`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), crop-only positive `resize_percent` (default 100%), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/07_scene_composition.json` demonstrates using Layout Cells and Layout Composer to prepare a multi-image scene blueprint.
 
 
 ## Paint
@@ -232,21 +232,21 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## Example Workflows
 
-The `workflows/` directory contains **only seven integrated end-to-end examples**, replacing the previous isolated node tests:
+The `workflows/` directory contains **seven integrated workflows ordered from the simplest use case to the most complex**. Start at 01 and progress as you become familiar with Krea2 CcC:
 
-| Workflow | Real-world task | Integrated capabilities |
+| Step | Workflow | What it demonstrates |
 | --- | --- | --- |
-| [01 — Identity & Scene Transfer](workflows/01_identity_scene_transfer.json) | Transfer a person's identity into another scene while keeping the pose, outfit and background | References, SAM masks, regional Boost, Prompt Creator, Edit |
-| [02 — Outfit Transfer](workflows/02_outfit_transfer.json) | Dress a subject using a third clothing reference | Three References, SAM, Boost, Prompt Creator, Edit |
-| [03 — Character Consistency](workflows/03_character_consistency.json) | Keep a recognizable subject across different actions and environments | Reference, chained body/face masks, Prompt Creator, Edit |
-| [04 — Scene Composition](workflows/04_scene_composition.json) | Merge visual environmental ideas into a new coherent scene | Layout Cells, Layout Composer, Reference, Prompt Creator, Edit |
-| [05 — Local Image Editing](workflows/05_local_image_editing.json) | Keep a person while replacing the background with a studio scene | Layout, SAM, InvertMask, Paint Prepare, Paint, Restore |
-| [06 — Outpainting & Reframing](workflows/06_outpainting_reframing.json) | Expand a photograph in multiple directions | Paint Prepare, Paint, Restore |
-| [07 — Creative Generation](workflows/07_creative_generation.json) | Generate an original image from visual inspiration | Vision Reference, Prompt Creator, optional LoRA Stack, T2I |
+| 01 | [Creative Generation](workflows/01_creative_generation.json) | Vision Reference + Prompt Creator + T2I; optional LoRA Stack |
+| 02 | [Outpainting & Reframing](workflows/02_outpainting_reframing.json) | Extend a source image with Paint Prepare, Paint and Restore |
+| 03 | [Local Image Editing](workflows/03_local_image_editing.json) | Layout Composer, SAM masking, inverse selection and background replacement with Paint |
+| 04 | [Identity & Scene Transfer](workflows/04_identity_scene_transfer.json) | Two visual references, regional masks, Prompt Creator and Edit |
+| 05 | [Character Consistency](workflows/05_character_consistency.json) | Ordered body/face mask boosts and identity preservation across scenes |
+| 06 | [Outfit Transfer](workflows/06_outfit_transfer.json) | Three coordinated references (scene, identity, outfit) plus regional masks |
+| 07 | [Scene Composition](workflows/07_scene_composition.json) | Multiple layout cells, composited scene blueprint, subject reference and Edit |
 
-To run these examples, replace the LoadImage placeholders with your own images and select the model files installed in ComfyUI. The image assets are not distributed with the repository. The examples combine multiple features and are starting points for tuning, not claims of GPU-validated generation quality.
+**How to try them:** replace `LoadImage` placeholders with your own images and verify all model, LoRA, and SAM filenames against your ComfyUI installation. Use a fixed seed when comparing results. These are starting workflows and still need GPU generation testing.
 
-**Attention Boost** uses the signed `-5.0` to `+5.0` scale in steps of `0.1`: `0` is neutral, `+5` is 10×, and `-5` blocks direct attention. Masks used for Paint control pixels to regenerate, not VAE/RoPE attention. For Edit, connect `mask_attention` to the corresponding Reference; `composite_image` is an altered image, not a replacement for the original image unless intentionally desired.
+**Boost:** `-5` blocks direct VAE/RoPE reference attention, `0` is neutral, and `+5` corresponds to 10×. For Paint, the mask selects pixels to regenerate; it is not a reference-attention Boost mask.
 
 
 See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.

@@ -224,7 +224,7 @@ LoRA Stack and LoRA Stack Sliders each apply 10 MODEL-only LoRAs. LoRA Stack wit
 
 Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns unchanged MODEL plus conditioning and LATENT. Visual retains Qwen image rows; Semantic removes them after the same multimodal encoding. Neither mode generates analysis text. A nonempty user instruction is passed as Qwen image guidance. The explicit negative prompt remains text-only.
 
-The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
+The checked-in `workflows/01_creative_generation.json` demonstrates the T2I runtime path, with Prompt Creator and an optional LoRA Stack upstream:
 
 ~~~text
 Vision Reference ----+

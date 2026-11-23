@@ -278,7 +278,7 @@ Negative text is fixed internally to an empty string. Appearance images remain a
 
 `CcCKrea2LayoutCell` accepts an IMAGE and an optional `previous_layout` chain. Set `placement` to `cell`, `full_row`, or `full_column`. Rows/columns start at 1. Crop-only `resize_percent` (integer, 1–1000%, default 100%) proportionally resizes the source before clipping; bicubic antialiasing is used. Fit modes: `contain` scales the complete image proportionally into its slot; `stretch` fills the slot non-proportionally; `crop` clips at native pixel scale; `fit` proportionally covers then clips. All resize operations use bicubic antialiasing. `horizontal_position`, `vertical_position`, `offset_x` and `offset_y` apply only to `crop` and `fit`. Offsets are signed pixel additions to the selected alignment.
 
-`CcCKrea2LayoutComposer` consumes `KREA2_LAYOUT_CHAIN`, Krea `preset_size`, `padding`, `gap`, and `background_color`. It produces `image` and `layout_info`. Output dimensions are resolved before row/column sizes; whole rows/columns span the occupied grid. Overlaps, gaps, invalid positions or impossible padding raise errors. The sample `workflows/20_layout_composer_2x2_1x1_1x1.json` uses six input images across four columns.
+`CcCKrea2LayoutComposer` consumes `KREA2_LAYOUT_CHAIN`, Krea `preset_size`, `padding`, `gap`, and `background_color`. It produces `image` and `layout_info`. Output dimensions are resolved before row/column sizes; whole rows/columns span the occupied grid. Overlaps, gaps, invalid positions or impossible padding raise errors. The sample `workflows/07_scene_composition.json` uses Layout Cells and Composer to prepare a multi-image scene blueprint.
 
 
 ## Krea2 CcC Paint Prepare
@@ -441,19 +441,18 @@ The node applies prompt augmentation and creates an empty SD3-compatible latent 
 
 ## Example Workflows
 
-Examples are historical fixtures and have not been migrated in this cleanup; a workflow referring to the removed Attention Region node will not load as a current graph.
+The seven workflows are in `workflows/` and are ordered from simpler generation to more complex reference-guided editing:
 
-- workflows/01_scene_subject.json — Scene + Subject edit.
-- workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — **legacy/incompatible**: still contains the removed `CcCKrea2AttentionRegion` nodes. Intentionally unchanged; migrate its regions to per-Visual-Reference target masks before using.
-- workflows/20_layout_composer_2x2_1x1_1x1.json — mixed grid composition with stacked cells and full columns.
-- workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
-- workflows/06_text_to_image.json — T2I example using Vision Reference analysis and text-only final conditioning.
+1. `01_creative_generation.json` — Vision-only inspiration, Prompt Creator and T2I.
+2. `02_outpainting_reframing.json` — Paint extension and restoration.
+3. `03_local_image_editing.json` — Layout + SAM + inverted mask + Paint for studio background replacement.
+4. `04_identity_scene_transfer.json` — Two references, mask Boost and Prompt Creator for scene/identity transfer.
+5. `05_character_consistency.json` — Ordered body and facial masks for consistent character identity.
+6. `06_outfit_transfer.json` — Three references: scene, subject and outfit.
+7. `07_scene_composition.json` — Layout-based scene blueprint and reference-guided composition.
 
-- workflows/12_edit_vision_semantic.json — Vision Reference / Semantic.
-- workflows/13_edit_vision_visual.json — Vision Reference / Visual.
-- workflows/14_edit_vision_style.json — obsolete Style example; requires explicit migration.
-- workflows/18_edit_vision_context.json — obsolete Context example; requires explicit migration.
+These files replace the previous isolated examples. Source photographs must be supplied in ComfyUI, and GPU image quality has not been verified.
+
 
 ### Edit RoPE annotated preview
 
@@ -468,7 +467,4 @@ Latent exports the post-fit target image as `target_image`.
 
 Every Reference always exposes its original source image to downstream nodes, even with `vae_rope_enable=false` and `vision_enable=false`. The image-only representation contributes no Edit conditioning. `vae_rope_enable` replaces `visual_enable`; `vae_rope_*` replaces the corresponding `visual_*` widget names. Vision independently controls Qwen conditioning and may resize its own analysis image without discarding the source.
 
-Prompt Creator's optional `reference_edit_image` input now accepts `KREA2_REFERENCE_CHAIN` (not `IMAGE`). For analysis, edit images are first and the optional `references` chain follows. Paired VAE/RoPE+Vision entries are analyzed once. The output `references` combines the edit chain first and the other chain next, keeping the processing switches unchanged. The source image is available to Prompt Creator even when both conditioning paths are disabled. Existing saved workflows need socket and widget migration; workflow JSONs were not changed.
-
-- `workflows/19_scene_subject_prompt_creator.json` — standalone Scene + Subject + Prompt Creator example. Prompt Creator analyzes Scene as Image 1 and Subject as Image 2, then forwards both references to Edit and supplies its enhanced positive prompt. No RoPE or geometry modifications.
-- `workflows/05_edit_prompt_creator.json` — migrated `reference_edit_image` from IMAGE to a Reference chain; the scene is Image 1 and the subject is Image 2. Both references flow through Prompt Creator to Edit.
+Prompt Creator accepts an optional `references` input of type `KREA2_REFERENCE_CHAIN`. It analyzes source images in chain order (paired VAE/RoPE and Vision inputs are analyzed once), returns the generated prompt, and forwards the same reference chain to Edit. See `workflows/04_identity_scene_transfer.json` and `workflows/06_outfit_transfer.json` for complete examples.
