@@ -313,9 +313,7 @@ Outputs:
 - paint_context
 - latent
 - prepared_image
-- semantic_reference
 - generated_mask
-- keep_mask
 - paint_geometry
 - paint_prepare_info
 
@@ -336,6 +334,8 @@ image + mask
 ~~~
 
 The known source image is not resized during Paint geometry normalization.
+
+The semantic reference and keep mask are still computed internally and kept in `paint_context`; they are no longer separate node outputs. The remaining image and mask outputs allow visual inspection without redundant sockets.
 
 Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas. paint_geometry carries enough information for Paint Restore to undo only the temporary geometry.
 
