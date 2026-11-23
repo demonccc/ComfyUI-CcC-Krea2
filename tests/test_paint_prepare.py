@@ -178,7 +178,7 @@ def test_public_paint_prepare_owns_geometry_controls_and_restore_context_output(
 
     assert "image" in required
     assert "vae" in required
-    assert required["geometry_mode"][0] == ("pad", "crop")
+    assert "geometry_mode" not in required
     assert required["padding_fill"][0] == ("edge", "reflect", "neutral", "white")
     assert "expand_left" in required
     assert "fill_holes" in required
