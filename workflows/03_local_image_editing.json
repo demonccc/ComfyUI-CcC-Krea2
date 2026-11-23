@@ -279,8 +279,7 @@
           "name": "generated_mask",
           "type": "MASK",
           "links": [
-            12,
-            25
+            12
           ]
         },
         {
@@ -821,11 +820,6 @@
           "name": "paint_geometry",
           "type": "KREA2_PAINT_GEOMETRY",
           "link": 24
-        },
-        {
-          "name": "generated_mask",
-          "type": "MASK",
-          "link": 25
         }
       ],
       "outputs": [
@@ -1392,14 +1386,6 @@
       21,
       1,
       "KREA2_PAINT_GEOMETRY"
-    ],
-    [
-      25,
-      6,
-      4,
-      21,
-      2,
-      "MASK"
     ],
     [
       26,
