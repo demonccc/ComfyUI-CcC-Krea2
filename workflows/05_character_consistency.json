@@ -968,8 +968,8 @@
         "body",
         1,
         0.5,
-        false,
         "#000000",
+        false,
         false
       ],
       "title": "Body proportions — gentle influence"
@@ -1049,9 +1049,9 @@
         "face,hair",
         3,
         0.5,
-        true,
         "#000000",
-        false
+        false,
+        true
       ],
       "title": "Face and hair — final priority"
     },
