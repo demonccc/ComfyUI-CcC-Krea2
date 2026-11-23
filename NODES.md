@@ -312,9 +312,9 @@ Outputs:
 
 - paint_context
 - latent
-- prepared_image
 - generated_mask
 - paint_geometry
+- prepared_image
 - paint_prepare_info
 
 Processing order:
