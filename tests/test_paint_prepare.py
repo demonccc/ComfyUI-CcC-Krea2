@@ -184,4 +184,14 @@ def test_public_paint_prepare_owns_geometry_controls_and_restore_context_output(
     assert "fill_holes" in required
     assert "mask_grow" in required
     assert "mask" in optional
-    assert CcCKrea2PaintPrepare.RETURN_NAMES[-2:] == ("paint_geometry", "paint_prepare_info")
+    assert CcCKrea2PaintPrepare.RETURN_NAMES == (
+        "paint_context",
+        "latent",
+        "prepared_image",
+        "generated_mask",
+        "paint_geometry",
+        "paint_prepare_info",
+    )
+    assert len(CcCKrea2PaintPrepare.RETURN_TYPES) == 6
+    assert "semantic_reference" not in CcCKrea2PaintPrepare.RETURN_NAMES
+    assert "keep_mask" not in CcCKrea2PaintPrepare.RETURN_NAMES
