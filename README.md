@@ -232,28 +232,22 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## Example Workflows
 
-**End-to-end product showcases:** start with [`workflows/showcase/README.md`](workflows/showcase/README.md) for seven complete Identity/Scene, Outfit, Character, Composition, Studio/Restore, Outpainting, and Creative T2I workflows. The existing workflows below remain as low-level examples and migration references.
+The `workflows/` directory contains **only seven integrated end-to-end examples**, replacing the previous isolated node tests:
 
-**Compatibility note:** Workflow JSON files have not been edited during the refactor. Saved workflows may contain removed node types or outdated inputs; the legacy regional-attention workflow is explicitly identified below.
+| Workflow | Real-world task | Integrated capabilities |
+| --- | --- | --- |
+| [01 — Identity & Scene Transfer](workflows/01_identity_scene_transfer.json) | Transfer a person's identity into another scene while keeping the pose, outfit and background | References, SAM masks, regional Boost, Prompt Creator, Edit |
+| [02 — Outfit Transfer](workflows/02_outfit_transfer.json) | Dress a subject using a third clothing reference | Three References, SAM, Boost, Prompt Creator, Edit |
+| [03 — Character Consistency](workflows/03_character_consistency.json) | Keep a recognizable subject across different actions and environments | Reference, chained body/face masks, Prompt Creator, Edit |
+| [04 — Scene Composition](workflows/04_scene_composition.json) | Merge visual environmental ideas into a new coherent scene | Layout Cells, Layout Composer, Reference, Prompt Creator, Edit |
+| [05 — Local Image Editing](workflows/05_local_image_editing.json) | Keep a person while replacing the background with a studio scene | Layout, SAM, InvertMask, Paint Prepare, Paint, Restore |
+| [06 — Outpainting & Reframing](workflows/06_outpainting_reframing.json) | Expand a photograph in multiple directions | Paint Prepare, Paint, Restore |
+| [07 — Creative Generation](workflows/07_creative_generation.json) | Generate an original image from visual inspiration | Vision Reference, Prompt Creator, optional LoRA Stack, T2I |
 
-- workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
-- workflows/02_anypaint_remove_people.json — SAM 3.1 mask chain -> Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — regional face/hair attention using chained Krea2 CcC Mask nodes, native ComfyUI SAM 3.1, and the fourth RoPE/Boost preview from Edit.
-- workflows/20_layout_composer_2x2_1x1_1x1.json — six-image grid with four columns and two full-height columns.
-- workflows/05_edit_prompt_creator.json — Prompt Creator create_from_image preset.
-- workflows/06_text_to_image.json — Krea2 text-to-image path with optional Vision Reference using Visual or Semantic token retention.
-- workflows/07_prompt_creator_enhance.json — Prompt Creator enhance preset.
-- workflows/08_prompt_creator_create_from_theme.json — Prompt Creator create_from_theme preset.
-- workflows/09_prompt_creator_custom.json — Prompt Creator custom-mode contract test.
-- workflows/10_edit_fit_crop.json — Edit reference_fit=crop path.
-- workflows/11_edit_fit_contain.json — Edit reference_fit=contain path.
-- workflows/12_edit_vision_semantic.json — Edit with Vision Reference / Semantic.
-- workflows/13_edit_vision_visual.json — Edit with Vision Reference / Visual.
-- workflows/14_edit_vision_style.json — legacy Style workflow; requires explicit migration to Visual or Semantic.
-- workflows/15_paint_outpaint.json — expansion-only outpaint path.
-- workflows/16_paint_crop_restore.json — crop geometry + reverse restore/composite path.
-- workflows/17_paint_no_kv_cache.json — Paint runtime with KV cache disabled.
-- workflows/18_edit_vision_context.json — legacy Context workflow; requires explicit migration to Visual or Semantic.
+To run these examples, replace the LoadImage placeholders with your own images and select the model files installed in ComfyUI. The image assets are not distributed with the repository. The examples combine multiple features and are starting points for tuning, not claims of GPU-validated generation quality.
+
+**Attention Boost** uses the signed `-5.0` to `+5.0` scale in steps of `0.1`: `0` is neutral, `+5` is 10×, and `-5` blocks direct attention. Masks used for Paint control pixels to regenerate, not VAE/RoPE attention. For Edit, connect `mask_attention` to the corresponding Reference; `composite_image` is an altered image, not a replacement for the original image unless intentionally desired.
+
 
 See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.
 
