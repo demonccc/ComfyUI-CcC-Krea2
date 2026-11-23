@@ -158,11 +158,11 @@
           "link": 18
         },
         {
-          "name": "positive_prompt",
+          "name": "prompt",
           "type": "STRING",
           "link": 19,
           "widget": {
-            "name": "positive_prompt"
+            "name": "prompt"
           }
         }
       ],
