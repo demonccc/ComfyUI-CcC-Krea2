@@ -206,7 +206,7 @@ KSampler --> VAE Decode --> Krea2 CcC Paint Restore-+
 
 **Paint Prepare** now owns what used to be the standalone geometry stage:
 
-- pad or crop to a curated Krea working geometry
+- pad to a curated Krea working geometry (no crop selector)
 - no source-image resize during geometry normalization
 - edge, reflect, neutral, or white padding fill
 - explicit expand_left/top/right/bottom outpaint canvas expansion
@@ -222,7 +222,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 **Paint** consumes paint_context, grounds Qwen with the prepared semantic reference, attaches the pre-encoded appearance reference, and optionally enables the Paint runtime's internal reference K/V cache.
 
-**Paint Restore** consumes the decoded image plus paint_geometry. Pad mode removes only temporary Krea padding; crop mode composites the generated crop back into the preserved requested canvas.
+**Paint Restore** consumes the decoded image plus paint_geometry and removes only temporary Krea padding.
 
 ## LoRA and Text to Image
 
