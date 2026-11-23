@@ -318,5 +318,8 @@ class CcCKrea2PaintRestore:
             "required": {"image": ("IMAGE",), "paint_geometry": ("KREA2_PAINT_GEOMETRY",)},
         }
 
-    def restore(self, image, paint_geometry):
+    def restore(self, image, paint_geometry, generated_mask=None):
+        # Compatibility with queued / previously saved workflows that still
+        # submit the removed crop-only socket. Pad restoration does not use it.
+        del generated_mask
         return (restore_paint_geometry(image, paint_geometry),)
