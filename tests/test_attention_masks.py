@@ -230,3 +230,76 @@ def test_unified_reference_regional_masks_last_wins():
     assert effective[0, 0].item() == pytest.approx(4)
     assert effective[1, 1].item() == pytest.approx(-2)
     assert effective[0, 3].item() == pytest.approx(0)
+
+
+def test_mask_invert_is_opt_in_and_affects_output_chain_and_composite():
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+
+    source = torch.ones((1, 2, 3, 3))
+    selection = torch.tensor([[[1.0, 0.0, 0.25], [0.0, 0.0, 1.0]]])
+    node = CcCKrea2Mask()
+    assert node.INPUT_TYPES()["required"]["invert"][1]["default"] is False
+    original, plain_mask, plain_chain, plain_preview, _ = node.process(
+        source, source="mask", mask=selection, boost=-5, invert=False,
+    )
+    _, inverse_mask, inverse_chain, inverse_preview, info = node.process(
+        source, source="mask", mask=selection, boost=-5, invert=True,
+    )
+    torch.testing.assert_close(original, source)
+    torch.testing.assert_close(plain_mask, selection)
+    torch.testing.assert_close(inverse_mask, 1.0 - selection)
+    torch.testing.assert_close(plain_chain.regions[0].mask, selection)
+    torch.testing.assert_close(inverse_chain.regions[0].mask, 1.0 - selection)
+    assert "inverted: True" in info
+    # Selection and visualization are inverted, not only the mask socket.
+    torch.testing.assert_close(plain_preview[0, 0, 0], torch.full((3,), 0.10))
+    torch.testing.assert_close(inverse_preview[0, 0, 0], torch.ones(3))
+    torch.testing.assert_close(inverse_preview[0, 0, 1], torch.full((3,), 0.10))
+
+
+def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
+    from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
+    from ccc_krea2.modular_nodes.reference_node import CcCKrea2Reference
+
+    image = torch.ones((1, 2, 3, 3))
+    first_mask = torch.tensor([[[1., 1., 0.], [0., 0., 0.]]])
+    second_mask = torch.tensor([[[1., 0., 1.], [0., 0., 0.]]])
+    mask_node = CcCKrea2Mask()
+    _, _, first, _, _ = mask_node.process(
+        image, source="mask", mask=first_mask, boost=3,
+    )
+    _, combined, final, composite, _ = mask_node.process(
+        image, source="mask", mask=second_mask, boost=-5, invert=True,
+        previous_mask_attention=first,
+    )
+    effective_second_mask = 1.0 - second_mask
+    torch.testing.assert_close(combined, torch.maximum(first_mask, effective_second_mask))
+    torch.testing.assert_close(final.regions[-1].mask, effective_second_mask)
+    assert len(final.regions) == 2
+    # Pixel (0,0) is excluded by inversion so earlier +3 remains.
+    assert composite[0, 0, 0, 0].item() == pytest.approx(1.0 - (0.90 - 0.85 * 0.8))
+    # Pixel (0,1) belongs to both but inverted -5 wins.
+    assert composite[0, 0, 1, 0].item() == pytest.approx(0.10)
+
+    refs, _ = CcCKrea2Reference().process(
+        image=image, vae_rope_enable=True, vision_enable=False,
+        vae_rope_boost=0, mask_attention=final,
+    )
+    weights = refs.entries[0].attention_weight_map
+    assert weights[0, 0, 0].item() == pytest.approx(3.0)
+    assert weights[0, 0, 1].item() == pytest.approx(-5.0)
+    assert weights[0, 1, 2].item() == pytest.approx(-5.0)
+
+
+def test_inverted_sam_mask_is_applied_after_detection(monkeypatch):
+    from ccc_krea2.modular_nodes import mask_node as mask_module
+
+    image = torch.ones((1, 2, 2, 3))
+    detected = torch.tensor([[[1.0, 0.0], [0.0, 0.0]]])
+    monkeypatch.setattr(mask_module, "_sam31_mask", lambda *args: detected)
+    _, combined, chain, _, _ = mask_module.CcCKrea2Mask().process(
+        image, source="sam3", prompt="person", sam_model=object(),
+        sam_clip=object(), invert=True, boost=2,
+    )
+    torch.testing.assert_close(combined, 1.0 - detected)
+    torch.testing.assert_close(chain.regions[0].mask, combined)
