@@ -6,6 +6,7 @@ import torch
 from ccc_krea2.modular_nodes.paint_geometry_node import (
     prepare_paint_geometry,
     restore_paint_geometry,
+    CcCKrea2PaintRestore,
 )
 
 
@@ -115,3 +116,17 @@ def test_restore_rejects_removed_crop_mode():
     context["mode"] = "crop"
     with pytest.raises(ValueError, match="only pad is supported"):
         restore_paint_geometry(prepared, context)
+
+
+def test_restore_accepts_legacy_generated_mask_keyword_without_reintroducing_socket():
+    image = _image(800, 800)
+    context, prepared, _ = _prepare(image)
+    node = CcCKrea2PaintRestore()
+    assert "generated_mask" not in node.INPUT_TYPES().get("optional", {})
+    legacy_mask = torch.ones((1, *prepared.shape[1:3]))
+    result = node.restore(
+        image=prepared, paint_geometry=context, generated_mask=legacy_mask,
+    )[0]
+    expected = restore_paint_geometry(prepared, context)
+    torch.testing.assert_close(result, expected)
+    torch.testing.assert_close(result, image)
