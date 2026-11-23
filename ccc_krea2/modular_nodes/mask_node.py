@@ -125,6 +125,7 @@ class CcCKrea2Mask:
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "unload_sam_model": ("BOOLEAN", {"default": False}),
                 "composite_color": ("COLOR", {"default": "#000000", "tooltip": "Pick the overlay color applied to low-Boost regions in composite_image."}),
+                "invert": ("BOOLEAN", {"default": False, "tooltip": "Invert the selected mask before applying Boost, merging masks, and creating the composite."}),
             },
             "optional": {
                 "mask": ("MASK",),
@@ -136,7 +137,7 @@ class CcCKrea2Mask:
 
     def process(self, image, source="sam3", prompt="face", boost=0.0, confidence=0.5,
                 mask=None, previous_mask_attention=None, sam_model=None,
-                sam_clip=None, unload_sam_model=False, composite_color="#000000"):
+                sam_clip=None, unload_sam_model=False, composite_color="#000000", invert=False):
         if image.ndim != 4:
             raise ValueError("Image must have ComfyUI BHWC dimensions.")
         batch, height, width = image.shape[:3]
@@ -153,6 +154,10 @@ class CcCKrea2Mask:
         else:
             raise ValueError(f"[Krea2 CcC Mask] Unsupported source: {source}")
         mask = _normalize_mask(mask, batch, height, width, image.device)
+        # Apply inversion to the normalized selected mask before any chaining,
+        # per-region Boost, Paint MASK output or composite preview.
+        if invert:
+            mask = 1.0 - mask
         if previous_mask_attention is not None:
             if not isinstance(previous_mask_attention, MaskChain) or previous_mask_attention.geometry != geometry:
                 raise ValueError("Chained masks must belong to the same image geometry.")
@@ -163,5 +168,5 @@ class CcCKrea2Mask:
             regions = ()
         chain = MaskChain(geometry, combined, regions + (AttentionRegion(mask, float(boost)),))
         composite_image = _composite_attention_image(image, chain.regions, composite_color)
-        info = f"Mask source: {source}; regions: {len(chain.regions)}; last boost: {boost:.2f}; composite: {composite_color}"
+        info = f"Mask source: {source}; inverted: {bool(invert)}; regions: {len(chain.regions)}; last boost: {boost:.2f}; composite: {composite_color}"
         return image, combined, chain, composite_image, info
