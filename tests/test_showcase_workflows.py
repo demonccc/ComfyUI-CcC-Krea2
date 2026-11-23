@@ -1,4 +1,4 @@
-"""Structural contracts for the seven integrated showcase workflows.
+"""Structural contracts for the seven integrated example workflows.
 
 These tests do not assert sampling quality: that needs Krea2/SAM/Qwen model
 weights and a running ComfyUI instance.
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 
-SHOWCASE_DIR = Path(__file__).resolve().parents[1] / "workflows" / "showcase"
+WORKFLOWS_DIR = Path(__file__).resolve().parents[1] / "workflows"
 SCENARIOS = (
     "01_identity_scene_transfer.json",
     "02_outfit_transfer.json",
@@ -24,7 +24,7 @@ SCENARIOS = (
 
 @pytest.mark.parametrize("filename", SCENARIOS)
 def test_showcase_graph_links_and_nodes(filename):
-    graph = json.loads((SHOWCASE_DIR / filename).read_text(encoding="utf-8"))
+    graph = json.loads((WORKFLOWS_DIR / filename).read_text(encoding="utf-8"))
     nodes = {node["id"]: node for node in graph["nodes"]}
     links = {link[0]: link for link in graph["links"]}
 
@@ -54,7 +54,7 @@ def test_showcase_graph_links_and_nodes(filename):
 
 @pytest.mark.parametrize("filename", SCENARIOS)
 def test_showcase_uses_current_custom_controls(filename):
-    graph = json.loads((SHOWCASE_DIR / filename).read_text(encoding="utf-8"))
+    graph = json.loads((WORKFLOWS_DIR / filename).read_text(encoding="utf-8"))
     nodes = graph["nodes"]
     for node in nodes:
         if node["type"] == "CcCKrea2Reference":
@@ -76,7 +76,7 @@ def test_showcase_uses_current_custom_controls(filename):
 
 def test_studio_workflow_paints_background_not_subject():
     graph = json.loads(
-        (SHOWCASE_DIR / SCENARIOS[4]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / SCENARIOS[4]).read_text(encoding="utf-8")
     )
     nodes = {n["id"]: n for n in graph["nodes"]}
     assert nodes[62]["type"] == "InvertMask"
@@ -88,7 +88,7 @@ def test_studio_workflow_paints_background_not_subject():
 
 def test_creative_t2i_uses_native_prompt_input():
     graph = json.loads(
-        (SHOWCASE_DIR / SCENARIOS[6]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / SCENARIOS[6]).read_text(encoding="utf-8")
     )
     creator = next(n for n in graph["nodes"] if n["type"] == "CcCKrea2EditPromptCreator")
     t2i = next(n for n in graph["nodes"] if n["type"] == "CcCKrea2TextToImage")
@@ -99,7 +99,7 @@ def test_creative_t2i_uses_native_prompt_input():
 
 def test_character_identity_mask_has_final_priority():
     graph = json.loads(
-        (SHOWCASE_DIR / SCENARIOS[2]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / SCENARIOS[2]).read_text(encoding="utf-8")
     )
     nodes = {n["id"]: n for n in graph["nodes"]}
     assert nodes[71]["widgets_values"][1] == "body"
