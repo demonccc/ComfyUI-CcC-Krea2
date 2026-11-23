@@ -46,7 +46,11 @@ def create_empty_sd3_latent(width: int, height: int, batch_size: int = 1) -> Dic
 
 def _encode_t2i_vision(clip, prompt: str, references: VisionReferenceChain):
     """Encode both presets with Qwen, excluding Semantic image rows afterwards."""
-    from .conditioning import extract_vision_spans_from_tokens, apply_vision_weights_to_conditioning
+    from .conditioning import (
+        KREA2_TEMPLATE,
+        extract_vision_spans_from_tokens,
+        apply_vision_weights_to_conditioning,
+    )
     images, image_map, annotations, items = [], [], [], []
     for index, entry in enumerate(
         (entry for entry in references.entries if isinstance(entry, VisionReferenceEntry)), start=1
@@ -67,7 +71,13 @@ def _encode_t2i_vision(clip, prompt: str, references: VisionReferenceChain):
     if annotations:
         user_text += "\n\n" + "\n".join(annotations)
     conditioning_prompt = (VISION_PAD_TOKEN * len(images)) + user_text
-    tokens = clip.tokenize(conditioning_prompt, images=images)
+    # Qwen's automatic image template starts at the user turn. Krea2's
+    # encoder strips a system+user prefix, so using that template would cause
+    # the span parser to discard image rows before the assistant turn.
+    # Explicit Krea2 conditioning also avoids Qwen's implicit extra image pad.
+    tokens = clip.tokenize(
+        conditioning_prompt, images=images, llama_template=KREA2_TEMPLATE,
+    )
     conditioning = clip.encode_from_tokens_scheduled(tokens)
     spans, _, _, _ = extract_vision_spans_from_tokens(
         tokens=tokens, physical_image_map=image_map, clip=clip,
