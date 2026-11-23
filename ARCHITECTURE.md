@@ -213,9 +213,7 @@ Explicit outpaint expansion belongs to the requested/final canvas. Temporary Kre
 
 Paint consumes KREA2_PAINT_CONTEXT. It grounds Qwen with the prepared semantic reference, attaches the pre-encoded appearance reference, and installs the Paint runtime. Its kv_cache switch is an internal runtime K/V optimization; it is not the removed public Reference Cache feature.
 
-Paint Restore uses paint_geometry from Paint Prepare:
-
-- pad: remove temporary Krea padding only.
+Paint Restore uses paint_geometry from Paint Prepare to remove temporary Krea padding. It does not expose the removed crop-only generated_mask input.
 
 ## LoRA and T2I
 
