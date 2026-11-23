@@ -1153,7 +1153,7 @@
         "clothing",
         3,
         0.5,
-        true,
+        false,
         "#000000"
       ],
       "title": "Outfit fabric and colors"
