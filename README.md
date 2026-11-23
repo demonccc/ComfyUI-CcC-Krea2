@@ -232,6 +232,8 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## Example Workflows
 
+**End-to-end product showcases:** start with [`workflows/showcase/README.md`](workflows/showcase/README.md) for seven complete Identity/Scene, Outfit, Character, Composition, Studio/Restore, Outpainting, and Creative T2I workflows. The existing workflows below remain as low-level examples and migration references.
+
 **Compatibility note:** Workflow JSON files have not been edited during the refactor. Saved workflows may contain removed node types or outdated inputs; the legacy regional-attention workflow is explicitly identified below.
 
 - workflows/01_scene_subject.json — ordered Scene + Subject Visual References, Size Resolver, Latent, Edit; BodySwap disabled by default.
