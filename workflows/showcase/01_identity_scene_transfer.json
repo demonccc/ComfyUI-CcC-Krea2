@@ -1053,7 +1053,7 @@
         "face",
         3,
         0.5,
-        true,
+        false,
         "#000000"
       ],
       "title": "Subject face — preserve identity"
