@@ -1073,8 +1073,8 @@
         "face",
         3,
         0.5,
-        false,
         "#000000",
+        false,
         false
       ],
       "title": "Face fidelity"
@@ -1154,8 +1154,8 @@
         "clothing",
         3,
         0.5,
-        false,
         "#000000",
+        false,
         false
       ],
       "title": "Outfit fabric and colors"
