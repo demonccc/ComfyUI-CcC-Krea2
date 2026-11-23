@@ -12,7 +12,6 @@ import torch.nn.functional as F
 
 from ..constants import NODE_CATEGORY
 from .paint_geometry_node import (
-    GEOMETRY_MODES,
     PADDING_FILLS,
     HORIZONTAL_POSITIONS,
     VERTICAL_POSITIONS,
@@ -274,7 +273,7 @@ class CcCKrea2PaintPrepare:
     FUNCTION = "prepare"
     DESCRIPTION = (
         "Prepares Krea2 Paint from the native image and mask in one step: resolves reversible "
-        "Krea pad/crop geometry without resizing source pixels, applies optional outpaint expansion, "
+        "Krea padding geometry without resizing source pixels, applies optional outpaint expansion, "
         "fills/grows/feathers the mask, creates the semantic reference, VAE-encodes the known canvas, "
         "and returns the sampling latent plus paint_geometry for Paint Restore."
     )
@@ -285,7 +284,6 @@ class CcCKrea2PaintPrepare:
             "required": {
                 "image": ("IMAGE",),
                 "vae": ("VAE",),
-                "geometry_mode": (GEOMETRY_MODES, {"default": "pad"}),
                 "padding_fill": (PADDING_FILLS, {"default": "edge"}),
                 "horizontal_position": (HORIZONTAL_POSITIONS, {"default": "center"}),
                 "vertical_position": (VERTICAL_POSITIONS, {"default": "center"}),
@@ -308,7 +306,6 @@ class CcCKrea2PaintPrepare:
         self,
         image,
         vae,
-        geometry_mode="pad",
         padding_fill="edge",
         horizontal_position="center",
         vertical_position="center",
@@ -326,7 +323,6 @@ class CcCKrea2PaintPrepare:
         paint_geometry, _, _ = prepare_paint_geometry(
             image=image,
             mask=mask,
-            geometry_mode=geometry_mode,
             padding_fill=padding_fill,
             horizontal_position=horizontal_position,
             vertical_position=vertical_position,
@@ -350,12 +346,12 @@ class CcCKrea2PaintPrepare:
         transform = paint_geometry.get("transform", {})
         info = "\n".join([
             "=== Krea2 CcC Paint Prepare ===",
-            f"Geometry Mode: {geometry_mode}",
+            "Geometry Mode: pad",
             f"Source: {paint_geometry['source_width']} x {paint_geometry['source_height']}",
             f"Requested Canvas: {paint_geometry['base_width']} x {paint_geometry['base_height']}",
             f"Krea Working Geometry: {paint_geometry['target_width']} x {paint_geometry['target_height']}",
             f"Position: {horizontal_position} / {vertical_position}",
-            f"Padding Fill: {padding_fill if geometry_mode == 'pad' or any((expand_left, expand_top, expand_right, expand_bottom)) else '<unused>'}",
+            f"Padding Fill: {padding_fill}",
             f"Transform: {transform}",
             f"Fill Holes: {'yes' if fill_holes else 'no'}",
             f"Mask Grow: {mask_grow}px",
