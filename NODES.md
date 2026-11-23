@@ -57,7 +57,7 @@ Required controls:
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
 
-Reference exposes `mask_attention` for ordered regional Boost masks. Every masked region replaces the global Boost in its selected pixels; later overlapping regions take priority. The mask follows the reference image through VAE geometry. `reference_boost_mask` and the earlier target-attention-scope controls have been removed.
+Reference exposes `mask_attention` for ordered regional Boost masks. Every masked region replaces the global Boost in its selected pixels; later overlapping regions take priority. `Krea2 CcC Mask` has `invert` (BOOLEAN, default `false`): when enabled, it inverts the normalized SAM/external mask before applying that region's Boost and before updating the mask union, `mask_attention`, and `composite_image`. The returned IMAGE remains unmodified. The widget is appended after `composite_color` to preserve existing saved widget ordering. The mask follows the reference image through VAE geometry. `reference_boost_mask` and the earlier target-attention-scope controls have been removed.
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
