@@ -596,7 +596,7 @@
       },
       "widgets_values": [
         "create_from_image_t2i",
-        "Analyze the inspiration image and generate an original, detailed, coherent English text-to-image prompt. Transfer its palette, materials, mood, lighting and overall visual language into a NEW cinematic photographic scene. Explicitly specify the setting, main subjects, details, composition, perspective, camera and lighting. The final output must describe the image directly and must not refer to source images.",
+        "Use the image as visual guidance. Derive the visual style, lighting, mood, materials, composition, and important details from it. Describe one coherent final image directly in English with concrete visible details. Output only the final prompt.",
         true,
         4096,
         0.25,
