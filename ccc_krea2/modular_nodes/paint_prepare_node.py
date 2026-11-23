@@ -254,8 +254,6 @@ class CcCKrea2PaintPrepare:
         "KREA2_PAINT_CONTEXT",
         "LATENT",
         "IMAGE",
-        "IMAGE",
-        "MASK",
         "MASK",
         "KREA2_PAINT_GEOMETRY",
         "STRING",
@@ -264,9 +262,7 @@ class CcCKrea2PaintPrepare:
         "paint_context",
         "latent",
         "prepared_image",
-        "semantic_reference",
         "generated_mask",
-        "keep_mask",
         "paint_geometry",
         "paint_prepare_info",
     )
@@ -365,9 +361,7 @@ class CcCKrea2PaintPrepare:
             context,
             latent,
             prepared_image,
-            semantic_reference,
             generated_mask,
-            keep_mask,
             paint_geometry,
             info,
         )
