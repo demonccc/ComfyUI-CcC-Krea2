@@ -1,4 +1,4 @@
-"""Krea2 CcC Paint Geometry pad/crop/restore contract."""
+"""Krea2 CcC Paint Geometry pad/restore contract."""
 
 import pytest
 import torch
@@ -19,7 +19,6 @@ def _image(height, width):
 
 def _prepare(
     image,
-    mode="pad",
     fill="edge",
     hpos="center",
     vpos="center",
@@ -32,7 +31,6 @@ def _prepare(
     return prepare_paint_geometry(
         image,
         mask,
-        geometry_mode=mode,
         padding_fill=fill,
         horizontal_position=hpos,
         vertical_position=vpos,
@@ -62,7 +60,6 @@ def test_explicit_outpaint_expansion_is_separate_from_temporary_krea_padding():
     image = _image(1024, 1344)
     context, _, prepared_mask = _prepare(
         image,
-        mode="pad",
         hpos="left",
         expand_right=128,
     )
@@ -89,23 +86,19 @@ def test_padding_fill_modes_are_available_and_edge_is_non_destructive():
         assert context["padding_fill"] == fill
 
 
-def test_crop_selects_inner_krea_geometry_and_position():
-    image = _image(1200, 1600)
-    context, prepared, _ = _prepare(image, mode="crop", hpos="right", vpos="bottom")
-    assert (context["target_width"], context["target_height"]) == (1536, 1152)
-    assert prepared.shape == (1, 1152, 1536, 3)
-    assert context["transform"]["crop_x"] == 64
-    assert context["transform"]["crop_y"] == 48
+def test_pad_guardrail_rejects_source_larger_than_supported_presets():
+    with pytest.raises(ValueError, match="Resize the source"):
+        _prepare(_image(1000, 2050))
 
 
-def test_crop_guardrail_rejects_image_below_every_krea_target():
-    with pytest.raises(ValueError, match="Use padding"):
-        _prepare(_image(800, 800), mode="crop")
-
-
-def test_pad_guardrail_rejects_image_above_available_krea_size():
-    with pytest.raises(ValueError, match="Use crop"):
-        _prepare(_image(1000, 2050), mode="pad")
+def test_pad_preserves_complete_source_and_mask():
+    image = _image(800, 800)
+    mask = torch.zeros((1, 800, 800), dtype=torch.float32)
+    mask[:, 750:790, 730:790] = 1
+    context, prepared, prepared_mask = _prepare(image, mask=mask)
+    x, y = context["transform"]["pad_left"], context["transform"]["pad_top"]
+    torch.testing.assert_close(prepared[:, y:y + 800, x:x + 800], image)
+    torch.testing.assert_close(prepared_mask[:, y:y + 800, x:x + 800], mask)
 
 
 def test_pad_restore_removes_only_temporary_krea_padding():
@@ -116,15 +109,9 @@ def test_pad_restore_removes_only_temporary_krea_padding():
     assert torch.allclose(restored, image)
 
 
-def test_crop_restore_composites_only_generated_mask_region():
-    image = _image(1200, 1600)
-    context, prepared, _ = _prepare(image, mode="crop")
-    generated = torch.ones_like(prepared)
-    mask = torch.zeros((1, prepared.shape[1], prepared.shape[2]), dtype=torch.float32)
-    mask[:, 100:200, 100:200] = 1.0
-
-    restored = restore_paint_geometry(generated, context, mask)
-    x = context["transform"]["crop_x"]
-    y = context["transform"]["crop_y"]
-    assert torch.all(restored[:, y + 100:y + 200, x + 100:x + 200] == 1.0)
-    assert torch.allclose(restored[:, y:y + 50, x:x + 50], context["base_image"][:, y:y + 50, x:x + 50])
+def test_restore_rejects_removed_crop_mode():
+    image = _image(800, 800)
+    context, prepared, _ = _prepare(image)
+    context["mode"] = "crop"
+    with pytest.raises(ValueError, match="only pad is supported"):
+        restore_paint_geometry(prepared, context)
