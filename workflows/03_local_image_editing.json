@@ -973,7 +973,8 @@
         0,
         0.5,
         false,
-        "#000000"
+        "#000000",
+        false
       ],
       "title": "SAM: select subject"
     },
@@ -1053,7 +1054,8 @@
         0,
         0.5,
         true,
-        "#000000"
+        "#000000",
+        false
       ],
       "title": "SAM: include hair"
     },
