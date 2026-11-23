@@ -187,9 +187,9 @@ def test_public_paint_prepare_owns_geometry_controls_and_restore_context_output(
     assert CcCKrea2PaintPrepare.RETURN_NAMES == (
         "paint_context",
         "latent",
-        "prepared_image",
         "generated_mask",
         "paint_geometry",
+        "prepared_image",
         "paint_prepare_info",
     )
     assert len(CcCKrea2PaintPrepare.RETURN_TYPES) == 6
