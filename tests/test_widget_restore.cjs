@@ -1,4 +1,4 @@
-/* Reference / Latent: never migrate or rewrite invalid saved widget values.
+/* Reference / Latent: migrate removed Vision presets while preserving other widget values.
  * Run: node tests/test_widget_restore.cjs
  */
 const assert = require("node:assert/strict");
@@ -21,8 +21,17 @@ async function verifyUnmodified(comfyClass, entries) {
   await extension.nodeCreated(node);
   node.onConfigure({ widgets_values: entries.map(([, value]) => value) });
   for (let i = 0; i < entries.length; i++) {
-    assert.deepEqual(widgets[i].value, entries[i][1],
-      `${comfyClass}: unexpected rewrite of ${entries[i][0]}`);
+    const name = entries[i][0];
+    const isVisionMode = ["vision_mode", "latent_vision_mode", "mode"].includes(name);
+    const expected = isVisionMode && !["visual", "semantic"].includes(entries[i][1])
+      ? "visual"
+      : entries[i][1];
+    assert.deepEqual(widgets[i].value, expected,
+      `${comfyClass}: unexpected value for ${name}`);
+    if (isVisionMode) {
+      assert.deepEqual(Array.from(widgets[i].options.values), ["visual", "semantic"],
+        `${comfyClass}: obsolete Vision modes remain in combo options`);
+    }
   }
 }
 
@@ -58,5 +67,8 @@ async function verifyUnmodified(comfyClass, entries) {
     ["latent_vision_enable", true], ["latent_vision_mode", ""],
     ["latent_vision_vision_fidelity", "balanced"], ["batch_size", ""],
   ]);
-  console.log("Reference and Latent do not mutate saved widget values: PASS");
+  await verifyUnmodified("CcCKrea2VisionReference", [
+    ["mode", "style"], ["instruction", "Preserve the color palette."],
+  ]);
+  console.log("Vision modes limited to Visual / Semantic: PASS");
 })().catch(error => { console.error(error); process.exitCode = 1; });
