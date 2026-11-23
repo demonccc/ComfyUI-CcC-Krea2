@@ -222,7 +222,7 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 **Paint** consumes paint_context, grounds Qwen with the prepared semantic reference, attaches the pre-encoded appearance reference, and optionally enables the Paint runtime's internal reference K/V cache.
 
-**Paint Restore** consumes the decoded image plus paint_geometry and removes only temporary Krea padding.
+**Paint Restore** consumes the decoded image plus paint_geometry and removes only temporary Krea padding; its former crop-only generated_mask input was removed.
 
 ## LoRA and Text to Image
 
