@@ -374,10 +374,6 @@ Required inputs:
 - image
 - paint_geometry
 
-Optional input:
-
-- generated_mask
-
 Output:
 
 - image
