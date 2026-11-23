@@ -57,7 +57,7 @@ Required controls:
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
 
-Reference exposes `mask_attention` for ordered regional Boost masks. Every masked region replaces the global Boost in its selected pixels; later overlapping regions take priority. `Krea2 CcC Mask` has `invert` (BOOLEAN, default `false`): when enabled, it inverts the normalized SAM/external mask before applying that region's Boost and before updating the mask union, `mask_attention`, and `composite_image`. The returned IMAGE remains unmodified. The widget is appended after `composite_color` to preserve existing saved widget ordering. The mask follows the reference image through VAE geometry. `reference_boost_mask` and the earlier target-attention-scope controls have been removed.
+Reference exposes `mask_attention` for ordered regional Boost masks. Every masked region replaces the global Boost in its selected pixels; later overlapping regions take priority. `Krea2 CcC Mask` has `invert` (BOOLEAN, default `false`): when enabled, it inverts the normalized SAM/external mask before applying that region's Boost and before updating the mask union, `mask_attention`, and `composite_image`. The returned IMAGE remains unmodified. `unload_sam_model` is the final control after `composite_color` and `invert`. The mask follows the reference image through VAE geometry. `reference_boost_mask` and the earlier target-attention-scope controls have been removed.
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
@@ -291,7 +291,6 @@ Required controls:
 | --- | --- | --- |
 | image | IMAGE | — |
 | vae | VAE | — |
-| geometry_mode | pad, crop | pad |
 | padding_fill | edge, reflect, neutral, white | edge |
 | horizontal_position | center, left, right | center |
 | vertical_position | center, top, bottom | center |
@@ -325,7 +324,7 @@ Processing order:
 ~~~text
 image + mask
  -> explicit outpaint expansion
- -> internal Krea pad/crop geometry
+ -> internal Krea padding geometry
  -> optional fill enclosed holes
  -> signed mask grow/shrink
  -> directional feather
@@ -385,7 +384,6 @@ Output:
 
 pad mode removes only temporary Krea padding and preserves explicit user expansion.
 
-crop mode composites the decoded generated crop back at its original coordinates. If generated_mask is provided, only the generated/feathered area replaces the preserved base canvas.
 
 No inverse resize is performed.
 
