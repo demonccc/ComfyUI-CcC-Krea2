@@ -238,10 +238,10 @@ def prepare_paint_geometry(
         bottom=pad_bottom,
         fill_value=1.0,
     )
-    working_mask = torch.maximum(
-        torch.maximum(working_user_mask, working_expansion_mask),
-        working_krea_padding_mask,
-    )
+    # Geometry-only padding must remain known context, not become another
+    # inpaint/outpaint region. Only user masks and explicitly requested canvas
+    # expansion are generated; temporary padding is discarded by Restore.
+    working_mask = torch.maximum(working_user_mask, working_expansion_mask)
     transform = {
         "pad_left": int(pad_left),
         "pad_top": int(pad_top),
