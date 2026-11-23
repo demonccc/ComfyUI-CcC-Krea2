@@ -279,7 +279,7 @@ def prepare_paint_geometry(
     return context, working_image, working_mask
 
 
-def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any], generated_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any]) -> torch.Tensor:
     if not isinstance(paint_geometry, dict):
         raise ValueError("[Krea2 CcC Paint Restore] paint_geometry is invalid.")
     if image.ndim != 4 or image.shape[-1] < 3:
@@ -293,12 +293,11 @@ def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any], 
 
     if mode != "pad":
         raise ValueError(f"[Krea2 CcC Paint Restore] Unsupported geometry mode '{mode}'; only pad is supported.")
-    if mode == "pad":
-        left = int(transform.get("pad_left", 0))
-        top = int(transform.get("pad_top", 0))
-        base_w = int(paint_geometry["base_width"])
-        base_h = int(paint_geometry["base_height"])
-        return image[:, top:top + base_h, left:left + base_w, :].clamp(0.0, 1.0)
+    left = int(transform.get("pad_left", 0))
+    top = int(transform.get("pad_top", 0))
+    base_w = int(paint_geometry["base_width"])
+    base_h = int(paint_geometry["base_height"])
+    return image[:, top:top + base_h, left:left + base_w, :].clamp(0.0, 1.0)
 
 
 
@@ -317,8 +316,7 @@ class CcCKrea2PaintRestore:
     def INPUT_TYPES(cls):
         return {
             "required": {"image": ("IMAGE",), "paint_geometry": ("KREA2_PAINT_GEOMETRY",)},
-            "optional": {"generated_mask": ("MASK",)},
         }
 
-    def restore(self, image, paint_geometry, generated_mask=None):
-        return (restore_paint_geometry(image, paint_geometry, generated_mask),)
+    def restore(self, image, paint_geometry):
+        return (restore_paint_geometry(image, paint_geometry),)
