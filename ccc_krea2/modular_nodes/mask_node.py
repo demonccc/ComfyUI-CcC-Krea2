@@ -123,9 +123,9 @@ class CcCKrea2Mask:
                 "prompt": ("STRING", {"default": "face"}),
                 "boost": ("FLOAT", {"default": 0.0, "min": -5.0, "max": 5.0, "step": 0.1}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
-                "unload_sam_model": ("BOOLEAN", {"default": False}),
                 "composite_color": ("COLOR", {"default": "#000000", "tooltip": "Pick the overlay color applied to low-Boost regions in composite_image."}),
                 "invert": ("BOOLEAN", {"default": False, "tooltip": "Invert the selected mask before applying Boost, merging masks, and creating the composite."}),
+                "unload_sam_model": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "mask": ("MASK",),
