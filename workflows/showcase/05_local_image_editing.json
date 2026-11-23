@@ -1,6 +1,6 @@
 {
-  "last_node_id": 52,
-  "last_link_id": 35,
+  "last_node_id": 63,
+  "last_link_id": 41,
   "nodes": [
     {
       "id": 1,
@@ -198,7 +198,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            33
+            36
           ]
         },
         {
@@ -213,7 +213,7 @@
       "widgets_values": [
         "local_edit_source.png"
       ],
-      "title": "SOURCE PHOTO — replace image"
+      "title": "SUBJECT PHOTO — replace image"
     },
     {
       "id": 6,
@@ -243,7 +243,7 @@
         {
           "name": "mask",
           "type": "MASK",
-          "link": 35
+          "link": 41
         }
       ],
       "outputs": [
@@ -308,7 +308,7 @@
       },
       "widgets_values": [
         "pad",
-        "edge",
+        "white",
         "center",
         "center",
         0,
@@ -321,7 +321,7 @@
         5,
         "both"
       ],
-      "title": "Paint Prepare - Geometry + Mask + Latent"
+      "title": "Paint Prepare — background only"
     },
     {
       "id": 7,
@@ -568,7 +568,7 @@
         "Node name for S&R": "CcCKrea2Paint"
       },
       "widgets_values": [
-        "Remove the selected person and every trace of them, restoring the original background, surfaces, textures, perspective, shadows and lighting. Keep all other details untouched.",
+        "A professional studio portrait of the same unchanged subject with a clean seamless white cyclorama background, even soft studio illumination, natural contact shadows, no background objects, no text. Preserve the visible person, outfit, face, and pose.",
         true,
         true
       ],
@@ -772,7 +772,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "CcC_Showcase_05_LocalEditing"
+        "CcC_Showcase_05_StudioBackground"
       ]
     },
     {
@@ -795,7 +795,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "SHOWCASE 05 — LOCAL IMAGE EDITING & RESTORE\nReplace local_edit_source.png with a real scene. SAM 3.1 segments the person and hair with two chained masks. The final union MASK goes to Paint Prepare; Paint generates the replacement and Paint Restore returns the image to its original dimensions. Inspect prepared canvas, generated mask, keep mask and final output. Attention Boost does not control Paint."
+        "SHOWCASE 05 — STUDIO BACKGROUND REPLACEMENT\nBased on the supplied complex Paint + Layout + SAM + InvertMask + Restore example. Flow: subject IMAGE -> Layout Cell (position/scale) -> Layout Composer (target studio canvas) -> SAM 3.1 person + hair union -> InvertMask (paint everything EXCEPT the subject) -> Paint Prepare -> AnyPaint -> sampling -> Paint Restore. Preserve the subject while replacing the background. Change Layout Cell placement and Mask text prompts to adapt. The reference image and subject masks are inspectable. Boost is not used for Paint."
       ]
     },
     {
@@ -915,7 +915,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 33
+          "link": 38
         },
         {
           "name": "previous_mask_attention",
@@ -975,7 +975,7 @@
         false,
         "#000000"
       ],
-      "title": "Mask: person"
+      "title": "SAM: select subject"
     },
     {
       "id": 52,
@@ -1025,7 +1025,7 @@
           "name": "mask",
           "type": "MASK",
           "links": [
-            35
+            40
           ]
         },
         {
@@ -1055,7 +1055,172 @@
         true,
         "#000000"
       ],
-      "title": "Mask: hair and boundary"
+      "title": "SAM: include hair"
+    },
+    {
+      "id": 60,
+      "type": "CcCKrea2LayoutCell",
+      "pos": [
+        -1100,
+        450
+      ],
+      "size": [
+        360,
+        350
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 36
+        }
+      ],
+      "outputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "links": [
+            37
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutCell"
+      },
+      "widgets_values": [
+        "cell",
+        1,
+        1,
+        "contain",
+        100,
+        "center",
+        "center",
+        0,
+        0
+      ],
+      "title": "Position subject in target canvas"
+    },
+    {
+      "id": 61,
+      "type": "CcCKrea2LayoutComposer",
+      "pos": [
+        -730,
+        450
+      ],
+      "size": [
+        360,
+        250
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "layout",
+          "type": "KREA2_LAYOUT_CHAIN",
+          "link": 37
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            38,
+            39
+          ]
+        },
+        {
+          "name": "layout_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LayoutComposer"
+      },
+      "widgets_values": [
+        "832 x 1216 | ~2:3 | ~1.01 MP",
+        16,
+        8,
+        "white"
+      ],
+      "title": "Build studio canvas"
+    },
+    {
+      "type": "InvertMask",
+      "pos": [
+        800,
+        1070
+      ],
+      "size": [
+        190,
+        70
+      ],
+      "flags": {},
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 40
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            41
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "Node name for S&R": "InvertMask"
+      },
+      "widgets_values": [],
+      "id": 62,
+      "title": "Invert subject mask — replace BACKGROUND",
+      "order": 25
+    },
+    {
+      "type": "PreviewImage",
+      "pos": [
+        100,
+        1150
+      ],
+      "size": [
+        300,
+        240
+      ],
+      "flags": {},
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 39
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "id": 63,
+      "title": "Composited input preview",
+      "order": 26
     }
   ],
   "links": [
@@ -1292,14 +1457,6 @@
       "KREA2_MASK_CHAIN"
     ],
     [
-      33,
-      5,
-      0,
-      51,
-      0,
-      "IMAGE"
-    ],
-    [
       34,
       52,
       0,
@@ -1308,9 +1465,49 @@
       "IMAGE"
     ],
     [
-      35,
+      36,
+      5,
+      0,
+      60,
+      0,
+      "IMAGE"
+    ],
+    [
+      37,
+      60,
+      0,
+      61,
+      0,
+      "KREA2_LAYOUT_CHAIN"
+    ],
+    [
+      38,
+      61,
+      0,
+      51,
+      0,
+      "IMAGE"
+    ],
+    [
+      39,
+      61,
+      0,
+      63,
+      0,
+      "IMAGE"
+    ],
+    [
+      40,
       52,
       1,
+      62,
+      0,
+      "MASK"
+    ],
+    [
+      41,
+      62,
+      0,
       6,
       2,
       "MASK"
