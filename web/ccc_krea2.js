@@ -28,6 +28,15 @@ const T2I_KREA_PRESETS = [
     ["2048 x 2048 | 1:1 | ~4.19 MP", 2048, 2048],
 ];
 
+// The Python nodes expose only Visual and Semantic. Saved workflows can carry
+// obsolete combo choices, so constrain both the values and the current selection.
+function normalizeVisionMode(widget) {
+    if (!widget) return;
+    if (widget.options) widget.options.values = ["visual", "semantic"];
+    if (widget.value === "reference") widget.value = "visual";
+    else if (!["visual", "semantic"].includes(widget.value)) widget.value = "visual";
+}
+
 function setWidgetDisabled(node, name, disabled) {
     const widget = node.widgets?.find((w) => w.name === name);
     if (!widget) return;
@@ -262,13 +271,7 @@ app.registerExtension({
         if (node.comfyClass === "CcCKrea2Reference") {
             const find = (name) => node.widgets?.find((w) => w.name === name);
             const refresh = () => {
-                const currentMode = find("vision_mode");
-                if (currentMode) {
-                    // Saved workflow combo options can outlive a backend node update.
-                    // Keep the visible modes synchronized with the Python schema.
-                    const modes = ["reference", "semantic", "visual", "style", "context"];
-                    if (currentMode.options) currentMode.options.values = modes;
-                }
+                normalizeVisionMode(find("vision_mode"));
                 const visual = find("vae_rope_enable")?.value === true;
                 const vision = find("vision_enable")?.value === true;
                 for (const widget of node.widgets ?? []) {
@@ -282,13 +285,8 @@ app.registerExtension({
                 setWidgetDisabled(node, "vae_rope_placement_grid", !visual || fit === "crop");
                 setWidgetDisabled(node, "vae_rope_rope_geometry", !visual || fit === "native");
                 setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
-                const visionMode = find("vision_mode")?.value ?? "reference";
-                setWidgetDisabled(node, "vision_style_processing", !vision || visionMode !== "style");
                 setWidgetDisabled(node, "vision_instruction", !vision);
                 setWidgetDisabled(node, "vae_rope_prompt_annotation", !visual);
-                setWidgetDisabled(node, "vision_fidelity", !vision || !["semantic", "style"].includes(visionMode));
-                setWidgetDisabled(node, "vision_guidance_seed",
-                    !vision || (find("vision_guidance_seed_mode")?.value ?? "fixed") !== "fixed");
                 node.setDirtyCanvas?.(true, true);
             };
             for (const name of ["vae_rope_enable", "vae_rope_reference_fit",
@@ -366,42 +364,17 @@ app.registerExtension({
         }
 
         if (node.comfyClass === "CcCKrea2VisionReference") {
-            const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
-            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
-
-            const updateVisionReferenceState = () => {
-                const mode = modeWidget?.value ?? "semantic";
-                const styleMode = mode === "style";
-
-                if (processingWidget) {
-                    processingWidget.disabled = !styleMode;
-                    if (!styleMode) processingWidget.value = "full";
-                }
-
-                // All Vision modes use Qwen guidance generation in the current
-                // T2I runtime, so these controls must stay available for
-                // Semantic, Visual, Style, and Context.
-                setWidgetDisabled(node, "guidance_seed_mode", false);
-                setWidgetDisabled(node, "guidance_detail", false);
-                setWidgetDisabled(node, "vision_guidance", false);
-
-                const seedMode = seedModeWidget?.value ?? "fixed";
-                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
+            const refresh = () => {
+                normalizeVisionMode(node.widgets?.find(w => w.name === "mode"));
                 node.setDirtyCanvas?.(true, true);
             };
-
-            for (const widget of [modeWidget, seedModeWidget]) {
-                if (!widget) continue;
-                const originalCallback = widget.callback;
-                widget.callback = function () {
-                    const result = originalCallback?.apply(this, arguments);
-                    updateVisionReferenceState();
-                    return result;
-                };
-            }
-
-            setTimeout(updateVisionReferenceState, 20);
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = originalConfigure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            setTimeout(refresh, 20);
         }
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
@@ -485,11 +458,7 @@ app.registerExtension({
                 if (contentWidget?.value !== "from_image" && visionEnableWidget) {
                     visionEnableWidget.value = false;
                 }
-                const modeWidget = node.widgets?.find(w => w.name === "latent_vision_mode");
-                if (modeWidget) {
-                    const modes = ["reference", "semantic", "visual", "style", "context"];
-                    if (modeWidget.options) modeWidget.options.values = modes;
-                }
+                normalizeVisionMode(node.widgets?.find(w => w.name === "latent_vision_mode"));
                 const enabled = visionEnableWidget?.value === true && contentWidget?.value === "from_image";
                 // The enable switch must remain interactive when content comes
                 // from an image. Do not disable it with the dependent controls.
@@ -503,10 +472,7 @@ app.registerExtension({
                     contentWidget?.value !== "from_image");
                 setWidgetDisabled(node, "latent_vision_max_edge", !enabled ||
                     node.widgets?.find(w => w.name === "latent_vision_resize")?.value !== true);
-                const mode = node.widgets?.find(w => w.name === "latent_vision_mode")?.value ?? "reference";
-                setWidgetDisabled(node, "latent_vision_style_processing", !enabled || mode !== "style");
-                const seedMode = node.widgets?.find(w => w.name === "latent_vision_guidance_seed_mode")?.value ?? "fixed";
-                setWidgetDisabled(node, "latent_vision_guidance_seed", !enabled || seedMode !== "fixed");
+
                 node.setDirtyCanvas?.(true, true);
             };
 
