@@ -103,7 +103,7 @@ def test_pad_preserves_complete_source_and_mask():
 
 def test_pad_restore_removes_only_temporary_krea_padding():
     image = _image(1500, 1000)
-    context, prepared, _ = _prepare(image, mode="pad")
+    context, prepared, _ = _prepare(image)
     restored = restore_paint_geometry(prepared, context)
     assert restored.shape == image.shape
     assert torch.allclose(restored, image)
