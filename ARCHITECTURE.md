@@ -191,7 +191,7 @@ source IMAGE + MASK + VAE
         v
 Paint Prepare
   explicit outpaint expansion
-  pad/crop to curated Krea working geometry
+  pad to curated Krea working geometry
   no source resize
   fill holes / grow / feather
   semantic reference
@@ -207,7 +207,7 @@ KSampler -> VAE Decode                            |
         +------------------> Paint Restore <--------+
 ~~~
 
-Paint Prepare uses internal geometry helpers but exposes the geometry controls directly. pad chooses a curated Krea geometry that contains the requested canvas; crop chooses one that fits inside it. Impossible directions fail rather than resizing the known source.
+Paint Prepare uses internal padding geometry helpers to choose a curated Krea working canvas that contains the requested image. If the source exceeds all supported Krea geometries, it fails with a resize instruction instead of cropping source content.
 
 Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas and is removed by Restore.
 
@@ -216,7 +216,6 @@ Paint consumes KREA2_PAINT_CONTEXT. It grounds Qwen with the prepared semantic r
 Paint Restore uses paint_geometry from Paint Prepare:
 
 - pad: remove temporary Krea padding only.
-- crop: composite the decoded generated crop back at the exact original coordinates; optional generated_mask limits replacement to the generated/feathered region.
 
 ## LoRA and T2I
 
