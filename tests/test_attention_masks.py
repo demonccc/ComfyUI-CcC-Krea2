@@ -143,9 +143,9 @@ def test_mask_composite_effective_boost_last_region_wins():
     assert torch.all(union == 1)
     assert len(third.regions) == 3
     # The last region overrides even Boost +5; outside it is Boost -3 or +5.
-    assert composite[0, 1, 1, 0].item() == pytest.approx(0.10)
+    assert composite[0, 1, 1, 0].item() == pytest.approx(0.0)
     assert composite[0, 0, 0, 0].item() == pytest.approx(0.95)
-    assert composite[0, 0, 3, 0].item() == pytest.approx(0.27)
+    assert composite[0, 0, 3, 0].item() == pytest.approx(0.19)
 
 
 def test_mask_composite_color_and_unselected_pixels():
@@ -180,7 +180,7 @@ def test_composite_unselected_pixels_remain_exact_for_minus_five_boost():
         composite_color="#000000",
     )
     torch.testing.assert_close(composite[0, 0, 1], original[0, 0, 1])
-    torch.testing.assert_close(composite[0, 0, 0], source[0, 0, 0] * 0.10)
+    torch.testing.assert_close(composite[0, 0, 0], torch.zeros_like(source[0, 0, 0]))
 
 
 def test_unified_reference_boost_regions_override_global_only_inside_masks():
@@ -277,9 +277,9 @@ def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
     torch.testing.assert_close(final.regions[-1].mask, effective_second_mask)
     assert len(final.regions) == 2
     # Pixel (0,0) is excluded by inversion so earlier +3 remains.
-    assert composite[0, 0, 0, 0].item() == pytest.approx(1.0 - (0.90 - 0.85 * 0.8))
+    assert composite[0, 0, 0, 0].item() == pytest.approx(1.0 - (1.0 - 0.95 * 0.8))
     # Pixel (0,1) belongs to both but inverted -5 wins.
-    assert composite[0, 0, 1, 0].item() == pytest.approx(0.10)
+    assert composite[0, 0, 1, 0].item() == pytest.approx(0.0)
 
     refs, _ = CcCKrea2Reference().process(
         image=image, vae_rope_enable=True, vision_enable=False,
