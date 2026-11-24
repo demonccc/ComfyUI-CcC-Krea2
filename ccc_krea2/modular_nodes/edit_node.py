@@ -272,6 +272,7 @@ class CcCKrea2Edit:
                 reference_count=reference_count,
                 rope_positions=rope_positions,
                 reference_boosts=None,
+                isolate_references=isolate_references,
             )
 
         if apply_krea2_edit_patch and reference_count:
