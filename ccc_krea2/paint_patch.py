@@ -139,7 +139,7 @@ def _registered_reference_tokens(
         raise ValueError("[Krea2 CcC Paint] At least one reference latent is required.")
     if rope_positions is not None:
         from .patch import _build_incontext_3d_rope_pos_ids
-        grids = [(ref.shape[-2] // patch_size, ref.shape[-1] // patch_size) for ref in refs]
+        grids = [((ref.shape[-2] + patch_size - 1) // patch_size, (ref.shape[-1] + patch_size - 1) // patch_size) for ref in refs]
         # Source shapes are already patch-compatible for the regular Edit route.
         positions = _build_incontext_3d_rope_pos_ids(
             batch_size, 0, grids, target_grid, device, list(rope_positions),
@@ -328,6 +328,8 @@ def _forward_with_registered_reference_kv(
 
     txt_len = context.shape[1]
     image_len = image_tokens.shape[1]
+    if callable(reference_bias):
+        reference_bias = reference_bias(txt_len, image_len)
     combined = torch.cat((context, image_tokens), dim=1)
 
     text_positions = torch.zeros(
