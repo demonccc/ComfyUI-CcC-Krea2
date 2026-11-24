@@ -388,10 +388,16 @@ def _compute_ref_attention_bias_patchified(
                 regional = regional.unsqueeze(0)
             if regional.ndim != 3:
                 raise ValueError("Reference weight map must be [B,H,W].")
+            regional = regional.to(device=device, dtype=torch.float32)
+            # Average graded boosts, but never dilute explicit -5 exclusions
+            # at token boundaries: any excluded source pixel blocks that key.
+            excluded = F.adaptive_max_pool2d(
+                (regional <= -5.0).unsqueeze(1).to(torch.float32), (gh, gw)
+            )[:, 0].flatten(1) > 0
             weights = F.interpolate(
-                regional.to(device=device, dtype=torch.float32).unsqueeze(1),
-                size=(gh, gw), mode="area"
+                regional.unsqueeze(1), size=(gh, gw), mode="area"
             )[:, 0].flatten(1).to(dtype=dtype)
+            weights = torch.where(excluded, -5.0, weights)
             weights = weights.expand(batch_size, -1)
             if not torch.isfinite(weights).all() or torch.any((weights < -5.0) | (weights > 5.0)):
                 raise ValueError("[Krea2 CcC Edit] Regional attention boost must be in [-5, 5].")
