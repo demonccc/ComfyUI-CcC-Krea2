@@ -87,7 +87,7 @@ def test_anypaint_token_alignment_regenerates_entire_partially_masked_patch():
     # Averaging the mask would leave residual known content; a single
     # selected cell must instead regenerate all four.
     generated = torch.zeros((1, 8, 8))
-    generated[:, 1, 1] = 1.0
+    generated[:, 2:4, 2:4] = 1.0
     noise = _token_aligned_soft_noise_mask(generated, latent_h=4, latent_w=4, patch_size=2)
     assert noise.shape == (1, 1, 4, 4)
     torch.testing.assert_close(noise[0, 0, :2, :2], torch.ones((2, 2)))
