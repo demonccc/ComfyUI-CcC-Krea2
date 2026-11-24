@@ -50,6 +50,63 @@ def test_prepare_creates_sampling_latent_and_token_aligned_noise_mask():
     assert torch.allclose(keep, 1.0 - generated)
 
 
+def test_sampler_vae_never_encodes_original_masked_subject():
+    class TrackingVAE(FakeVAE):
+        def __init__(self):
+            self.inputs = []
+
+        def encode(self, image):
+            self.inputs.append(image.clone())
+            return super().encode(image)
+
+    geometry = _geometry(height=32, width=32)
+    geometry["working_image"][:, 10:22, 10:22, :] = 1.0
+    geometry["working_mask"][:, 10:22, 10:22] = 1.0
+    vae = TrackingVAE()
+
+    context, latent, prepared, semantic, generated, keep = prepare_paint_context(
+        vae, geometry,
+        mask_grow=0, mask_blur_mode="gaussian_sigma",
+        mask_blur_amount=0.0, mask_blur_direction="outside",
+    )
+
+    # First VAE encoding is the neutralized appearance reference; second is
+    # the full-resolution sampling latent. Neither may contain the subject.
+    assert len(vae.inputs) == 2
+    assert vae.inputs[1][0, 15, 15].mean() < 0.9
+    assert not torch.allclose(vae.inputs[1][0, 15, 15], prepared[0, 15, 15])
+    torch.testing.assert_close(vae.inputs[1][0, 0, 0], prepared[0, 0, 0])
+    torch.testing.assert_close(vae.inputs[0][0, 15, 15], semantic[0, 15, 15])
+    assert latent["noise_mask"].max() > 0
+    assert generated[0, 15, 15] == 1
+    assert context["semantic_reference"] is semantic
+
+
+def test_sampler_vae_preserves_explicit_outpaint_fill_context():
+    class TrackingVAE(FakeVAE):
+        def __init__(self):
+            self.inputs = []
+
+        def encode(self, image):
+            self.inputs.append(image.clone())
+            return super().encode(image)
+
+    geometry = _geometry(height=32, width=32)
+    geometry["working_image"][:, :, 24:, :] = 0.9
+    geometry["working_mask"][:, :, 24:] = 1.0
+    expansion = torch.zeros_like(geometry["working_mask"])
+    expansion[:, :, 24:] = 1.0
+    geometry["working_expansion_mask"] = expansion
+
+    vae = TrackingVAE()
+    prepare_paint_context(
+        vae, geometry, mask_grow=0,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    )
+    torch.testing.assert_close(vae.inputs[1][:, :, 24:], geometry["working_image"][:, :, 24:])
+
+
 def test_fill_holes_fills_only_enclosed_mask_interiors():
     ring = torch.zeros((1, 16, 16), dtype=torch.float32)
     ring[:, 3:13, 3] = 1.0
