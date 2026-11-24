@@ -221,7 +221,11 @@ def prepare_paint_context(
     semantic_reference = _downscale_semantic_reference(semantic_full)
 
     reference_latent = _extract_latent(vae.encode(semantic_reference))
-    known_latent = _extract_latent(vae.encode(known_image))
+    # Do not encode the original masked subject into the sampling latent:
+    # even with noise_mask, its VAE features can leak into regeneration and
+    # prompt the model to reconstruct or duplicate the removed subject.
+    # Outside generated_mask, semantic_full is pixel-identical to known_image.
+    known_latent = _extract_latent(vae.encode(semantic_full))
     latent_tensor = _ensure_image_latent_5d(known_latent)
     latent_h, latent_w = latent_tensor.shape[-2:]
     noise_mask = _token_aligned_soft_noise_mask(generated_mask, latent_h, latent_w, patch_size=2).to(device=known_latent.device, dtype=known_latent.dtype)
@@ -355,7 +359,7 @@ class CcCKrea2PaintPrepare:
             f"Expansion Context Pixels: {int((context['expansion_context_mask'] > 0.5).sum())}",
             f"Semantic Reference: {semantic_reference.shape[2]}x{semantic_reference.shape[1]} max-edge {_SEMANTIC_REFERENCE_MAX_EDGE}px",
             f"Generated Mask Range: {float(generated_mask.min()):.3f}..{float(generated_mask.max()):.3f}",
-            "Latent: known-image samples + token-aligned noise_mask",
+            "Latent: masked-neutralized samples + token-aligned noise_mask",
         ])
         return (
             context,
