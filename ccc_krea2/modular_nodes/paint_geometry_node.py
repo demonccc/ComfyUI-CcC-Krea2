@@ -127,12 +127,14 @@ def _select_krea_geometry(width: int, height: int) -> Tuple[int, int]:
             "requested outpaint expansion."
         )
 
-    def score(geometry: Tuple[int, int]) -> Tuple[float, float]:
+    def score(geometry: Tuple[int, int]) -> Tuple[int, float]:
         candidate_w, candidate_h = geometry
-        ratio = candidate_w / float(candidate_h)
-        ratio_error = abs((ratio / source_ratio) - 1.0)
-        size_error = abs(candidate_w - width) / float(max(1, width)) + abs(candidate_h - height) / float(max(1, height))
-        return ratio_error, size_error
+        # Paint preserves source pixels without resizing. Minimize the unused
+        # canvas first; matching the aspect ratio at the price of a much larger
+        # padded canvas makes inpainting context needlessly sparse.
+        added_area = candidate_w * candidate_h - width * height
+        ratio_error = abs((candidate_w / float(candidate_h)) / source_ratio - 1.0)
+        return added_area, ratio_error
 
     return min(candidates, key=score)
 
