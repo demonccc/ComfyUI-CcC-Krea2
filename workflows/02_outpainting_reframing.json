@@ -34,7 +34,12 @@
             "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/moodyKrea2Mix_v3-Global-FP8.safetensors",
             "directory": "diffusion_models"
           }
-        ]
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "moodyKrea2Mix_v3-Global-FP8.safetensors",
@@ -73,7 +78,12 @@
             "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3VL4BAbliteratedComfyui_FP8.safetensors",
             "directory": "text_encoders"
           }
-        ]
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
@@ -114,7 +124,12 @@
             "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors",
             "directory": "vae"
           }
-        ]
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "qwen_image_vae.safetensors"
@@ -158,7 +173,12 @@
             "url": "https://huggingface.co/yijunwang2/krea2-anypaint/resolve/main/Krea2/krea2_anypaint_rank32.safetensors",
             "directory": "loras"
           }
-        ]
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         true,
@@ -208,12 +228,22 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "LoadImage"
+        "Node name for S&R": "LoadImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
-        "outpaint_source.png"
+        "outpaint_source.png",
+        "image"
       ],
-      "title": "SOURCE PHOTO — replace image"
+      "title": "SOURCE PHOTO — replace image",
+      "widgets_values_named": {
+        "image": "outpaint_source.png",
+        "upload": "image"
+      }
     },
     {
       "id": 6,
@@ -242,6 +272,7 @@
         },
         {
           "name": "mask",
+          "shape": 7,
           "type": "MASK",
           "link": null
         }
@@ -289,7 +320,24 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2PaintPrepare"
+        "Node name for S&R": "CcCKrea2PaintPrepare",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
       },
       "widgets_values": [
         "reflect",
@@ -328,9 +376,20 @@
           "link": 10
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
       "properties": {
-        "Node name for S&R": "PreviewImage"
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [],
       "title": "Prepared Canvas"
@@ -366,7 +425,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "MaskToImage"
+        "Node name for S&R": "MaskToImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [],
       "title": "Generated Mask"
@@ -392,9 +456,20 @@
           "link": 13
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
       "properties": {
-        "Node name for S&R": "PreviewImage"
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": []
     },
@@ -427,6 +502,12 @@
           "name": "paint_context",
           "type": "KREA2_PAINT_CONTEXT",
           "link": 8
+        },
+        {
+          "name": "prompt_augmentation",
+          "shape": 7,
+          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
+          "link": null
         }
       ],
       "outputs": [
@@ -458,7 +539,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2Paint"
+        "Node name for S&R": "CcCKrea2Paint",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "Seamlessly extend the original photograph into the expanded canvas, continuing the environment, surfaces, perspective, sky, shadows, reflections and lighting. Preserve the original central image and match the camera viewpoint.",
@@ -480,7 +566,7 @@
       ],
       "flags": {},
       "order": 13,
-      "mode": 0,
+      "mode": 4,
       "inputs": [
         {
           "name": "model",
@@ -498,11 +584,21 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ModelSamplingAuraFlow"
+        "Node name for S&R": "ModelSamplingAuraFlow",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
-        1.15
-      ]
+        1.15,
+        "flow"
+      ],
+      "widgets_values_named": {
+        "shift": 1.15,
+        "sampling": "flow"
+      }
     },
     {
       "id": 15,
@@ -527,7 +623,7 @@
       ],
       "outputs": [
         {
-          "name": "MODEL",
+          "name": "model",
           "type": "MODEL",
           "links": [
             20
@@ -535,7 +631,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "BlackwellAttentionFix"
+        "Node name for S&R": "BlackwellAttentionFix",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "pytorch"
@@ -587,7 +688,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "KSampler"
+        "Node name for S&R": "KSampler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         589415,
@@ -635,7 +741,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "VAEDecode"
+        "Node name for S&R": "VAEDecode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": []
     },
@@ -660,9 +771,20 @@
           "link": 26
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
       "properties": {
-        "Node name for S&R": "SaveImage"
+        "Node name for S&R": "SaveImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "CcC_Showcase_06_Outpainting"
@@ -685,7 +807,12 @@
       "inputs": [],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "Note"
+        "Node name for S&R": "Note",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
         "SHOWCASE 06 — OUTPAINTING & REFRAMING\nThe entire process is connected: source IMAGE -> Paint Prepare with asymmetric expansion -> Paint -> sampler -> Paint Restore -> SaveImage. The expansion area is generated automatically; a SAM mask is unnecessary. Modify expand_left/top/right/bottom independently and inspect prepared canvas, generated mask and preserved mask."
@@ -727,7 +854,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2PaintRestore"
+        "Node name for S&R": "CcCKrea2PaintRestore",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [],
       "title": "Restore Native Canvas"
