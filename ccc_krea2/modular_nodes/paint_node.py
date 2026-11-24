@@ -21,7 +21,7 @@ def _encode_qwen_with_reference(
         if outfit_reference.ndim != 4 or outfit_reference.shape[-1] < 3:
             raise ValueError("[Krea2 CcC Paint] outfit_reference must be an IMAGE [B,H,W,C].")
         images.append(outfit_reference[..., :3].clamp(0.0, 1.0))
-        image_prefix += "Picture 2: <|vision_start|><|image_pad|><|vision_end|>"
+        image_prefix += " Picture 2: <|vision_start|><|image_pad|><|vision_end|>"
     try:
         from comfy.text_encoders.krea2 import KREA2_TEMPLATE
         tokens = clip.tokenize(image_prefix + (prompt or ""), images=images, llama_template=KREA2_TEMPLATE)
