@@ -4,7 +4,6 @@ from typing import List, Tuple, Dict, Any
 from .reference_specs import ReferenceChain
 
 
-from .style_processing import get_style_processing_image_count
 
 
 def parse_aliases(raw_aliases: str) -> Tuple[str, ...]:
@@ -74,19 +73,6 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
             f"Physical Qwen images cannot contain an empty logical slot."
         )
 
-    # Phase 3.5: Enforce non-Style references before Style
-    seen_style = False
-    for item in resolved_sorted:
-        ref_path = getattr(item["spec"], "reference_path", item["spec"].role.lower())
-        if ref_path == "style" or item["spec"].role.lower() == "style":
-            seen_style = True
-        elif seen_style:
-            raise ValueError(
-                "Invalid reference chain order: Style references expand into multiple physical Qwen images; "
-                "placing Style before edit references makes Image N aliases ambiguous; "
-                "place all edit references before Style."
-            )
-
     # Phase 5: Expand aliases and assign physical indices/ranges in sorted logical slot order
     resolved: List[Dict[str, Any]] = []
     global_aliases = set()
@@ -123,18 +109,10 @@ def resolve_reference_slots_and_aliases(chain: ReferenceChain) -> Tuple[List[Dic
         include_in_vision = getattr(spec, "include_in_vision", True)
 
         if not include_in_vision:
-            if ref_path == "style" or spec.role.lower() == "style":
-                raise ValueError("Style references must participate in Qwen Vision conditioning.")
             vae_frame = vae_frame_counter if is_appearance else None
             if is_appearance:
                 vae_frame_counter += 1
             physical_qwen_range = None
-        elif ref_path == "style" or spec.role.lower() == "style":
-            vae_frame = None
-            style_proc = getattr(spec, "style_processing", "2x2")
-            span_len = get_style_processing_image_count(style_proc)
-            physical_qwen_range = (physical_qwen_index, physical_qwen_index + span_len - 1)
-            physical_qwen_index += span_len
         elif not is_appearance:
             vae_frame = None
             physical_qwen_range = (physical_qwen_index, physical_qwen_index)

@@ -1,38 +1,5 @@
 import { app } from "../../scripts/app.js";
 
-const PROMPT_CREATOR_PRESETS = {
-    enhance: `Analyze the user's instructions and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's instructions as the authoritative guide for the desired result. Use the available visual context to understand and describe that result accurately.
-
-Preserve the user's intent and constraints while improving clarity. Do not add unnecessary assumptions or unrelated details.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
-
-    create_from_image: `Analyze the reference edit image and the user's instructions, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the reference edit image as the authoritative visual blueprint for the desired result. Build the prompt from what is visibly present in that image.
-
-Use the user's instructions to determine what should be preserved, changed, emphasized, or adapted.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
-
-    create_from_theme: `Analyze the user's theme or idea and the available visual context, then create a clear English I2I prompt for Krea2 Edit.
-
-Treat the user's theme or idea as the authoritative creative direction. Use the available visual context to build a coherent desired result that fits it.
-
-Keep the prompt focused on the intended final image. Add only the visual detail needed to make the result clear and useful.
-
-Write the result as a direct description of the desired final image, not as an explanation of the editing process.
-
-Return only the final I2I prompt as one plain-text paragraph.`,
-};
-
-
 // Consolidated from the existing compactLoader frontend behavior.
 // LoRA stacks use ComfyUI's native BOOLEAN, COMBO, FLOAT and STRING widgets.
 // Keep widget types, callbacks and workflow serialization untouched.
@@ -61,11 +28,49 @@ const T2I_KREA_PRESETS = [
     ["2048 x 2048 | 1:1 | ~4.19 MP", 2048, 2048],
 ];
 
+// The Python nodes expose only Visual and Semantic. Saved workflows can carry
+// obsolete combo choices, so constrain both the values and the current selection.
+function normalizeVisionMode(widget) {
+    if (!widget) return;
+    if (widget.options) widget.options.values = ["visual", "semantic"];
+    if (widget.value === "reference") widget.value = "visual";
+    else if (!["visual", "semantic"].includes(widget.value)) widget.value = "visual";
+}
+
 function setWidgetDisabled(node, name, disabled) {
     const widget = node.widgets?.find((w) => w.name === name);
     if (!widget) return;
-    widget.disabled = disabled;
+    const next = Boolean(disabled);
+    widget.disabled = next;
+    // DOM-backed STRING/textarea widgets are not canvas widgets. Keep their
+    // actual input element in sync with LiteGraph/Nodes 2.0 disabled state.
+    if (widget.element) {
+        widget.element.disabled = next;
+        widget.element.readOnly = next;
+        widget.element.querySelectorAll?.("input, textarea, select, button")
+            .forEach((element) => { element.disabled = next; });
+    }
     widget.triggerDraw?.();
+}
+
+// A fixed 20ms timer is not a reliable widget-initialization barrier, especially
+// when a saved workflow creates nodes before their widgets or DOM controls exist.
+// Refresh immediately, on the next frames, and after ComfyUI restores node values.
+function scheduleWidgetRefresh(node, refresh) {
+    refresh();
+    requestAnimationFrame(() => {
+        refresh();
+        requestAnimationFrame(refresh);
+    });
+    // ComfyUI may attach restored widgets after nodeCreated. Refresh after
+    // graph insertion too; avoid relying solely on transient timers.
+    const originalAdded = node.onAdded;
+    node.onAdded = function (...args) {
+        const result = originalAdded?.apply(this, args);
+        refresh();
+        requestAnimationFrame(refresh);
+        return result;
+    };
 }
 
 function t2iPresetDimensions(label) {
@@ -186,7 +191,7 @@ function migrateLegacyT2IWidgets(node, values) {
 
 function setupLoraDisabledState(node, attempts = 0) {
     if (node.__cccLoraDisabledInstalled) return;
-    const count = node.comfyClass === "CcCKrea2LoRAStackWithPrompt" ? 5 : 10;
+    const count = 5;
     const find = (name) => node.widgets?.find((widget) => widget.name === name);
 
     if (!find("lora_1_enabled")) {
@@ -200,7 +205,7 @@ function setupLoraDisabledState(node, attempts = 0) {
             const enabled = find(`lora_${i}_enabled`)?.value === true;
             for (const suffix of ["name", "strength", "prompt_position", "prompt"]) {
                 const widget = find(`lora_${i}_${suffix}`);
-                if (widget) widget.disabled = !enabled;
+                if (widget) setWidgetDisabled(node, widget.name, !enabled);
             }
         }
         node.setDirtyCanvas?.(true, true);
@@ -232,15 +237,143 @@ app.registerExtension({
         if (!node || !node.comfyClass) return;
         if (NATIVE_LORA_NODES.has(node.comfyClass)) setupLoraDisabledState(node);
 
+        if (node.comfyClass === "CcCKrea2LayoutCell") {
+            const find = (name) => node.widgets?.find(w => w.name === name);
+            const refresh = () => {
+                const placement = find("placement")?.value ?? "cell";
+                const fit = find("fit")?.value ?? "contain";
+                setWidgetDisabled(node, "row", placement === "full_column");
+                setWidgetDisabled(node, "column", placement === "full_row");
+                const hasPosition = fit === "crop" || fit === "fit";
+                setWidgetDisabled(node, "resize_percent", fit !== "crop");
+                for (const name of ["horizontal_position", "vertical_position", "offset_x", "offset_y"]) {
+                    setWidgetDisabled(node, name, !hasPosition);
+                }
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (const name of ["placement", "fit"]) {
+                const widget = find(name);
+                if (!widget) continue;
+                const old = widget.callback;
+                widget.callback = function (...args) {
+                    const result = old?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const oldConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = oldConfigure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            scheduleWidgetRefresh(node, refresh);
+        }
+
+        if (node.comfyClass === "CcCKrea2PaintPrepare") {
+            // Saved Paint Prepare workflows used to start with geometry_mode.
+            // Geometry is now always padding; shift the saved values by one.
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (info, ...rest) {
+                const result = originalConfigure?.call(this, info, ...rest);
+                const saved = info?.widgets_values;
+                if (Array.isArray(saved) && (saved[0] === "pad" || saved[0] === "crop")) {
+                    const values = saved.slice(1);
+                    for (let i = 0; i < (node.widgets?.length ?? 0) && i < values.length; i++) {
+                        node.widgets[i].value = values[i];
+                    }
+                    node.setDirtyCanvas?.(true, true);
+                }
+                return result;
+            };
+        }
+
+        if (node.comfyClass === "CcCKrea2Mask") {
+            const find = (name) => node.widgets?.find((w) => w.name === name);
+            const refresh = () => {
+                const usingMask = find("source")?.value === "mask";
+                setWidgetDisabled(node, "prompt", usingMask);
+                setWidgetDisabled(node, "confidence", usingMask);
+                setWidgetDisabled(node, "unload_sam_model", usingMask);
+                node.setDirtyCanvas?.(true, true);
+            };
+            const source = find("source");
+            if (source) {
+                const original = source.callback;
+                source.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (info, ...rest) {
+                const result = originalConfigure?.call(this, info, ...rest);
+                const saved = info?.widgets_values;
+                if (Array.isArray(saved) && typeof saved[4] === "boolean" &&
+                    typeof saved[5] === "string") {
+                    // Previous order: unload, composite_color, [invert].
+                    // Current order: composite_color, invert, unload (last).
+                    const color = find("composite_color");
+                    const invert = find("invert");
+                    const unload = find("unload_sam_model");
+                    if (color) color.value = saved[5];
+                    if (invert) invert.value = typeof saved[6] === "boolean" ? saved[6] : false;
+                    if (unload) unload.value = saved[4];
+                }
+                refresh();
+                return result;
+            };
+            scheduleWidgetRefresh(node, refresh);
+        }
+
+        if (node.comfyClass === "CcCKrea2Reference") {
+            const find = (name) => node.widgets?.find((w) => w.name === name);
+            const refresh = () => {
+                normalizeVisionMode(find("vision_mode"));
+                const visual = find("vae_rope_enable")?.value === true;
+                const vision = find("vision_enable")?.value === true;
+                for (const widget of node.widgets ?? []) {
+                    if (widget.name.startsWith("vae_rope_") && widget.name !== "vae_rope_enable") {
+                        setWidgetDisabled(node, widget.name, !visual);
+                    } else if (widget.name.startsWith("vision_") && widget.name !== "vision_enable") {
+                        setWidgetDisabled(node, widget.name, !vision);
+                    }
+                }
+                const fit = find("vae_rope_reference_fit")?.value ?? "native";
+                setWidgetDisabled(node, "vae_rope_placement_grid", !visual || fit === "crop");
+                setWidgetDisabled(node, "vae_rope_rope_geometry", !visual || fit === "native");
+                setWidgetDisabled(node, "vision_max_edge", !vision || find("vision_resize")?.value !== true);
+                setWidgetDisabled(node, "vision_instruction", !vision);
+                setWidgetDisabled(node, "vae_rope_prompt_annotation", !visual);
+                node.setDirtyCanvas?.(true, true);
+            };
+            for (const name of ["vae_rope_enable", "vae_rope_reference_fit",
+                                "vision_enable", "vision_resize", "vision_mode", "vision_guidance_seed_mode"]) {
+                const widget = find(name);
+                if (!widget) continue;
+                const original = widget.callback;
+                widget.callback = function (...args) {
+                    const result = original?.apply(this, args);
+                    refresh();
+                    return result;
+                };
+            }
+            const configure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = configure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            scheduleWidgetRefresh(node, refresh);
+        }
+
         if (node.comfyClass === "CcCKrea2VisualReference") {
             const semanticWidget = node.widgets?.find((w) => w.name === "semantic");
             const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
             const fitWidget = node.widgets?.find((w) => w.name === "reference_fit");
 
-            const setDisabled = (name, disabled) => {
-                const widget = node.widgets?.find((w) => w.name === name);
-                if (widget) widget.disabled = disabled;
-            };
+            const setDisabled = (name, disabled) => setWidgetDisabled(node, name, disabled);
 
             const updateSemanticState = () => {
                 const enabled = semanticWidget?.value === true;
@@ -267,6 +400,8 @@ app.registerExtension({
 
             for (const [widget, callback] of [
                 [semanticWidget, updateSemanticState],
+                ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
+                    .map(name => [node.widgets?.find(w => w.name === name), updateSemanticState]),
                 [semanticResizeWidget, updateSemanticState],
                 [fitWidget, updateFitState],
             ]) {
@@ -278,49 +413,25 @@ app.registerExtension({
                 };
             }
 
-            setTimeout(() => {
+            scheduleWidgetRefresh(node, () => {
                 updateSemanticState();
                 updateFitState();
-            }, 20);
+                node.setDirtyCanvas?.(true, true);
+            });
         }
 
         if (node.comfyClass === "CcCKrea2VisionReference") {
-            const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const processingWidget = node.widgets?.find((w) => w.name === "style_processing");
-            const seedModeWidget = node.widgets?.find((w) => w.name === "guidance_seed_mode");
-
-            const updateVisionReferenceState = () => {
-                const mode = modeWidget?.value ?? "semantic";
-                const styleMode = mode === "style";
-
-                if (processingWidget) {
-                    processingWidget.disabled = !styleMode;
-                    if (!styleMode) processingWidget.value = "full";
-                }
-
-                // All Vision modes use Qwen guidance generation in the current
-                // T2I runtime, so these controls must stay available for
-                // Semantic, Visual, Style, and Context.
-                setWidgetDisabled(node, "guidance_seed_mode", false);
-                setWidgetDisabled(node, "guidance_detail", false);
-                setWidgetDisabled(node, "vision_guidance", false);
-
-                const seedMode = seedModeWidget?.value ?? "fixed";
-                setWidgetDisabled(node, "guidance_seed", seedMode !== "fixed");
+            const refresh = () => {
+                normalizeVisionMode(node.widgets?.find(w => w.name === "mode"));
                 node.setDirtyCanvas?.(true, true);
             };
-
-            for (const widget of [modeWidget, seedModeWidget]) {
-                if (!widget) continue;
-                const originalCallback = widget.callback;
-                widget.callback = function () {
-                    const result = originalCallback?.apply(this, arguments);
-                    updateVisionReferenceState();
-                    return result;
-                };
-            }
-
-            setTimeout(updateVisionReferenceState, 20);
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = originalConfigure?.apply(this, args);
+                refresh();
+                return result;
+            };
+            scheduleWidgetRefresh(node, refresh);
         }
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
@@ -363,7 +474,7 @@ app.registerExtension({
                 return result;
             };
 
-            setTimeout(() => {
+            scheduleWidgetRefresh(node, () => {
                 const currentMode = String(dimensionsWidget?.value ?? "");
                 if (!["preset", "fixed"].includes(currentMode)) {
                     const syntheticLegacy = node.widgets?.map((w) => w.value) ?? [];
@@ -371,19 +482,16 @@ app.registerExtension({
                 }
                 normalizeT2ICurrentWidgets(node);
                 updateDimensionsState();
-            }, 20);
+            });
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
             const dimensionsWidget = node.widgets?.find((w) => w.name === "dimensions");
             const contentWidget = node.widgets?.find((w) => w.name === "content");
             const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
-            const semanticWidget = node.widgets?.find((w) => w.name === "latent_semantic");
+            const visionEnableWidget = node.widgets?.find((w) => w.name === "latent_vision_enable");
 
-            const setDisabled = (name, disabled) => {
-                const widget = node.widgets?.find((w) => w.name === name);
-                if (widget) widget.disabled = disabled;
-            };
+            const setDisabled = (name, disabled) => setWidgetDisabled(node, name, disabled);
 
             const updateDimensionsState = () => {
                 const mode = dimensionsWidget?.value ?? "preset";
@@ -398,17 +506,37 @@ app.registerExtension({
                 setDisabled("content_fit", !fromImage);
             };
 
-            const updateSemanticState = () => {
-                const enabled = semanticWidget?.value === true;
-                setDisabled("latent_semantic_instruction", !enabled);
-                setDisabled("latent_grounding_px", !enabled);
+            const updateVisionState = () => {
+                // Empty target latents have no source image for Vision analysis.
+                // Clear the switch, rather than just greying it out while true.
+                if (contentWidget?.value !== "from_image" && visionEnableWidget) {
+                    visionEnableWidget.value = false;
+                }
+                normalizeVisionMode(node.widgets?.find(w => w.name === "latent_vision_mode"));
+                const enabled = visionEnableWidget?.value === true && contentWidget?.value === "from_image";
+                // The enable switch must remain interactive when content comes
+                // from an image. Do not disable it with the dependent controls.
+                for (const widget of node.widgets ?? []) {
+                    if (widget.name.startsWith("latent_vision_") &&
+                        widget.name !== "latent_vision_enable") {
+                        setWidgetDisabled(node, widget.name, !enabled);
+                    }
+                }
+                setWidgetDisabled(node, "latent_vision_enable",
+                    contentWidget?.value !== "from_image");
+                setWidgetDisabled(node, "latent_vision_max_edge", !enabled ||
+                    node.widgets?.find(w => w.name === "latent_vision_resize")?.value !== true);
+
+                node.setDirtyCanvas?.(true, true);
             };
 
             for (const [widget, callback] of [
                 [dimensionsWidget, updateDimensionsState],
-                [contentWidget, updateContentState],
+                [contentWidget, () => { updateContentState(); updateVisionState(); }],
                 [contentFitWidget, updateContentState],
-                [semanticWidget, updateSemanticState],
+                [visionEnableWidget, updateVisionState],
+                ...["latent_vision_resize", "latent_vision_mode", "latent_vision_guidance_seed_mode"]
+                    .map(name => [node.widgets?.find(w => w.name === name), updateVisionState]),
             ]) {
                 if (!widget) continue;
                 const originalCallback = widget.callback;
@@ -418,11 +546,21 @@ app.registerExtension({
                 };
             }
 
-            setTimeout(() => {
+            const originalConfigure = node.onConfigure;
+            node.onConfigure = function (...args) {
+                const result = originalConfigure?.apply(this, args);
                 updateDimensionsState();
                 updateContentState();
-                updateSemanticState();
-            }, 20);
+                updateVisionState();
+                return result;
+            };
+
+            scheduleWidgetRefresh(node, () => {
+                updateDimensionsState();
+                updateContentState();
+                updateVisionState();
+                node.setDirtyCanvas?.(true, true);
+            });
         }
 
 
@@ -449,87 +587,6 @@ app.registerExtension({
             }
         }
 
-        if (node.comfyClass === "CcCKrea2EditPromptCreator") {
-            const modeWidget = node.widgets?.find((w) => w.name === "mode");
-            const systemPromptWidget = node.widgets?.find((w) => w.name === "system_prompt");
-
-            if (!modeWidget || !systemPromptWidget) return;
-
-            let previousMode = modeWidget.value ?? "enhance";
-            let customSystemPrompt =
-                previousMode === "custom" ? String(systemPromptWidget.value ?? "") : "";
-
-            const setSystemPromptValue = (value) => {
-                if (systemPromptWidget.value !== value) {
-                    systemPromptWidget.value = value;
-                }
-
-                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
-                if (inputEl && "value" in inputEl && inputEl.value !== value) {
-                    inputEl.value = value;
-                }
-
-                systemPromptWidget.triggerDraw?.();
-            };
-
-            const setSystemPromptEditable = (editable) => {
-                systemPromptWidget.options ??= {};
-                systemPromptWidget.options.read_only = !editable;
-                systemPromptWidget.disabled = false;
-
-                const inputEl = systemPromptWidget.inputEl ?? systemPromptWidget.element;
-                if (inputEl) {
-                    inputEl.readOnly = !editable;
-                    inputEl.style.opacity = editable ? "" : "0.65";
-                }
-
-                systemPromptWidget.triggerDraw?.();
-            };
-
-            const updatePromptCreatorState = () => {
-                const mode = modeWidget.value ?? "enhance";
-
-                if (previousMode === "custom" && mode !== "custom") {
-                    customSystemPrompt = String(systemPromptWidget.value ?? "");
-                }
-
-                if (mode === "custom") {
-                    if (!customSystemPrompt.trim()) {
-                        customSystemPrompt =
-                            PROMPT_CREATOR_PRESETS[previousMode] ??
-                            PROMPT_CREATOR_PRESETS.enhance;
-                    }
-                    setSystemPromptValue(customSystemPrompt);
-                    setSystemPromptEditable(true);
-                } else {
-                    setSystemPromptValue(
-                        PROMPT_CREATOR_PRESETS[mode] ?? PROMPT_CREATOR_PRESETS.enhance
-                    );
-                    setSystemPromptEditable(false);
-                }
-
-                previousMode = mode;
-                node.setDirtyCanvas?.(true, true);
-            };
-
-            const originalModeCallback = modeWidget.callback;
-            modeWidget.callback = function () {
-                if (originalModeCallback) originalModeCallback.apply(this, arguments);
-                updatePromptCreatorState();
-            };
-
-            const originalSystemPromptCallback = systemPromptWidget.callback;
-            systemPromptWidget.callback = function () {
-                if (originalSystemPromptCallback) {
-                    originalSystemPromptCallback.apply(this, arguments);
-                }
-                if ((modeWidget.value ?? "enhance") === "custom") {
-                    customSystemPrompt = String(systemPromptWidget.value ?? "");
-                }
-            };
-
-            setTimeout(updatePromptCreatorState, 100);
-        }
 
     }
 });

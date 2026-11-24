@@ -1,62 +1,9 @@
-"""Public Prompt Creator contract with optional visual references."""
+"""Compatibility import for the unified public Prompt Creator implementation.
 
-from __future__ import annotations
+Keep this module for existing Python integrations importing its historic path.
+The node implementation and ComfyUI interface live in edit_prompt_creator_node.py.
+"""
 
-from typing import Any, Optional
+from .edit_prompt_creator_node import CcCKrea2EditPromptCreator
 
-import torch
-
-from .edit_prompt_creator_node import CcCKrea2EditPromptCreator as _BasePromptCreator
-from .edit_reference_types import EditReferenceChain
-
-
-class CcCKrea2EditPromptCreator(_BasePromptCreator):
-    """Expose references as optional while preserving full multimodal analysis."""
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        schema = _BasePromptCreator.INPUT_TYPES()
-        required = dict(schema.get("required", {}))
-        references = required.pop("references")
-        optional = {
-            "references": references,
-            **dict(schema.get("optional", {})),
-        }
-        return {
-            "required": required,
-            "optional": optional,
-        }
-
-    def create(
-        self,
-        clip: Any,
-        mode: str = "enhance",
-        user_prompt: str = "",
-        system_prompt: str = "",
-        thinking: bool = False,
-        max_tokens: int = 512,
-        temperature: float = 0.25,
-        top_p: float = 0.90,
-        seed: int = 0,
-        references: Optional[EditReferenceChain] = None,
-        reference_edit_image: Optional[torch.Tensor] = None,
-    ):
-        passthrough_references = (
-            references if references is not None else EditReferenceChain()
-        )
-
-        created_prompt, _, creator_info, thinking_text = super().create(
-            clip=clip,
-            references=passthrough_references,
-            mode=mode,
-            user_prompt=user_prompt,
-            system_prompt=system_prompt,
-            thinking=thinking,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            seed=seed,
-            reference_edit_image=reference_edit_image,
-        )
-
-        return created_prompt, passthrough_references, creator_info, thinking_text
+__all__ = ["CcCKrea2EditPromptCreator"]

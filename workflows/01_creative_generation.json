@@ -1,6 +1,6 @@
 {
-  "last_node_id": 12,
-  "last_link_id": 13,
+  "last_node_id": 63,
+  "last_link_id": 21,
   "nodes": [
     {
       "id": 1,
@@ -14,7 +14,7 @@
         100
       ],
       "flags": {},
-      "order": 1,
+      "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -22,7 +22,7 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            1
+            14
           ]
         }
       ],
@@ -56,7 +56,7 @@
         100
       ],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -64,7 +64,8 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            2
+            2,
+            16
           ]
         }
       ],
@@ -97,7 +98,7 @@
         100
       ],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -138,13 +139,13 @@
         430
       ],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "MODEL",
-          "link": 1
+          "link": 15
         },
         {
           "name": "clip",
@@ -154,7 +155,15 @@
         {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "link": 13
+          "link": 18
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": 19,
+          "widget": {
+            "name": "prompt"
+          }
         }
       ],
       "outputs": [
@@ -196,9 +205,9 @@
         "Node name for S&R": "CcCKrea2TextToImage"
       },
       "widgets_values": [
-        "A cinematic photograph of a futuristic coastal city at golden hour, with reflective glass towers, elevated walkways, lush vegetation, and dramatic warm sunlight.",
+        "",
         "preset",
-        "2048 x 1152 | 16:9 | ~2.36 MP",
+        "1536 x 1024 | 3:2 | ~1.57 MP",
         1024,
         1024,
         "preserve_aspect_krea_bounds",
@@ -219,7 +228,7 @@
         100
       ],
       "flags": {},
-      "order": 5,
+      "order": 4,
       "mode": 0,
       "inputs": [
         {
@@ -256,7 +265,7 @@
         100
       ],
       "flags": {},
-      "order": 6,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
@@ -293,7 +302,7 @@
         260
       ],
       "flags": {},
-      "order": 7,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -330,8 +339,8 @@
         "Node name for S&R": "KSampler"
       },
       "widgets_values": [
-        0,
-        "randomize",
+        76142,
+        "fixed",
         8,
         1,
         "euler",
@@ -351,7 +360,7 @@
         100
       ],
       "flags": {},
-      "order": 8,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
@@ -391,7 +400,7 @@
         200
       ],
       "flags": {},
-      "order": 9,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
@@ -405,7 +414,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "CcCKrea2_T2I"
+        "CcC_Showcase_07_CreativeGeneration"
       ]
     },
     {
@@ -420,7 +429,7 @@
         520
       ],
       "flags": {},
-      "order": 10,
+      "order": 9,
       "mode": 0,
       "inputs": [],
       "outputs": [],
@@ -428,7 +437,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Krea2 CcC Text-to-Image workflow with Vision Reference.\\n\\nFlow:\\n- UNETLoader + CLIPLoader -> Krea2 CcC Text To Image -> sampler path.\\n- Vision Reference declares Semantic, Visual, Style, or Context information; T2I analyzes it into mode-scoped text guidance.\\n- Leave instruction empty to test the preset itself. Use instruction only for additional guidance inside the selected mode.\\n- Semantic and Visual use the full source image. Style can use full, 2x2, or 4x4 analysis.\\n- Context keeps scene/framing/action relationships, not clothing or identity.\\n- Direct Vision rows never enter final T2I conditioning. Negative prompt remains text-only.\\n- Vision Reference is optional; disconnect it for normal text-only T2I."
+        "SHOWCASE 07 — CREATIVE GENERATION\nA complete idea-to-image workflow. Inspiration IMAGE -> Vision-only Reference -> Prompt Creator (create_from_image_t2i) -> Text To Image -> sampling -> output. Prompt Creator creates and previews the final prompt and forwards the same reference chain. Optional LoRA Stack is fully disabled by default so it can be enabled selectively. No Edit LoRA is needed for plain text-to-image generation."
       ],
       "title": "Workflow Notes"
     },
@@ -465,20 +474,20 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "t2i_vision_reference.jpg"
+        "creative_inspiration.jpg"
       ],
-      "title": "T2I Vision Reference Image"
+      "title": "Visual inspiration — replace image"
     },
     {
       "id": 12,
-      "type": "CcCKrea2VisionReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         360,
         620
       ],
       "size": [
         500,
-        380
+        600
       ],
       "flags": {},
       "order": 11,
@@ -495,39 +504,245 @@
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "links": [
-            13
+            17
           ]
         },
         {
-          "name": "vision_info",
+          "name": "reference_info",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisionReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
-        "semantic",
-        "",
-        "full",
-        "fixed",
+        false,
         0,
-        "balanced",
-        "balanced"
+        "native",
+        "inside",
+        "center",
+        "center",
+        "spatial",
+        "overlay",
+        "latent",
+        "",
+        true,
+        1,
+        true,
+        768,
+        "visual",
+        "Use only atmosphere, colors, materials, camera language and lighting as inspiration."
       ],
-      "title": "Vision Reference"
+      "title": "Reference"
+    },
+    {
+      "id": 60,
+      "type": "CcCKrea2EditPromptCreator",
+      "pos": [
+        1020,
+        550
+      ],
+      "size": [
+        560,
+        680
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 16
+        },
+        {
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "created_prompt",
+          "type": "STRING",
+          "links": [
+            19,
+            20
+          ]
+        },
+        {
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "links": [
+            18
+          ]
+        },
+        {
+          "name": "creator_info",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "thinking",
+          "type": "STRING",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2EditPromptCreator"
+      },
+      "widgets_values": [
+        "create_from_image_t2i",
+        "Use the image as visual guidance. Derive the visual style, lighting, mood, materials, composition, and important details from it. Describe one coherent final image with concrete visible details.",
+        true,
+        4096,
+        0.25,
+        0.9,
+        73629
+      ],
+      "title": "Prompt Creator — image to T2I prompt"
+    },
+    {
+      "id": 61,
+      "type": "CcCKrea2LoRAStack",
+      "pos": [
+        380,
+        500
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2LoRAStack",
+        "models": [
+          {
+            "name": "Krea2/krea2_identity_edit_v1_2.safetensors",
+            "url": "https://huggingface.co/conradlocke/krea2-identity-edit/resolve/main/Krea2/krea2_identity_edit_v1_2.safetensors",
+            "directory": "loras",
+            "hash": "6adf9a69cc9502d286db7b69964d37da7e9cfe4b05b4d004bc275f087d3fd3cf",
+            "hash_type": "SHA256"
+          },
+          {
+            "name": "Krea2/krea2_bodyswap_v1.safetensors",
+            "url": "https://huggingface.co/Alissonerdx/BFS-Best-Face-Swap/resolve/main/Krea2/krea2_bodyswap_v1.safetensors",
+            "directory": "loras",
+            "hash": "0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79",
+            "hash_type": "SHA256"
+          }
+        ]
+      },
+      "widgets_values": [
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1
+      ],
+      "title": "Optional LoRA Stack — disabled"
+    },
+    {
+      "type": "PreviewAny",
+      "pos": [
+        1940,
+        540
+      ],
+      "size": [
+        390,
+        240
+      ],
+      "flags": {},
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "id": 62,
+      "title": "Generated prompt",
+      "order": 14
+    },
+    {
+      "type": "PreviewAny",
+      "pos": [
+        1940,
+        830
+      ],
+      "size": [
+        390,
+        240
+      ],
+      "flags": {},
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "id": 63,
+      "title": "Thinking",
+      "order": 15
     }
   ],
   "links": [
-    [
-      1,
-      1,
-      0,
-      4,
-      0,
-      "MODEL"
-    ],
     [
       2,
       2,
@@ -617,12 +832,68 @@
       "IMAGE"
     ],
     [
-      13,
+      14,
+      1,
+      0,
+      61,
+      0,
+      "MODEL"
+    ],
+    [
+      15,
+      61,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      16,
+      2,
+      0,
+      60,
+      0,
+      "CLIP"
+    ],
+    [
+      17,
       12,
       0,
+      60,
+      1,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      18,
+      60,
+      1,
       4,
       2,
       "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      19,
+      60,
+      0,
+      4,
+      3,
+      "STRING"
+    ],
+    [
+      20,
+      60,
+      0,
+      62,
+      0,
+      "STRING"
+    ],
+    [
+      21,
+      60,
+      3,
+      63,
+      0,
+      "STRING"
     ]
   ],
   "groups": [
@@ -677,5 +948,14 @@
       "color": "#3f789e"
     }
   ],
-  "version": 0.4
+  "version": 0.4,
+  "extra": {
+    "ds": {
+      "scale": 0.42,
+      "offset": [
+        310,
+        220
+      ]
+    }
+  }
 }

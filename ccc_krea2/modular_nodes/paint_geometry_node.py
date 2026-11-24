@@ -10,7 +10,6 @@ from ..constants import NODE_CATEGORY
 from ..krea_geometry import KREA_PRESET_GEOMETRIES
 
 
-GEOMETRY_MODES = ("pad", "crop")
 PADDING_FILLS = ("edge", "reflect", "neutral", "white")
 HORIZONTAL_POSITIONS = ("center", "left", "right")
 VERTICAL_POSITIONS = ("center", "top", "bottom")
@@ -113,27 +112,29 @@ def _pad_mask(
     return canvas
 
 
-def _select_krea_geometry(width: int, height: int, mode: str) -> Tuple[int, int]:
+def _select_krea_geometry(width: int, height: int) -> Tuple[int, int]:
+    """Choose a supported Krea canvas that fully contains the source."""
     source_ratio = width / float(height)
-    candidates = []
-    for candidate_w, candidate_h in sorted(set(KREA_PRESET_GEOMETRIES.values())):
-        if mode == "pad" and candidate_w >= width and candidate_h >= height:
-            candidates.append((candidate_w, candidate_h))
-        elif mode == "crop" and candidate_w <= width and candidate_h <= height:
-            candidates.append((candidate_w, candidate_h))
+    candidates = [
+        (candidate_w, candidate_h)
+        for candidate_w, candidate_h in set(KREA_PRESET_GEOMETRIES.values())
+        if candidate_w >= width and candidate_h >= height
+    ]
     if not candidates:
-        if mode == "crop":
-            raise ValueError("[Krea2 CcC Paint Geometry] crop is not possible: the working image is smaller than every compatible Krea target geometry. Use padding.")
-        if mode == "pad":
-            raise ValueError("[Krea2 CcC Paint Geometry] padding is not possible: the working image exceeds the available Krea target size on at least one axis. Use crop.")
-        raise ValueError(f"[Krea2 CcC Paint Geometry] Invalid geometry mode '{mode}'.")
+        raise ValueError(
+            "[Krea2 CcC Paint Geometry] Image exceeds all supported Krea canvas "
+            "geometries. Resize the source before Paint Prepare, or reduce the "
+            "requested outpaint expansion."
+        )
 
-    def score(geometry: Tuple[int, int]) -> Tuple[float, float]:
+    def score(geometry: Tuple[int, int]) -> Tuple[int, float]:
         candidate_w, candidate_h = geometry
-        ratio = candidate_w / float(candidate_h)
-        ratio_error = abs((ratio / source_ratio) - 1.0)
-        size_error = abs(candidate_w - width) / float(max(1, width)) + abs(candidate_h - height) / float(max(1, height))
-        return ratio_error, size_error
+        # Paint preserves source pixels without resizing. Minimize the unused
+        # canvas first; matching the aspect ratio at the price of a much larger
+        # padded canvas makes inpainting context needlessly sparse.
+        added_area = candidate_w * candidate_h - width * height
+        ratio_error = abs((candidate_w / float(candidate_h)) / source_ratio - 1.0)
+        return added_area, ratio_error
 
     return min(candidates, key=score)
 
@@ -142,7 +143,6 @@ def prepare_paint_geometry(
     image: torch.Tensor,
     mask: Optional[torch.Tensor],
     *,
-    geometry_mode: str,
     padding_fill: str,
     horizontal_position: str,
     vertical_position: str,
@@ -155,8 +155,6 @@ def prepare_paint_geometry(
         raise ValueError("[Krea2 CcC Paint Geometry] IMAGE must be [B,H,W,C] with at least 3 channels.")
     if min(expand_left, expand_top, expand_right, expand_bottom) < 0:
         raise ValueError("[Krea2 CcC Paint Geometry] Canvas expansion cannot be negative.")
-    if geometry_mode not in GEOMETRY_MODES:
-        raise ValueError(f"[Krea2 CcC Paint Geometry] Invalid geometry_mode '{geometry_mode}'. Expected one of: {', '.join(GEOMETRY_MODES)}.")
     if padding_fill not in PADDING_FILLS:
         raise ValueError(f"[Krea2 CcC Paint Geometry] Invalid padding_fill '{padding_fill}'.")
     if horizontal_position not in HORIZONTAL_POSITIONS:
@@ -205,73 +203,55 @@ def prepare_paint_geometry(
     base_mask = torch.maximum(base_user_mask, base_expansion_mask)
     base_h, base_w = base_image.shape[1:3]
 
-    target_w, target_h = _select_krea_geometry(base_w, base_h, geometry_mode)
+    target_w, target_h = _select_krea_geometry(base_w, base_h)
 
-    if geometry_mode == "pad":
-        pad_left, pad_right = _axis_split(target_w - base_w, horizontal_position)
-        pad_top, pad_bottom = _axis_split(target_h - base_h, vertical_position)
-        working_image = _pad_image(
-            base_image,
-            base_mask,
-            left=pad_left,
-            top=pad_top,
-            right=pad_right,
-            bottom=pad_bottom,
-            fill=padding_fill,
-        )
-        working_user_mask = _pad_mask(
-            base_user_mask,
-            left=pad_left,
-            top=pad_top,
-            right=pad_right,
-            bottom=pad_bottom,
-            fill_value=0.0,
-        )
-        working_expansion_mask = _pad_mask(
-            base_expansion_mask,
-            left=pad_left,
-            top=pad_top,
-            right=pad_right,
-            bottom=pad_bottom,
-            fill_value=0.0,
-        )
-        working_krea_padding_mask = _pad_mask(
-            torch.zeros_like(base_mask),
-            left=pad_left,
-            top=pad_top,
-            right=pad_right,
-            bottom=pad_bottom,
-            fill_value=1.0,
-        )
-        working_mask = torch.maximum(
-            torch.maximum(working_user_mask, working_expansion_mask),
-            working_krea_padding_mask,
-        )
-        transform = {
-            "pad_left": int(pad_left),
-            "pad_top": int(pad_top),
-            "pad_right": int(pad_right),
-            "pad_bottom": int(pad_bottom),
-        }
-    else:
-        crop_left, _ = _axis_split(base_w - target_w, horizontal_position)
-        crop_top, _ = _axis_split(base_h - target_h, vertical_position)
-        y_slice = slice(crop_top, crop_top + target_h)
-        x_slice = slice(crop_left, crop_left + target_w)
-        working_image = base_image[:, y_slice, x_slice, :]
-        working_user_mask = base_user_mask[:, y_slice, x_slice]
-        working_expansion_mask = base_expansion_mask[:, y_slice, x_slice]
-        working_krea_padding_mask = torch.zeros_like(working_user_mask)
-        working_mask = torch.maximum(working_user_mask, working_expansion_mask)
-        transform = {
-            "crop_x": int(crop_left),
-            "crop_y": int(crop_top),
-            "crop_width": int(target_w),
-            "crop_height": int(target_h),
-        }
-
+    pad_left, pad_right = _axis_split(target_w - base_w, horizontal_position)
+    pad_top, pad_bottom = _axis_split(target_h - base_h, vertical_position)
+    working_image = _pad_image(
+        base_image,
+        base_mask,
+        left=pad_left,
+        top=pad_top,
+        right=pad_right,
+        bottom=pad_bottom,
+        fill=padding_fill,
+    )
+    working_user_mask = _pad_mask(
+        base_user_mask,
+        left=pad_left,
+        top=pad_top,
+        right=pad_right,
+        bottom=pad_bottom,
+        fill_value=0.0,
+    )
+    working_expansion_mask = _pad_mask(
+        base_expansion_mask,
+        left=pad_left,
+        top=pad_top,
+        right=pad_right,
+        bottom=pad_bottom,
+        fill_value=0.0,
+    )
+    working_krea_padding_mask = _pad_mask(
+        torch.zeros_like(base_mask),
+        left=pad_left,
+        top=pad_top,
+        right=pad_right,
+        bottom=pad_bottom,
+        fill_value=1.0,
+    )
+    # Geometry-only padding must remain known context, not become another
+    # inpaint/outpaint region. Only user masks and explicitly requested canvas
+    # expansion are generated; temporary padding is discarded by Restore.
+    working_mask = torch.maximum(working_user_mask, working_expansion_mask)
+    transform = {
+        "pad_left": int(pad_left),
+        "pad_top": int(pad_top),
+        "pad_right": int(pad_right),
+        "pad_bottom": int(pad_bottom),
+    }
     context: Dict[str, Any] = {
-        "mode": geometry_mode,
+        "mode": "pad",
         "padding_fill": padding_fill,
         "horizontal_position": horizontal_position,
         "vertical_position": vertical_position,
@@ -301,7 +281,7 @@ def prepare_paint_geometry(
     return context, working_image, working_mask
 
 
-def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any], generated_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any]) -> torch.Tensor:
     if not isinstance(paint_geometry, dict):
         raise ValueError("[Krea2 CcC Paint Restore] paint_geometry is invalid.")
     if image.ndim != 4 or image.shape[-1] < 3:
@@ -313,57 +293,35 @@ def restore_paint_geometry(image: torch.Tensor, paint_geometry: Dict[str, Any], 
     if not torch.is_tensor(base_image):
         raise ValueError("[Krea2 CcC Paint Restore] geometry context is missing base_image.")
 
-    if mode == "pad":
-        left = int(transform.get("pad_left", 0))
-        top = int(transform.get("pad_top", 0))
-        base_w = int(paint_geometry["base_width"])
-        base_h = int(paint_geometry["base_height"])
-        return image[:, top:top + base_h, left:left + base_w, :].clamp(0.0, 1.0)
+    if mode != "pad":
+        raise ValueError(f"[Krea2 CcC Paint Restore] Unsupported geometry mode '{mode}'; only pad is supported.")
+    left = int(transform.get("pad_left", 0))
+    top = int(transform.get("pad_top", 0))
+    base_w = int(paint_geometry["base_width"])
+    base_h = int(paint_geometry["base_height"])
+    return image[:, top:top + base_h, left:left + base_w, :].clamp(0.0, 1.0)
 
-    if mode == "crop":
-        x = int(transform["crop_x"])
-        y = int(transform["crop_y"])
-        width = int(transform["crop_width"])
-        height = int(transform["crop_height"])
-        restored = base_image.to(device=image.device, dtype=image.dtype).clone()
-        generated = image[:, :height, :width, :3].clamp(0.0, 1.0)
-        if generated_mask is None:
-            alpha = torch.ones((generated.shape[0], height, width, 1), device=generated.device, dtype=generated.dtype)
-        else:
-            alpha = generated_mask
-            if alpha.ndim == 2:
-                alpha = alpha.unsqueeze(0)
-            if alpha.ndim != 3:
-                raise ValueError("[Krea2 CcC Paint Restore] generated_mask must be [B,H,W].")
-            if alpha.shape[1:] != (height, width):
-                import torch.nn.functional as F
-                alpha = F.interpolate(alpha.unsqueeze(1).float(), size=(height, width), mode="bilinear", align_corners=False).squeeze(1)
-            alpha = alpha.to(device=generated.device, dtype=generated.dtype).clamp(0.0, 1.0).unsqueeze(-1)
-        original_region = restored[:, y:y + height, x:x + width, :3]
-        restored[:, y:y + height, x:x + width, :3] = original_region * (1.0 - alpha) + generated * alpha
-        return restored.clamp(0.0, 1.0)
-
-    raise ValueError(f"[Krea2 CcC Paint Restore] Unknown geometry mode '{mode}'.")
 
 
 class CcCKrea2PaintRestore:
-    """Restore a Paint result from temporary Krea pad/crop geometry."""
+    """Restore a Paint result by removing temporary Krea padding."""
 
     CATEGORY = NODE_CATEGORY
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = "restore"
     DESCRIPTION = (
-        "Restores Paint output to the requested native canvas. Pad mode removes only temporary "
-        "Krea padding. Crop mode composites the generated crop back into the preserved native canvas."
+        "Removes temporary Krea padding while preserving the requested inpaint/outpaint canvas."
     )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {"image": ("IMAGE",), "paint_geometry": ("KREA2_PAINT_GEOMETRY",)},
-            "optional": {"generated_mask": ("MASK",)},
         }
 
     def restore(self, image, paint_geometry, generated_mask=None):
-        return (restore_paint_geometry(image, paint_geometry, generated_mask),)
+        # Compatibility with queued / previously saved workflows that still
+        # submit the removed crop-only socket. Pad restoration does not use it.
+        del generated_mask
+        return (restore_paint_geometry(image, paint_geometry),)

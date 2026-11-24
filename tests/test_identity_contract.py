@@ -184,3 +184,35 @@ def test_vision_reference_fixed_semantic_visual_style_context_behavior():
     assert context.appearance_reference is False
 
 
+
+
+
+def test_visual_only_reference_annotation_does_not_leak_internal_labels():
+    class VisualOnlySpec:
+        include_in_vision = False
+        appearance_reference = True
+        alias = "This reference defines the clothing."
+        reference_path = "edit"
+
+    text = build_grounded_positive_user_content(
+        [{"spec": VisualOnlySpec(), "vae_reference_frame": 2}],
+        "Recreate the outfit.",
+    )
+    assert "VAE/RoPE" not in text
+    assert "This reference defines the clothing." in text
+    assert text.endswith("Recreate the outfit.")
+    assert VISION_PAD_TOKEN not in text
+
+
+def test_visual_only_unannotated_reference_adds_no_prompt_text():
+    class VisualOnlySpec:
+        include_in_vision = False
+        appearance_reference = True
+        alias = ""
+        reference_path = "edit"
+
+    text = build_grounded_positive_user_content(
+        [{"spec": VisualOnlySpec(), "vae_reference_frame": 1}],
+        "Change the outfit.",
+    )
+    assert text == "Change the outfit."

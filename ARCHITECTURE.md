@@ -1,10 +1,20 @@
 # Architecture
 
+## Unified Krea2 CcC Reference
+
+Node ID: `CcCKrea2Reference`. This is the recommended reference node for new workflows.
+
+The required inputs start with `image`, then `vae_rope_enable` and its `vae_rope_*` controls, followed by `vision_enable`, `vision_weight`, resize, mode and optional instruction. Optional inputs are `previous_references` and `mask_attention`. Disabled groups are ignored. At least one path must be enabled.
+
+The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
+
+Visual and Vision classes are internal helpers of the registered unified Reference; their old standalone node IDs are not public. Migrating saved workflows is explicit.
+
 ## Public Surface
 
-**Current code contract:** the 14 registered nodes are authoritative; old workflow JSON files have deliberately not been migrated.
+**Current code contract:** the registered node mappings in `ccc_krea2/nodes.py` are authoritative; examples in `workflows/` demonstrate supported configurations.
 
-The current package registers **14 public nodes**:
+The package exposes these principal nodes:
 
 ~~~text
 Edit:
@@ -16,7 +26,8 @@ Edit:
   Krea2 CcC Edit
 
 Utility:
-  Krea2 CcC Character Sheet
+  Krea2 CcC Layout Cell
+  Krea2 CcC Layout Composer
 
 Paint:
   Krea2 CcC Paint Prepare
@@ -32,9 +43,9 @@ LoRA / T2I:
 
 The Reference Cache implementation was removed. There is no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
 
-## Single Edit Runtime
+## Edit Runtime (Joint or Experimental K/V)
 
-Krea2 CcC Edit has one edit execution path.
+Krea2 CcC Edit exposes a default-off `use_kv_reference` toggle. The existing joint reference attention remains the default; enabling the toggle selects the isolated t=0 K/V path derived from Paint. Both paths consume the same Qwen grounding, prepared appearance references, Boosts, attention masks and RoPE placement.
 
 ~~~text
 IMAGE --> Visual Reference --> Vision Reference --> Visual Reference
@@ -43,7 +54,6 @@ IMAGE --> Visual Reference --> Vision Reference --> Visual Reference
                                                       |
                                                       v
                                                 Edit.references
-Latent.target_image --> MASK editor --> Visual Reference.target_attention_mask
 Latent -------------------------------> Edit.latent
 Size Resolver ---------> Latent
 ~~~
@@ -77,24 +87,17 @@ Visible downstream references are named Image N. The final-output sanitizer remo
 
 reference_edit_image is visible to the Creator only unless the user separately wires that image into another existing path. The final prompt therefore verbalizes useful scene details instead of referring to the hidden image itself.
 
-### Character Sheet
+### Image Layout
 
-Character Sheet is a deterministic IMAGE utility before Visual Reference:
+The layout utility uses a chain of independent cells and a final composer:
 
 ~~~text
-portrait/body IMAGE inputs
-        |
-        v
-Character Sheet
-  preserve aspect
-  fit complete source
-  no crop/stretch
-        |
-        v
-normal Visual Reference
+IMAGE --> Layout Cell --> Layout Cell --> Layout Cell --> Layout Composer --> IMAGE
+                shared KREA2_LAYOUT_CHAIN
 ~~~
 
-It does not run Qwen, VAE, conditioning, or latent processing.
+Each cell declares a row/column or a full row/column, fit mode, alignment and signed offsets. The composer resolves Krea preset dimensions, padding and gaps before composing, rejecting overlapping or unfilled grid cells. This replaces the former sheet-specific utility.
+
 
 ## Visual Reference: Two Independent Representations
 
@@ -114,35 +117,38 @@ source image
           reference latent
           boost
           RoPE placement
-          optional target attention scope
+          source reference masks / regional Boost
 ~~~
 
 The Qwen copy does not need to match target pixel geometry. Appearance preparation resolves against the target geometry before VAE encoding.
 
 The positive branch uses configured reference boosts. The grounded negative branch uses the same appearance-image vision blocks, fixed empty negative text, no role annotation text, and neutral boost 1.0.
 
-### Attention masks owned by Visual Reference
+### Reference-side attention masks
 
-- `reference_boost_mask`: optional MASK on the source reference image. It follows the exact same pixel crop/resize as the reference before VAE encoding. Its selected tokens receive the configured reference `boost`.
-- `target_attention_mask`: optional MASK on `Latent.target_image`, i.e. the final target canvas, **after** all content-fit geometry. Edit rejects wrong target dimensions instead of silently warping the mask.
-- `attention_scope=global`: boost from all target queries to selected source tokens.
-- `attention_scope=boost in mask`: boost only from target queries selected by the target mask.
-- `attention_scope=only in mask`: also deny direct target queries outside the target mask from attending to this reference.
-
-Each Visual Reference carries both optional masks in its own chain entry, so no independent mask ordering, separate Attention Region node or tag lookup exists. The source and target masks are downsampled to the actual reference/target DiT token grids in the attention computation; **latents are never refit after VAE**. Masks are batched independently.
+`reference_boost_mask` is optional and selects source tokens to which the
+VAE/RoPE Boost applies. In the unified Reference, the `mask_attention`
+chain can override the reference Boost regionally, with the latest mask
+taking precedence. Areas outside the masks keep the Reference's Boost.
+There is no target-attention mask or attention-scope mode.
 
 ## Vision Reference
 
-Vision References declare Qwen/Vision information and do not create appearance latents. The declaration is consumer-neutral:
+Vision Reference has only two presets: **Visual** and **Semantic**. Both are
+encoded multimodally by the same Qwen processor, using the same image preparation
+and optionally supplied free-form `instruction`.
 
-- **Semantic** -> content/meaning, pose/action, objects, composition, and spatial relationships.
-- **Visual** -> near-copy/full visual blueprint. Balanced/Detailed treat pose, gaze, framing, composition, appearance, and subject count as anchors; Flexible may adapt pose/composition but never duplicates or multiplies subjects.
-- **Style** -> exact legacy Visual guidance behavior, retained because that preset produced the desired style-transfer result; the resulting guidance is applied strongly as the dominant visual treatment; only this mode exposes full / 2x2 / 4x4 processing.
-- **Context** -> mandatory scene staging: environment, viewpoint/framing, exact pose and limb placement, head orientation, gaze target, gesture, action/interaction, object placement, composition, crop, depth, and spatial relationships are treated as constraints without copying identity, clothing, or style.
+- **Visual** retains the image's encoded visual rows.
+- **Semantic** removes those image rows from the final conditioning tensor,
+  retaining the encoded text rows.
 
-Vision Reference has no public grounding or fidelity control. It carries Qwen text-guidance generation configuration used by the T2I Vision adapter for Semantic, Visual, Style, and Context. Guidance Detail changes extraction depth, not only token ceiling, and Vision Guidance intentionally uses widely separated conservative/balanced/flexible sampling presets. The consumer still owns how the declared information is transformed into conditioning.
-
-The public Latent node, not the retired legacy target builder, owns target geometry. The runtime receives only the sampling latent and current reference metadata; no disabled target-vision-context path is transported. Masks belong to individual Visual References and must be painted at the final target dimensions.
+Neither preset uses a hidden system directive, extracts descriptive text with
+`clip.generate`, or appends generated guidance to the positive prompt.
+Instructions are added as Image N guidance only if nonempty; an empty instruction
+adds nothing. Other than image-row retention the pipeline is identical.
+VAE/RoPE image conditioning remains a separate mechanism and is not removed
+by choosing Semantic. Previously saved Style, Context, Reference and internal
+mode identifiers require explicit workflow migration.
 
 ## Target Geometry
 
@@ -169,11 +175,13 @@ Visual Reference `semantic_grounding_px` and Latent `latent_grounding_px` use a 
 
 Appearance reference latents are attached to CONDITIONING together with reference fit, positive boost, neutral negative boost, RoPE placement, optional target region, and target attention scope.
 
-The Edit runtime executes one in-context sequence:
+With `use_kv_reference=false`, Edit executes the existing joint in-context sequence:
 
 ~~~text
 [text | reference 1 | reference 2 | ... | target]
 ~~~
+
+With `use_kv_reference=true`, each reference is encoded through independent t=0 attention to create per-layer K/V; the sampling pass contains `[text | target]` queries that can attend to cached reference keys/values. The K/V branch preserves Edit's per-reference Boost, regional masks, and RoPE coordinates through an additive target-to-reference attention bias. Reference isolation is intrinsic to K/V. This experimental path is not an identity/fidelity guarantee.
 
 ## Paint
 
@@ -185,7 +193,7 @@ source IMAGE + MASK + VAE
         v
 Paint Prepare
   explicit outpaint expansion
-  pad/crop to curated Krea working geometry
+  pad to curated Krea working geometry
   no source resize
   fill holes / grow / feather
   semantic reference
@@ -201,24 +209,23 @@ KSampler -> VAE Decode                            |
         +------------------> Paint Restore <--------+
 ~~~
 
-Paint Prepare uses internal geometry helpers but exposes the geometry controls directly. pad chooses a curated Krea geometry that contains the requested canvas; crop chooses one that fits inside it. Impossible directions fail rather than resizing the known source.
+Paint Prepare neutralizes selected pixels in the semantic visual reference for Qwen and t=0 K/V; the sampling latent encodes the known canvas, following AnyPaint. A conservative binary token-level `noise_mask` instructs KSampler to regenerate entire affected 2x2 DiT patches rather than partially preserving source content.
+
+Paint Prepare uses internal padding geometry helpers to choose a curated Krea working canvas that contains the requested image. If the source exceeds all supported Krea geometries, it fails with a resize instruction instead of cropping source content.
 
 Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas and is removed by Restore.
 
 Paint consumes KREA2_PAINT_CONTEXT. It grounds Qwen with the prepared semantic reference, attaches the pre-encoded appearance reference, and installs the Paint runtime. Its kv_cache switch is an internal runtime K/V optimization; it is not the removed public Reference Cache feature.
 
-Paint Restore uses paint_geometry from Paint Prepare:
-
-- pad: remove temporary Krea padding only.
-- crop: composite the decoded generated crop back at the exact original coordinates; optional generated_mask limits replacement to the generated/feathered region.
+Paint Restore uses paint_geometry from Paint Prepare to remove temporary Krea padding. It does not expose the removed crop-only generated_mask input.
 
 ## LoRA and T2I
 
 LoRA Stack and LoRA Stack Sliders each apply 10 MODEL-only LoRAs. LoRA Stack with Prompt applies 5 MODEL-only LoRAs and emits optional positive prompt augmentation.
 
-Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns the unchanged MODEL plus conditioning and LATENT. Its Vision adapter uses Qwen multimodal generation as an analysis step for Semantic, Visual, Style, and Context, then converts that analysis into text-only Krea conditioning. Direct Qwen vision rows are deliberately not used in T2I because the attempted direct transport was unsafe with the T2I conditioning path. The explicit negative prompt remains text-only.
+Text to Image consumes optional prompt_augmentation and optional references, resolves its empty latent through the shared Krea geometry library, and returns unchanged MODEL plus conditioning and LATENT. Visual retains Qwen image rows; Semantic removes them after the same multimodal encoding. Neither mode generates analysis text. A nonempty user instruction is passed as Qwen image guidance. The explicit negative prompt remains text-only.
 
-The checked-in `workflows/06_text_to_image.json` demonstrates the direct runtime path:
+The checked-in `workflows/01_creative_generation.json` demonstrates the T2I runtime path, with Prompt Creator and an optional LoRA Stack upstream:
 
 ~~~text
 Vision Reference ----+

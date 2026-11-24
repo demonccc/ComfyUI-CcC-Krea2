@@ -1,18 +1,20 @@
 # ComfyUI-Krea-CcC Nodes
 
-This document describes the **14 public nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
+This document describes the **15 registered nodes registered in ccc_krea2/nodes.py**. Internal helper classes and modules are intentionally excluded.
 
 ## Public Node Inventory
 
 | Display name | Node id |
 | --- | --- |
-| Krea2 CcC Visual Reference | CcCKrea2VisualReference |
-| Krea2 CcC Vision Reference | CcCKrea2VisionReference |
+| Krea2 CcC Reference | CcCKrea2Reference |
+| Visual Reference helper (internal) | CcCKrea2VisualReference |
+| Vision Reference helper (internal) | CcCKrea2VisionReference |
 | Krea2 CcC Size Resolver | CcCKrea2SizeResolver |
 | Krea2 CcC Latent | CcCKrea2Latent |
 | Krea2 CcC Edit Prompt Creator | CcCKrea2EditPromptCreator |
 | Krea2 CcC Edit | CcCKrea2Edit |
-| Krea2 CcC Character Sheet | CcCKrea2CharacterSheet |
+| Krea2 CcC Layout Cell | CcCKrea2LayoutCell |
+| Krea2 CcC Layout Composer | CcCKrea2LayoutComposer |
 | Krea2 CcC Paint Prepare | CcCKrea2PaintPrepare |
 | Krea2 CcC Paint | CcCKrea2Paint |
 | Krea2 CcC Paint Restore | CcCKrea2PaintRestore |
@@ -23,6 +25,16 @@ This document describes the **14 public nodes registered in ccc_krea2/nodes.py**
 
 The Reference Cache implementation has been removed. There are no cache nodes and no public Krea2 CcC Paint Geometry node.
 
+## Unified Krea2 CcC Reference
+
+Node ID: `CcCKrea2Reference`. This is the recommended reference node for new workflows.
+
+The required inputs start with `image`, then `vae_rope_enable` and the `vae_rope_*` controls, followed by `vision_enable`, `vision_weight`, resize, mode, and optional instruction. Optional inputs are `previous_references` and `mask_attention`. Disabled groups are ignored. At least one path must be enabled.
+
+The Visual path produces an appearance/VAE entry with no automatic Qwen participation. The Vision path produces Visual or Semantic Qwen conditioning without any VAE appearance entry. Both paths can operate on the same source image, appended in Visual-then-Vision order to a shared `KREA2_REFERENCE_CHAIN`. This is compatible with Edit's existing separate spatial LoRA reference mechanism and Qwen conditioning interfaces, but Vision fidelity requires live sampling tests.
+
+Standalone Visual and Vision classes remain internal helpers and are not independently registered. Saved workflows must use the unified Reference and valid Vision modes.
+
 ## Krea2 CcC Visual Reference
 
 Declares one ordered appearance reference.
@@ -32,7 +44,7 @@ Required controls:
 | Control | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | image | IMAGE | — | Source reference. |
-| boost | 0..10 | 1.0 | Positive target-to-reference attention boost. |
+| boost | -5.0..+5.0, step 0.1 | 0.0 | Signed boost: multiplier `10^(boost/5)`; -5 blocks, 0 neutral (1×), +5 amplifies to 10×. |
 | reference_fit | native, crop, contain, fit | native | Appearance/VAE pixel fit. |
 | placement_grid | inside, outside | inside | RoPE placement grid; crop forces inside. Outside + center + center is invalid. |
 | grid_horizontal_position | center, left, right | center | Horizontal RoPE/grid position. |
@@ -44,13 +56,8 @@ Required controls:
 | semantic_resize | boolean | true | Downscale Qwen image only when above the cap. |
 | semantic_grounding_px | 32..4096, step 32 | 768 | Qwen longest-edge cap. |
 | prompt_annotation | text | empty | Role-only Image N annotation. |
-| attention_scope | global, boost in mask, only in mask | global | Scope on the prepared target; no tags. |
 
-Optional inputs: `previous_references`, `reference_boost_mask` (MASK on the original reference, transformed alongside the image), and `target_attention_mask` (MASK drawn on the final target canvas, required for regional attention). Each Visual Reference owns both masks; no separate tags or mask ordering is needed.
-
-`global` applies boost to selected reference tokens from the entire target; `boost in mask` limits the boost to white pixels in the target mask; `only in mask` additionally blocks direct target-to-reference attention outside the target mask. `reference_boost_mask` limits boost to selected reference tokens and combines with the target mask when both are connected.
-
-Masks must be aligned to their own images: `reference_boost_mask` must match the original Visual Reference image pixel dimensions; `target_attention_mask` must match the final `Latent.target_image` dimensions. ComfyUI MASK inputs accept one mask shared by the batch or one per item. Mismatched sizes raise an error, not an implicit resize. The source mask follows the reference's crop/resize **before** VAE; at runtime both masks are projected to the DiT token grids using area reduction and a >0.5 threshold. `only in mask` restricts *direct attention*, not image editing/pixel preservation (use Paint for inpainting).
+Reference exposes `mask_attention` for ordered regional Boost masks. Every masked region replaces the global Boost in its selected pixels; later overlapping regions take priority. `Krea2 CcC Mask` has `invert` (BOOLEAN, default `false`): when enabled, it inverts the normalized SAM/external mask before applying that region's Boost and before updating the mask union, `mask_attention`, and `composite_image`. The returned IMAGE remains unmodified. `unload_sam_model` is the final control after `composite_color` and `invert`. The mask follows the reference image through VAE geometry. `reference_boost_mask` and the earlier target-attention-scope controls have been removed.
 
 Output: `references` (`KREA2_REFERENCE_CHAIN`).
 
@@ -65,37 +72,32 @@ Qwen preparation is independent from appearance/VAE fit. Image resizing uses bic
 
 prompt_annotation is identification only, for example: This is the subject image. Edit instructions belong in Edit's positive_prompt.
 
-The positive branch uses the configured boost. The grounded negative branch uses the same appearance-image vision blocks with no role annotation text, fixed empty negative text, and neutral boost 1.0.
+The positive branch uses the configured boost. The grounded negative branch uses the same appearance-image vision blocks with no role annotation text, fixed empty negative text, and neutral boost 0.0.
 
 ## Krea2 CcC Vision Reference
 
-Adds one Qwen/Vision-only reference. It never creates an appearance VAE latent.
+Adds a Qwen-only reference without an appearance VAE latent. There are **only
+two modes**:
 
 | Control | Values | Default | Meaning |
 | --- | --- | --- | --- |
-| image | IMAGE | — | Source image shown to Qwen Vision. |
-| mode | semantic, visual, style, context | semantic | Chooses what the reference contributes. |
-| instruction | text | empty | Optional extra instruction for this reference. |
-| style_processing | full, 2x2, 4x4 | full | Used only by Style; all other modes force full. |
-| guidance_seed_mode | fixed, incremental, random | fixed | Seed behavior for Qwen text guidance generation. |
-| guidance_seed | integer | 0 | Base/fixed Qwen guidance seed; editable only in fixed mode. |
-| guidance_detail | compact, balanced, detailed | balanced | Extraction-depth policy plus max-length budget: compact keeps only highest-impact facts (256), balanced keeps major + secondary facts (512), detailed is exhaustive within the selected mode (1024). |
-| vision_guidance | conservative, balanced, flexible | balanced | Qwen sampling preset. Conservative = temp 0.05 / top_p 0.70 / top_k 32 / min_p 0.10; balanced = 0.25 / 0.90 / 64 / 0.05; flexible = 0.70 / 0.99 / 128 / 0.01. |
+| image | IMAGE | — | Image provided to Qwen for multimodal encoding. |
+| mode | visual, semantic | visual | Visual keeps image rows; Semantic drops image rows after multimodal encoding. |
+| instruction | text | empty | Free user instruction for Qwen. Omitted entirely when empty. |
+| weight | 0.0..2.0 | 1.0 | Multiplier for retained Visual image rows only. |
 | previous_references | KREA2_REFERENCE_CHAIN | optional | Previous mixed reference chain. |
 
-Outputs:
+Outputs: `references` and `vision_info`.
 
-- `references` (`KREA2_REFERENCE_CHAIN`)
-- `vision_info` (`STRING`) with consumer-neutral declaration metadata including mode, processing, Qwen guidance preset/seed, source resolution, and chain size.
+Both modes use the **same image preparation**, Qwen encoder, and user-provided
+instruction, without hidden prompts or preset-dependent guidance generation.
+Neither mode invokes `clip.generate()` or appends an automatically generated
+description to Edit/T2I's positive prompt. Semantic removes its image rows from
+the final conditioning tensor; the Qwen-encoded text rows remain. The general
+reference VAE/RoPE path is independent of this selection.
 
-Vision Reference defines information semantics rather than a transport algorithm:
-
-- **Semantic**: content/meaning, pose, action, objects, composition, and spatial relationships.
-- **Visual**: near-copy/full visual blueprint. Balanced/Detailed strongly anchor pose, gaze, framing, composition, and appearance; Flexible may adapt pose/composition while retaining visual identity. Subject count is always locked and must not be expanded into clones, variants, panels, or repeated subjects.
-- **Style**: intentionally reuses the exact legacy Visual guidance preset that previously produced the desired style-transfer behavior, and its final conditioning explicitly treats that guidance as the dominant visual treatment. Supports full, 2x2, or 4x4 analysis.
-- **Context**: mandatory scene staging including setting, viewpoint, exact pose and limb placement, head orientation, gaze target, gesture, action, interaction, crop/framing, composition, object placement, depth, and spatial relationships while excluding identity, clothing, and visual style.
-
-There is no public `grounding_px` or `fidelity` control. Qwen text-generation settings travel with the Vision Reference and are consumed by T2I's text-guidance adapter for Semantic, Visual, Style, and Context. `guidance_seed` is editable only when `guidance_seed_mode=fixed`; `style_processing` is the only mode-specific control and is enabled only for Style.
+Old mode values including `reference`, `style`, and `context` must be
+migrated explicitly. Outdated saved widgets are not reinterpreted.
 
 ## Krea2 CcC Size Resolver
 
@@ -176,9 +178,8 @@ Required inputs/controls:
 | --- | --- | --- |
 | clip | CLIP | — |
 | references | KREA2_REFERENCE_CHAIN | optional |
-| mode | enhance, create_from_image, create_from_theme, custom | enhance |
-| user_prompt | text | empty |
-| system_prompt | text | enhance preset |
+| mode | enhance_t2i/i2i, create_from_image_t2i/i2i, create_from_theme_t2i/i2i, none | enhance_t2i |
+| instructions | text | empty |
 | thinking | boolean | false |
 | max_tokens | 32..32768, step 32 | 512 |
 | temperature | 0.01..2.0 | 0.25 |
@@ -198,22 +199,18 @@ Outputs:
 
 The first three output slots remain compatible with the earlier node contract; thinking is the fourth output.
 
-### Mode and system_prompt behavior
+### Presets and instructions
 
-- enhance: treats the user's instructions as the authoritative guide and uses available visual context to make the requested final image clearer without changing intent.
-- create_from_image: requires reference_edit_image and treats it as the authoritative visual blueprint for the desired result; the user's instructions decide what should be preserved, changed, emphasized, or adapted. Visual References remain part of the multimodal analysis and keep their Image N mapping; reference_edit_image is an additional internal blueprint image, not a replacement for those references.
-- create_from_theme: treats the user's theme or idea as the authoritative creative direction and uses the available visual context to build a coherent final-image prompt.
-- custom: sends the editable system_prompt exactly as the Qwen system prompt.
+The node exposes six presets from three shared templates. Each family generates either a text-to-image (T2I) or image-to-image (I2I) prompt, replacing only the `{kind}` placeholder:
 
-For enhance, create_from_image, and create_from_theme, the frontend shows the effective preset system_prompt in the text field but keeps it greyed/read-only. Selecting custom enables the same field for editing. When entering custom for the first time, the current preset becomes the starting text; an existing custom value is preserved when switching away and back.
+- `enhance_t2i` / `enhance_i2i`: enrich the instructions while preserving their intent.
+- `create_from_image_t2i` / `create_from_image_i2i`: analyze optional reference images and use the instructions to decide which visual information is relevant and how to use it.
+- `create_from_theme_t2i` / `create_from_theme_i2i`: invent a scene inspired by the instructions.
+- `none`: no preset instruction; the user writes the complete task in `instructions`.
 
-The backend does not trust the visible field for preset modes: it resolves the canonical preset by mode. In custom mode, it requires a non-empty system_prompt.
+There is no editable `system_prompt` textbox and no frontend preset preview or graying. The prompt sent to Qwen is assembled as preset instruction (if selected), `INSTRUCTIONS`, optional neutral `IMAGE MAPPING` (Image 1, Image 2, etc.), and shared `KREA2 PROMPT GUIDELINES`. The guidelines also apply to `none`. The full effective assembled prompt appears on the `creator_info` output.
 
-### Generalist preset behavior
-
-The built-in presets intentionally avoid hard-coding people, clothing, poses, objects, or other content-specific checklists. Prompt Creator analyzes the available visual context and follows the user's request, producing a direct description of the desired final image rather than explaining the edit operation.
-
-For create_from_image, the reference edit image is the primary visual blueprint. The preset does not predefine which visual details are important; relevance is determined by the image and the user's instructions.
+Both Image and Theme families accept references optionally, and do not assign image roles. Enhance remains text-only for prompt analysis; reference chains remain available for downstream Edit.
 
 ### Thinking
 
@@ -253,7 +250,10 @@ Required inputs/controls:
 
 Optional inputs:
 
+- use_kv_reference (BOOLEAN, default false): false keeps the existing joint Edit reference attention; true uses isolated t=0 K/V reference attention with caching, respecting reference Boost, regional masks and RoPE positions. Experimental; not guaranteed to improve fidelity.
+- isolate_references (BOOLEAN, default false): applies to the joint mode. K/V mode isolates reference processing inherently.
 - references (KREA2_REFERENCE_CHAIN)
+- prompt_augmentation (optional)
 
 Outputs:
 
@@ -272,51 +272,18 @@ ordered references
   -> VAE appearance latents
   -> CONDITIONING reference metadata
   -> Krea2 CcC Edit patch/runtime
-  -> [text | references | target]
+  -> use_kv_reference=false: joint [text | references | target]
+  -> use_kv_reference=true: t=0 reference K/V + [text | target]
 ~~~
 
 Negative text is fixed internally to an empty string. Appearance images remain available to the grounded negative pass with neutral boosts.
 
-## Krea2 CcC Character Sheet
+## Krea2 CcC Image Layout
 
-Deterministically composes generic portrait/body IMAGE inputs into one IMAGE.
+`CcCKrea2LayoutCell` accepts an IMAGE and an optional `previous_layout` chain. Set `placement` to `cell`, `full_row`, or `full_column`. Rows/columns start at 1. Crop-only `resize_percent` (integer, 1–1000%, default 100%) proportionally resizes the source before clipping; bicubic antialiasing is used. Fit modes: `contain` scales the complete image proportionally into its slot; `stretch` fills the slot non-proportionally; `crop` clips at native pixel scale; `fit` proportionally covers then clips. All resize operations use bicubic antialiasing. `horizontal_position`, `vertical_position`, `offset_x` and `offset_y` apply only to `crop` and `fit`. Offsets are signed pixel additions to the selected alignment.
 
-Required controls:
+`CcCKrea2LayoutComposer` consumes `KREA2_LAYOUT_CHAIN`, Krea `preset_size`, `padding`, `gap`, and `background_color`. It produces `image` and `layout_info`. Output dimensions are resolved before row/column sizes; whole rows/columns span the occupied grid. Overlaps, gaps, invalid positions or impossible padding raise errors. The sample `workflows/07_scene_composition.json` uses Layout Cells and Composer to prepare a multi-image scene blueprint.
 
-| Control | Values | Default |
-| --- | --- | --- |
-| sheet_type | 9 layouts | 1 portrait |
-| sheet_geometry | same curated Krea presets as Latent | 1024 x 1024 |
-| padding | 0..128 | 8 |
-| outer_margin | 0..128 | 8 |
-| background | white, gray, black | white |
-
-Optional IMAGE inputs:
-
-- portrait_1
-- portrait_2
-- portrait_3
-- portrait_4
-- body_1
-- body_2
-
-Layouts:
-
-- 1 portrait
-- 2 portraits
-- 3 portraits
-- 4 portraits
-- 1 body
-- 2 bodies
-- 1 portrait + 2 bodies
-- 3 portraits + 1 body
-- 4 portraits + 1 body
-
-Output: character_sheet.
-
-Input numbers mean ordering only. Specific camera angles are not required.
-
-Every source is uniformly resized to fit completely inside its slot with preserved aspect ratio. Character Sheet does not crop, cover, stretch, run Qwen, encode VAE, or create a latent.
 
 ## Krea2 CcC Paint Prepare
 
@@ -328,7 +295,6 @@ Required controls:
 | --- | --- | --- |
 | image | IMAGE | — |
 | vae | VAE | — |
-| geometry_mode | pad, crop | pad |
 | padding_fill | edge, reflect, neutral, white | edge |
 | horizontal_position | center, left, right | center |
 | vertical_position | center, top, bottom | center |
@@ -350,11 +316,9 @@ Outputs:
 
 - paint_context
 - latent
-- prepared_image
-- semantic_reference
 - generated_mask
-- keep_mask
 - paint_geometry
+- prepared_image
 - paint_prepare_info
 
 Processing order:
@@ -362,7 +326,7 @@ Processing order:
 ~~~text
 image + mask
  -> explicit outpaint expansion
- -> internal Krea pad/crop geometry
+ -> internal Krea padding geometry
  -> optional fill enclosed holes
  -> signed mask grow/shrink
  -> directional feather
@@ -373,7 +337,13 @@ image + mask
  -> sampling LATENT
 ~~~
 
+For inpainting, Paint Prepare neutralizes selected pixels in the semantic visual reference sent to Qwen and the t=0 K/V reference. The sampling LATENT instead encodes the known image, matching AnyPaint. Its binary token-aligned `noise_mask` determines which 2x2 DiT patch groups are regenerated and which are preserved; partial feather coverage never leaves a token partially preserved. Explicit outpaint expansion remains visible as padding-fill context.
+
+Paint Prepare chooses the smallest supported Krea canvas that contains the source and any requested outpaint expansion; it does not favor an exact aspect match when that would add substantially more temporary padding. `paint_prepare_info` also reports the user/generated mask coverage and how much padding was added.
+
 The known source image is not resized during Paint geometry normalization.
+
+The semantic reference and keep mask are still computed internally and kept in `paint_context`; they are no longer separate node outputs. The remaining image and mask outputs allow visual inspection without redundant sockets.
 
 Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas. paint_geometry carries enough information for Paint Restore to undo only the temporary geometry.
 
@@ -412,17 +382,12 @@ Required inputs:
 - image
 - paint_geometry
 
-Optional input:
-
-- generated_mask
-
 Output:
 
 - image
 
 pad mode removes only temporary Krea padding and preserves explicit user expansion.
 
-crop mode composites the decoded generated crop back at its original coordinates. If generated_mask is provided, only the generated/feathered area replaces the preserved base canvas.
 
 No inverse resize is performed.
 
@@ -438,7 +403,7 @@ Optional input: `prompt_augmentation`, allowing prompt triggers to accumulate ac
 
 Outputs: `model`, `prompt_augmentation`.
 
-Edit and T2I accept `prompt_augmentation` on their own optional inputs. This does not alter Edit's fixed-empty grounded negative prompt.
+Edit, Paint, and T2I accept `prompt_augmentation` on their own optional inputs. This does not alter Edit's fixed-empty grounded negative prompt.
 
 ## Krea2 CcC Lora Stack Sliders
 
@@ -478,20 +443,30 @@ The node applies prompt augmentation and creates an empty SD3-compatible latent 
 
 ## Example Workflows
 
-Examples are historical fixtures and have not been migrated in this cleanup; a workflow referring to the removed Attention Region node will not load as a current graph.
+The seven workflows are in `workflows/` and are ordered from simpler generation to more complex reference-guided editing:
 
-- workflows/01_scene_subject.json — Scene + Subject edit.
-- workflows/02_anypaint_remove_people.json — Paint Prepare -> Paint -> Paint Restore.
-- workflows/03_regional_attention.json — **legacy/incompatible**: still contains the removed `CcCKrea2AttentionRegion` nodes. Intentionally unchanged; migrate its regions to per-Visual-Reference target masks before using.
-- workflows/04_character_sheet_identity.json — generic Character Sheet identity reference.
-- workflows/05_edit_prompt_creator.json — create_from_image Prompt Creator with the optional Vision Reference branch wired but disabled.
-- workflows/06_text_to_image.json — T2I example using Vision Reference analysis and text-only final conditioning.
+1. `01_creative_generation.json` — Vision-only inspiration, Prompt Creator and T2I.
+2. `02_outpainting_reframing.json` — Paint extension and restoration.
+3. `03_local_image_editing.json` — Layout + SAM + inverted mask + Paint for studio background replacement.
+4. `04_identity_scene_transfer.json` — Two references, mask Boost and Prompt Creator for scene/identity transfer.
+5. `05_character_consistency.json` — Ordered body and facial masks for consistent character identity.
+6. `06_outfit_transfer.json` — Three references: scene, subject and outfit.
+7. `07_scene_composition.json` — Layout-based scene blueprint and reference-guided composition.
 
-- workflows/12_edit_vision_semantic.json — Vision Reference / Semantic.
-- workflows/13_edit_vision_visual.json — Vision Reference / Visual.
-- workflows/14_edit_vision_style.json — Vision Reference / Style.
-- workflows/18_edit_vision_context.json — Vision Reference / Context.
+These files replace the previous isolated examples. Source photographs must be supplied in ComfyUI, and GPU image quality has not been verified.
+
 
 ### Edit RoPE annotated preview
 
-`rope_preview` returns a three-image `IMAGE` batch in fixed order: **layout**, **overlay_boxes**, **overlay_visuals**. All three share the same spatial extent and layout planner. `layout` draws the target and colored reference boxes. `overlay_boxes` draws the target's VAE-prepared image when the input Latent was created `from_image` (otherwise a neutral canvas), with translucent reference boxes. `overlay_visuals` draws the same opaque target with VAE-prepared Visual Reference images overlaid transparently. `collapsed` references are points in all three views, not image thumbnails. Qwen-only Vision References are excluded. The target image is preserved as Latent metadata and exported as `target_image` for mask painting and RoPE preview; it is the original post-fit pixel canvas, not a VAE decode of latent samples.
+The `rope_preview` IMAGE batch contains four spatial views: layout, overlay_boxes,
+overlay_visuals and regional_boosts, followed by one RoPE-positioned Boost view
+per appearance reference. All frames share one coordinate system. Collapsed
+references appear as points and Qwen-only Vision References are excluded.
+Latent exports the post-fit target image as `target_image`.
+
+
+### Reference image transport (updated)
+
+Every Reference always exposes its original source image to downstream nodes, even with `vae_rope_enable=false` and `vision_enable=false`. The image-only representation contributes no Edit conditioning. `vae_rope_enable` replaces `visual_enable`; `vae_rope_*` replaces the corresponding `visual_*` widget names. Vision independently controls Qwen conditioning and may resize its own analysis image without discarding the source.
+
+Prompt Creator accepts an optional `references` input of type `KREA2_REFERENCE_CHAIN`. It analyzes source images in chain order (paired VAE/RoPE and Vision inputs are analyzed once), returns the generated prompt, and forwards the same reference chain to Edit. See `workflows/04_identity_scene_transfer.json` and `workflows/06_outfit_transfer.json` for complete examples.

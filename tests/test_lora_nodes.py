@@ -127,3 +127,24 @@ def test_lora_stack_with_prompt_preserves_incoming_augmentation(monkeypatch):
 def test_lora_nodes_have_no_cache_invalidating_hook():
     assert not hasattr(CcCKrea2LoRAStack, "IS_CHANGED")
     assert not hasattr(CcCKrea2LoRAStackWithPrompt, "IS_CHANGED")
+
+
+
+def test_both_lora_stacks_expose_exactly_five_slots():
+    for cls in (CcCKrea2LoRAStack, CcCKrea2LoRAStackWithPrompt):
+        required = cls.INPUT_TYPES()["required"]
+        assert len(cls().loaders) == 5
+        assert all(f"lora_{i}_enabled" in required for i in range(1, 6))
+        assert all(f"lora_{i}_name" in required for i in range(1, 6))
+        assert "lora_6_enabled" not in required
+
+
+def test_prompt_stack_fifth_slot_triggers_augmentation_without_model_lora():
+    node = CcCKrea2LoRAStackWithPrompt()
+    model = FakeModel()
+    model_out, augmentation = node.apply_loras(
+        model, lora_5_enabled=True, lora_5_name="None",
+        lora_5_prompt_position="append", lora_5_prompt="fifth trigger",
+    )
+    assert model_out is model
+    assert augmentation.positive_append == ("fifth trigger",)

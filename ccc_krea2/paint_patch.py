@@ -82,6 +82,7 @@ def _registered_reference_tokens(
     device: torch.device,
     dtype: torch.dtype,
     target_grid: Tuple[int, int],
+    rope_positions: Optional[Sequence[str]] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Patchify refs and register their x/y RoPE coordinates over the complete target grid."""
     patch_size = getattr(dit_model, "patch", 2)
@@ -136,6 +137,14 @@ def _registered_reference_tokens(
 
     if not token_parts:
         raise ValueError("[Krea2 CcC Paint] At least one reference latent is required.")
+    if rope_positions is not None:
+        from .patch import _build_incontext_3d_rope_pos_ids
+        grids = [((ref.shape[-2] + patch_size - 1) // patch_size, (ref.shape[-1] + patch_size - 1) // patch_size) for ref in refs]
+        # Source shapes are already patch-compatible for the regular Edit route.
+        positions = _build_incontext_3d_rope_pos_ids(
+            batch_size, 0, grids, target_grid, device, list(rope_positions),
+        )
+        return torch.cat(token_parts, dim=1), positions[:, :sum(h * w for h, w in grids)]
     return torch.cat(token_parts, dim=1), torch.cat(position_parts, dim=1)
 
 
@@ -146,6 +155,7 @@ def _attention_with_optional_reference_kv(
     *,
     kv_capture: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
     reference_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    reference_bias: Optional[torch.Tensor] = None,
     transformer_options: Optional[Dict[str, Any]] = None,
 ) -> torch.Tensor:
     """Krea2 attention with post-RoPE reference K/V capture/injection."""
@@ -183,7 +193,7 @@ def _attention_with_optional_reference_kv(
         k,
         v,
         attn.heads,
-        mask=None,
+        mask=reference_bias,
         skip_reshape=True,
         transformer_options=transformer_options,
     )
@@ -198,6 +208,7 @@ def _block_with_optional_reference_kv(
     *,
     kv_capture: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None,
     reference_kv: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    reference_bias: Optional[torch.Tensor] = None,
     transformer_options: Optional[Dict[str, Any]] = None,
 ) -> torch.Tensor:
     """SingleStreamBlock execution with optional isolated reference K/V."""
@@ -210,6 +221,7 @@ def _block_with_optional_reference_kv(
         freqs,
         kv_capture=kv_capture,
         reference_kv=reference_kv,
+        reference_bias=reference_bias,
         transformer_options=transformer_options,
     )
 
@@ -218,12 +230,30 @@ def _block_with_optional_reference_kv(
     return x
 
 
+def _isolated_reference_bias(
+    reference_lengths: Sequence[int], *, batch_size: int, device: torch.device,
+    dtype: torch.dtype,
+) -> Optional[torch.Tensor]:
+    """Block off attention between different references during their t=0 K/V pass."""
+    if len(reference_lengths) < 2:
+        return None
+    total = sum(reference_lengths)
+    bias = torch.full((batch_size, 1, total, total), float("-inf"), device=device, dtype=dtype)
+    offset = 0
+    for length in reference_lengths:
+        bias[:, :, offset:offset + length, offset:offset + length] = 0.0
+        offset += length
+    return bias
+
+
 def _precompute_registered_reference_kv(
     dit_model: Any,
     x: torch.Tensor,
     timesteps: torch.Tensor,
     refs: Sequence[torch.Tensor],
     transformer_options: Dict[str, Any],
+    rope_positions: Optional[Sequence[str]] = None,
+    isolate_references: bool = False,
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     temporal = x.ndim == 5
     batch_size = x.shape[0] * (x.shape[2] if temporal else 1)
@@ -240,8 +270,19 @@ def _precompute_registered_reference_kv(
         device=x.device,
         dtype=x.dtype,
         target_grid=(target_h, target_w),
+        rope_positions=rope_positions,
     )
     hidden = dit_model.first(ref_tokens)
+    reference_bias = None
+    if isolate_references:
+        reference_lengths = [
+            ((ref.shape[-2] + patch_size - 1) // patch_size)
+            * ((ref.shape[-1] + patch_size - 1) // patch_size)
+            for ref in refs
+        ]
+        reference_bias = _isolated_reference_bias(
+            reference_lengths, batch_size=batch_size, device=x.device, dtype=hidden.dtype,
+        )
 
     zero = torch.zeros_like(timesteps)
     t0 = _timestep_embedding(zero, getattr(dit_model, "tdim", 256)).unsqueeze(1).to(hidden.dtype)
@@ -263,6 +304,7 @@ def _precompute_registered_reference_kv(
             ref_vec,
             freqs,
             kv_capture=capture,
+            reference_bias=reference_bias,
             transformer_options=block_options,
         )
         caches.append(capture[0])
@@ -276,6 +318,7 @@ def _forward_with_registered_reference_kv(
     context: torch.Tensor,
     reference_kv: Sequence[Tuple[torch.Tensor, torch.Tensor]],
     transformer_options: Dict[str, Any],
+    reference_bias: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     temporal = x.ndim == 5
     if temporal:
@@ -313,6 +356,8 @@ def _forward_with_registered_reference_kv(
 
     txt_len = context.shape[1]
     image_len = image_tokens.shape[1]
+    if callable(reference_bias):
+        reference_bias = reference_bias(txt_len, image_len)
     combined = torch.cat((context, image_tokens), dim=1)
 
     text_positions = torch.zeros(
@@ -347,6 +392,7 @@ def _forward_with_registered_reference_kv(
             tvec,
             freqs,
             reference_kv=cached_kv,
+            reference_bias=reference_bias,
             transformer_options=block_options,
         )
 

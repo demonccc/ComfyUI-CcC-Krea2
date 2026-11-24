@@ -1,6 +1,6 @@
 {
-  "last_node_id": 17,
-  "last_link_id": 23,
+  "last_node_id": 91,
+  "last_link_id": 42,
   "nodes": [
     {
       "id": 1,
@@ -14,7 +14,7 @@
         100
       ],
       "flags": {},
-      "order": 1,
+      "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -55,7 +55,7 @@
         100
       ],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -63,7 +63,8 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            10
+            10,
+            26
           ]
         }
       ],
@@ -95,7 +96,7 @@
         100
       ],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -103,9 +104,9 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
+            6,
             11,
-            20,
-            6
+            20
           ]
         }
       ],
@@ -137,7 +138,7 @@
         250
       ],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
@@ -153,11 +154,6 @@
           "links": [
             9
           ]
-        },
-        {
-          "name": "prompt_augmentation",
-          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
-          "links": []
         }
       ],
       "properties": {
@@ -181,13 +177,14 @@
       },
       "widgets_values": [
         true,
-        1,
-        true,
-        "Krea2/krea2_identity_edit_v1_2.safetensors",
+        "Krea2/krea2_identity_edit_v2.safetensors",
         1,
         false,
         "Krea2/krea2_bodyswap_v1.safetensors",
         0.35,
+        false,
+        "None",
+        1,
         false,
         "None",
         1,
@@ -208,7 +205,7 @@
         200
       ],
       "flags": {},
-      "order": 5,
+      "order": 4,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -216,8 +213,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            2,
-            13
+            30,
+            31
           ]
         },
         {
@@ -232,7 +229,7 @@
       "widgets_values": [
         "scene.jpg"
       ],
-      "title": "Scene Image"
+      "title": "SCENE / POSE"
     },
     {
       "id": 6,
@@ -246,7 +243,7 @@
         200
       ],
       "flags": {},
-      "order": 6,
+      "order": 5,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -254,8 +251,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4,
-            12
+            36
           ]
         },
         {
@@ -270,18 +266,81 @@
       "widgets_values": [
         "subject.jpg"
       ],
-      "title": "Subject Image"
+      "title": "SUBJECT / IDENTITY"
     },
     {
       "id": 7,
-      "type": "CcCKrea2VisualReference",
+      "type": "CcCKrea2Reference",
       "pos": [
         380,
         500
       ],
       "size": [
-        410,
-        390
+        470,
+        600
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 34
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 35
+        }
+      ],
+      "outputs": [
+        {
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "links": [
+            29
+          ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Reference"
+      },
+      "widgets_values": [
+        true,
+        -1,
+        "contain",
+        "outside",
+        "left",
+        "center",
+        "spatial",
+        "stacked",
+        "latent",
+        "This is the scene blueprint.",
+        true,
+        1,
+        true,
+        768,
+        "visual",
+        ""
+      ],
+      "title": "Scene Reference"
+    },
+    {
+      "id": 8,
+      "type": "CcCKrea2Reference",
+      "pos": [
+        900,
+        820
+      ],
+      "size": [
+        470,
+        600
       ],
       "flags": {},
       "order": 7,
@@ -290,7 +349,17 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 2
+          "link": 39
+        },
+        {
+          "name": "previous_references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 29
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": 40
         }
       ],
       "outputs": [
@@ -298,128 +367,37 @@
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
           "links": [
-            3
+            25
           ]
+        },
+        {
+          "name": "reference_info",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
+        "Node name for S&R": "CcCKrea2Reference"
       },
       "widgets_values": [
+        true,
         1,
         "contain",
         "inside",
         "center",
         "center",
+        "spatial",
+        "stacked",
+        "latent",
+        "This is the identity subject.",
         true,
-        true,
-        768,
-        "This is the scene image.",
-        "global",
-        ""
-      ],
-      "title": "Scene Visual Reference - contain"
-    },
-    {
-      "id": 8,
-      "type": "CcCKrea2VisualReference",
-      "pos": [
-        830,
-        500
-      ],
-      "size": [
-        410,
-        420
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 4
-        },
-        {
-          "name": "previous_references",
-          "type": "KREA2_REFERENCE_CHAIN",
-          "link": 3
-        }
-      ],
-      "outputs": [
-        {
-          "name": "references",
-          "type": "KREA2_REFERENCE_CHAIN",
-          "links": [
-            14
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2VisualReference"
-      },
-      "widgets_values": [
-        4,
-        "contain",
-        "inside",
-        "center",
-        "center",
-        true,
+        1,
         true,
         768,
-        "This is the subject image.",
-        "global",
+        "visual",
         ""
       ],
-      "title": "Subject Visual Reference - contain"
-    },
-    {
-      "id": 16,
-      "type": "CcCKrea2SizeResolver",
-      "pos": [
-        400,
-        980
-      ],
-      "size": [
-        420,
-        180
-      ],
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "long_edge_image",
-          "type": "IMAGE",
-          "link": 12
-        },
-        {
-          "name": "aspect_ratio_image",
-          "type": "IMAGE",
-          "link": 13
-        }
-      ],
-      "outputs": [
-        {
-          "name": "width",
-          "type": "INT",
-          "links": [
-            21
-          ]
-        },
-        {
-          "name": "height",
-          "type": "INT",
-          "links": [
-            22
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CcCKrea2SizeResolver"
-      },
-      "widgets_values": [],
-      "title": "Subject Long Edge + Scene Aspect Size"
+      "title": "Subject Reference"
     },
     {
       "id": 17,
@@ -433,7 +411,7 @@
         520
       ],
       "flags": {},
-      "order": 10,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
@@ -442,14 +420,9 @@
           "link": 20
         },
         {
-          "name": "width",
-          "type": "INT",
-          "link": 21
-        },
-        {
-          "name": "height",
-          "type": "INT",
-          "link": 22
+          "name": "dimensions_image",
+          "type": "IMAGE",
+          "link": 30
         }
       ],
       "outputs": [
@@ -470,7 +443,7 @@
         "Node name for S&R": "CcCKrea2Latent"
       },
       "widgets_values": [
-        "fixed",
+        "from_image",
         1024,
         1024,
         "1024 x 1024 | 1:1 | ~1.05 MP",
@@ -478,17 +451,20 @@
         "empty",
         "crop",
         false,
-        "",
+        true,
         768,
+        "",
+        "visual",
+        "",
         1
       ],
-      "title": "Scene + Subject Latent"
+      "title": "Target Latent - Fixed 1024x1024"
     },
     {
       "id": 9,
       "type": "CcCKrea2Edit",
       "pos": [
-        850,
+        2250,
         0
       ],
       "size": [
@@ -496,7 +472,7 @@
         320
       ],
       "flags": {},
-      "order": 11,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
@@ -520,9 +496,17 @@
           "link": 23
         },
         {
+          "name": "positive_prompt",
+          "type": "STRING",
+          "link": 27,
+          "widget": {
+            "name": "positive_prompt"
+          }
+        },
+        {
           "name": "references",
           "type": "KREA2_REFERENCE_CHAIN",
-          "link": 14
+          "link": 28
         }
       ],
       "outputs": [
@@ -564,8 +548,9 @@
         "Node name for S&R": "CcCKrea2Edit"
       },
       "widgets_values": [
-        "Replace the person in the scene image with the person from the subject image.",
-        true
+        "",
+        true,
+        false
       ]
     },
     {
@@ -580,7 +565,7 @@
         100
       ],
       "flags": {},
-      "order": 12,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -617,7 +602,7 @@
         100
       ],
       "flags": {},
-      "order": 13,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
@@ -654,7 +639,7 @@
         200
       ],
       "flags": {},
-      "order": 14,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
@@ -691,8 +676,8 @@
         "Node name for S&R": "KSampler"
       },
       "widgets_values": [
-        0,
-        "randomize",
+        11980427,
+        "fixed",
         8,
         1,
         "euler",
@@ -712,7 +697,7 @@
         100
       ],
       "flags": {},
-      "order": 15,
+      "order": 13,
       "mode": 0,
       "inputs": [
         {
@@ -752,7 +737,7 @@
         200
       ],
       "flags": {},
-      "order": 16,
+      "order": 14,
       "mode": 0,
       "inputs": [
         {
@@ -766,22 +751,22 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "CcCKrea2_EditFit_contain"
+        "CcC_Showcase_01_IdentityScene"
       ]
     },
     {
       "id": 15,
       "type": "Note",
       "pos": [
-        1450,
-        220
+        2350,
+        520
       ],
       "size": [
         700,
         380
       ],
       "flags": {},
-      "order": 17,
+      "order": 15,
       "mode": 0,
       "inputs": [],
       "outputs": [],
@@ -789,7 +774,359 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "Krea2 Edit reference_fit=contain test.\n\nBoth scene and subject Visual References use contain. This workflow is intended to exercise the contain appearance-fit path end-to-end through Edit and sampling. BodySwap LoRA is disabled by default. Existing workflows already cover resize and native paths."
+        "SHOWCASE 01 / IDENTITY & SCENE TRANSFER\nInputs: scene + identity. SAM masks control scene person/outfit and subject face. Both visual references feed Qwen and VAE/RoPE. Prompt Creator generates the complete edit prompt; Edit performs generation. Start with your own source images; keep sampler seed fixed while tuning Boost. Mask composites are previews only; Reference receives original IMAGE and mask_attention."
+      ]
+    },
+    {
+      "id": 18,
+      "type": "CcCKrea2EditPromptCreator",
+      "pos": [
+        1350,
+        600
+      ],
+      "size": [
+        560,
+        680
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 26
+        },
+        {
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "link": 25
+        }
+      ],
+      "outputs": [
+        {
+          "name": "created_prompt",
+          "type": "STRING",
+          "links": [
+            27,
+            41
+          ]
+        },
+        {
+          "name": "references",
+          "type": "KREA2_REFERENCE_CHAIN",
+          "links": [
+            28
+          ]
+        },
+        {
+          "name": "creator_info",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "thinking",
+          "type": "STRING",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2EditPromptCreator"
+      },
+      "widgets_values": [
+        "create_from_image_i2i",
+        "Image 1 is the scene blueprint: preserve the scene, pose, clothing, accessories, action, framing, and lighting. Image 2 supplies only the new person's identity, face, body shape, and proportions. Describe the desired resulting photograph in detailed concrete English, without referring to image numbers in the final prompt. Preserve all other people in the scene.",
+        true,
+        4096,
+        0.25,
+        0.9,
+        0
+      ],
+      "title": "Prompt Creator - Scene + Subject"
+    },
+    {
+      "id": 70,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -1500,
+        -150
+      ],
+      "size": [
+        355,
+        105
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            32,
+            37
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            33,
+            38
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "models": [
+          {
+            "name": "sam3.1_multiplex_fp16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/sam3.1/resolve/main/checkpoints/sam3.1_multiplex_fp16.safetensors",
+            "directory": "checkpoints"
+          }
+        ]
+      },
+      "widgets_values": [
+        "sam3.1_multiplex_fp16.safetensors"
+      ],
+      "title": "SAM 3.1 checkpoint"
+    },
+    {
+      "id": 71,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        -1050,
+        500
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 31
+        },
+        {
+          "name": "previous_mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": null
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 32
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 33
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            34
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            35
+          ]
+        },
+        {
+          "name": "composite_image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "person",
+        -2,
+        0.5,
+        "#000000",
+        false,
+        false
+      ],
+      "title": "Scene person — reduce identity"
+    },
+    {
+      "id": 72,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        -650,
+        500
+      ],
+      "size": [
+        355,
+        290
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 36
+        },
+        {
+          "name": "previous_mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "link": null
+        },
+        {
+          "name": "sam_model",
+          "type": "MODEL",
+          "link": 37
+        },
+        {
+          "name": "sam_clip",
+          "type": "CLIP",
+          "link": 38
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            39
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": [
+            40
+          ]
+        },
+        {
+          "name": "composite_image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CcCKrea2Mask"
+      },
+      "widgets_values": [
+        "sam3",
+        "face",
+        3,
+        0.5,
+        "#000000",
+        false,
+        false
+      ],
+      "title": "Subject face — preserve identity"
+    },
+    {
+      "type": "PreviewAny",
+      "size": [
+        300,
+        220
+      ],
+      "flags": {},
+      "mode": 0,
+      "order": 20,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 41
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "id": 90,
+      "title": "Generated prompt",
+      "pos": [
+        2100,
+        520
+      ]
+    },
+    {
+      "type": "PreviewAny",
+      "size": [
+        300,
+        220
+      ],
+      "flags": {},
+      "mode": 0,
+      "order": 21,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 42
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewAny"
+      },
+      "widgets_values": [],
+      "id": 91,
+      "title": "Qwen thinking",
+      "pos": [
+        2100,
+        790
       ]
     }
   ],
@@ -801,30 +1138,6 @@
       4,
       0,
       "MODEL"
-    ],
-    [
-      2,
-      5,
-      0,
-      7,
-      0,
-      "IMAGE"
-    ],
-    [
-      3,
-      7,
-      0,
-      8,
-      1,
-      "KREA2_REFERENCE_CHAIN"
-    ],
-    [
-      4,
-      6,
-      0,
-      8,
-      0,
-      "IMAGE"
     ],
     [
       5,
@@ -883,30 +1196,6 @@
       "VAE"
     ],
     [
-      12,
-      6,
-      0,
-      16,
-      0,
-      "IMAGE"
-    ],
-    [
-      13,
-      5,
-      0,
-      16,
-      1,
-      "IMAGE"
-    ],
-    [
-      14,
-      8,
-      0,
-      9,
-      4,
-      "KREA2_REFERENCE_CHAIN"
-    ],
-    [
       15,
       9,
       0,
@@ -955,91 +1244,167 @@
       "VAE"
     ],
     [
-      21,
-      16,
-      0,
-      17,
-      1,
-      "INT"
-    ],
-    [
-      22,
-      16,
-      1,
-      17,
-      2,
-      "INT"
-    ],
-    [
       23,
       17,
       0,
       9,
       3,
       "LATENT"
+    ],
+    [
+      25,
+      8,
+      0,
+      18,
+      1,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      26,
+      2,
+      0,
+      18,
+      0,
+      "CLIP"
+    ],
+    [
+      27,
+      18,
+      0,
+      9,
+      4,
+      "STRING"
+    ],
+    [
+      28,
+      18,
+      1,
+      9,
+      5,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      29,
+      7,
+      0,
+      8,
+      1,
+      "KREA2_REFERENCE_CHAIN"
+    ],
+    [
+      30,
+      5,
+      0,
+      17,
+      1,
+      "IMAGE"
+    ],
+    [
+      31,
+      5,
+      0,
+      71,
+      0,
+      "IMAGE"
+    ],
+    [
+      32,
+      70,
+      0,
+      71,
+      2,
+      "MODEL"
+    ],
+    [
+      33,
+      70,
+      1,
+      71,
+      3,
+      "CLIP"
+    ],
+    [
+      34,
+      71,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      35,
+      71,
+      2,
+      7,
+      1,
+      "KREA2_MASK_CHAIN"
+    ],
+    [
+      36,
+      6,
+      0,
+      72,
+      0,
+      "IMAGE"
+    ],
+    [
+      37,
+      70,
+      0,
+      72,
+      2,
+      "MODEL"
+    ],
+    [
+      38,
+      70,
+      1,
+      72,
+      3,
+      "CLIP"
+    ],
+    [
+      39,
+      72,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      40,
+      72,
+      2,
+      8,
+      2,
+      "KREA2_MASK_CHAIN"
+    ],
+    [
+      41,
+      18,
+      0,
+      90,
+      0,
+      "STRING"
+    ],
+    [
+      42,
+      18,
+      3,
+      91,
+      0,
+      "STRING"
     ]
   ],
-  "groups": [
-    {
-      "title": "Loaders",
-      "bounding": [
-        0,
-        -50,
-        700,
-        500
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Scene + Subject References",
-      "bounding": [
-        0,
-        450,
-        1250,
-        500
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Size Resolver + Latent",
-      "bounding": [
-        350,
-        930,
-        1100,
-        620
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Krea2 CcC Edit",
-      "bounding": [
-        800,
-        -50,
-        850,
-        500
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Sampling",
-      "bounding": [
-        1750,
-        -50,
-        1050,
-        500
-      ],
-      "color": "#3f789e"
-    },
-    {
-      "title": "Output",
-      "bounding": [
-        2850,
-        -50,
-        680,
-        500
-      ],
-      "color": "#3f789e"
+  "groups": [],
+  "version": 0.4,
+  "extra": {
+    "ds": {
+      "scale": 0.42,
+      "offset": [
+        300,
+        200
+      ]
     }
-  ],
-  "version": 0.4
+  }
 }

@@ -2,10 +2,9 @@
 
 import torch
 from typing import Tuple, Dict, Any, List
-from .reference_specs import ReferenceChain, StyleReferenceSpec
+from .reference_specs import ReferenceChain
 from .reference_slots import resolve_reference_slots_and_aliases
 from .krea2edit_geometry import resolve_krea2edit_geometry, process_image_and_mask_geometry
-from .style_processing import expand_style_reference_spans
 from .conditioning import (
     encode_krea2_qwen_context,
     attach_reference_latents_to_conditioning,
@@ -62,7 +61,6 @@ def run_krea2_edit_orchestrator(
     neg_qwen_image_map: List[Dict[str, Any]] = []
 
     vae_ref_specs: List[Dict[str, Any]] = []
-    style_ref_specs: List[Dict[str, Any]] = []
     semantic_ref_specs: List[Dict[str, Any]] = []
 
     for ref_item in resolved_refs:
@@ -98,9 +96,15 @@ def run_krea2_edit_orchestrator(
                     resize_method=getattr(spec, "visual_resize_method", "bicubic"),
                 )
 
-                fit_img, fit_mask = process_image_and_mask_geometry(
-                    image=src_img, mask=getattr(spec, "attention_mask", None), geom=geom
+                fit_img, _ = process_image_and_mask_geometry(
+                    image=src_img, mask=None, geom=geom
                 )
+                weight_map = getattr(spec, "attention_weight_map", None)
+                fitted_weights = None
+                if weight_map is not None:
+                    _, fitted_weights = process_image_and_mask_geometry(
+                        image=src_img, mask=weight_map, geom=geom
+                    )
                 encoded = vae.encode(fit_img) if vae is not None else None
                 lat_tokens = None
                 if encoded is not None:
@@ -115,7 +119,7 @@ def run_krea2_edit_orchestrator(
                         "role": ref_role,
                         "slot": slot,
                         "latent_tokens": lat_tokens,
-                        "mask": fit_mask,
+                        "attention_weight_map": fitted_weights,
                         "geom": geom,
                         "spec": spec,
                         "ref_item": ref_item,
@@ -175,33 +179,6 @@ def run_krea2_edit_orchestrator(
                     }
                 )
 
-        elif ref_path == "style":
-            assert isinstance(spec, StyleReferenceSpec) or getattr(spec, "reference_path", "") == "style"
-
-            prep_crops, s_start, s_end = expand_style_reference_spans(spec, start_slot=slot, clip=clip)
-            phys_range = ref_item.get("physical_qwen_range", (s_start, s_end))
-            for crop_idx, crop_prep in enumerate(prep_crops):
-                pos_idx = len(pos_qwen_images) + 1
-                pos_qwen_images.append(crop_prep.vision_image)
-                pos_qwen_image_map.append(
-                    {
-                        "role": "style",
-                        "slot": slot,
-                        "logical_reference_id": slot,
-                        "logical_role": "style",
-                        "logical_vision_slot": slot,
-                        "physical_qwen_image_index": pos_idx,
-                        "style_group_id": slot,
-                        "crop_tile_index": crop_idx,
-                        "image": crop_prep.vision_image,
-                        "spec": spec,
-                    }
-                )
-
-            style_ref_specs.append(
-                {"role": "style", "slot": slot, "spans": phys_range, "spec": spec, "ref_item": ref_item}
-            )
-
     # Format user content using the Krea2 CcC Edit grounded prompt contract.
     user_content = build_grounded_positive_user_content(
         resolved_references=resolved_refs,
@@ -233,9 +210,6 @@ def run_krea2_edit_orchestrator(
     vae_latents_for_transport: List[torch.Tensor] = [
         ref["latent_tokens"] for ref in vae_ref_specs if ref.get("latent_tokens") is not None
     ]
-    prepared_reference_masks = [ref["mask"] for ref in vae_ref_specs if ref.get("latent_tokens") is not None]
-    if len(prepared_reference_masks) != len(vae_latents_for_transport):
-        raise ValueError("[Krea2 CcC Edit] Reference masks and VAE latents are out of alignment.")
     patched_model = model
     pos_conditioning = attach_reference_latents_to_conditioning(
         pos_qwen_context.conditioning, vae_latents_for_transport
@@ -244,12 +218,16 @@ def run_krea2_edit_orchestrator(
         neg_qwen_context.conditioning, vae_latents_for_transport
     )
 
-    if any(mask is not None for mask in prepared_reference_masks):
-        # Each source mask follows its corresponding VAE latent, even when vision-only
-        # references are interleaved with appearance references.
+    prepared_weight_maps = [
+        ref.get("attention_weight_map") for ref in vae_ref_specs
+        if ref.get("latent_tokens") is not None
+    ]
+    if any(weight is not None for weight in prepared_weight_maps):
         pos_conditioning = _conditioning_set_values(
-            pos_conditioning, {"reference_boost_masks": prepared_reference_masks}
+            pos_conditioning, {"reference_attention_maps": prepared_weight_maps}
         )
+        # Keep the grounded negative branch neutral: regional Boost maps
+        # belong only to positive target-to-reference attention.
 
     # Step 7: Build edit_info report
     info_lines = [
@@ -266,8 +244,8 @@ def run_krea2_edit_orchestrator(
             f"Target Latent Geometry: {lw} x {lh} (Batch Size: {bs})",
             "",
             "Conditioning Summary:",
-            f"  Positive Row Count Before Style Processing: {pos_qwen_context.pos_rows_before}",
-            f"  Positive Row Count After Style Processing: {pos_qwen_context.pos_rows_after}",
+            f"  Positive Row Count Before Semantic Filtering: {pos_qwen_context.pos_rows_before}",
+            f"  Positive Row Count After Semantic Filtering: {pos_qwen_context.pos_rows_after}",
             f"  Negative Row Count: {neg_qwen_context.neg_rows}",
             f"  Positive Physical Qwen Image Count: {len(pos_qwen_images)}",
             f"  Negative Physical Qwen Image Count: {len(neg_qwen_images)}",
@@ -279,7 +257,7 @@ def run_krea2_edit_orchestrator(
     for ref in vae_ref_specs:
         sp = ref["spec"]
         ref_item = ref["ref_item"]
-        b_boost = getattr(sp, "attention_boost", 1.0)
+        b_boost = getattr(sp, "attention_boost", 0.0)
         aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
         phys_range = ref_item.get("physical_qwen_range")
         phys_idx = phys_range[0] if phys_range else None
@@ -353,15 +331,7 @@ def run_krea2_edit_orchestrator(
         if (phys_idx - 1) < len(pos_qwen_context.vision_row_spans):
             row_start, row_end = pos_qwen_context.vision_row_spans[phys_idx - 1]
             original_rows = row_end - row_start
-        summary_rows = int(getattr(sp, "vision_summary_rows", 0) or 0)
-        vision_indirect = bool(getattr(sp, "vision_indirect", False))
-        if vision_indirect:
-            retained_rows = 0
-        elif summary_rows > 0:
-            retained_rows = min(summary_rows, original_rows)
-        else:
-            retained_rows = original_rows
-
+        retained_rows = 0 if vision_mode == "semantic" else original_rows
         info_lines.extend(
             [
                 f"{mode_label} Vision Reference [Slot {sem['slot']} - {sem['role'].capitalize()}]:",
@@ -369,73 +339,13 @@ def run_krea2_edit_orchestrator(
                 f"  Physical Qwen Image Index: {phys_idx}",
                 f"  Actual Conditioning Row Span: {span_str}",
                 f"  Original Vision Rows: {original_rows}",
-                f"  Summary Rows Requested: {summary_rows}",
-                f"  Indirect Vision Transport: {vision_indirect}",
                 f"  Retained Vision Rows: {retained_rows}",
                 f"  Removed Vision Rows: {max(0, original_rows - retained_rows)}",
                 f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
                 f"  Vision Instruction Active: {'yes' if sem.get('has_instruction') else 'no'}",
-                f"  Semantic Extract: {getattr(sp, 'semantic_extract', 'none')}",
-                f"  Internal Semantic Fidelity: {float(getattr(sp, 'semantic_strength', 1.0)):.2f}",
                 "  Appearance Reference: no",
                 "  VAE Reference Frame: none",
                 "  Negative Conditioning Included: no",
-                "",
-            ]
-        )
-
-    for st in style_ref_specs:
-        sp = st["spec"]
-        ref_item = st["ref_item"]
-        aliases_str = ", ".join(ref_item.get("expanded_aliases", ()))
-        phys_range = ref_item.get("physical_qwen_range", st["spans"])
-        s_start, s_end = phys_range
-        st_spans = (
-            pos_qwen_context.vision_row_spans[s_start - 1 : s_end]
-            if (s_start - 1) < len(pos_qwen_context.vision_row_spans)
-            else []
-        )
-        shuffle_str = (
-            "SHUFFLE_2X2"
-            if sp.style_processing == "2x2"
-            else ("SHUFFLE_4X4" if sp.style_processing == "4x4" else "identity")
-        )
-        style_total_rows = sum(e - s for s, e in st_spans)
-        summary_rows = int(getattr(sp, "vision_summary_rows", 0) or 0)
-        physical_count = s_end - s_start + 1
-        vision_indirect = bool(getattr(sp, "vision_indirect", False))
-        retained_rows = min(style_total_rows, summary_rows * physical_count) if summary_rows > 0 else (
-            0 if (vision_indirect or sp.indirect_style_transfer) else style_total_rows
-        )
-        rows_rem = max(0, style_total_rows - retained_rows)
-        status_str = (
-            f"compact style summary retained ({retained_rows} rows)"
-            if summary_rows > 0
-            else (
-                "indirect Qwen re-contextualization (direct rows removed)"
-                if (vision_indirect or sp.indirect_style_transfer)
-                else "direct (rows preserved)"
-            )
-        )
-
-        info_lines.extend(
-            [
-                f"Style Vision Reference [Slot {st['slot']}]:",
-                f"  Logical Vision Slot: {st['slot']}",
-                f"  Physical Qwen Image Start: {s_start}",
-                f"  Physical Qwen Image End: {s_end}",
-                f"  Physical Qwen Image Count: {physical_count}",
-                f"  Actual Conditioning Row Spans: {st_spans}",
-                f"  Original Vision Rows: {style_total_rows}",
-                f"  Summary Rows per Physical Image: {summary_rows}",
-                f"  Retained Style Rows: {retained_rows}",
-                f"  Removed Vision Rows: {rows_rem}",
-                f"  Transport Status: {status_str}",
-                f"  Style Reference Processing: {sp.style_processing}",
-                f"  Crop Shuffle Order: {shuffle_str}",
-                f"  Internal Style Fidelity: {sp.style_fidelity:.2f}",
-                "  VAE Reference Frame: none",
-                f"  Expanded Aliases: {aliases_str if aliases_str else 'none'}",
                 "",
             ]
         )

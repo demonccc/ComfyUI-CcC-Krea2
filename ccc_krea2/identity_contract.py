@@ -12,15 +12,6 @@ def _alias_for(item: Dict[str, Any], spec: Any) -> str:
     return str(getattr(spec, "alias", "") or "")
 
 
-def _style_block_count(spec: Any) -> int:
-    processing = getattr(spec, "style_processing", "2x2")
-    if processing == "full":
-        return 1
-    if processing == "4x4":
-        return 16
-    return 4
-
-
 def build_grounded_positive_user_content(
     resolved_references: List[Dict[str, Any]],
     user_prompt: str = "",
@@ -38,12 +29,21 @@ def build_grounded_positive_user_content(
 
     for item in resolved_references:
         spec = item.get("spec")
-        if spec is None or not getattr(spec, "include_in_vision", True):
+        if spec is None:
+            continue
+
+        # A Visual-only reference has no Qwen image block. Keep an explicit
+        # user annotation when supplied, without leaking internal VAE/RoPE
+        # implementation labels into the text-to-image prompt.
+        if not getattr(spec, "include_in_vision", True):
+            alias = _alias_for(item, spec).strip()
+            if alias and getattr(spec, "appearance_reference", True):
+                annotations.append(alias)
             continue
 
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
         is_appearance = bool(getattr(spec, "appearance_reference", True))
-        count = _style_block_count(spec) if ref_path == "style" else 1
+        count = 1
         blocks.extend([VISION_PAD_TOKEN] * count)
 
         alias = _alias_for(item, spec).strip()
@@ -51,25 +51,19 @@ def build_grounded_positive_user_content(
 
         if ref_path == "edit" and is_appearance:
             label = f"Image {physical_index}"
-            if instruction:
-                annotations.append(f"{label}: {instruction}")
-            elif alias:
-                # Compatibility for older role-based reference nodes.
+            if alias:
                 annotations.append(f"{label}: {alias}")
+            if instruction:
+                annotations.append(f"{label} guidance: {instruction}")
             physical_index += count
             continue
 
         if alias or instruction:
-            if count == 1:
-                label = f"Image {physical_index}"
-            else:
-                label = f"Images {physical_index}-{physical_index + count - 1}"
-            if alias and instruction:
-                annotations.append(f"{label} ({alias}): {instruction}")
-            elif alias:
+            label = f"Image {physical_index}"
+            if alias:
                 annotations.append(f"{label}: {alias}")
-            else:
-                annotations.append(f"{label}: {instruction}")
+            if instruction:
+                annotations.append(f"{label} guidance: {instruction}")
 
         physical_index += count
 
@@ -94,7 +88,7 @@ def build_grounded_negative_user_content(
         if spec is None or not getattr(spec, "include_in_vision", True):
             continue
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
-        if ref_path == "style" or not getattr(spec, "appearance_reference", True):
+        if not getattr(spec, "appearance_reference", True):
             continue
         blocks.append(VISION_PAD_TOKEN)
 

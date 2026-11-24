@@ -12,7 +12,6 @@ import torch.nn.functional as F
 
 from ..constants import NODE_CATEGORY
 from .paint_geometry_node import (
-    GEOMETRY_MODES,
     PADDING_FILLS,
     HORIZONTAL_POSITIONS,
     VERTICAL_POSITIONS,
@@ -54,11 +53,14 @@ def _grow_or_shrink(mask: torch.Tensor, amount: int) -> torch.Tensor:
     if radius == 0:
         return mask
     kernel = radius * 2 + 1
-    if amount > 0:
-        return F.max_pool2d(mask.unsqueeze(1), kernel, stride=1, padding=radius).squeeze(1)
-    inverse = 1.0 - mask
-    grown_inverse = F.max_pool2d(inverse.unsqueeze(1), kernel, stride=1, padding=radius).squeeze(1)
-    return (1.0 - grown_inverse).clamp(0.0, 1.0)
+    # A square max filter is separable: horizontal then vertical pooling yields
+    # exactly the same dilation as a single (kernel, kernel) max_pool2d.
+    # This avoids the quadratic kernel work for large mask_grow values.
+    value = mask.unsqueeze(1) if amount > 0 else (1.0 - mask).unsqueeze(1)
+    value = F.max_pool2d(value, kernel_size=(1, kernel), stride=1, padding=(0, radius))
+    value = F.max_pool2d(value, kernel_size=(kernel, 1), stride=1, padding=(radius, 0))
+    result = value.squeeze(1)
+    return result if amount > 0 else (1.0 - result).clamp(0.0, 1.0)
 
 
 def _box_blur(mask: torch.Tensor, radius: int) -> torch.Tensor:
@@ -151,18 +153,23 @@ def _ensure_image_latent_5d(latent: torch.Tensor) -> torch.Tensor:
 
 
 def _token_aligned_soft_noise_mask(generated_mask: torch.Tensor, latent_h: int, latent_w: int, *, patch_size: int = 2) -> torch.Tensor:
+    """AnyPaint-compatible binary token mask: a token regenerates unless all its pixels are known."""
     mask = generated_mask
     if mask.ndim == 2:
         mask = mask.unsqueeze(0)
     if mask.ndim != 3:
         raise ValueError(f"[Krea2 CcC Paint Prepare] generated_mask must be [B,H,W], got {tuple(mask.shape)}.")
-    mask = F.interpolate(mask.unsqueeze(1).float(), size=(latent_h, latent_w), mode="bilinear", align_corners=False).squeeze(1).clamp(0.0, 1.0)
     if latent_h % patch_size or latent_w % patch_size:
-        return mask.unsqueeze(1)
-    blocks = mask.view(mask.shape[0], latent_h // patch_size, patch_size, latent_w // patch_size, patch_size)
-    block_values = blocks.mean(dim=(2, 4))
-    aligned = block_values.repeat_interleave(patch_size, dim=1).repeat_interleave(patch_size, dim=2)
-    return aligned.unsqueeze(1)
+        raise ValueError("[Krea2 CcC Paint Prepare] latent dimensions must be divisible by Krea patch size.")
+    # Keep-mask preservation uses a conservative rule: every pixel in a
+    # patch must be known. Do not average mask weights into partial denoising.
+    keep = 1.0 - mask.float().clamp(0.0, 1.0)
+    keep = F.interpolate(keep.unsqueeze(1), size=(latent_h, latent_w), mode="bilinear", align_corners=False).squeeze(1)
+    keep = (keep > 0.5).float()
+    blocks = keep.view(keep.shape[0], latent_h // patch_size, patch_size, latent_w // patch_size, patch_size)
+    known_blocks = blocks.amin(dim=(2, 4))
+    known = known_blocks.repeat_interleave(patch_size, dim=1).repeat_interleave(patch_size, dim=2)
+    return (1.0 - known).unsqueeze(1)
 
 
 def prepare_paint_context(
@@ -206,15 +213,48 @@ def prepare_paint_context(
         direction=mask_blur_direction,
     )
     keep_mask = (1.0 - generated_mask).clamp(0.0, 1.0)
+    # Temporary geometry padding is cropped by Restore, but may still carry
+    # reflected source pixels into the VAE and registered reference attention.
+    temporary_padding_mask = paint_geometry.get("working_krea_padding_mask")
+    if temporary_padding_mask is None:
+        temporary_padding_mask = torch.zeros_like(expansion_mask)
+    else:
+        temporary_padding_mask = temporary_padding_mask.to(device=hard_mask.device, dtype=hard_mask.dtype).clamp(0.0, 1.0)
+        if temporary_padding_mask.shape != expansion_mask.shape:
+            raise ValueError("[Krea2 CcC Paint Prepare] working_krea_padding_mask must match working_mask geometry.")
+    has_expansion = bool((expansion_mask > 0.0).any().item())
 
-    # Explicit outpaint expansion is still fully generable, but its Geometry padding
-    # (edge/reflect/neutral/white) remains visible to the semantic/appearance reference.
-    # This carries border color and lighting continuity into AnyPaint instead of replacing
-    # the whole new margin with one neutral tone. Manual masks, temporary Krea padding,
-    # and any grow/feather that reaches into known pixels remain neutralized.
-    semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
+    # Keep inpainting's existing semantic masking unchanged. For outpainting,
+    # the expansion pixels are a generation canvas, not reference content.
+    # Removing those fill pixels from Qwen and K/V conditioning prevents edge
+    # and reflect padding from being learned as a scene to preserve. The
+    # original image, including any overlap from mask grow, remains visible.
+    if has_expansion:
+        user_mask = paint_geometry.get("working_user_mask")
+        if user_mask is None:
+            user_mask = (hard_mask - expansion_mask).clamp(0.0, 1.0)
+        else:
+            user_mask = user_mask.to(device=hard_mask.device, dtype=hard_mask.dtype).clamp(0.0, 1.0)
+            if user_mask.shape != hard_mask.shape:
+                raise ValueError("[Krea2 CcC Paint Prepare] working_user_mask must match working_mask geometry.")
+        if fill_holes:
+            user_mask = _fill_mask_holes(user_mask)
+        user_semantic_mask = _apply_feather(
+            _grow_or_shrink(user_mask, int(mask_grow)),
+            mode=mask_blur_mode,
+            amount=float(mask_blur_amount),
+            direction=mask_blur_direction,
+        )
+        semantic_neutralize_mask = torch.maximum(
+            torch.maximum(expansion_mask, temporary_padding_mask), user_semantic_mask
+        ).clamp(0.0, 1.0)
+        # Compute neutral color from actual source pixels only, excluding
+        # both requested expansion and discarded geometry padding.
+        semantic_fill = _neutral_fill(known_image, 1.0 - semantic_neutralize_mask)
+    else:
+        semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
+        semantic_fill = _neutral_fill(known_image, keep_mask)
     semantic_keep_mask = (1.0 - semantic_neutralize_mask).clamp(0.0, 1.0)
-    semantic_fill = _neutral_fill(known_image, keep_mask)
     semantic_full = (
         known_image * semantic_keep_mask.unsqueeze(-1).to(known_image.dtype)
         + semantic_fill * semantic_neutralize_mask.unsqueeze(-1).to(known_image.dtype)
@@ -222,10 +262,56 @@ def prepare_paint_context(
     semantic_reference = _downscale_semantic_reference(semantic_full)
 
     reference_latent = _extract_latent(vae.encode(semantic_reference))
-    known_latent = _extract_latent(vae.encode(known_image))
+    # Pure inpaint keeps the original binary, token-aligned AnyPaint mask.
+    # In outpaint, a zero blur amount must be truly binary: no hidden feather.
+    # When explicitly enabled, blur follows the selected mode and direction.
+    if has_expansion:
+        non_source_mask = torch.maximum(expansion_mask, temporary_padding_mask)
+        sampling_image = (
+            known_image * (1.0 - non_source_mask).unsqueeze(-1)
+            + semantic_fill * non_source_mask.unsqueeze(-1)
+        ).clamp(0.0, 1.0)
+    else:
+        sampling_image = known_image
+    known_latent = _extract_latent(vae.encode(sampling_image))
     latent_tensor = _ensure_image_latent_5d(known_latent)
     latent_h, latent_w = latent_tensor.shape[-2:]
-    noise_mask = _token_aligned_soft_noise_mask(generated_mask, latent_h, latent_w, patch_size=2).to(device=known_latent.device, dtype=known_latent.dtype)
+    if has_expansion:
+        # Expand into the original image by mask_grow, independent of padding.
+        # Do not silently introduce blur when mask_blur_amount is zero.
+        expansion_for_denoise = _grow_or_shrink(expansion_mask, int(mask_grow))
+        if float(mask_blur_amount) > 0.0:
+            expansion_for_denoise = _apply_feather(
+                expansion_for_denoise,
+                mode=mask_blur_mode,
+                amount=float(mask_blur_amount),
+                direction=mask_blur_direction,
+            )
+            expansion_noise_mask = F.interpolate(
+                expansion_for_denoise.unsqueeze(1),
+                size=(latent_h, latent_w),
+                mode="area",
+            )
+        else:
+            expansion_noise_mask = _token_aligned_soft_noise_mask(
+                expansion_for_denoise, latent_h, latent_w, patch_size=2
+            )
+        # Any user-selected inpaint mask remains binary, just as in pure inpaint.
+        user_generated = _apply_feather(
+            _grow_or_shrink(user_mask, int(mask_grow)),
+            mode=mask_blur_mode,
+            amount=float(mask_blur_amount),
+            direction=mask_blur_direction,
+        )
+        user_noise_mask = _token_aligned_soft_noise_mask(
+            user_generated, latent_h, latent_w, patch_size=2
+        )
+        noise_mask = torch.maximum(expansion_noise_mask, user_noise_mask)
+    else:
+        noise_mask = _token_aligned_soft_noise_mask(
+            generated_mask, latent_h, latent_w, patch_size=2
+        )
+    noise_mask = noise_mask.to(device=known_latent.device, dtype=known_latent.dtype)
 
     latent = {"samples": known_latent, "noise_mask": noise_mask}
     context: Dict[str, Any] = {
@@ -254,27 +340,23 @@ class CcCKrea2PaintPrepare:
     RETURN_TYPES = (
         "KREA2_PAINT_CONTEXT",
         "LATENT",
-        "IMAGE",
-        "IMAGE",
-        "MASK",
         "MASK",
         "KREA2_PAINT_GEOMETRY",
+        "IMAGE",
         "STRING",
     )
     RETURN_NAMES = (
         "paint_context",
         "latent",
-        "prepared_image",
-        "semantic_reference",
         "generated_mask",
-        "keep_mask",
         "paint_geometry",
+        "prepared_image",
         "paint_prepare_info",
     )
     FUNCTION = "prepare"
     DESCRIPTION = (
         "Prepares Krea2 Paint from the native image and mask in one step: resolves reversible "
-        "Krea pad/crop geometry without resizing source pixels, applies optional outpaint expansion, "
+        "Krea padding geometry without resizing source pixels, applies optional outpaint expansion, "
         "fills/grows/feathers the mask, creates the semantic reference, VAE-encodes the known canvas, "
         "and returns the sampling latent plus paint_geometry for Paint Restore."
     )
@@ -285,7 +367,6 @@ class CcCKrea2PaintPrepare:
             "required": {
                 "image": ("IMAGE",),
                 "vae": ("VAE",),
-                "geometry_mode": (GEOMETRY_MODES, {"default": "pad"}),
                 "padding_fill": (PADDING_FILLS, {"default": "edge"}),
                 "horizontal_position": (HORIZONTAL_POSITIONS, {"default": "center"}),
                 "vertical_position": (VERTICAL_POSITIONS, {"default": "center"}),
@@ -308,7 +389,6 @@ class CcCKrea2PaintPrepare:
         self,
         image,
         vae,
-        geometry_mode="pad",
         padding_fill="edge",
         horizontal_position="center",
         vertical_position="center",
@@ -326,7 +406,6 @@ class CcCKrea2PaintPrepare:
         paint_geometry, _, _ = prepare_paint_geometry(
             image=image,
             mask=mask,
-            geometry_mode=geometry_mode,
             padding_fill=padding_fill,
             horizontal_position=horizontal_position,
             vertical_position=vertical_position,
@@ -348,14 +427,22 @@ class CcCKrea2PaintPrepare:
         context, latent, prepared_image, semantic_reference, generated_mask, keep_mask = result
 
         transform = paint_geometry.get("transform", {})
+        original_mask = paint_geometry["working_user_mask"]
+        padding_mask = paint_geometry["working_krea_padding_mask"]
+        active_mask = generated_mask > 0.5
+        source_region = paint_geometry["working_krea_padding_mask"] < 0.5
+        user_pixels = int((original_mask > 0.5).sum().item())
+        generated_pixels = int(active_mask.sum().item())
+        source_pixels = int(source_region.sum().item())
+        padding_pixels = int((padding_mask > 0.5).sum().item())
         info = "\n".join([
             "=== Krea2 CcC Paint Prepare ===",
-            f"Geometry Mode: {geometry_mode}",
+            "Geometry Mode: pad",
             f"Source: {paint_geometry['source_width']} x {paint_geometry['source_height']}",
             f"Requested Canvas: {paint_geometry['base_width']} x {paint_geometry['base_height']}",
             f"Krea Working Geometry: {paint_geometry['target_width']} x {paint_geometry['target_height']}",
             f"Position: {horizontal_position} / {vertical_position}",
-            f"Padding Fill: {padding_fill if geometry_mode == 'pad' or any((expand_left, expand_top, expand_right, expand_bottom)) else '<unused>'}",
+            f"Padding Fill: {padding_fill}",
             f"Transform: {transform}",
             f"Fill Holes: {'yes' if fill_holes else 'no'}",
             f"Mask Grow: {mask_grow}px",
@@ -363,15 +450,25 @@ class CcCKrea2PaintPrepare:
             f"Expansion Context Pixels: {int((context['expansion_context_mask'] > 0.5).sum())}",
             f"Semantic Reference: {semantic_reference.shape[2]}x{semantic_reference.shape[1]} max-edge {_SEMANTIC_REFERENCE_MAX_EDGE}px",
             f"Generated Mask Range: {float(generated_mask.min()):.3f}..{float(generated_mask.max()):.3f}",
-            "Latent: known-image samples + token-aligned noise_mask",
+            f"User Mask Coverage: {user_pixels}/{source_pixels} ({100.0 * user_pixels / max(1, source_pixels):.2f}%)",
+            f"Generated Mask Coverage: {generated_pixels}/{source_pixels} ({100.0 * generated_pixels / max(1, source_pixels):.2f}%)",
+            f"Temporary Padding Coverage: {padding_pixels}/{int(padding_mask.numel())} ({100.0 * padding_pixels / max(1, padding_mask.numel()):.2f}%)",
+            f"Generated Pixels In Temporary Padding: {int((active_mask & (padding_mask > 0.5)).sum().item())}",
+            "Latent: known-image samples + " + (
+                (
+                    "soft outpaint transition / binary user-inpaint noise_mask"
+                    if float(mask_blur_amount) > 0.0
+                    else "binary outpaint / binary user-inpaint token noise_mask"
+                )
+                if bool((context["expansion_context_mask"] > 0).any().item())
+                else "AnyPaint-compatible binary token noise_mask"
+            ),
         ])
         return (
             context,
             latent,
-            prepared_image,
-            semantic_reference,
             generated_mask,
-            keep_mask,
             paint_geometry,
+            prepared_image,
             info,
         )

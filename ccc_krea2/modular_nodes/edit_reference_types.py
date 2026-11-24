@@ -7,13 +7,18 @@ import torch
 
 
 @dataclass(frozen=True)
+class ImageReferenceEntry:
+    """Always-present image, without active conditioning."""
+    image: torch.Tensor
+
+
+@dataclass(frozen=True)
 class VisualReferenceEntry:
     """One visual edit reference before Qwen/VAE preparation."""
 
     image: Optional[torch.Tensor] = None
-    boost: float = 1.0
-    reference_boost_mask: Optional[torch.Tensor] = None
-    target_attention_mask: Optional[torch.Tensor] = None
+    boost: float = 0.0
+    attention_weight_map: Optional[torch.Tensor] = None
     reference_fit: str = "native"
     rope_mode: str = "spatial"
     reference_stack: str = "overlay"
@@ -25,7 +30,6 @@ class VisualReferenceEntry:
     semantic_resize: bool = True
     semantic_grounding_px: int = 768
     prompt_annotation: str = ""
-    attention_scope: str = "global"
 
     @property
     def rope_position(self) -> str:
@@ -44,26 +48,25 @@ class VisualReferenceEntry:
 
 @dataclass(frozen=True)
 class VisionReferenceEntry:
-    """One Qwen-only Vision Reference before vision preparation."""
+    """Qwen image and optional user instruction; mode controls token retention only."""
 
     image: torch.Tensor
-    mode: str = "semantic_only"
+    mode: str = "visual"
     instruction: str = ""
-    processing: str = "full"
-    guidance_seed_mode: str = "fixed"
-    guidance_seed_configured: int = 0
-    guidance_seed: int = 0
-    guidance_detail: str = "balanced"
-    vision_guidance: str = "balanced"
+    vision_weight: float = 1.0
+    # Paired with the preceding VAE/RoPE appearance reference in unified Reference.
+    paired_visual: bool = False
+    # Original source image (before the optional Qwen downscale).
+    source_image: Optional[torch.Tensor] = None
 
 
 @dataclass(frozen=True)
 class EditReferenceChain:
     """One ordered chain containing both appearance and Qwen-only references."""
 
-    entries: Tuple[VisualReferenceEntry | VisionReferenceEntry, ...] = ()
+    entries: Tuple[ImageReferenceEntry | VisualReferenceEntry | VisionReferenceEntry, ...] = ()
 
-    def append(self, entry: VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
+    def append(self, entry: ImageReferenceEntry | VisualReferenceEntry | VisionReferenceEntry) -> "EditReferenceChain":
         return EditReferenceChain(self.entries + (entry,))
 
     def __len__(self) -> int:

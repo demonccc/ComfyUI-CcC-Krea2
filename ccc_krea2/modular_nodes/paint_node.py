@@ -12,9 +12,16 @@ from ..paint_patch import patch_krea2_paint_model
 from ..patch import _conditioning_set_values
 
 
-def _encode_qwen_with_reference(clip: Any, prompt: str, image: torch.Tensor):
+def _encode_qwen_with_reference(
+    clip: Any, prompt: str, image: torch.Tensor, outfit_reference: torch.Tensor | None = None
+):
     image_prefix = "Picture 1: <|vision_start|><|image_pad|><|vision_end|>"
     images = [image]
+    if outfit_reference is not None:
+        if outfit_reference.ndim != 4 or outfit_reference.shape[-1] < 3:
+            raise ValueError("[Krea2 CcC Paint] outfit_reference must be an IMAGE [B,H,W,C].")
+        images.append(outfit_reference[..., :3].clamp(0.0, 1.0))
+        image_prefix += " Picture 2: <|vision_start|><|image_pad|><|vision_end|>"
     try:
         from comfy.text_encoders.krea2 import KREA2_TEMPLATE
         tokens = clip.tokenize(image_prefix + (prompt or ""), images=images, llama_template=KREA2_TEMPLATE)
@@ -66,10 +73,11 @@ class CcCKrea2Paint:
             },
             "optional": {
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
+                "outfit_reference": ("IMAGE",),
             },
         }
 
-    def process(self, model, clip, paint_context: Dict[str, Any], positive_prompt="", apply_krea2_paint_patch=True, kv_cache=True, prompt_augmentation=None):
+    def process(self, model, clip, paint_context: Dict[str, Any], positive_prompt="", apply_krea2_paint_patch=True, kv_cache=True, prompt_augmentation=None, outfit_reference=None):
         if not isinstance(paint_context, dict):
             raise ValueError("[Krea2 CcC Paint] paint_context is invalid.")
         required = ("semantic_reference", "reference_latent", "generated_mask", "keep_mask")
@@ -81,7 +89,7 @@ class CcCKrea2Paint:
         reference_latent = paint_context["reference_latent"]
 
         positive_prompt, _ = apply_prompt_augmentation(positive_prompt, "", prompt_augmentation)
-        positive = _encode_qwen_with_reference(clip, positive_prompt, semantic_reference)
+        positive = _encode_qwen_with_reference(clip, positive_prompt, semantic_reference, outfit_reference)
         negative = _encode_negative(clip)
         positive = _conditioning_set_values(positive, {"reference_latents": [reference_latent]})
         if negative:
@@ -99,7 +107,7 @@ class CcCKrea2Paint:
             f"Canvas: {paint_context.get('canvas_width')}x{paint_context.get('canvas_height')}",
             f"Geometry Mode: {paint_context.get('geometry_mode')}",
             f"Semantic Reference: {semantic_reference.shape[2]}x{semantic_reference.shape[1]}",
-            "Qwen: Picture 1 grounded reference",
+            "Qwen: Picture 1 grounded reference" + (" + Picture 2 outfit reference" if outfit_reference is not None else ""),
             "Appearance Reference: pre-encoded Paint Prepare latent",
             "Reference Placement: registered over complete target grid",
             f"Runtime: {runtime}",

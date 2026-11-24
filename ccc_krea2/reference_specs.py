@@ -45,36 +45,20 @@ class ReferenceSpec:
 
     # Visual/edit path
     appearance_reference: bool = True
-    attention_boost: float = 1.0
-    attention_mask: Optional[torch.Tensor] = None
+    attention_boost: float = 0.0
+    attention_weight_map: Optional[torch.Tensor] = None
     visual_reference_fit: str = "native"
     visual_resize_method: str = "lanczos"
     rope_position: str = "inside:center:center"
 
-    # Qwen-only Vision Reference processing
+    # Qwen Vision reference processing
     vision_reference_mode: str = ""
-    vision_summary_rows: int = 0
-    vision_indirect: bool = False
-    semantic_extract: str = "none"
-    semantic_strength: float = 1.0
-    indirect_vision_context: bool = False
+    vision_weight: float = 1.0
 
-    # Style path
-    style_fidelity: float = 0.5
-    style_processing: str = "2x2"
-    indirect_style_transfer: bool = True
 
     @property
     def role(self) -> str:
         return self.reference_path
-
-
-@dataclass(frozen=True)
-class StyleReferenceSpec(ReferenceSpec):
-    """Reference that contributes style information through Qwen Vision."""
-
-    reference_path: str = "style"
-    appearance_reference: bool = False
 
 
 @dataclass(frozen=True)
