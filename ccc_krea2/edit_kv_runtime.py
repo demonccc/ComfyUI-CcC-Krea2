@@ -115,17 +115,14 @@ def krea2_dit_edit_kv_forward(
     target_h = (x.shape[-2] + patch - 1) // patch
     target_w = (x.shape[-1] + patch - 1) // patch
     batch_size = x.shape[0] * (x.shape[2] if x.ndim == 5 else 1)
-    # Only determine token lengths here: the actual text sequence is unpacked
-    # inside the Paint-style K/V forward, whose arguments are identical.
-    unpacked_context = dit_model._unpack_context(context)
-    txt_len = dit_model.txtmlp(
-        dit_model.txtfusion(unpacked_context, mask=None, transformer_options=transformer_options)
-    ).shape[1]
-    bias = _edit_kv_reference_bias(
-        batch_size=batch_size, txt_len=txt_len,
-        target_len=target_h * target_w, ref_grids=grids,
-        boosts=boosts, attention_maps=maps, device=x.device, dtype=x.dtype,
-    )
+    # The shared K/V forward constructs text tokens once. Defer construction
+    # of the attention bias until the true fused text length is known.
+    def make_bias(txt_len: int, target_len: int):
+        return _edit_kv_reference_bias(
+            batch_size=batch_size, txt_len=txt_len,
+            target_len=target_len, ref_grids=grids,
+            boosts=boosts, attention_maps=maps, device=x.device, dtype=x.dtype,
+        )
 
     if kv_state is None:
         kv_state = {"last_timestep": None, "entries": {}}
@@ -145,5 +142,5 @@ def krea2_dit_edit_kv_forward(
 
     return _forward_with_registered_reference_kv(
         dit_model, x, timesteps, context, cached_kv, transformer_options,
-        reference_bias=bias,
+        reference_bias=make_bias,
     )
