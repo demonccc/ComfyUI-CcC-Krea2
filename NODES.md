@@ -333,7 +333,9 @@ image + mask
  -> sampling LATENT
 ~~~
 
-For inpainting, Paint Prepare neutralizes the selected pixels **before VAE encoding the sampling LATENT**, not only in the semantic reference. The source image is retained for preview, while the sampling latent does not retain the masked subject. Outside the generated mask, source pixels are preserved. Explicit outpaint expansion remains visible as padding-fill context.\n\nThe known source image is not resized during Paint geometry normalization.
+For inpainting, Paint Prepare neutralizes the selected pixels **before VAE encoding the sampling LATENT**, not only in the semantic reference. The source image is retained for preview, while the sampling latent does not retain the masked subject. Outside the generated mask, source pixels are preserved. Explicit outpaint expansion remains visible as padding-fill context.\n\nPaint Prepare chooses the smallest supported Krea canvas that contains the source and any requested outpaint expansion; it does not favor an exact aspect match when that would add substantially more temporary padding. `paint_prepare_info` also reports the user/generated mask coverage and how much padding was added.
+
+The known source image is not resized during Paint geometry normalization.
 
 The semantic reference and keep mask are still computed internally and kept in `paint_context`; they are no longer separate node outputs. The remaining image and mask outputs allow visual inspection without redundant sockets.
 
