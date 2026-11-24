@@ -163,23 +163,51 @@ def test_outpaint_sampling_latent_is_independent_of_padding_fill_pixels():
         torch.testing.assert_close(candidate, sampler_inputs[0])
 
 
-def test_outpaint_sampler_has_soft_boundary_while_pure_inpaint_stays_binary():
+def _outpaint_denoise_mask(*, grow=0, blur=0.0, mode="gaussian_sigma", direction="outside"):
     geometry = _geometry(height=64, width=64)
     expansion = torch.zeros_like(geometry["working_mask"])
     expansion[:, :, 32:] = 1.0
     geometry["working_mask"] = expansion.clone()
     geometry["working_expansion_mask"] = expansion
     geometry["working_user_mask"] = torch.zeros_like(expansion)
-    _, out_latent, _, _, _, _ = prepare_paint_context(
-        FakeVAE(), geometry, mask_grow=0,
-        mask_blur_mode="gaussian_sigma", mask_blur_amount=0.0,
-        mask_blur_direction="outside",
+    _, latent, _, _, _, _ = prepare_paint_context(
+        FakeVAE(), geometry, mask_grow=grow,
+        mask_blur_mode=mode, mask_blur_amount=blur,
+        mask_blur_direction=direction,
     )
-    out_mask = out_latent["noise_mask"]
-    assert out_mask.shape == (1, 1, 8, 8)
-    assert torch.any((out_mask > 0.0) & (out_mask < 1.0))
-    assert out_mask[0, 0, 4, 0] < out_mask[0, 0, 4, 7]
+    return latent["noise_mask"]
 
+
+def test_outpaint_blur_zero_is_binary_and_matches_token_aligned_grown_mask():
+    for grow in (0, 8, 16):
+        mask = _outpaint_denoise_mask(grow=grow, blur=0.0)
+        assert mask.shape == (1, 1, 8, 8)
+        assert torch.all((mask == 0) | (mask == 1))
+
+        expansion = torch.zeros((1, 64, 64))
+        expansion[:, :, 32:] = 1.0
+        expected = _token_aligned_soft_noise_mask(
+            _grow_or_shrink(expansion, grow), latent_h=8, latent_w=8, patch_size=2
+        )
+        torch.testing.assert_close(mask, expected)
+
+
+def test_outpaint_explicit_blur_produces_soft_mask_and_honors_direction():
+    no_blur = _outpaint_denoise_mask(blur=0.0)
+    outside = _outpaint_denoise_mask(blur=4.0, direction="outside")
+    inside = _outpaint_denoise_mask(blur=4.0, direction="inside")
+    both = _outpaint_denoise_mask(blur=4.0, direction="both")
+    assert torch.any((outside > 0.0) & (outside < 1.0))
+    assert torch.any((inside > 0.0) & (inside < 1.0))
+    assert torch.any((both > 0.0) & (both < 1.0))
+    assert not torch.equal(outside, no_blur)
+    assert not torch.equal(inside, no_blur)
+    assert torch.all(outside >= both)
+    assert torch.all(both >= inside)
+    assert not torch.equal(_outpaint_denoise_mask(blur=4.0, mode="standard"), outside)
+
+
+def test_pure_inpaint_noise_mask_remains_binary_even_with_blur():
     in_geometry = _geometry(height=64, width=64)
     in_geometry["working_mask"][:, 20:44, 20:44] = 1.0
     _, in_latent, _, _, _, _ = prepare_paint_context(
