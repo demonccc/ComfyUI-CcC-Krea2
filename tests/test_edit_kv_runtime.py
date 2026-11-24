@@ -68,3 +68,73 @@ def test_joint_and_kv_both_register_edit_wrapper_without_mutating_original():
     assert hasattr(joint, "wrapper")
     assert hasattr(cached, "wrapper")
     assert not hasattr(original, "wrapper")
+
+
+
+def test_kv_runtime_caches_reference_and_passes_boost_maps(monkeypatch):
+    from ccc_krea2 import edit_kv_runtime
+
+    class FakeDit:
+        patch = 2
+
+    source = torch.ones((1, 16, 8, 8))
+    state = {"last_timestep": None, "entries": {}}
+    calls = {"precompute": 0, "forward": 0}
+
+    def fake_precompute(*args, **kwargs):
+        calls["precompute"] += 1
+        assert kwargs["rope_positions"] == ["inside:center:center"]
+        return [("keys", "values")]
+
+    def fake_forward(*args, **kwargs):
+        calls["forward"] += 1
+        bias = kwargs["reference_bias"](txt_len=2, target_len=16)
+        assert bias.shape == (1, 1, 18, 34)
+        assert torch.isneginf(bias[:, :, 2:, 18:]).all()
+        return args[1]
+
+    monkeypatch.setattr(edit_kv_runtime, "_precompute_registered_reference_kv", fake_precompute)
+    monkeypatch.setattr(edit_kv_runtime, "_forward_with_registered_reference_kv", fake_forward)
+
+    for _ in range(2):
+        result = edit_kv_runtime.krea2_dit_edit_kv_forward(
+            dit_model=FakeDit(), x=source, timesteps=torch.tensor([1.0]),
+            context=torch.zeros((1, 2, 16)), ref_latents=[source],
+            ref_boosts=[-5.0], ref_rope_positions=["inside:center:center"],
+            kv_state=state,
+        )
+        torch.testing.assert_close(result, source)
+    assert calls == {"precompute": 1, "forward": 2}
+
+
+def test_edit_wrapper_dispatches_to_selected_path(monkeypatch):
+    from ccc_krea2 import patch
+    from ccc_krea2 import edit_kv_runtime
+
+    calls = []
+
+    def joint(**kwargs):
+        calls.append("joint")
+        return kwargs["x"]
+
+    def kv(**kwargs):
+        calls.append("kv")
+        return kwargs["x"]
+
+    monkeypatch.setattr(patch, "krea2_dit_incontext_forward", joint)
+    monkeypatch.setattr(edit_kv_runtime, "krea2_dit_edit_kv_forward", kv)
+
+    class Executor:
+        class_obj = object()
+
+    x = torch.zeros((1, 16, 8, 8))
+    context = torch.zeros((1, 2, 16))
+    ref = torch.ones_like(x)
+    for enabled in (False, True):
+        model = patch_krea2_model(FakeModel(), use_kv_reference=enabled)
+        output = model.wrapper(
+            Executor(), x, torch.tensor([1.0]), context,
+            ref_latents=[ref], transformer_options={},
+        )
+        torch.testing.assert_close(output, x)
+    assert calls == ["joint", "kv"]
