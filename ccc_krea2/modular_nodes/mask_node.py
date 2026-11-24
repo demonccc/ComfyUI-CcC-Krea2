@@ -86,7 +86,7 @@ def _composite_color_rgb(value, device, dtype):
 
 
 def _composite_attention_image(image, regions, composite_color="#000000"):
-    """Last Mask Wins in pixel space; -5 darkens 90%, +5 darkens 5%.
+    """Last Mask Wins in pixel space; -5 is fully opaque, +5 overlays 5%.
 
     Pixels outside all regions remain unchanged. This is a Vision-friendly
     rendered IMAGE, independent of the Reference node global Boost.
@@ -101,7 +101,7 @@ def _composite_attention_image(image, regions, composite_color="#000000"):
         selection = region.mask.to(image.device) > 0.5
         effective = torch.where(selection, float(region.boost), effective)
         selected_any |= selection
-    opacity = ((0.90 - 0.85 * ((effective + 5.0) / 10.0)) * selected_any).unsqueeze(-1)
+    opacity = ((1.0 - 0.95 * ((effective + 5.0) / 10.0)) * selected_any).unsqueeze(-1)
     rgb = image[..., :3]
     color = _composite_color_rgb(composite_color, rgb.device, rgb.dtype)
     return (rgb * (1.0 - opacity) + color * opacity).clamp(0.0, 1.0)
