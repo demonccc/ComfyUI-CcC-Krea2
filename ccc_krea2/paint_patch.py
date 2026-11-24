@@ -230,6 +230,22 @@ def _block_with_optional_reference_kv(
     return x
 
 
+def _isolated_reference_bias(
+    reference_lengths: Sequence[int], *, batch_size: int, device: torch.device,
+    dtype: torch.dtype,
+) -> Optional[torch.Tensor]:
+    """Block off attention between different references during their t=0 K/V pass."""
+    if len(reference_lengths) < 2:
+        return None
+    total = sum(reference_lengths)
+    bias = torch.full((batch_size, 1, total, total), float("-inf"), device=device, dtype=dtype)
+    offset = 0
+    for length in reference_lengths:
+        bias[:, :, offset:offset + length, offset:offset + length] = 0.0
+        offset += length
+    return bias
+
+
 def _precompute_registered_reference_kv(
     dit_model: Any,
     x: torch.Tensor,
@@ -237,6 +253,7 @@ def _precompute_registered_reference_kv(
     refs: Sequence[torch.Tensor],
     transformer_options: Dict[str, Any],
     rope_positions: Optional[Sequence[str]] = None,
+    isolate_references: bool = False,
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     temporal = x.ndim == 5
     batch_size = x.shape[0] * (x.shape[2] if temporal else 1)
@@ -256,6 +273,16 @@ def _precompute_registered_reference_kv(
         rope_positions=rope_positions,
     )
     hidden = dit_model.first(ref_tokens)
+    reference_bias = None
+    if isolate_references:
+        reference_lengths = [
+            ((ref.shape[-2] + patch_size - 1) // patch_size)
+            * ((ref.shape[-1] + patch_size - 1) // patch_size)
+            for ref in refs
+        ]
+        reference_bias = _isolated_reference_bias(
+            reference_lengths, batch_size=batch_size, device=x.device, dtype=hidden.dtype,
+        )
 
     zero = torch.zeros_like(timesteps)
     t0 = _timestep_embedding(zero, getattr(dit_model, "tdim", 256)).unsqueeze(1).to(hidden.dtype)
@@ -277,6 +304,7 @@ def _precompute_registered_reference_kv(
             ref_vec,
             freqs,
             kv_capture=capture,
+            reference_bias=reference_bias,
             transformer_options=block_options,
         )
         caches.append(capture[0])
