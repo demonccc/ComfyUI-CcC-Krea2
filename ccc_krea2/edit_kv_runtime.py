@@ -137,6 +137,7 @@ def krea2_dit_edit_kv_forward(
         cached_kv = _precompute_registered_reference_kv(
             dit_model, x, timesteps, ref_latents, transformer_options,
             rope_positions=rope,
+            isolate_references=True,
         )
         kv_state["entries"][key] = cached_kv
 
