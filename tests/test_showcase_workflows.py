@@ -13,12 +13,15 @@ import pytest
 WORKFLOWS_DIR = Path(__file__).resolve().parents[1] / "workflows"
 SCENARIOS = (
     "01_creative_generation.json",
-    "02_outpainting_reframing.json",
-    "03_local_image_editing.json",
-    "04_identity_scene_transfer.json",
-    "05_character_consistency.json",
-    "06_outfit_transfer.json",
-    "07_scene_composition.json",
+    "02_reference_identity_edit.json",
+    "03_inpaint_remove_object.json",
+    "04_outpainting_reframing.json",
+    "05_inpainting_edit.json",
+    "06_inpaint_outfit_transfer.json",
+    "07_edit_outfit_transfer.json",
+    "08_identity_scene_transfer.json",
+    "09_character_consistency.json",
+    "10_scene_composition.json",
 )
 
 
@@ -60,12 +63,12 @@ def test_showcase_uses_current_custom_controls(filename):
         if node["type"] == "CcCKrea2Reference":
             values = node["widgets_values"]
             assert len(values) == 16
-            assert -5.0 <= values[1] <= 5.0
+            assert -10.0 <= values[1] <= 10.0
             assert values[14] in ("visual", "semantic")
         if node["type"] == "CcCKrea2Mask":
             values = node["widgets_values"]
             assert len(values) == 7
-            assert -5.0 <= values[2] <= 5.0
+            assert -10.0 <= values[2] <= 10.0
             assert isinstance(values[4], str)  # composite_color
             assert isinstance(values[5], bool)  # invert
             assert isinstance(values[6], bool)  # unload_sam_model must be last
@@ -102,9 +105,18 @@ def test_creative_t2i_uses_native_prompt_input():
 
 def test_character_identity_mask_has_final_priority():
     graph = json.loads(
-        (WORKFLOWS_DIR / SCENARIOS[4]).read_text(encoding="utf-8")
+        (WORKFLOWS_DIR / "09_character_consistency.json").read_text(encoding="utf-8")
     )
     nodes = {n["id"]: n for n in graph["nodes"]}
     assert nodes[71]["widgets_values"][1] == "body"
     assert nodes[72]["widgets_values"][1] == "face,hair"
     assert nodes[72]["widgets_values"][2] > nodes[71]["widgets_values"][2]
+
+def test_inpaint_outfit_transfer_uses_second_outfit_image():
+    graph = json.loads((WORKFLOWS_DIR / "06_inpaint_outfit_transfer.json").read_text(encoding="utf-8"))
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    paint = next(n for n in nodes.values() if n["type"] == "CcCKrea2Paint")
+    outfit_socket = next(i for i in paint["inputs"] if i["name"] == "outfit_reference")
+    link = next(l for l in graph["links"] if l[0] == outfit_socket["link"])
+    assert nodes[link[1]]["type"] == "LoadImage"
+    assert "Picture 2" in paint["widgets_values_named"]["positive_prompt"]
