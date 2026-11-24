@@ -211,12 +211,29 @@ def prepare_paint_context(
     )
     keep_mask = (1.0 - generated_mask).clamp(0.0, 1.0)
 
-    # Explicit outpaint expansion is still fully generable, but its Geometry padding
-    # (edge/reflect/neutral/white) remains visible to the semantic/appearance reference.
-    # This carries border color and lighting continuity into AnyPaint instead of replacing
-    # the whole new margin with one neutral tone. Manual masks, temporary Krea padding,
-    # and any grow/feather that reaches into known pixels remain neutralized.
-    semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
+    # Expansion padding is visual guidance, not a user-selected region to hide.
+    # Keep both its fill pixels and the original pixels along the overlap visible
+    # to Qwen / reference K/V, even when mask grow or feather extends inward.
+    # For combined inpaint + outpaint, only the user mask is neutralized.
+    # Without expansion, retain the existing inpainting behavior exactly.
+    if bool((expansion_mask > 0.0).any().item()):
+        user_mask = paint_geometry.get("working_user_mask")
+        if user_mask is None:
+            user_mask = (hard_mask - expansion_mask).clamp(0.0, 1.0)
+        else:
+            user_mask = user_mask.to(device=hard_mask.device, dtype=hard_mask.dtype).clamp(0.0, 1.0)
+            if user_mask.shape != hard_mask.shape:
+                raise ValueError("[Krea2 CcC Paint Prepare] working_user_mask must match working_mask geometry.")
+        if fill_holes:
+            user_mask = _fill_mask_holes(user_mask)
+        semantic_neutralize_mask = _apply_feather(
+            _grow_or_shrink(user_mask, int(mask_grow)),
+            mode=mask_blur_mode,
+            amount=float(mask_blur_amount),
+            direction=mask_blur_direction,
+        )
+    else:
+        semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
     semantic_keep_mask = (1.0 - semantic_neutralize_mask).clamp(0.0, 1.0)
     semantic_fill = _neutral_fill(known_image, keep_mask)
     semantic_full = (
