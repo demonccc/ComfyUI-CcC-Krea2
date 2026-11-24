@@ -248,8 +248,21 @@ def prepare_paint_context(
     reference_latent = _extract_latent(vae.encode(semantic_reference))
     # Match AnyPaint's known-region sampling contract: retain the known canvas
     # as the latent, and use a binary, token-aligned noise mask to replace
-    # selected tokens during denoising. The semantic reference remains masked.
-    known_latent = _extract_latent(vae.encode(known_image))
+    # selected tokens during denoising.
+    #
+    # The outpaint expansion is fully regenerated, but the VAE still encodes its
+    # initial pixels. Edge/reflect fills can therefore seed repeated scenery
+    # even when the Qwen/K/V reference is neutralized. Initialize ONLY the
+    # explicit expansion with the same source-derived neutral color instead.
+    # Pure inpaint follows the original unmodified known-image path.
+    if bool((expansion_mask > 0.0).any().item()):
+        sampling_image = (
+            known_image * (1.0 - expansion_mask).unsqueeze(-1)
+            + semantic_fill * expansion_mask.unsqueeze(-1)
+        ).clamp(0.0, 1.0)
+    else:
+        sampling_image = known_image
+    known_latent = _extract_latent(vae.encode(sampling_image))
     latent_tensor = _ensure_image_latent_5d(known_latent)
     latent_h, latent_w = latent_tensor.shape[-2:]
     noise_mask = _token_aligned_soft_noise_mask(generated_mask, latent_h, latent_w, patch_size=2).to(device=known_latent.device, dtype=known_latent.dtype)
