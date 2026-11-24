@@ -174,7 +174,7 @@ def is_model_already_patched(model: Any, patch_key: str = "ccc_krea2_edit") -> b
     return False
 
 
-def patch_krea2_model(model: Any, *, use_kv_reference: bool = False) -> Any:
+def patch_krea2_model(model: Any) -> Any:
     """Clone MODEL and register the Krea2 CcC Edit runtime wrapper that consumes references from CONDITIONING."""
     if is_model_already_patched(model, "ccc_krea2_edit"):
         raise RuntimeError(
@@ -184,7 +184,6 @@ def patch_krea2_model(model: Any, *, use_kv_reference: bool = False) -> Any:
     install_krea2_reference_conditioning()
     patched_model = model.clone()
     patched_model._ccc_patch_key = "ccc_krea2_edit"
-    kv_state: Dict[str, Any] = {"last_timestep": None, "entries": {}}
 
     def krea2_edit_wrapper(
         executor: Any,
@@ -234,22 +233,6 @@ def patch_krea2_model(model: Any, *, use_kv_reference: bool = False) -> Any:
             for v in _normalize_runtime_list(kwargs.get("ccc_ref_rope_positions"), count, "none")
         ]
         attention_maps = _normalize_runtime_list(kwargs.get("ccc_ref_attention_maps"), count, None)
-
-        if use_kv_reference:
-            from .edit_kv_runtime import krea2_dit_edit_kv_forward
-
-            return krea2_dit_edit_kv_forward(
-                dit_model=dit_model,
-                x=x,
-                timesteps=timesteps,
-                context=context,
-                ref_latents=ref_latents,
-                ref_boosts=boosts,
-                ref_rope_positions=rope_positions,
-                ref_attention_maps=attention_maps,
-                transformer_options=transformer_options,
-                kv_state=kv_state,
-            )
 
         return krea2_dit_incontext_forward(
             dit_model=dit_model,
