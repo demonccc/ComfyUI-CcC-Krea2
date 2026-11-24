@@ -163,6 +163,66 @@ def test_outpaint_sampling_latent_is_independent_of_padding_fill_pixels():
         torch.testing.assert_close(candidate, sampler_inputs[0])
 
 
+def test_outpaint_sampler_has_soft_boundary_while_pure_inpaint_stays_binary():
+    geometry = _geometry(height=64, width=64)
+    expansion = torch.zeros_like(geometry["working_mask"])
+    expansion[:, :, 32:] = 1.0
+    geometry["working_mask"] = expansion.clone()
+    geometry["working_expansion_mask"] = expansion
+    geometry["working_user_mask"] = torch.zeros_like(expansion)
+    _, out_latent, _, _, _, _ = prepare_paint_context(
+        FakeVAE(), geometry, mask_grow=0,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    )
+    out_mask = out_latent["noise_mask"]
+    assert out_mask.shape == (1, 1, 8, 8)
+    assert torch.any((out_mask > 0.0) & (out_mask < 1.0))
+    assert out_mask[0, 0, 4, 0] < out_mask[0, 0, 4, 7]
+
+    in_geometry = _geometry(height=64, width=64)
+    in_geometry["working_mask"][:, 20:44, 20:44] = 1.0
+    _, in_latent, _, _, _, _ = prepare_paint_context(
+        FakeVAE(), in_geometry, mask_grow=0,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=12.0,
+        mask_blur_direction="both",
+    )
+    assert torch.all((in_latent["noise_mask"] == 0) | (in_latent["noise_mask"] == 1))
+
+
+def test_temporary_reflect_padding_is_neutralized_only_for_outpaint():
+    class TrackingVAE(FakeVAE):
+        def __init__(self):
+            self.inputs = []
+
+        def encode(self, image):
+            self.inputs.append(image.clone())
+            return super().encode(image)
+
+    geometry = _geometry(height=64, width=64)
+    geometry["working_image"][:, :, 48:, :] = 0.95
+    expansion = torch.zeros_like(geometry["working_mask"])
+    expansion[:, :, 40:48] = 1.0
+    temporary = torch.zeros_like(expansion)
+    temporary[:, :, 48:] = 1.0
+    geometry["working_mask"] = expansion.clone()
+    geometry["working_expansion_mask"] = expansion
+    geometry["working_krea_padding_mask"] = temporary
+    geometry["working_user_mask"] = torch.zeros_like(expansion)
+    vae = TrackingVAE()
+    context, latent, prepared, semantic, _, _ = prepare_paint_context(
+        vae, geometry, mask_grow=0,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=0.0,
+        mask_blur_direction="outside",
+    )
+    # Neither of the VAE inputs can contain reflected content in the
+    # disposable geometry padding.
+    assert not torch.allclose(vae.inputs[0][:, :, 48:], prepared[:, :, 48:])
+    assert not torch.allclose(vae.inputs[1][:, :, 48:], prepared[:, :, 48:])
+    torch.testing.assert_close(vae.inputs[1][:, :, :40], prepared[:, :, :40])
+    assert torch.all(context["semantic_neutralize_mask"][:, :, 48:] == 1)
+
+
 def test_fill_holes_fills_only_enclosed_mask_interiors():
     ring = torch.zeros((1, 16, 16), dtype=torch.float32)
     ring[:, 3:13, 3] = 1.0
