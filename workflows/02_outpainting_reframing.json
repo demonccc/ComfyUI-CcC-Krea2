@@ -1,4 +1,6 @@
 {
+  "id": "8c841422-0596-4a60-8a76-eac9a1db3684",
+  "revision": 0,
   "last_node_id": 21,
   "last_link_id": 26,
   "nodes": [
@@ -27,6 +29,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "UNETLoader",
         "models": [
           {
@@ -44,7 +48,11 @@
       "widgets_values": [
         "moodyKrea2Mix_v3-Global-FP8.safetensors",
         "default"
-      ]
+      ],
+      "widgets_values_named": {
+        "unet_name": "moodyKrea2Mix_v3-Global-FP8.safetensors",
+        "weight_dtype": "default"
+      }
     },
     {
       "id": 2,
@@ -55,7 +63,7 @@
       ],
       "size": [
         320,
-        100
+        106
       ],
       "flags": {},
       "order": 1,
@@ -71,6 +79,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "CLIPLoader",
         "models": [
           {
@@ -89,7 +99,12 @@
         "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
         "krea2",
         "default"
-      ]
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
+        "type": "krea2",
+        "device": "default"
+      }
     },
     {
       "id": 3,
@@ -117,6 +132,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "VAELoader",
         "models": [
           {
@@ -133,7 +150,10 @@
       },
       "widgets_values": [
         "qwen_image_vae.safetensors"
-      ]
+      ],
+      "widgets_values_named": {
+        "vae_name": "qwen_image_vae.safetensors"
+      }
     },
     {
       "id": 4,
@@ -144,10 +164,10 @@
       ],
       "size": [
         360,
-        250
+        394
       ],
       "flags": {},
-      "order": 3,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
@@ -166,6 +186,8 @@
         }
       ],
       "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "c3f1c6a03f8b8ea26e22ac3a670feba34328060c",
         "Node name for S&R": "CcCKrea2LoRAStack",
         "models": [
           {
@@ -196,21 +218,38 @@
         false,
         "None",
         1
-      ]
+      ],
+      "widgets_values_named": {
+        "lora_1_enabled": true,
+        "lora_1_name": "Krea2/krea2_anypaint_rank32.safetensors",
+        "lora_1_strength": 1,
+        "lora_2_enabled": false,
+        "lora_2_name": "None",
+        "lora_2_strength": 1,
+        "lora_3_enabled": false,
+        "lora_3_name": "None",
+        "lora_3_strength": 1,
+        "lora_4_enabled": false,
+        "lora_4_name": "None",
+        "lora_4_strength": 1,
+        "lora_5_enabled": false,
+        "lora_5_name": "None",
+        "lora_5_strength": 1
+      }
     },
     {
       "id": 5,
       "type": "LoadImage",
       "pos": [
-        0,
-        470
+        -212.93756575566573,
+        493.20480136383503
       ],
       "size": [
         330,
-        300
+        314.00000000000006
       ],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -227,7 +266,10 @@
           "links": []
         }
       ],
+      "title": "SOURCE PHOTO — replace image",
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "LoadImage",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -236,12 +278,11 @@
         }
       },
       "widgets_values": [
-        "outpaint_source.png",
+        "videl_sano_br.avif",
         "image"
       ],
-      "title": "SOURCE PHOTO — replace image",
       "widgets_values_named": {
-        "image": "outpaint_source.png",
+        "image": "videl_sano_br.avif",
         "upload": "image"
       }
     },
@@ -257,7 +298,7 @@
         620
       ],
       "flags": {},
-      "order": 5,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -319,7 +360,10 @@
           "links": []
         }
       ],
+      "title": "Paint Prepare - Outpaint Expansion",
       "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "c3f1c6a03f8b8ea26e22ac3a670feba34328060c",
         "Node name for S&R": "CcCKrea2PaintPrepare",
         "ue_properties": {
           "version": "8.0.1",
@@ -340,7 +384,7 @@
         }
       },
       "widgets_values": [
-        "reflect",
+        "edge",
         "center",
         "center",
         288,
@@ -348,12 +392,25 @@
         288,
         224,
         false,
-        0,
+        100,
         "gaussian_sigma",
-        0,
-        "outside"
+        30,
+        "both"
       ],
-      "title": "Paint Prepare - Outpaint Expansion"
+      "widgets_values_named": {
+        "padding_fill": "edge",
+        "horizontal_position": "center",
+        "vertical_position": "center",
+        "expand_left": 288,
+        "expand_top": 160,
+        "expand_right": 288,
+        "expand_bottom": 224,
+        "fill_holes": false,
+        "mask_grow": 100,
+        "mask_blur_mode": "gaussian_sigma",
+        "mask_blur_amount": 30,
+        "mask_blur_direction": "both"
+      }
     },
     {
       "id": 7,
@@ -367,7 +424,7 @@
         250
       ],
       "flags": {},
-      "order": 6,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
@@ -383,7 +440,10 @@
           "links": null
         }
       ],
+      "title": "Prepared Canvas",
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "PreviewImage",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -392,7 +452,7 @@
         }
       },
       "widgets_values": [],
-      "title": "Prepared Canvas"
+      "widgets_values_named": {}
     },
     {
       "id": 9,
@@ -424,16 +484,17 @@
           ]
         }
       ],
+      "title": "Generated Mask",
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "MaskToImage",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "8.0.1",
           "input_ue_unconnectable": {}
         }
-      },
-      "widgets_values": [],
-      "title": "Generated Mask"
+      }
     },
     {
       "id": 10,
@@ -447,7 +508,7 @@
         250
       ],
       "flags": {},
-      "order": 9,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
@@ -464,6 +525,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "PreviewImage",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -471,7 +534,8 @@
           "input_ue_unconnectable": {}
         }
       },
-      "widgets_values": []
+      "widgets_values": [],
+      "widgets_values_named": {}
     },
     {
       "id": 13,
@@ -485,7 +549,7 @@
         330
       ],
       "flags": {},
-      "order": 12,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
@@ -539,6 +603,8 @@
         }
       ],
       "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "c3f1c6a03f8b8ea26e22ac3a670feba34328060c",
         "Node name for S&R": "CcCKrea2Paint",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -547,26 +613,30 @@
         }
       },
       "widgets_values": [
-        "Seamlessly extend the original photograph into the expanded canvas, continuing the environment, surfaces, perspective, sky, shadows, reflections and lighting. Preserve the original central image and match the camera viewpoint.",
+        "Seamlessly extend the original photograph into the expanded canvas.",
         true,
         true
       ],
-      "title": "Krea2 CcC Paint"
+      "widgets_values_named": {
+        "positive_prompt": "Seamlessly extend the original photograph into the expanded canvas.",
+        "apply_krea2_paint_patch": true,
+        "kv_cache": true
+      }
     },
     {
       "id": 14,
       "type": "ModelSamplingAuraFlow",
       "pos": [
         1580,
-        0
+        -3.9968028886505635e-15
       ],
       "size": [
         300,
         100
       ],
       "flags": {},
-      "order": 13,
-      "mode": 4,
+      "order": 10,
+      "mode": 0,
       "inputs": [
         {
           "name": "model",
@@ -584,6 +654,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "ModelSamplingAuraFlow",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -612,7 +684,7 @@
         100
       ],
       "flags": {},
-      "order": 14,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
@@ -631,6 +703,8 @@
         }
       ],
       "properties": {
+        "aux_id": "lonecatone23/comfyUI-BlackwellAttentionFix",
+        "ver": "42428da9c5039f0ee4bfcb8f0db310d1904dfe60",
         "Node name for S&R": "BlackwellAttentionFix",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -640,7 +714,10 @@
       },
       "widgets_values": [
         "pytorch"
-      ]
+      ],
+      "widgets_values_named": {
+        "mode": "pytorch"
+      }
     },
     {
       "id": 16,
@@ -651,10 +728,10 @@
       ],
       "size": [
         330,
-        220
+        474
       ],
       "flags": {},
-      "order": 15,
+      "order": 13,
       "mode": 0,
       "inputs": [
         {
@@ -688,6 +765,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "KSampler",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -703,7 +782,16 @@
         "euler",
         "simple",
         1
-      ]
+      ],
+      "widgets_values_named": {
+        "seed": 589415,
+        "control_after_generate": "fixed",
+        "steps": 8,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1
+      }
     },
     {
       "id": 17,
@@ -717,7 +805,7 @@
         100
       ],
       "flags": {},
-      "order": 16,
+      "order": 14,
       "mode": 0,
       "inputs": [
         {
@@ -741,14 +829,15 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "VAEDecode",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "8.0.1",
           "input_ue_unconnectable": {}
         }
-      },
-      "widgets_values": []
+      }
     },
     {
       "id": 18,
@@ -759,10 +848,10 @@
       ],
       "size": [
         330,
-        220
+        270
       ],
       "flags": {},
-      "order": 17,
+      "order": 16,
       "mode": 0,
       "inputs": [
         {
@@ -779,6 +868,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
         "Node name for S&R": "SaveImage",
         "ue_properties": {
           "widget_ue_connectable": {},
@@ -788,21 +879,24 @@
       },
       "widgets_values": [
         "CcC_Showcase_06_Outpainting"
-      ]
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "CcC_Showcase_06_Outpainting"
+      }
     },
     {
       "id": 19,
       "type": "Note",
       "pos": [
-        1550,
-        300
+        2341.690944886942,
+        674.0057162127373
       ],
       "size": [
         850,
         430
       ],
       "flags": {},
-      "order": 18,
+      "order": 4,
       "mode": 0,
       "inputs": [],
       "outputs": [],
@@ -816,7 +910,12 @@
       },
       "widgets_values": [
         "SHOWCASE 06 — OUTPAINTING & REFRAMING\nThe entire process is connected: source IMAGE -> Paint Prepare with asymmetric expansion -> Paint -> sampler -> Paint Restore -> SaveImage. The expansion area is generated automatically; a SAM mask is unnecessary. Modify expand_left/top/right/bottom independently and inspect prepared canvas, generated mask and preserved mask."
-      ]
+      ],
+      "widgets_values_named": {
+        "text": "SHOWCASE 06 — OUTPAINTING & REFRAMING\nThe entire process is connected: source IMAGE -> Paint Prepare with asymmetric expansion -> Paint -> sampler -> Paint Restore -> SaveImage. The expansion area is generated automatically; a SAM mask is unnecessary. Modify expand_left/top/right/bottom independently and inspect prepared canvas, generated mask and preserved mask."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 21,
@@ -830,7 +929,7 @@
         150
       ],
       "flags": {},
-      "order": 19,
+      "order": 15,
       "mode": 0,
       "inputs": [
         {
@@ -853,16 +952,17 @@
           ]
         }
       ],
+      "title": "Restore Native Canvas",
       "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "c3f1c6a03f8b8ea26e22ac3a670feba34328060c",
         "Node name for S&R": "CcCKrea2PaintRestore",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "8.0.1",
           "input_ue_unconnectable": {}
         }
-      },
-      "widgets_values": [],
-      "title": "Restore Native Canvas"
+      }
     }
   ],
   "links": [
@@ -1029,6 +1129,7 @@
   ],
   "groups": [
     {
+      "id": 1,
       "title": "Models + AnyPaint LoRA",
       "bounding": [
         -40,
@@ -1036,9 +1137,11 @@
         820,
         410
       ],
-      "color": "#3f789e"
+      "color": "#3f789e",
+      "flags": {}
     },
     {
+      "id": 2,
       "title": "Source + Paint Prepare",
       "bounding": [
         -40,
@@ -1046,9 +1149,11 @@
         1060,
         880
       ],
-      "color": "#3f789e"
+      "color": "#3f789e",
+      "flags": {}
     },
     {
+      "id": 3,
       "title": "Paint Inspection",
       "bounding": [
         1040,
@@ -1056,9 +1161,11 @@
         1060,
         870
       ],
-      "color": "#3f789e"
+      "color": "#3f789e",
+      "flags": {}
     },
     {
+      "id": 4,
       "title": "Paint Runtime",
       "bounding": [
         880,
@@ -1066,9 +1173,11 @@
         680,
         400
       ],
-      "color": "#3f789e"
+      "color": "#3f789e",
+      "flags": {}
     },
     {
+      "id": 5,
       "title": "Sampling + Restore + Output",
       "bounding": [
         1540,
@@ -1076,8 +1185,29 @@
         2150,
         300
       ],
-      "color": "#3f789e"
+      "color": "#3f789e",
+      "flags": {}
     }
   ],
-  "version": 0.4
+  "config": {},
+  "extra": {
+    "ue_links": [],
+    "links_added_by_ue": [],
+    "ds": {
+      "scale": 1.2040761879443567,
+      "offset": [
+        -1362.5920672858526,
+        112.43184089902493
+      ]
+    },
+    "frontendVersion": "1.59.11",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4,
+  "seed_widgets": {
+    "16": 0
+  }
 }
