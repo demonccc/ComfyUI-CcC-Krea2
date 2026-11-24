@@ -2,7 +2,7 @@
 
 import torch
 
-from ccc_krea2.modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare, prepare_paint_context
+from ccc_krea2.modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare, prepare_paint_context, _token_aligned_soft_noise_mask
 
 
 class FakeVAE:
@@ -50,7 +50,7 @@ def test_prepare_creates_sampling_latent_and_token_aligned_noise_mask():
     assert torch.allclose(keep, 1.0 - generated)
 
 
-def test_sampler_vae_never_encodes_original_masked_subject():
+def test_sampler_vae_encodes_original_known_canvas_and_masked_semantic_reference():
     class TrackingVAE(FakeVAE):
         def __init__(self):
             self.inputs = []
@@ -70,16 +70,36 @@ def test_sampler_vae_never_encodes_original_masked_subject():
         mask_blur_amount=0.0, mask_blur_direction="outside",
     )
 
-    # First VAE encoding is the neutralized appearance reference; second is
-    # the full-resolution sampling latent. Neither may contain the subject.
+    # AnyPaint: semantic reference excludes the selected subject, while the
+    # full-resolution sampling latent encodes the known image. noise_mask
+    # determines which tokens get regenerated during denoising.
     assert len(vae.inputs) == 2
-    assert vae.inputs[1][0, 15, 15].mean() < 0.9
-    assert not torch.allclose(vae.inputs[1][0, 15, 15], prepared[0, 15, 15])
-    torch.testing.assert_close(vae.inputs[1][0, 0, 0], prepared[0, 0, 0])
+    torch.testing.assert_close(vae.inputs[1], prepared)
+    assert vae.inputs[0][0, 15, 15].mean() < 0.9
     torch.testing.assert_close(vae.inputs[0][0, 15, 15], semantic[0, 15, 15])
     assert latent["noise_mask"].max() > 0
     assert generated[0, 15, 15] == 1
     assert context["semantic_reference"] is semantic
+
+
+def test_anypaint_token_alignment_regenerates_entire_partially_masked_patch():
+    # Four latent cells are grouped into one 2x2 DiT patch.
+    # Averaging the mask would leave residual known content; a single
+    # selected cell must instead regenerate all four.
+    generated = torch.zeros((1, 8, 8))
+    generated[:, 1, 1] = 1.0
+    noise = _token_aligned_soft_noise_mask(generated, latent_h=4, latent_w=4, patch_size=2)
+    assert noise.shape == (1, 1, 4, 4)
+    torch.testing.assert_close(noise[0, 0, :2, :2], torch.ones((2, 2)))
+    torch.testing.assert_close(noise[0, 0, 2:, 2:], torch.zeros((2, 2)))
+    assert torch.all((noise == 0) | (noise == 1))
+
+
+def test_anypaint_token_alignment_never_partially_preserves_feathered_patch():
+    generated = torch.zeros((1, 8, 8))
+    generated[:, 1:3, 1:3] = 0.8
+    noise = _token_aligned_soft_noise_mask(generated, latent_h=4, latent_w=4, patch_size=2)
+    assert torch.all((noise == 0) | (noise == 1))
 
 
 def test_sampler_vae_preserves_explicit_outpaint_fill_context():
