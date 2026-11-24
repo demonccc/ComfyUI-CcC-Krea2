@@ -332,3 +332,36 @@ def test_non_exclusion_regional_boosts_still_average_to_reference_tokens():
         bias[0, 0, 6:, 2], torch.full((3,), expected)
     )
     assert (bias[0, 0, 6:, 3:6] == 0).all()
+
+
+def test_positive_five_matches_legacy_ten_multiplier_for_full_reference():
+    # Legacy boost=10 used log(10) on target->reference attention.
+    # The signed +5 must retain that exact upper endpoint.
+    bias = bias_for(boosts=[5.0])
+    torch.testing.assert_close(
+        bias[0, 0, 7:, 3:7],
+        torch.full((8, 4), math.log(10.0)),
+    )
+
+
+def test_positive_five_regional_full_mask_matches_global_boost():
+    region = torch.full((1, 16, 16), 5.0)
+    regional = _compute_ref_attention_bias_patchified(
+        boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
+        ref_token_grids=[(2, 2)], ref_attention_maps=[region],
+        device=torch.device("cpu"), dtype=torch.float32,
+    )
+    global_bias = bias_for(boosts=[5.0])
+    torch.testing.assert_close(regional, global_bias)
+
+
+def test_positive_five_regional_token_block_preserves_full_strength():
+    region = torch.zeros((1, 16, 16), dtype=torch.float32)
+    region[:, :8, :8] = 5.0
+    bias = _compute_ref_attention_bias_patchified(
+        boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
+        ref_token_grids=[(2, 2)], ref_attention_maps=[region],
+        device=torch.device("cpu"), dtype=torch.float32,
+    )
+    torch.testing.assert_close(bias[0, 0, 7:, 3], torch.full((8,), math.log(10.0)))
+    assert (bias[0, 0, 7:, 4:7] == 0).all()
