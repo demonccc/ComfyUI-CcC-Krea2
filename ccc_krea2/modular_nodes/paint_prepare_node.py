@@ -210,13 +210,23 @@ def prepare_paint_context(
         direction=mask_blur_direction,
     )
     keep_mask = (1.0 - generated_mask).clamp(0.0, 1.0)
+    # Temporary geometry padding is cropped by Restore, but may still carry
+    # reflected source pixels into the VAE and registered reference attention.
+    temporary_padding_mask = paint_geometry.get("working_krea_padding_mask")
+    if temporary_padding_mask is None:
+        temporary_padding_mask = torch.zeros_like(expansion_mask)
+    else:
+        temporary_padding_mask = temporary_padding_mask.to(device=hard_mask.device, dtype=hard_mask.dtype).clamp(0.0, 1.0)
+        if temporary_padding_mask.shape != expansion_mask.shape:
+            raise ValueError("[Krea2 CcC Paint Prepare] working_krea_padding_mask must match working_mask geometry.")
+    has_expansion = bool((expansion_mask > 0.0).any().item())
 
     # Keep inpainting's existing semantic masking unchanged. For outpainting,
     # the expansion pixels are a generation canvas, not reference content.
     # Removing those fill pixels from Qwen and K/V conditioning prevents edge
     # and reflect padding from being learned as a scene to preserve. The
     # original image, including any overlap from mask grow, remains visible.
-    if bool((expansion_mask > 0.0).any().item()):
+    if has_expansion:
         user_mask = paint_geometry.get("working_user_mask")
         if user_mask is None:
             user_mask = (hard_mask - expansion_mask).clamp(0.0, 1.0)
@@ -232,8 +242,11 @@ def prepare_paint_context(
             amount=float(mask_blur_amount),
             direction=mask_blur_direction,
         )
-        semantic_neutralize_mask = torch.maximum(expansion_mask, user_semantic_mask).clamp(0.0, 1.0)
-        # Compute neutral padding color only from actual, unmasked source pixels.
+        semantic_neutralize_mask = torch.maximum(
+            torch.maximum(expansion_mask, temporary_padding_mask), user_semantic_mask
+        ).clamp(0.0, 1.0)
+        # Compute neutral color from actual source pixels only, excluding
+        # both requested expansion and discarded geometry padding.
         semantic_fill = _neutral_fill(known_image, 1.0 - semantic_neutralize_mask)
     else:
         semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
@@ -246,26 +259,48 @@ def prepare_paint_context(
     semantic_reference = _downscale_semantic_reference(semantic_full)
 
     reference_latent = _extract_latent(vae.encode(semantic_reference))
-    # Match AnyPaint's known-region sampling contract: retain the known canvas
-    # as the latent, and use a binary, token-aligned noise mask to replace
-    # selected tokens during denoising.
-    #
-    # The outpaint expansion is fully regenerated, but the VAE still encodes its
-    # initial pixels. Edge/reflect fills can therefore seed repeated scenery
-    # even when the Qwen/K/V reference is neutralized. Initialize ONLY the
-    # explicit expansion with the same source-derived neutral color instead.
-    # Pure inpaint follows the original unmodified known-image path.
-    if bool((expansion_mask > 0.0).any().item()):
+    # Pure inpaint keeps the original binary, token-aligned AnyPaint mask.
+    # Outpaint needs a soft transition on the original-image side of the
+    # expansion, or ComfyUI's sampler clamps all preserved vs. generated
+    # latents at a sharp rectangular boundary regardless of mask blur.
+    if has_expansion:
+        non_source_mask = torch.maximum(expansion_mask, temporary_padding_mask)
         sampling_image = (
-            known_image * (1.0 - expansion_mask).unsqueeze(-1)
-            + semantic_fill * expansion_mask.unsqueeze(-1)
+            known_image * (1.0 - non_source_mask).unsqueeze(-1)
+            + semantic_fill * non_source_mask.unsqueeze(-1)
         ).clamp(0.0, 1.0)
     else:
         sampling_image = known_image
     known_latent = _extract_latent(vae.encode(sampling_image))
     latent_tensor = _ensure_image_latent_5d(known_latent)
     latent_h, latent_w = latent_tensor.shape[-2:]
-    noise_mask = _token_aligned_soft_noise_mask(generated_mask, latent_h, latent_w, patch_size=2).to(device=known_latent.device, dtype=known_latent.dtype)
+    if has_expansion:
+        # Blend only the explicit expansion into the original source. Never
+        # ask the model to regenerate discarded Krea geometry padding.
+        # The soft denoise mask is supported by ComfyUI's sampler and gives
+        # the transition partial regeneration rather than a binary step.
+        fade_sigma = max(12.0, float(mask_blur_amount))
+        expansion_for_denoise = _grow_or_shrink(expansion_mask, int(mask_grow))
+        expansion_fade = _gaussian_blur(expansion_for_denoise, fade_sigma)
+        expansion_fade_latent = F.interpolate(
+            expansion_fade.unsqueeze(1), size=(latent_h, latent_w), mode="area"
+        )
+        # Any user-selected inpaint mask remains binary, just as in pure inpaint.
+        user_generated = _apply_feather(
+            _grow_or_shrink(user_mask, int(mask_grow)),
+            mode=mask_blur_mode,
+            amount=float(mask_blur_amount),
+            direction=mask_blur_direction,
+        )
+        user_noise_mask = _token_aligned_soft_noise_mask(
+            user_generated, latent_h, latent_w, patch_size=2
+        )
+        noise_mask = torch.maximum(expansion_fade_latent, user_noise_mask)
+    else:
+        noise_mask = _token_aligned_soft_noise_mask(
+            generated_mask, latent_h, latent_w, patch_size=2
+        )
+    noise_mask = noise_mask.to(device=known_latent.device, dtype=known_latent.dtype)
 
     latent = {"samples": known_latent, "noise_mask": noise_mask}
     context: Dict[str, Any] = {
