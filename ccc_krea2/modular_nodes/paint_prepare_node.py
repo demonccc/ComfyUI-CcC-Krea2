@@ -344,6 +344,14 @@ class CcCKrea2PaintPrepare:
         context, latent, prepared_image, semantic_reference, generated_mask, keep_mask = result
 
         transform = paint_geometry.get("transform", {})
+        original_mask = paint_geometry["working_user_mask"]
+        padding_mask = paint_geometry["working_krea_padding_mask"]
+        active_mask = generated_mask > 0.5
+        source_region = paint_geometry["working_krea_padding_mask"] < 0.5
+        user_pixels = int((original_mask > 0.5).sum().item())
+        generated_pixels = int(active_mask.sum().item())
+        source_pixels = int(source_region.sum().item())
+        padding_pixels = int((padding_mask > 0.5).sum().item())
         info = "\n".join([
             "=== Krea2 CcC Paint Prepare ===",
             "Geometry Mode: pad",
@@ -359,6 +367,10 @@ class CcCKrea2PaintPrepare:
             f"Expansion Context Pixels: {int((context['expansion_context_mask'] > 0.5).sum())}",
             f"Semantic Reference: {semantic_reference.shape[2]}x{semantic_reference.shape[1]} max-edge {_SEMANTIC_REFERENCE_MAX_EDGE}px",
             f"Generated Mask Range: {float(generated_mask.min()):.3f}..{float(generated_mask.max()):.3f}",
+            f"User Mask Coverage: {user_pixels}/{source_pixels} ({100.0 * user_pixels / max(1, source_pixels):.2f}%)",
+            f"Generated Mask Coverage: {generated_pixels}/{source_pixels} ({100.0 * generated_pixels / max(1, source_pixels):.2f}%)",
+            f"Temporary Padding Coverage: {padding_pixels}/{int(padding_mask.numel())} ({100.0 * padding_pixels / max(1, padding_mask.numel()):.2f}%)",
+            f"Generated Pixels In Temporary Padding: {int((active_mask & (padding_mask > 0.5)).sum().item())}",
             "Latent: masked-neutralized samples + token-aligned noise_mask",
         ])
         return (
