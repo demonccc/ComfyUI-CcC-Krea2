@@ -25,7 +25,7 @@ def _rgb(image):
 
 
 def _boost_visibility_preview(image, weights):
-    """Darken low-boost pixels: -5 is 90% black, +5 retains 95% source.
+    """Darken low-boost pixels: -10 is 90% black, +10 retains 95% source.
 
     The weights are the final, already-composed per-pixel regional boost map.
     Mask order must be resolved upstream before rendering this image.
@@ -34,7 +34,7 @@ def _boost_visibility_preview(image, weights):
     values = np.asarray(weights, dtype=np.float32)
     if values.shape != rgb.shape[:2]:
         raise ValueError("Effective boost map must match the prepared reference geometry.")
-    alpha = 0.90 - 0.85 * ((np.clip(values, -5.0, 5.0) + 5.0) / 10.0)
+    alpha = 0.90 - 0.85 * ((np.clip(values, -10.0, 10.0) + 10.0) / 20.0)
     visible = np.clip(rgb * (1.0 - alpha[..., None]), 0.0, 255.0)
     return Image.fromarray(np.rint(visible).astype(np.uint8), "RGB")
 
