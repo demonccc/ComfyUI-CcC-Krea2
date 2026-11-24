@@ -84,6 +84,7 @@ def test_kv_runtime_caches_reference_and_passes_boost_maps(monkeypatch):
     def fake_precompute(*args, **kwargs):
         calls["precompute"] += 1
         assert kwargs["rope_positions"] == ["inside:center:center"]
+        assert kwargs["isolate_references"] is True
         return [("keys", "values")]
 
     def fake_forward(*args, **kwargs):
@@ -138,3 +139,18 @@ def test_edit_wrapper_dispatches_to_selected_path(monkeypatch):
         )
         torch.testing.assert_close(output, x)
     assert calls == ["joint", "kv"]
+
+
+def test_separate_reference_kv_blocks_cannot_cross_attend():
+    from ccc_krea2.paint_patch import _isolated_reference_bias
+    bias = _isolated_reference_bias(
+        [2, 3], batch_size=1, device=torch.device("cpu"), dtype=torch.float32,
+    )
+    assert bias.shape == (1, 1, 5, 5)
+    assert torch.isfinite(bias[0, 0, :2, :2]).all()
+    assert torch.isfinite(bias[0, 0, 2:, 2:]).all()
+    assert torch.isneginf(bias[0, 0, :2, 2:]).all()
+    assert torch.isneginf(bias[0, 0, 2:, :2]).all()
+    assert _isolated_reference_bias(
+        [2], batch_size=1, device=torch.device("cpu"), dtype=torch.float32,
+    ) is None
