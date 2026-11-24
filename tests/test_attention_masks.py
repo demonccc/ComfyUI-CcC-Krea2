@@ -84,7 +84,7 @@ def test_minus_ten_blocks_only_its_reference():
 
 
 def test_regional_minus_ten_blocks_while_zero_remains_neutral():
-    weight_map = torch.tensor([[[-10., 2.], [0., -5.]]])
+    weight_map = torch.tensor([[[-10., 2.], [0., -10.]]])
     bias = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
         ref_token_grids=[(2, 2)], ref_attention_maps=[weight_map],
@@ -96,7 +96,7 @@ def test_regional_minus_ten_blocks_while_zero_remains_neutral():
     assert (selected[:, 2] == 0).all()
 
 
-@pytest.mark.parametrize("boost", [-10.0, -4.9, -4.0, -3.0, -2.0, -1.0, 0.0, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0])
+@pytest.mark.parametrize("boost", [-10.0, -9.9, -5.0, -4.0, -3.0, -2.0, -1.0, 0.0, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0])
 def test_uniform_regional_boost_matches_global(boost):
     regional = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
@@ -142,7 +142,7 @@ def test_mask_composite_effective_boost_last_region_wins():
     torch.testing.assert_close(original, source)
     assert torch.all(union == 1)
     assert len(third.regions) == 3
-    # The last region overrides even Boost +10; outside it is Boost -3 or +5.
+    # The last region overrides even Boost +10; outside it is Boost -3 or +10.
     assert composite[0, 1, 1, 0].item() == pytest.approx(0.0)
     assert composite[0, 0, 0, 0].item() == pytest.approx(0.3325)
     assert composite[0, 0, 3, 0].item() == pytest.approx(0.95)
@@ -278,7 +278,7 @@ def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
     assert len(final.regions) == 2
     # Pixel (0,0) is excluded by inversion so earlier +3 remains.
     assert composite[0, 0, 0, 0].item() == pytest.approx(1.0 - (1.0 - 0.95 * 0.65))
-    # Pixel (0,1) belongs to both but inverted -5 wins.
+    # Pixel (0,1) belongs to both but inverted -10 wins.
     assert composite[0, 0, 1, 0].item() == pytest.approx(0.0)
 
     refs, _ = CcCKrea2Reference().process(
