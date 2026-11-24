@@ -43,9 +43,9 @@ LoRA / T2I:
 
 The Reference Cache implementation was removed. There is no public Paint Geometry node. Paint geometry helpers remain internal implementation details used by Paint Prepare and Paint Restore.
 
-## Single Edit Runtime
+## Edit Runtime (Joint or Experimental K/V)
 
-Krea2 CcC Edit has one edit execution path.
+Krea2 CcC Edit exposes a default-off `use_kv_reference` toggle. The existing joint reference attention remains the default; enabling the toggle selects the isolated t=0 K/V path derived from Paint. Both paths consume the same Qwen grounding, prepared appearance references, Boosts, attention masks and RoPE placement.
 
 ~~~text
 IMAGE --> Visual Reference --> Vision Reference --> Visual Reference
@@ -175,11 +175,13 @@ Visual Reference `semantic_grounding_px` and Latent `latent_grounding_px` use a 
 
 Appearance reference latents are attached to CONDITIONING together with reference fit, positive boost, neutral negative boost, RoPE placement, optional target region, and target attention scope.
 
-The Edit runtime executes one in-context sequence:
+With `use_kv_reference=false`, Edit executes the existing joint in-context sequence:
 
 ~~~text
 [text | reference 1 | reference 2 | ... | target]
 ~~~
+
+With `use_kv_reference=true`, each reference is encoded through independent t=0 attention to create per-layer K/V; the sampling pass contains `[text | target]` queries that can attend to cached reference keys/values. The K/V branch preserves Edit's per-reference Boost, regional masks, and RoPE coordinates through an additive target-to-reference attention bias. Reference isolation is intrinsic to K/V. This experimental path is not an identity/fidelity guarantee.
 
 ## Paint
 
