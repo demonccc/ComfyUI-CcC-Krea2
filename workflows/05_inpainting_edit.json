@@ -752,10 +752,10 @@
         }
       },
       "widgets_values": [
-        "CcC_Showcase_06_Outpainting"
+        "CcC_Inpainting_Edit"
       ],
       "widgets_values_named": {
-        "filename_prefix": "CcC_Showcase_06_Outpainting"
+        "filename_prefix": "CcC_Inpainting_Edit"
       }
     },
     {
@@ -783,10 +783,10 @@
         }
       },
       "widgets_values": [
-        "SHOWCASE 06 — OUTPAINTING & REFRAMING\nThe entire process is connected: source IMAGE -> Paint Prepare with asymmetric expansion -> Paint -> sampler -> Paint Restore -> SaveImage. The expansion area is generated automatically; a SAM mask is unnecessary. Modify expand_left/top/right/bottom independently and inspect prepared canvas, generated mask and preserved mask."
+        "INPAINTING EDIT\nSelect the image region to regenerate with SAM, inspect the generated mask and describe the desired replacement in the Paint positive prompt. Paint Prepare, sampling and Paint Restore are already connected. The unmasked surroundings remain the source context."
       ],
       "widgets_values_named": {
-        "text": "SHOWCASE 06 — OUTPAINTING & REFRAMING\nThe entire process is connected: source IMAGE -> Paint Prepare with asymmetric expansion -> Paint -> sampler -> Paint Restore -> SaveImage. The expansion area is generated automatically; a SAM mask is unnecessary. Modify expand_left/top/right/bottom independently and inspect prepared canvas, generated mask and preserved mask."
+        "text": "INPAINTING EDIT\nSelect the image region to regenerate with SAM, inspect the generated mask and describe the desired replacement in the Paint positive prompt. Paint Prepare, sampling and Paint Restore are already connected. The unmasked surroundings remain the source context."
       },
       "color": "#432",
       "bgcolor": "#653"
