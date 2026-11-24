@@ -40,8 +40,28 @@ function normalizeVisionMode(widget) {
 function setWidgetDisabled(node, name, disabled) {
     const widget = node.widgets?.find((w) => w.name === name);
     if (!widget) return;
-    widget.disabled = disabled;
+    const next = Boolean(disabled);
+    widget.disabled = next;
+    // DOM-backed STRING/textarea widgets are not canvas widgets. Keep their
+    // actual input element in sync with LiteGraph/Nodes 2.0 disabled state.
+    if (widget.element) {
+        widget.element.disabled = next;
+        widget.element.readOnly = next;
+        widget.element.querySelectorAll?.("input, textarea, select, button")
+            .forEach((element) => { element.disabled = next; });
+    }
     widget.triggerDraw?.();
+}
+
+// A fixed 20ms timer is not a reliable widget-initialization barrier, especially
+// when a saved workflow creates nodes before their widgets or DOM controls exist.
+// Refresh immediately, on the next frames, and after ComfyUI restores node values.
+function scheduleWidgetRefresh(node, refresh) {
+    refresh();
+    requestAnimationFrame(() => {
+        refresh();
+        requestAnimationFrame(refresh);
+    });
 }
 
 function t2iPresetDimensions(label) {
@@ -176,7 +196,7 @@ function setupLoraDisabledState(node, attempts = 0) {
             const enabled = find(`lora_${i}_enabled`)?.value === true;
             for (const suffix of ["name", "strength", "prompt_position", "prompt"]) {
                 const widget = find(`lora_${i}_${suffix}`);
-                if (widget) widget.disabled = !enabled;
+                if (widget) setWidgetDisabled(node, widget.name, !enabled);
             }
         }
         node.setDirtyCanvas?.(true, true);
@@ -238,7 +258,7 @@ app.registerExtension({
                 refresh();
                 return result;
             };
-            setTimeout(refresh, 20);
+            scheduleWidgetRefresh(node, refresh);
         }
 
         if (node.comfyClass === "CcCKrea2PaintPrepare") {
@@ -295,7 +315,7 @@ app.registerExtension({
                 refresh();
                 return result;
             };
-            setTimeout(refresh, 20);
+            scheduleWidgetRefresh(node, refresh);
         }
 
         if (node.comfyClass === "CcCKrea2Reference") {
@@ -336,7 +356,7 @@ app.registerExtension({
                 refresh();
                 return result;
             };
-            setTimeout(refresh, 20);
+            scheduleWidgetRefresh(node, refresh);
         }
 
         if (node.comfyClass === "CcCKrea2VisualReference") {
@@ -387,10 +407,11 @@ app.registerExtension({
                 };
             }
 
-            setTimeout(() => {
+            scheduleWidgetRefresh(node, () => {
                 updateSemanticState();
                 updateFitState();
-            }, 20);
+                node.setDirtyCanvas?.(true, true);
+            });
         }
 
         if (node.comfyClass === "CcCKrea2VisionReference") {
@@ -404,7 +425,7 @@ app.registerExtension({
                 refresh();
                 return result;
             };
-            setTimeout(refresh, 20);
+            scheduleWidgetRefresh(node, refresh);
         }
 
         if (node.comfyClass === "CcCKrea2TextToImage") {
@@ -447,7 +468,7 @@ app.registerExtension({
                 return result;
             };
 
-            setTimeout(() => {
+            scheduleWidgetRefresh(node, () => {
                 const currentMode = String(dimensionsWidget?.value ?? "");
                 if (!["preset", "fixed"].includes(currentMode)) {
                     const syntheticLegacy = node.widgets?.map((w) => w.value) ?? [];
@@ -455,7 +476,7 @@ app.registerExtension({
                 }
                 normalizeT2ICurrentWidgets(node);
                 updateDimensionsState();
-            }, 20);
+            });
         }
 
         if (node.comfyClass === "CcCKrea2Latent") {
@@ -535,7 +556,7 @@ app.registerExtension({
                 updateDimensionsState();
                 updateContentState();
                 updateVisionState();
-            }, 20);
+            });
         }
 
 
