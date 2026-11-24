@@ -303,3 +303,32 @@ def test_inverted_sam_mask_is_applied_after_detection(monkeypatch):
     )
     torch.testing.assert_close(combined, 1.0 - detected)
     torch.testing.assert_close(chain.regions[0].mask, combined)
+
+
+def test_hard_exclusion_survives_downsampling_to_reference_tokens():
+    # A single excluded source pixel must not turn into a weak negative boost
+    # when a 4x4 reference mask is encoded on a 2x2 token grid.
+    regional = torch.zeros((1, 4, 4), dtype=torch.float32)
+    regional[0, 0, 0] = -5.0
+    bias = _compute_ref_attention_bias_patchified(
+        boosts=[0.0], txt_len=2, ref_token_lens=[4], tgt_len=3,
+        ref_token_grids=[(2, 2)], ref_attention_maps=[regional],
+        device=torch.device("cpu"), dtype=torch.float32,
+    )
+    assert torch.isneginf(bias[0, 0, 6:, 2]).all()
+    assert (bias[0, 0, 6:, 3:6] == 0).all()
+
+
+def test_non_exclusion_regional_boosts_still_average_to_reference_tokens():
+    regional = torch.zeros((1, 4, 4), dtype=torch.float32)
+    regional[0, 0, 0] = 4.0
+    bias = _compute_ref_attention_bias_patchified(
+        boosts=[0.0], txt_len=2, ref_token_lens=[4], tgt_len=3,
+        ref_token_grids=[(2, 2)], ref_attention_maps=[regional],
+        device=torch.device("cpu"), dtype=torch.float32,
+    )
+    expected = math.log(10.0) / 5.0
+    torch.testing.assert_close(
+        bias[0, 0, 6:, 2], torch.full((3,), expected)
+    )
+    assert (bias[0, 0, 6:, 3:6] == 0).all()
