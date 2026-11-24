@@ -544,7 +544,8 @@
       },
       "widgets_values": [
         "",
-        true
+        true,
+        false
       ]
     },
     {
