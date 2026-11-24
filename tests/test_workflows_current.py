@@ -31,11 +31,10 @@ def test_workflow_graph_contract(path):
             assert len(node.get("widgets_values", ())) == 7, (path, node["id"])
             assert not any(socket["name"] == "reference_edit_image" for socket in node.get("inputs", ()))
         if node["type"] == "CcCKrea2Edit":
-            # Existing showcase scenarios must retain the joint attention
-            # behavior until a user explicitly opts in to experimental K/V.
-            assert node.get("widgets_values", [])[-1] is False, (path, node["id"])
+            # Edit exposes prompt, apply-patch and isolate-references (no legacy K/V toggle).
+            assert len(node.get("widgets_values", ())) == 3, (path, node["id"])
         if node["type"] == "CcCKrea2Reference":
-            assert len(node.get("widgets_values", ())) == 20, (path, node["id"])
+            assert len(node.get("widgets_values", ())) == 16, (path, node["id"])
         for index, socket in enumerate(node.get("inputs", ())):
             link_id = socket.get("link")
             if link_id is not None:
@@ -50,3 +49,8 @@ def test_workflow_graph_contract(path):
         assert src in nodes and dst in nodes, (path, link)
         assert output < len(nodes[src].get("outputs", ())), (path, link)
         assert input_index < len(nodes[dst].get("inputs", ())), (path, link)
+
+def test_workflow_directory_has_all_ten_numbered_examples():
+    names = [p.name for p in FILES]
+    assert len(names) == 10
+    assert [name[:2] for name in names] == [f"{i:02d}" for i in range(1, 11)]
