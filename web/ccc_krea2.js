@@ -62,6 +62,15 @@ function scheduleWidgetRefresh(node, refresh) {
         refresh();
         requestAnimationFrame(refresh);
     });
+    // ComfyUI may attach restored widgets after nodeCreated. Refresh after
+    // graph insertion too; avoid relying solely on transient timers.
+    const originalAdded = node.onAdded;
+    node.onAdded = function (...args) {
+        const result = originalAdded?.apply(this, args);
+        refresh();
+        requestAnimationFrame(refresh);
+        return result;
+    };
 }
 
 function t2iPresetDimensions(label) {
@@ -364,10 +373,7 @@ app.registerExtension({
             const semanticResizeWidget = node.widgets?.find((w) => w.name === "semantic_resize");
             const fitWidget = node.widgets?.find((w) => w.name === "reference_fit");
 
-            const setDisabled = (name, disabled) => {
-                const widget = node.widgets?.find((w) => w.name === name);
-                if (widget) widget.disabled = disabled;
-            };
+            const setDisabled = (name, disabled) => setWidgetDisabled(node, name, disabled);
 
             const updateSemanticState = () => {
                 const enabled = semanticWidget?.value === true;
@@ -485,10 +491,7 @@ app.registerExtension({
             const contentFitWidget = node.widgets?.find((w) => w.name === "content_fit");
             const visionEnableWidget = node.widgets?.find((w) => w.name === "latent_vision_enable");
 
-            const setDisabled = (name, disabled) => {
-                const widget = node.widgets?.find((w) => w.name === name);
-                if (widget) widget.disabled = disabled;
-            };
+            const setDisabled = (name, disabled) => setWidgetDisabled(node, name, disabled);
 
             const updateDimensionsState = () => {
                 const mode = dimensionsWidget?.value ?? "preset";
@@ -552,10 +555,11 @@ app.registerExtension({
                 return result;
             };
 
-            setTimeout(() => {
+            scheduleWidgetRefresh(node, () => {
                 updateDimensionsState();
                 updateContentState();
                 updateVisionState();
+                node.setDirtyCanvas?.(true, true);
             });
         }
 
