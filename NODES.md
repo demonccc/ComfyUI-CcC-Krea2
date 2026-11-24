@@ -250,7 +250,10 @@ Required inputs/controls:
 
 Optional inputs:
 
+- use_kv_reference (BOOLEAN, default false): false keeps the existing joint Edit reference attention; true uses isolated t=0 K/V reference attention with caching, respecting reference Boost, regional masks and RoPE positions. Experimental; not guaranteed to improve fidelity.
+- isolate_references (BOOLEAN, default false): applies to the joint mode. K/V mode isolates reference processing inherently.
 - references (KREA2_REFERENCE_CHAIN)
+- prompt_augmentation (optional)
 
 Outputs:
 
@@ -269,7 +272,8 @@ ordered references
   -> VAE appearance latents
   -> CONDITIONING reference metadata
   -> Krea2 CcC Edit patch/runtime
-  -> [text | references | target]
+  -> use_kv_reference=false: joint [text | references | target]
+  -> use_kv_reference=true: t=0 reference K/V + [text | target]
 ~~~
 
 Negative text is fixed internally to an empty string. Appearance images remain available to the grounded negative pass with neutral boosts.
