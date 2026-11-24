@@ -455,7 +455,11 @@ class CcCKrea2PaintPrepare:
             f"Temporary Padding Coverage: {padding_pixels}/{int(padding_mask.numel())} ({100.0 * padding_pixels / max(1, padding_mask.numel()):.2f}%)",
             f"Generated Pixels In Temporary Padding: {int((active_mask & (padding_mask > 0.5)).sum().item())}",
             "Latent: known-image samples + " + (
-                "soft outpaint transition / binary user-inpaint noise_mask"
+                (
+                    "soft outpaint transition / binary user-inpaint noise_mask"
+                    if float(mask_blur_amount) > 0.0
+                    else "binary outpaint / binary user-inpaint token noise_mask"
+                )
                 if bool((context["expansion_context_mask"] > 0).any().item())
                 else "AnyPaint-compatible binary token noise_mask"
             ),
