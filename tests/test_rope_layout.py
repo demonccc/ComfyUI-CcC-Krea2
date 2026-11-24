@@ -82,14 +82,14 @@ def test_three_views_keep_identical_canvas_and_use_processed_target_content():
 
 
 
-def test_preview_inverse_opacity_0_to_10():
+def test_preview_inverse_opacity_minus_five_to_plus_five():
     source = Image.new("RGB", (3, 1), (200, 200, 200))
-    output = _boost_visibility_preview(source, np.array([[0.0, 5.0, 10.0]]))
+    output = _boost_visibility_preview(source, np.array([[-5.0, 0.0, 5.0]]))
     pixels = np.asarray(output)
     assert pixels.shape == (1, 3, 3)
-    assert pixels[0, 0, 0] == 20  # 90 percent black at Boost 0.
+    assert pixels[0, 0, 0] == 20  # 90 percent black at Boost -5.
     assert pixels[0, 1, 0] > pixels[0, 0, 0]
-    assert pixels[0, 2, 0] == 190  # 5 percent black at Boost 10.
+    assert pixels[0, 2, 0] == 190  # 5 percent black at Boost +5.
 
 
 def test_boost_preview_uses_rope_coordinates_and_isolated_views():
@@ -98,7 +98,7 @@ def test_boost_preview_uses_rope_coordinates_and_isolated_views():
     latent = {"samples": torch.zeros((1, 16, 16, 16))}
     left = VisualReferenceEntry(
         image=torch.ones((1, 128, 128, 3)),
-        boost=10.0, reference_fit="native",
+        boost=5.0, reference_fit="native",
         placement_grid="outside", grid_horizontal_position="left",
     )
     right = VisualReferenceEntry(
@@ -119,7 +119,7 @@ def test_multiple_overlapping_boost_references_preserve_each_identity_in_spatial
     entries = [
         VisualReferenceEntry(
             image=torch.full((1, 128, 128, 3), value),
-            boost=10.0,
+            boost=5.0,
             reference_fit="native",
         )
         for value in (0.2, 0.5, 0.8, 1.0)
@@ -127,7 +127,7 @@ def test_multiple_overlapping_boost_references_preserve_each_identity_in_spatial
     preview = render_rope_preview(entries, latent)
     assert preview.shape[0] == 8
     # Each isolated frame renders its own reference at the same RoPE position.
-    # Boost 10 must remain close to original brightness, without 120/255
+    # Boost +5 must remain close to original brightness, without 120/255
     # extra alpha attenuation.
     h, w = preview.shape[1:3]
     center = (h // 2, w // 2)
