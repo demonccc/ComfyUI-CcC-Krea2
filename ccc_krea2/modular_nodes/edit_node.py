@@ -214,7 +214,6 @@ class CcCKrea2Edit:
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "use_kv_reference": ("BOOLEAN", {"default": False, "tooltip": "Use isolated t=0 K/V reference attention instead of the current joint Edit attention. Experimental."}),
                 "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
                 "references": ("KREA2_REFERENCE_CHAIN",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
@@ -229,7 +228,6 @@ class CcCKrea2Edit:
         latent,
         positive_prompt="",
         apply_krea2_edit_patch=True,
-        use_kv_reference=False,
         isolate_references=False,
         references=None,
         prompt_augmentation=None,
@@ -277,7 +275,7 @@ class CcCKrea2Edit:
             )
 
         if apply_krea2_edit_patch and reference_count:
-            patched_model = patch_krea2_model(model=model, use_kv_reference=use_kv_reference)
+            patched_model = patch_krea2_model(model=model)
             runtime_mode = "ccc"
         else:
             patched_model = model
@@ -289,8 +287,7 @@ class CcCKrea2Edit:
             f"Visual References: {len(visual_entries)}",
             f"Vision References: {len(vision_entries)}",
             "Generated Vision text extractions: 0",
-            f"Reference K/V Mode: {bool(use_kv_reference and apply_krea2_edit_patch and reference_count)}",
-            f"VAE/RoPE attention isolation: {bool(isolate_references or use_kv_reference)}",
+            f"VAE/RoPE attention isolation: {bool(isolate_references)}",
             f"Latent Vision: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
