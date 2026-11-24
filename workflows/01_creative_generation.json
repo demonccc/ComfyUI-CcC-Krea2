@@ -596,7 +596,7 @@
       },
       "widgets_values": [
         "create_from_image_t2i",
-        "Use the image as visual guidance. Derive the visual style, lighting, mood, materials, composition, and important details from it. Describe one coherent final image directly in English with concrete visible details. Output only the final prompt.",
+        "Use the image as visual guidance. Derive the visual style, lighting, mood, materials, composition, and important details from it. Describe one coherent final image with concrete visible details.",
         true,
         4096,
         0.25,
