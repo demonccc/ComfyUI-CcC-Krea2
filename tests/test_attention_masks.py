@@ -252,9 +252,9 @@ def test_mask_invert_is_opt_in_and_affects_output_chain_and_composite():
     torch.testing.assert_close(inverse_chain.regions[0].mask, 1.0 - selection)
     assert "inverted: True" in info
     # Selection and visualization are inverted, not only the mask socket.
-    torch.testing.assert_close(plain_preview[0, 0, 0], torch.full((3,), 0.10))
+    torch.testing.assert_close(plain_preview[0, 0, 0], torch.zeros(3))
     torch.testing.assert_close(inverse_preview[0, 0, 0], torch.ones(3))
-    torch.testing.assert_close(inverse_preview[0, 0, 1], torch.full((3,), 0.10))
+    torch.testing.assert_close(inverse_preview[0, 0, 1], torch.zeros(3))
 
 
 def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
