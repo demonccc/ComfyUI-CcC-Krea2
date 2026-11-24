@@ -150,18 +150,23 @@ def _ensure_image_latent_5d(latent: torch.Tensor) -> torch.Tensor:
 
 
 def _token_aligned_soft_noise_mask(generated_mask: torch.Tensor, latent_h: int, latent_w: int, *, patch_size: int = 2) -> torch.Tensor:
+    """AnyPaint-compatible binary token mask: a token regenerates unless all its pixels are known."""
     mask = generated_mask
     if mask.ndim == 2:
         mask = mask.unsqueeze(0)
     if mask.ndim != 3:
         raise ValueError(f"[Krea2 CcC Paint Prepare] generated_mask must be [B,H,W], got {tuple(mask.shape)}.")
-    mask = F.interpolate(mask.unsqueeze(1).float(), size=(latent_h, latent_w), mode="bilinear", align_corners=False).squeeze(1).clamp(0.0, 1.0)
     if latent_h % patch_size or latent_w % patch_size:
-        return mask.unsqueeze(1)
-    blocks = mask.view(mask.shape[0], latent_h // patch_size, patch_size, latent_w // patch_size, patch_size)
-    block_values = blocks.mean(dim=(2, 4))
-    aligned = block_values.repeat_interleave(patch_size, dim=1).repeat_interleave(patch_size, dim=2)
-    return aligned.unsqueeze(1)
+        raise ValueError("[Krea2 CcC Paint Prepare] latent dimensions must be divisible by Krea patch size.")
+    # Keep-mask preservation uses a conservative rule: every pixel in a
+    # patch must be known. Do not average mask weights into partial denoising.
+    keep = 1.0 - mask.float().clamp(0.0, 1.0)
+    keep = F.interpolate(keep.unsqueeze(1), size=(latent_h, latent_w), mode="bilinear", align_corners=False).squeeze(1)
+    keep = (keep > 0.5).float()
+    blocks = keep.view(keep.shape[0], latent_h // patch_size, patch_size, latent_w // patch_size, patch_size)
+    known_blocks = blocks.amin(dim=(2, 4))
+    known = known_blocks.repeat_interleave(patch_size, dim=1).repeat_interleave(patch_size, dim=2)
+    return (1.0 - known).unsqueeze(1)
 
 
 def prepare_paint_context(
@@ -221,11 +226,10 @@ def prepare_paint_context(
     semantic_reference = _downscale_semantic_reference(semantic_full)
 
     reference_latent = _extract_latent(vae.encode(semantic_reference))
-    # Do not encode the original masked subject into the sampling latent:
-    # even with noise_mask, its VAE features can leak into regeneration and
-    # prompt the model to reconstruct or duplicate the removed subject.
-    # Outside generated_mask, semantic_full is pixel-identical to known_image.
-    known_latent = _extract_latent(vae.encode(semantic_full))
+    # Match AnyPaint's known-region sampling contract: retain the known canvas
+    # as the latent, and use a binary, token-aligned noise mask to replace
+    # selected tokens during denoising. The semantic reference remains masked.
+    known_latent = _extract_latent(vae.encode(known_image))
     latent_tensor = _ensure_image_latent_5d(known_latent)
     latent_h, latent_w = latent_tensor.shape[-2:]
     noise_mask = _token_aligned_soft_noise_mask(generated_mask, latent_h, latent_w, patch_size=2).to(device=known_latent.device, dtype=known_latent.dtype)
@@ -371,7 +375,7 @@ class CcCKrea2PaintPrepare:
             f"Generated Mask Coverage: {generated_pixels}/{source_pixels} ({100.0 * generated_pixels / max(1, source_pixels):.2f}%)",
             f"Temporary Padding Coverage: {padding_pixels}/{int(padding_mask.numel())} ({100.0 * padding_pixels / max(1, padding_mask.numel()):.2f}%)",
             f"Generated Pixels In Temporary Padding: {int((active_mask & (padding_mask > 0.5)).sum().item())}",
-            "Latent: masked-neutralized samples + token-aligned noise_mask",
+            "Latent: known-image samples + AnyPaint-compatible binary token noise_mask",
         ])
         return (
             context,
