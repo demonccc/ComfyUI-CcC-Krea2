@@ -53,11 +53,14 @@ def _grow_or_shrink(mask: torch.Tensor, amount: int) -> torch.Tensor:
     if radius == 0:
         return mask
     kernel = radius * 2 + 1
-    if amount > 0:
-        return F.max_pool2d(mask.unsqueeze(1), kernel, stride=1, padding=radius).squeeze(1)
-    inverse = 1.0 - mask
-    grown_inverse = F.max_pool2d(inverse.unsqueeze(1), kernel, stride=1, padding=radius).squeeze(1)
-    return (1.0 - grown_inverse).clamp(0.0, 1.0)
+    # A square max filter is separable: horizontal then vertical pooling yields
+    # exactly the same dilation as a single (kernel, kernel) max_pool2d.
+    # This avoids the quadratic kernel work for large mask_grow values.
+    value = mask.unsqueeze(1) if amount > 0 else (1.0 - mask).unsqueeze(1)
+    value = F.max_pool2d(value, kernel_size=(1, kernel), stride=1, padding=(0, radius))
+    value = F.max_pool2d(value, kernel_size=(kernel, 1), stride=1, padding=(radius, 0))
+    result = value.squeeze(1)
+    return result if amount > 0 else (1.0 - result).clamp(0.0, 1.0)
 
 
 def _box_blur(mask: torch.Tensor, radius: int) -> torch.Tensor:
