@@ -32,15 +32,13 @@ def build_grounded_positive_user_content(
         if spec is None:
             continue
 
-        # A VAE/RoPE reference has a role annotation even when the Qwen Vision
-        # path is disabled. Preserve that label as prompt text without adding
-        # any image-pad tokens or changing physical Qwen image numbering.
+        # A Visual-only reference has no Qwen image block. Keep an explicit
+        # user annotation when supplied, without leaking internal VAE/RoPE
+        # implementation labels into the text-to-image prompt.
         if not getattr(spec, "include_in_vision", True):
             alias = _alias_for(item, spec).strip()
             if alias and getattr(spec, "appearance_reference", True):
-                frame = item.get("vae_reference_frame")
-                label = f"VAE/RoPE Image {frame}" if frame is not None else "VAE/RoPE reference"
-                annotations.append(f"{label}: {alias}")
+                annotations.append(alias)
             continue
 
         ref_path = getattr(spec, "reference_path", getattr(spec, "role", "").lower())
