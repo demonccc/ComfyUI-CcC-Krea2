@@ -197,63 +197,44 @@ def test_directional_feather_has_distinct_semantics():
     assert both[0, 4, 7] > 0.0
 
 
-def test_semantic_reference_preserves_explicit_outpaint_context_but_neutralizes_manual_mask():
+def test_outpaint_reference_hides_fill_but_preserves_original_source_colors():
     geometry = _geometry()
+    # Source is varied, while edge/reflect/white padding could be quite different.
+    geometry["working_image"][:, :8, :12, :] = 0.2
+    geometry["working_image"][:, 8:, :12, :] = 0.8
     geometry["working_image"][:, :, 12:, :] = 0.95
-    geometry["working_image"][:, 5:9, 5:9, :] = 1.0
-
     geometry["working_mask"][:, :, 12:] = 1.0
-    geometry["working_mask"][:, 5:9, 5:9] = 1.0
-
     expansion = torch.zeros_like(geometry["working_mask"])
     expansion[:, :, 12:] = 1.0
     geometry["working_expansion_mask"] = expansion
-
-    context, _, prepared, semantic, generated, _ = prepare_paint_context(
-        FakeVAE(),
-        geometry,
-        fill_holes=False,
-        mask_grow=0,
-        mask_blur_mode="gaussian_sigma",
-        mask_blur_amount=0.0,
-        mask_blur_direction="outside",
-    )
-
-    # The explicit outpaint margin remains fully generable.
-    assert torch.all(generated[:, :, 12:] == 1.0)
-    # But its edge/reflect/etc. pixels remain visible in the semantic reference.
-    assert torch.allclose(semantic[:, :, 12:, :], prepared[:, :, 12:, :])
-    # A normal user mask is still neutralized.
-    assert semantic[0, 6, 6].mean() < prepared[0, 6, 6].mean()
-    assert torch.equal(context["expansion_context_mask"], expansion)
-    assert torch.all(context["semantic_neutralize_mask"][:, :, 12:] == 0.0)
-
-
-def test_outpaint_feather_keeps_original_border_colors_as_reference_context():
-    geometry = _geometry(height=32, width=32)
-    geometry["working_image"][:, :, :24, :] = 0.85
-    geometry["working_image"][:, :, 24:, :] = 0.35
-    geometry["working_mask"][:, :, 24:] = 1.0
-    expansion = torch.zeros_like(geometry["working_mask"])
-    expansion[:, :, 24:] = 1.0
-    geometry["working_expansion_mask"] = expansion
     geometry["working_user_mask"] = torch.zeros_like(expansion)
 
+    class TrackingVAE(FakeVAE):
+        def __init__(self):
+            self.inputs = []
+
+        def encode(self, image):
+            self.inputs.append(image.clone())
+            return super().encode(image)
+
+    vae = TrackingVAE()
     context, _, prepared, semantic, generated, _ = prepare_paint_context(
-        FakeVAE(), geometry, mask_grow=3,
-        mask_blur_mode="gaussian_sigma", mask_blur_amount=1.0,
-        mask_blur_direction="outside",
+        vae, geometry, mask_grow=2, mask_blur_mode="gaussian_sigma",
+        mask_blur_amount=1.0, mask_blur_direction="outside",
     )
 
-    # The sampling mask still regenerates an overlap inside the original image.
-    assert generated[0, 22, 22] > 0.0
-    # But the original border color is never replaced by a mean/gray fill
-    # in the semantic and K/V reference used to generate that overlap.
-    torch.testing.assert_close(semantic, prepared)
-    assert torch.count_nonzero(context["semantic_neutralize_mask"]) == 0
+    assert torch.all(generated[:, :, 12:] == 1.0)
+    assert generated[0, 4, 11] > 0  # overlap is still generated
+    torch.testing.assert_close(semantic[:, :, :12, :], prepared[:, :, :12, :])
+    # Mean of the actual source is ~0.5, not the 0.95 padding value.
+    torch.testing.assert_close(semantic[0, 4, 14], torch.full((3,), 0.5))
+    assert torch.all(context["semantic_neutralize_mask"][:, :, 12:] == 1.0)
+    torch.testing.assert_close(vae.inputs[0], semantic)
+    # Sampling latent still uses the padded working canvas (not the semantic reference).
+    torch.testing.assert_close(vae.inputs[1], prepared)
 
 
-def test_combined_outpaint_preserves_padding_overlap_and_neutralizes_inpaint_mask():
+def test_combined_outpaint_preserves_original_overlap_and_neutralizes_user_inpaint():
     geometry = _geometry(height=32, width=32)
     geometry["working_image"][:, :, :] = 0.25
     geometry["working_image"][:, 10:15, 10:15] = 1.0
@@ -275,6 +256,21 @@ def test_combined_outpaint_preserves_padding_overlap_and_neutralizes_inpaint_mas
     torch.testing.assert_close(semantic[0, 20, 23], prepared[0, 20, 23])
     assert semantic[0, 12, 12].mean() < prepared[0, 12, 12].mean()
     assert context["semantic_neutralize_mask"][0, 12, 12] == 1.0
+    assert context["semantic_neutralize_mask"][0, 20, 26] == 1.0
+
+
+def test_pure_inpaint_semantic_reference_remains_unchanged_by_outpaint_logic():
+    geometry = _geometry(height=32, width=32)
+    geometry["working_image"][:, 10:20, 10:20] = 0.95
+    geometry["working_mask"][:, 10:20, 10:20] = 1.0
+    context, _, prepared, semantic, generated, keep = prepare_paint_context(
+        FakeVAE(), geometry, mask_grow=1,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=1.0,
+        mask_blur_direction="both",
+    )
+    torch.testing.assert_close(context["semantic_neutralize_mask"], generated)
+    assert semantic[0, 15, 15].mean() < prepared[0, 15, 15].mean()
+    torch.testing.assert_close(keep, 1 - generated)
 
 
 def test_semantic_reference_neutralizes_generated_pixels():
