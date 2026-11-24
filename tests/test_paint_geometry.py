@@ -57,6 +57,19 @@ def test_pad_selects_containing_krea_geometry_without_resizing_source():
     assert torch.all(prepared_mask[:, :y] == 1) if y else True
 
 
+def test_portrait_inpainting_prefers_smaller_canvas_over_exact_ratio():
+    image = _image(1280, 720)
+    context, prepared, mask = _prepare(image, fill="white")
+    assert (context["target_width"], context["target_height"]) == (1024, 1536)
+    assert prepared.shape == (1, 1536, 1024, 3)
+    assert context["transform"] == {
+        "pad_left": 152, "pad_top": 128,
+        "pad_right": 152, "pad_bottom": 128,
+    }
+    # Temporary geometry must never turn into an extra generation mask.
+    assert torch.all(mask == 0)
+
+
 def test_explicit_outpaint_expansion_is_separate_from_temporary_krea_padding():
     image = _image(1024, 1344)
     context, _, prepared_mask = _prepare(
