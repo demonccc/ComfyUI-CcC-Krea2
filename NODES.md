@@ -333,7 +333,7 @@ image + mask
  -> sampling LATENT
 ~~~
 
-The known source image is not resized during Paint geometry normalization.
+For inpainting, Paint Prepare neutralizes the selected pixels **before VAE encoding the sampling LATENT**, not only in the semantic reference. The source image is retained for preview, while the sampling latent does not retain the masked subject. Outside the generated mask, source pixels are preserved. Explicit outpaint expansion remains visible as padding-fill context.\n\nThe known source image is not resized during Paint geometry normalization.
 
 The semantic reference and keep mask are still computed internally and kept in `paint_context`; they are no longer separate node outputs. The remaining image and mask outputs allow visual inspection without redundant sockets.
 
