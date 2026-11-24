@@ -30,6 +30,10 @@ def test_workflow_graph_contract(path):
         if node["type"] == "CcCKrea2EditPromptCreator":
             assert len(node.get("widgets_values", ())) == 7, (path, node["id"])
             assert not any(socket["name"] == "reference_edit_image" for socket in node.get("inputs", ()))
+        if node["type"] == "CcCKrea2Edit":
+            # Existing showcase scenarios must retain the joint attention
+            # behavior until a user explicitly opts in to experimental K/V.
+            assert node.get("widgets_values", [])[-1] is False, (path, node["id"])
         if node["type"] == "CcCKrea2Reference":
             assert len(node.get("widgets_values", ())) == 20, (path, node["id"])
         for index, socket in enumerate(node.get("inputs", ())):
