@@ -102,7 +102,7 @@ def test_anypaint_token_alignment_never_partially_preserves_feathered_patch():
     assert torch.all((noise == 0) | (noise == 1))
 
 
-def test_sampler_vae_preserves_explicit_outpaint_fill_context():
+def test_sampler_vae_neutralizes_explicit_outpaint_fill_but_preserves_source():
     class TrackingVAE(FakeVAE):
         def __init__(self):
             self.inputs = []
@@ -124,7 +124,43 @@ def test_sampler_vae_preserves_explicit_outpaint_fill_context():
         mask_blur_mode="gaussian_sigma", mask_blur_amount=0.0,
         mask_blur_direction="outside",
     )
-    torch.testing.assert_close(vae.inputs[1][:, :, 24:], geometry["working_image"][:, :, 24:])
+    # Expansion pixel values in the sampling VAE input must not reproduce
+    # edge/reflect/white padding. Source pixels retain their exact values.
+    torch.testing.assert_close(vae.inputs[1][:, :, :24], geometry["working_image"][:, :, :24])
+    torch.testing.assert_close(vae.inputs[1][:, :, 24:], geometry["working_image"][:, :, :24].mean(dim=(1, 2), keepdim=True).expand(-1, 32, 8, -1))
+    assert not torch.allclose(vae.inputs[1][:, :, 24:], geometry["working_image"][:, :, 24:])
+
+
+def test_outpaint_sampling_latent_is_independent_of_padding_fill_pixels():
+    class TrackingVAE(FakeVAE):
+        def __init__(self):
+            self.inputs = []
+
+        def encode(self, image):
+            self.inputs.append(image.clone())
+            return super().encode(image)
+
+    expansion = torch.zeros((1, 32, 32))
+    expansion[:, :, 24:] = 1.0
+    sampler_inputs = []
+    for padding_value in (0.0, 0.5, 1.0):
+        geometry = _geometry(height=32, width=32)
+        geometry["working_image"][:, :16, :24, :] = 0.1
+        geometry["working_image"][:, 16:, :24, :] = 0.7
+        geometry["working_image"][:, :, 24:, :] = padding_value
+        geometry["working_mask"] = expansion.clone()
+        geometry["working_expansion_mask"] = expansion.clone()
+        geometry["working_user_mask"] = torch.zeros_like(expansion)
+        vae = TrackingVAE()
+        _, _, prepared, _, _, _ = prepare_paint_context(
+            vae, geometry, mask_grow=0, mask_blur_mode="gaussian_sigma",
+            mask_blur_amount=0.0, mask_blur_direction="outside",
+        )
+        torch.testing.assert_close(vae.inputs[1][:, :, :24], prepared[:, :, :24])
+        sampler_inputs.append(vae.inputs[1])
+
+    for candidate in sampler_inputs[1:]:
+        torch.testing.assert_close(candidate, sampler_inputs[0])
 
 
 def test_fill_holes_fills_only_enclosed_mask_interiors():
@@ -230,8 +266,11 @@ def test_outpaint_reference_hides_fill_but_preserves_original_source_colors():
     torch.testing.assert_close(semantic[0, 4, 14], torch.full((3,), 0.5))
     assert torch.all(context["semantic_neutralize_mask"][:, :, 12:] == 1.0)
     torch.testing.assert_close(vae.inputs[0], semantic)
-    # Sampling latent still uses the padded working canvas (not the semantic reference).
-    torch.testing.assert_close(vae.inputs[1], prepared)
+    # Sampling latent preserves source pixels, but replaces only expansion fill
+    # with the neutral source-derived color instead of using reflect/edge pixels.
+    torch.testing.assert_close(vae.inputs[1][:, :, :12], prepared[:, :, :12])
+    torch.testing.assert_close(vae.inputs[1][0, 4, 14], torch.full((3,), 0.5))
+    assert not torch.allclose(vae.inputs[1][:, :, 12:], prepared[:, :, 12:])
 
 
 def test_combined_outpaint_preserves_original_overlap_and_neutralizes_user_inpaint():
