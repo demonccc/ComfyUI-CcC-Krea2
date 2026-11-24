@@ -187,7 +187,7 @@ The Visual Reference chain is returned unchanged.
 
 ## Image Layout
 
-`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), crop-only positive `resize_percent` (default 100%), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/07_scene_composition.json` demonstrates using Layout Cells and Layout Composer to prepare a multi-image scene blueprint.
+`Krea2 CcC Layout Cell` appends one IMAGE to a `KREA2_LAYOUT_CHAIN` with row, column, `cell/full_row/full_column`, fit (`contain/stretch/crop/fit`), crop-only positive `resize_percent` (default 100%), alignment and signed pixel offsets. `Krea2 CcC Layout Composer` resolves the grid using a Krea output preset, padding, gap, and background color. Overlapping or missing cells raise an error. `workflows/10_scene_composition.json` demonstrates using Layout Cells and Layout Composer to prepare a multi-image scene blueprint.
 
 
 ## Paint
@@ -234,21 +234,24 @@ There is **no public Krea2 CcC Paint Geometry node**.
 
 ## Example Workflows
 
-The `workflows/` directory contains **seven integrated workflows ordered from the simplest use case to the most complex**. Start at 01 and progress as you become familiar with Krea2 CcC:
+The `workflows/` directory contains **ten integrated workflows**:
 
 | Step | Workflow | What it demonstrates |
 | --- | --- | --- |
-| 01 | [Creative Generation](workflows/01_creative_generation.json) | Vision Reference + Prompt Creator + T2I; optional LoRA Stack |
-| 02 | [Outpainting & Reframing](workflows/02_outpainting_reframing.json) | Extend a source image with Paint Prepare, Paint and Restore |
-| 03 | [Local Image Editing](workflows/03_local_image_editing.json) | Layout Composer, SAM masking, inverse selection and background replacement with Paint |
-| 04 | [Identity & Scene Transfer](workflows/04_identity_scene_transfer.json) | Two visual references, regional masks, Prompt Creator and Edit |
-| 05 | [Character Consistency](workflows/05_character_consistency.json) | Ordered body/face mask boosts and identity preservation across scenes |
-| 06 | [Outfit Transfer](workflows/06_outfit_transfer.json) | Three coordinated references (scene, identity, outfit) plus regional masks |
-| 07 | [Scene Composition](workflows/07_scene_composition.json) | Multiple layout cells, composited scene blueprint, subject reference and Edit |
+| 01 | [Creative Generation](workflows/01_creative_generation.json) | Generate images from prompts |
+| 02 | [Reference Identity Edit](workflows/02_reference_identity_edit.json) | Single-reference identity-guided editing |
+| 03 | [Inpaint Remove Object](workflows/03_inpaint_remove_object.json) | Remove/reconstruct regions with SAM and Paint |
+| 04 | [Outpainting Reframing](workflows/04_outpainting_reframing.json) | Expand and reframe a source image |
+| 05 | [Inpainting Edit](workflows/05_inpainting_edit.json) | Regenerate a selected region using Paint |
+| 06 | [Inpaint Outfit Transfer](workflows/06_inpaint_outfit_transfer.json) | Use Paint with a second image as an outfit blueprint |
+| 07 | [Edit Outfit Transfer](workflows/07_edit_outfit_transfer.json) | Transfer garments with Edit and multiple references |
+| 08 | [Identity Scene Transfer](workflows/08_identity_scene_transfer.json) | Transfer identity to a reference scene |
+| 09 | [Character Consistency](workflows/09_character_consistency.json) | Preserve subject identity across scenes |
+| 10 | [Scene Composition](workflows/10_scene_composition.json) | Compose scene references using Layout Cells |
 
 **How to try them:** replace `LoadImage` placeholders with your own images and verify all model, LoRA, and SAM filenames against your ComfyUI installation. Use a fixed seed when comparing results. These are starting workflows and still need GPU generation testing.
 
-**Boost:** `-5` blocks direct VAE/RoPE reference attention, `0` is neutral, and `+5` corresponds to 10×. For Paint, the mask selects pixels to regenerate; it is not a reference-attention Boost mask.
+**Boost:** `-10` blocks direct VAE/RoPE reference attention, `0` is neutral, and `+10` corresponds to 10×. For Paint, the mask selects pixels to regenerate; it is not a reference-attention Boost mask.
 
 
 See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data-flow details.
@@ -257,7 +260,7 @@ See NODES.md for exact public-node controls and ARCHITECTURE.md for runtime/data
 
 ComfyUI-Krea-CcC was informed by work from the ComfyUI and Krea 2 community. Projects and ideas that influenced the implementation are documented in NOTICE.
 
-**RoPE preview:** Edit emits an `IMAGE` batch with four canonical views (`layout`, `overlay_boxes`, `overlay_visuals`, `regional_boosts`) followed by **one separate spatial Boost view per VAE/RoPE reference**. Every view uses the same coordinates computed by the runtime RoPE planner; the fourth no longer uses a centered gallery. When references overlap, the fourth view shows the actual overlay order; the additional per-reference frames preserve each image and mask at its own RoPE position so no reference disappears behind another. Target content is shown if available. All reference previews use the same source geometry as VAE preparation; collapsed references are displayed as points. Vision-only references do not appear. Boost -5 darkens the image by 90%, Boost +5 by 5%, with intermediate values interpolated linearly. The source image is not alpha-blended a second time into the preview, preserving visible detail. This is preview rendering only and does not change generation attention.
+**RoPE preview:** Edit emits an `IMAGE` batch with four canonical views (`layout`, `overlay_boxes`, `overlay_visuals`, `regional_boosts`) followed by **one separate spatial Boost view per VAE/RoPE reference**. Every view uses the same coordinates computed by the runtime RoPE planner; the fourth no longer uses a centered gallery. When references overlap, the fourth view shows the actual overlay order; the additional per-reference frames preserve each image and mask at its own RoPE position so no reference disappears behind another. Target content is shown if available. All reference previews use the same source geometry as VAE preparation; collapsed references are displayed as points. Vision-only references do not appear. Boost -10 darkens the image by 90%, Boost +10 by 5%, with intermediate values interpolated linearly. The source image is not alpha-blended a second time into the preview, preserving visible detail. This is preview rendering only and does not change generation attention.
 
 
 **Reference routing update:** Every Reference retains its source image whether VAE/RoPE and Vision are on or off. The previous Visual widgets are named VAE/RoPE (`vae_rope_enable` and `vae_rope_*`). Prompt Creator accepts one ordered `references` chain, analyzes its images once in chain order and forwards that same chain unchanged. To use a scene and a subject, connect Scene Reference to Subject Reference via `previous_references`, then connect Subject Reference to Prompt Creator. Both VAE/RoPE and Vision enable states are preserved. Existing workflows using the former IMAGE socket/widget names require migration.
