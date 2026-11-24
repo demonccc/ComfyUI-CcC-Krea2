@@ -33,7 +33,7 @@ class CcCKrea2VisualReference:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "boost": ("FLOAT", {"default": 0.0, "min": -5.0, "max": 5.0, "step": 0.1}),
+                "boost": ("FLOAT", {"default": 0.0, "min": -10.0, "max": 10.0, "step": 0.1}),
                 "reference_fit": (REFERENCE_FIT, {"default": "native"}),
                 "placement_grid": (
                     PLACEMENT_GRIDS,
