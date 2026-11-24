@@ -290,7 +290,7 @@ class CcCKrea2Edit:
             f"Vision References: {len(vision_entries)}",
             "Generated Vision text extractions: 0",
             f"Reference K/V Mode: {bool(use_kv_reference and apply_krea2_edit_patch and reference_count)}",
-            f"VAE/RoPE attention isolation: {bool(isolate_references)}",
+            f"VAE/RoPE attention isolation: {bool(isolate_references or use_kv_reference)}",
             f"Latent Vision: {'enabled' if latent_semantic.get('enabled') else 'disabled'}",
             "Conditioning Path: orchestrated Krea2 Edit preparation",
             (
