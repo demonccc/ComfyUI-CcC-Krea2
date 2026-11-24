@@ -212,9 +212,9 @@ class CcCKrea2Edit:
                 "latent": ("LATENT",),
                 "positive_prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
                 "apply_krea2_edit_patch": ("BOOLEAN", {"default": True}),
-                "use_kv_reference": ("BOOLEAN", {"default": False, "tooltip": "Use isolated t=0 K/V reference attention instead of the current joint Edit attention. Experimental."}),
             },
             "optional": {
+                "use_kv_reference": ("BOOLEAN", {"default": False, "tooltip": "Use isolated t=0 K/V reference attention instead of the current joint Edit attention. Experimental."}),
                 "isolate_references": ("BOOLEAN", {"default": False, "tooltip": "Prevent VAE/RoPE reference tokens from attending other references or the target; target still attends references according to masks and boosts."}),
                 "references": ("KREA2_REFERENCE_CHAIN",),
                 "prompt_augmentation": (CCC_KREA2_PROMPT_AUGMENTATION,),
