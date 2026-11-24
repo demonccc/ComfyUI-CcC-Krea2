@@ -389,30 +389,39 @@ def _compute_ref_attention_bias_patchified(
             if regional.ndim != 3:
                 raise ValueError("Reference weight map must be [B,H,W].")
             regional = regional.to(device=device, dtype=torch.float32)
-            # Average graded boosts, but never dilute explicit -5 exclusions
+            # Average graded boosts, but never dilute explicit -10 exclusions
             # at token boundaries: any excluded source pixel blocks that key.
             excluded = F.adaptive_max_pool2d(
-                (regional <= -5.0).unsqueeze(1).to(torch.float32), (gh, gw)
+                (regional <= -10.0).unsqueeze(1).to(torch.float32), (gh, gw)
             )[:, 0].flatten(1) > 0
             weights = F.interpolate(
                 regional.unsqueeze(1), size=(gh, gw), mode="area"
             )[:, 0].flatten(1).to(dtype=dtype)
-            weights = torch.where(excluded, -5.0, weights)
+            weights = torch.where(excluded, -10.0, weights)
             weights = weights.expand(batch_size, -1)
-            if not torch.isfinite(weights).all() or torch.any((weights < -5.0) | (weights > 5.0)):
-                raise ValueError("[Krea2 CcC Edit] Regional attention boost must be in [-5, 5].")
-            # Symmetric logarithmic scale: multiplier = 10 ** (boost / 5).
-            # -5 is a deliberate hard exclusion; all other values are finite.
-            block += (weights * (math.log(10.0) / 5.0)
-                      * tgt_weight.unsqueeze(-1)).unsqueeze(1)
-            block.masked_fill_((weights <= -5.0).unsqueeze(1).unsqueeze(1), float("-inf"))
+            if not torch.isfinite(weights).all() or torch.any((weights < -10.0) | (weights > 10.0)):
+                raise ValueError("[Krea2 CcC Edit] Regional attention boost must be in [-10, 10].")
+            # Signed extension of the legacy 0..10 strength scale.
+            # 0 is neutral, +10 is the legacy x10 peak, -10 is exclusion.
+            # Intermediate negative boosts attenuate by the reciprocal factor.
+            multiplier = torch.where(
+                weights >= 0,
+                1.0 + 0.9 * weights,
+                1.0 / (1.0 + 0.9 * weights.abs()),
+            )
+            block += multiplier.log().unsqueeze(1).unsqueeze(1)
+            block.masked_fill_((weights <= -10.0).unsqueeze(1).unsqueeze(1), float("-inf"))
         elif float(boost) != 0.0:
-            if not math.isfinite(float(boost)) or not -5.0 <= float(boost) <= 5.0:
-                raise ValueError("[Krea2 CcC Edit] Attention boost must be in [-5, 5].")
-            if float(boost) == -5.0:
+            if not math.isfinite(float(boost)) or not -10.0 <= float(boost) <= 10.0:
+                raise ValueError("[Krea2 CcC Edit] Attention boost must be in [-10, 10].")
+            if float(boost) == -10.0:
                 block.fill_(float("-inf"))
             else:
-                block += float(boost) * (math.log(10.0) / 5.0)
+                multiplier = (
+                    1.0 + 0.9 * float(boost)
+                    if boost > 0 else 1.0 / (1.0 + 0.9 * abs(float(boost)))
+                )
+                block += math.log(multiplier)
 
     return bias
 
