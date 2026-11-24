@@ -229,6 +229,54 @@ def test_semantic_reference_preserves_explicit_outpaint_context_but_neutralizes_
     assert torch.all(context["semantic_neutralize_mask"][:, :, 12:] == 0.0)
 
 
+def test_outpaint_feather_keeps_original_border_colors_as_reference_context():
+    geometry = _geometry(height=32, width=32)
+    geometry["working_image"][:, :, :24, :] = 0.85
+    geometry["working_image"][:, :, 24:, :] = 0.35
+    geometry["working_mask"][:, :, 24:] = 1.0
+    expansion = torch.zeros_like(geometry["working_mask"])
+    expansion[:, :, 24:] = 1.0
+    geometry["working_expansion_mask"] = expansion
+    geometry["working_user_mask"] = torch.zeros_like(expansion)
+
+    context, _, prepared, semantic, generated, _ = prepare_paint_context(
+        FakeVAE(), geometry, mask_grow=3,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=1.0,
+        mask_blur_direction="outside",
+    )
+
+    # The sampling mask still regenerates an overlap inside the original image.
+    assert generated[0, 22, 22] > 0.0
+    # But the original border color is never replaced by a mean/gray fill
+    # in the semantic and K/V reference used to generate that overlap.
+    torch.testing.assert_close(semantic, prepared)
+    assert torch.count_nonzero(context["semantic_neutralize_mask"]) == 0
+
+
+def test_combined_outpaint_preserves_padding_overlap_and_neutralizes_inpaint_mask():
+    geometry = _geometry(height=32, width=32)
+    geometry["working_image"][:, :, :] = 0.25
+    geometry["working_image"][:, 10:15, 10:15] = 1.0
+    expansion = torch.zeros_like(geometry["working_mask"])
+    expansion[:, :, 24:] = 1.0
+    user_mask = torch.zeros_like(expansion)
+    user_mask[:, 10:15, 10:15] = 1.0
+    geometry["working_mask"] = torch.maximum(user_mask, expansion)
+    geometry["working_expansion_mask"] = expansion
+    geometry["working_user_mask"] = user_mask
+
+    context, _, prepared, semantic, generated, _ = prepare_paint_context(
+        FakeVAE(), geometry, mask_grow=2,
+        mask_blur_mode="gaussian_sigma", mask_blur_amount=1.0,
+        mask_blur_direction="outside",
+    )
+
+    assert generated[0, 20, 23] > 0.0
+    torch.testing.assert_close(semantic[0, 20, 23], prepared[0, 20, 23])
+    assert semantic[0, 12, 12].mean() < prepared[0, 12, 12].mean()
+    assert context["semantic_neutralize_mask"][0, 12, 12] == 1.0
+
+
 def test_semantic_reference_neutralizes_generated_pixels():
     geometry = _geometry()
     geometry["working_image"][:, 5:11, 5:11] = 1.0
