@@ -13,6 +13,8 @@ The public surface currently contains **15 registered nodes** (including the uni
 - **Both**: one source image contributes one Visual entry and one Vision entry to the same ordered reference chain; Qwen is not fed a duplicate semantic copy from the Visual path.
 - **Neither**: invalid configuration. At least one path must be enabled.
 
+Edit also exposes optional `use_kv_reference` (default `false`): OFF retains the current joint reference attention; ON switches to experimental isolated t=0 reference K/V with cache, preserving configured per-reference Boost, regional attention masks, and RoPE positioning. This is a real alternate reference-attention path, not merely a speed flag. Existing workflows stay OFF; fidelity must be tested with the same image/prompt/seed.
+
 Edit exposes an optional `isolate_references` switch (off by default): when enabled, each VAE/RoPE reference can attend to text and itself but not to another reference or the target. Target-to-reference attention remains controlled by existing masks and Boost; this does not constitute full subject/region ownership and requires compatible attention backends.\n\nThe Krea2 Edit LoRA remains attached to the model as before. Its image-reference attention is provided by the enabled Visual path; the Vision path supplies separate Qwen conditioning and is **not** a substitute for the LoRA's spatial reference mechanism. Fidelity of the Vision modes with the LoRA still needs image-generation testing.
 
 The standalone Visual and Vision classes are internal implementation helpers, not independently registered public nodes. Use **Krea2 CcC Reference** for new workflows. Saved workflows with removed Vision mode values must be explicitly migrated; workflow JSON files have not been modified.
