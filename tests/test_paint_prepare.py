@@ -2,7 +2,7 @@
 
 import torch
 
-from ccc_krea2.modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare, prepare_paint_context, _token_aligned_soft_noise_mask
+from ccc_krea2.modular_nodes.paint_prepare_node import CcCKrea2PaintPrepare, prepare_paint_context, _token_aligned_soft_noise_mask, _grow_or_shrink
 
 
 class FakeVAE:
@@ -248,6 +248,32 @@ def test_fill_holes_does_not_close_an_open_boundary():
 
     _, _, _, _, filled, _ = _prepare(open_ring, fill_holes=True)
     assert filled[0, 8, 8] == 0.0
+
+
+def test_separable_mask_grow_matches_square_max_pool_for_soft_and_binary_masks():
+    import torch.nn.functional as F
+    torch.manual_seed(1042)
+    for height, width in ((9, 11), (32, 48)):
+        soft = torch.rand((2, height, width))
+        binary = (soft > 0.5).float()
+        for mask in (soft, binary):
+            for amount in (-16, -8, -3, -1, 0, 1, 3, 8, 16):
+                if amount == 0:
+                    expected = mask
+                else:
+                    radius = abs(amount)
+                    source = mask if amount > 0 else 1.0 - mask
+                    pooled = F.max_pool2d(
+                        source.unsqueeze(1),
+                        kernel_size=2 * radius + 1, stride=1, padding=radius,
+                    ).squeeze(1)
+                    expected = pooled if amount > 0 else (1.0 - pooled).clamp(0.0, 1.0)
+                torch.testing.assert_close(
+                    _grow_or_shrink(mask, amount),
+                    expected,
+                    rtol=0,
+                    atol=0,
+                )
 
 
 def test_signed_mask_grow_expands_and_shrinks():
