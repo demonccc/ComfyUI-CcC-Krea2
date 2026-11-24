@@ -207,7 +207,9 @@ KSampler -> VAE Decode                            |
         +------------------> Paint Restore <--------+
 ~~~
 
-The sampling latent is VAE-encoded from the neutralized working canvas to prevent masked subjects leaking back into the generation. Paint Prepare still outputs the original prepared image for preview; the semantic reference and sampling latent both exclude selected inpaint content.\n\nPaint Prepare uses internal padding geometry helpers to choose a curated Krea working canvas that contains the requested image. If the source exceeds all supported Krea geometries, it fails with a resize instruction instead of cropping source content.
+Paint Prepare neutralizes selected pixels in the semantic visual reference for Qwen and t=0 K/V; the sampling latent encodes the known canvas, following AnyPaint. A conservative binary token-level `noise_mask` instructs KSampler to regenerate entire affected 2x2 DiT patches rather than partially preserving source content.
+
+Paint Prepare uses internal padding geometry helpers to choose a curated Krea working canvas that contains the requested image. If the source exceeds all supported Krea geometries, it fails with a resize instruction instead of cropping source content.
 
 Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas and is removed by Restore.
 
