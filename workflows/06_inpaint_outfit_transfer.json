@@ -1,0 +1,1563 @@
+{
+  "id": "0617462e-ff2f-4c4a-af13-8aa7beaecdda",
+  "revision": 0,
+  "last_node_id": 30,
+  "last_link_id": 62,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        320,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "UNETLoader",
+        "models": [
+          {
+            "name": "moodyKrea2Mix_v3-Global-FP8.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/moodyKrea2Mix_v3-Global-FP8.safetensors",
+            "directory": "diffusion_models"
+          }
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "moodyKrea2Mix_v3-Global-FP8.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "moodyKrea2Mix_v3-Global-FP8.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        0,
+        140
+      ],
+      "size": [
+        320,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "CLIPLoader",
+        "models": [
+          {
+            "name": "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3VL4BAbliteratedComfyui_FP8.safetensors",
+            "directory": "text_encoders"
+          }
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
+        "krea2",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3VL4BAbliteratedComfyui_FP8.safetensors",
+        "type": "krea2",
+        "device": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        0,
+        280
+      ],
+      "size": [
+        320,
+        100
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            22,
+            41
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "VAELoader",
+        "models": [
+          {
+            "name": "qwen_image_vae.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors",
+            "directory": "vae"
+          }
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "qwen_image_vae.safetensors"
+      }
+    },
+    {
+      "id": 4,
+      "type": "CcCKrea2LoRAStack",
+      "pos": [
+        380,
+        0
+      ],
+      "size": [
+        360,
+        394
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "ba2688dffcd67d81ae2c8aa7e7916d779b12f443",
+        "Node name for S&R": "CcCKrea2LoRAStack",
+        "models": [
+          {
+            "name": "Krea2/krea2_anypaint_rank32.safetensors",
+            "url": "https://huggingface.co/yijunwang2/krea2-anypaint/resolve/main/Krea2/krea2_anypaint_rank32.safetensors",
+            "directory": "loras"
+          }
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        true,
+        "Krea2/krea2_anypaint_rank32.safetensors",
+        1,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1,
+        false,
+        "None",
+        1
+      ],
+      "widgets_values_named": {
+        "lora_1_enabled": true,
+        "lora_1_name": "Krea2/krea2_anypaint_rank32.safetensors",
+        "lora_1_strength": 1,
+        "lora_2_enabled": false,
+        "lora_2_name": "None",
+        "lora_2_strength": 1,
+        "lora_3_enabled": false,
+        "lora_3_name": "None",
+        "lora_3_strength": 1,
+        "lora_4_enabled": false,
+        "lora_4_name": "None",
+        "lora_4_strength": 1,
+        "lora_5_enabled": false,
+        "lora_5_name": "None",
+        "lora_5_strength": 1
+      }
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        -737.4043745362504,
+        497.4693375119982
+      ],
+      "size": [
+        330,
+        314.00000000000006
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            31
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "title": "SOURCE PHOTO — replace image",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "LoadImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "ComfyUI_temp_fadho_00001_.png",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "ComfyUI_temp_fadho_00001_.png",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 7,
+      "type": "PreviewImage",
+      "pos": [
+        1254.309454224235,
+        448.04765139568536
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 49
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Prepared Canvas",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 9,
+      "type": "MaskToImage",
+      "pos": [
+        1284.264934201354,
+        748.6919741977606
+      ],
+      "size": [
+        230,
+        80
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 50
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "title": "Generated Mask",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "MaskToImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "PreviewImage",
+      "pos": [
+        1568.8029456825816,
+        448.0584954698615
+      ],
+      "size": [
+        300,
+        250
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 13,
+      "type": "CcCKrea2Paint",
+      "pos": [
+        920,
+        0
+      ],
+      "size": [
+        590,
+        330
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        },
+        {
+          "name": "paint_context",
+          "type": "KREA2_PAINT_CONTEXT",
+          "link": 53
+        },
+        {
+          "name": "prompt_augmentation",
+          "shape": 7,
+          "type": "CCC_KREA2_PROMPT_AUGMENTATION",
+          "link": null
+        },
+        {
+          "name": "outfit_reference",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 62
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            16
+          ]
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            17
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            18
+          ]
+        },
+        {
+          "name": "paint_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "ba2688dffcd67d81ae2c8aa7e7916d779b12f443",
+        "Node name for S&R": "CcCKrea2Paint",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "Inpaint only the clothing selected by the mask. Replace it with the complete outfit shown in Picture 2 (the outfit reference), reproducing the garments, colors, fabric, patterns, seams and accessories faithfully. Keep the original person's face, identity, hair, body proportions, pose, hands, background and everything outside the mask unchanged. Make the replacement clothing fit naturally with realistic folds, shadows and lighting.",
+        true,
+        true
+      ],
+      "widgets_values_named": {
+        "positive_prompt": "Inpaint only the clothing selected by the mask. Replace it with the complete outfit shown in Picture 2 (the outfit reference), reproducing the garments, colors, fabric, patterns, seams and accessories faithfully. Keep the original person's face, identity, hair, body proportions, pose, hands, background and everything outside the mask unchanged. Make the replacement clothing fit naturally with realistic folds, shadows and lighting.",
+        "apply_krea2_paint_patch": true,
+        "kv_cache": true
+      }
+    },
+    {
+      "id": 14,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        1580,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "ModelSamplingAuraFlow",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        1.15,
+        "flow"
+      ],
+      "widgets_values_named": {
+        "shift": 1.15,
+        "sampling": "flow"
+      }
+    },
+    {
+      "id": 15,
+      "type": "BlackwellAttentionFix",
+      "pos": [
+        1920,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "lonecatone23/comfyUI-BlackwellAttentionFix",
+        "ver": "42428da9c5039f0ee4bfcb8f0db310d1904dfe60",
+        "Node name for S&R": "BlackwellAttentionFix",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "pytorch"
+      ],
+      "widgets_values_named": {
+        "mode": "pytorch"
+      }
+    },
+    {
+      "id": 16,
+      "type": "KSampler",
+      "pos": [
+        2260,
+        0
+      ],
+      "size": [
+        330,
+        474
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 20
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 17
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 18
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "KSampler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        384952408973795,
+        "randomize",
+        8,
+        1,
+        "euler",
+        "simple",
+        1
+      ],
+      "widgets_values_named": {
+        "seed": 384952408973795,
+        "control_after_generate": "randomize",
+        "steps": 8,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    {
+      "id": 17,
+      "type": "VAEDecode",
+      "pos": [
+        2640,
+        0
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 21
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "VAEDecode",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "SaveImage",
+      "pos": [
+        3360,
+        0
+      ],
+      "size": [
+        330,
+        270
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "SaveImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "CcC_Inpaint_Outfit_Transfer"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "CcC_Inpaint_Outfit_Transfer"
+      }
+    },
+    {
+      "id": 19,
+      "type": "Note",
+      "pos": [
+        2183.2210888123986,
+        574.2295688786858
+      ],
+      "size": [
+        850,
+        430
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "Note",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "INPAINT OUTFIT TRANSFER\nReplace the subject photo and the new outfit reference photo. SAM selects the clothing for regeneration. Paint sends the masked source as Qwen Picture 1 and the outfit photo as Picture 2, while preserving the source image's registered K/V appearance reference. Inspect the mask and adjust the prompt if needed, then sample and restore the original canvas."
+      ],
+      "widgets_values_named": {
+        "text": "INPAINT OUTFIT TRANSFER\nReplace the subject photo and the new outfit reference photo. SAM selects the clothing for regeneration. Paint sends the masked source as Qwen Picture 1 and the outfit photo as Picture 2, while preserving the source image's registered K/V appearance reference. Inspect the mask and adjust the prompt if needed, then sample and restore the original canvas."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 21,
+      "type": "CcCKrea2PaintRestore",
+      "pos": [
+        2980,
+        0
+      ],
+      "size": [
+        340,
+        150
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23
+        },
+        {
+          "name": "paint_geometry",
+          "type": "KREA2_PAINT_GEOMETRY",
+          "link": 52
+        },
+        {
+          "name": "generated_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 51
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            26
+          ]
+        }
+      ],
+      "title": "Restore Native Canvas",
+      "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "ba2688dffcd67d81ae2c8aa7e7916d779b12f443",
+        "Node name for S&R": "CcCKrea2PaintRestore",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "8.0.1",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "CcCKrea2Mask",
+      "pos": [
+        -352.7119244627509,
+        546.6598326295904
+      ],
+      "size": [
+        284.4375,
+        282
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 31
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "name": "sam_model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": 36
+        },
+        {
+          "name": "sam_clip",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 35
+        },
+        {
+          "name": "previous_mask_attention",
+          "shape": 7,
+          "type": "KREA2_MASK_CHAIN",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            61
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            42
+          ]
+        },
+        {
+          "name": "mask_attention",
+          "type": "KREA2_MASK_CHAIN",
+          "links": null
+        },
+        {
+          "name": "composite_image",
+          "type": "IMAGE",
+          "links": [
+            34
+          ]
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "ba2688dffcd67d81ae2c8aa7e7916d779b12f443",
+        "Node name for S&R": "CcCKrea2Mask",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "sam3",
+        "clothing, outfit",
+        -10,
+        0.5,
+        "#ff0000",
+        false,
+        false
+      ],
+      "widgets_values_named": {
+        "source": "sam3",
+        "prompt": "clothing, outfit",
+        "boost": -10,
+        "confidence": 0.5,
+        "composite_color": "#ff0000",
+        "invert": false,
+        "unload_sam_model": false
+      },
+      "title": "SAM: select clothing to replace"
+    },
+    {
+      "id": 25,
+      "type": "PreviewImage",
+      "pos": [
+        50.50361285263037,
+        691.3144124722088
+      ],
+      "size": [
+        236.22885662802014,
+        246
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 34
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "PreviewImage",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 26,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -600.752187534337,
+        219.05264029363812
+      ],
+      "size": [
+        270,
+        98
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            36
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            35
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.46.0",
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "sam3.1_multiplex_fp16.safetensors"
+      ],
+      "widgets_values_named": {
+        "ckpt_name": "sam3.1_multiplex_fp16.safetensors"
+      }
+    },
+    {
+      "id": 27,
+      "type": "CcCKrea2PaintPrepare",
+      "pos": [
+        395.7139992387201,
+        494.34722135389705
+      ],
+      "size": [
+        416.8236598356591,
+        488.66917183001465
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 61
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 41
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 42
+        }
+      ],
+      "outputs": [
+        {
+          "name": "paint_context",
+          "type": "KREA2_PAINT_CONTEXT",
+          "links": [
+            53
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            44
+          ]
+        },
+        {
+          "name": "generated_mask",
+          "type": "MASK",
+          "links": [
+            50,
+            51
+          ]
+        },
+        {
+          "name": "paint_geometry",
+          "type": "KREA2_PAINT_GEOMETRY",
+          "links": [
+            52
+          ]
+        },
+        {
+          "name": "prepared_image",
+          "type": "IMAGE",
+          "links": [
+            49
+          ]
+        },
+        {
+          "name": "paint_prepare_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "Paint Prepare - Inpaint",
+      "properties": {
+        "aux_id": "demonccc/ComfyUI-CcC-Krea2",
+        "ver": "41c74aa6f963de28de05bb51f21ecb51d5cb4fec",
+        "Node name for S&R": "CcCKrea2PaintPrepare",
+        "ue_properties": {
+          "version": "8.0.1",
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "title_regex": null,
+          "input_regex": null,
+          "group_regex": null,
+          "title_regex_invert": false,
+          "input_regex_invert": false,
+          "group_regex_invert": false,
+          "apply_to_unrepeated": 0,
+          "send_to_any": 0,
+          "string_to_combo": 0,
+          "repeated_type_rule": 0,
+          "group_restricted": 0,
+          "color_restricted": 0
+        }
+      },
+      "widgets_values": [
+        "neutral",
+        "center",
+        "center",
+        0,
+        0,
+        0,
+        0,
+        true,
+        5,
+        "gaussian_sigma",
+        20,
+        "outside"
+      ],
+      "widgets_values_named": {
+        "padding_fill": "neutral",
+        "horizontal_position": "center",
+        "vertical_position": "center",
+        "expand_left": 0,
+        "expand_top": 0,
+        "expand_right": 0,
+        "expand_bottom": 0,
+        "fill_holes": true,
+        "mask_grow": 5,
+        "mask_blur_mode": "gaussian_sigma",
+        "mask_blur_amount": 20,
+        "mask_blur_direction": "outside"
+      }
+    },
+    {
+      "id": 30,
+      "type": "LoadImage",
+      "pos": [
+        -1150,
+        960
+      ],
+      "size": [
+        330,
+        320
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            62
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "title": "OUTFIT REFERENCE — replace image",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "outfit_reference.png",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "outfit_reference.png",
+        "upload": "image"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      4,
+      0,
+      13,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      2,
+      0,
+      13,
+      1,
+      "CLIP"
+    ],
+    [
+      13,
+      9,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      13,
+      0,
+      14,
+      0,
+      "MODEL"
+    ],
+    [
+      17,
+      13,
+      1,
+      16,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      18,
+      13,
+      2,
+      16,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      19,
+      14,
+      0,
+      15,
+      0,
+      "MODEL"
+    ],
+    [
+      20,
+      15,
+      0,
+      16,
+      0,
+      "MODEL"
+    ],
+    [
+      21,
+      16,
+      0,
+      17,
+      0,
+      "LATENT"
+    ],
+    [
+      22,
+      3,
+      0,
+      17,
+      1,
+      "VAE"
+    ],
+    [
+      23,
+      17,
+      0,
+      21,
+      0,
+      "IMAGE"
+    ],
+    [
+      26,
+      21,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
+      31,
+      5,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      34,
+      24,
+      3,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      35,
+      26,
+      1,
+      24,
+      3,
+      "CLIP"
+    ],
+    [
+      36,
+      26,
+      0,
+      24,
+      2,
+      "MODEL"
+    ],
+    [
+      41,
+      3,
+      0,
+      27,
+      1,
+      "VAE"
+    ],
+    [
+      42,
+      24,
+      1,
+      27,
+      2,
+      "MASK"
+    ],
+    [
+      44,
+      27,
+      1,
+      16,
+      3,
+      "LATENT"
+    ],
+    [
+      49,
+      27,
+      4,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      50,
+      27,
+      2,
+      9,
+      0,
+      "MASK"
+    ],
+    [
+      51,
+      27,
+      2,
+      21,
+      2,
+      "MASK"
+    ],
+    [
+      52,
+      27,
+      3,
+      21,
+      1,
+      "KREA2_PAINT_GEOMETRY"
+    ],
+    [
+      53,
+      27,
+      0,
+      13,
+      2,
+      "KREA2_PAINT_CONTEXT"
+    ],
+    [
+      61,
+      24,
+      0,
+      27,
+      0,
+      "IMAGE"
+    ],
+    [
+      62,
+      30,
+      0,
+      13,
+      4,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "Models + AnyPaint LoRA",
+      "bounding": [
+        -40,
+        -40,
+        820,
+        410
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "Source + Paint Prepare",
+      "bounding": [
+        -40,
+        390,
+        1060,
+        880
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "Paint Inspection",
+      "bounding": [
+        1040,
+        390,
+        1060,
+        870
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "Paint Runtime",
+      "bounding": [
+        880,
+        -40,
+        680,
+        400
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "Sampling + Restore + Output",
+      "bounding": [
+        1540,
+        -40,
+        2150,
+        300
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ue_links": [],
+    "links_added_by_ue": [],
+    "ds": {
+      "scale": 1.1888993378618402,
+      "offset": [
+        1479.9340913457881,
+        -196.86945364661094
+      ]
+    },
+    "frontendVersion": "1.59.11",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4,
+  "seed_widgets": {
+    "16": 0
+  }
+}
