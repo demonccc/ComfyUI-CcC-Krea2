@@ -947,7 +947,7 @@
       "widgets_values": [
         "sam3",
         "woman on the right",
-        -5,
+        -10,
         0.5,
         "#ff0000",
         false,
@@ -956,7 +956,7 @@
       "widgets_values_named": {
         "source": "sam3",
         "prompt": "woman on the right",
-        "boost": -5,
+        "boost": -10,
         "confidence": 0.5,
         "composite_color": "#ff0000",
         "invert": false,
@@ -997,7 +997,8 @@
         "Node name for S&R": "PreviewImage",
         "ue_properties": {
           "version": "8.0.1",
-          "widget_ue_connectable": {},          "input_ue_unconnectable": {},
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
           "title_regex": null,
           "input_regex": null,
           "group_regex": null,
