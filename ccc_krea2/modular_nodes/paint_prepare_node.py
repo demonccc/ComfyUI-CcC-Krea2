@@ -263,9 +263,8 @@ def prepare_paint_context(
 
     reference_latent = _extract_latent(vae.encode(semantic_reference))
     # Pure inpaint keeps the original binary, token-aligned AnyPaint mask.
-    # Outpaint needs a soft transition on the original-image side of the
-    # expansion, or ComfyUI's sampler clamps all preserved vs. generated
-    # latents at a sharp rectangular boundary regardless of mask blur.
+    # In outpaint, a zero blur amount must be truly binary: no hidden feather.
+    # When explicitly enabled, blur follows the selected mode and direction.
     if has_expansion:
         non_source_mask = torch.maximum(expansion_mask, temporary_padding_mask)
         sampling_image = (
@@ -278,16 +277,25 @@ def prepare_paint_context(
     latent_tensor = _ensure_image_latent_5d(known_latent)
     latent_h, latent_w = latent_tensor.shape[-2:]
     if has_expansion:
-        # Blend only the explicit expansion into the original source. Never
-        # ask the model to regenerate discarded Krea geometry padding.
-        # The soft denoise mask is supported by ComfyUI's sampler and gives
-        # the transition partial regeneration rather than a binary step.
-        fade_sigma = max(12.0, float(mask_blur_amount))
+        # Expand into the original image by mask_grow, independent of padding.
+        # Do not silently introduce blur when mask_blur_amount is zero.
         expansion_for_denoise = _grow_or_shrink(expansion_mask, int(mask_grow))
-        expansion_fade = _gaussian_blur(expansion_for_denoise, fade_sigma)
-        expansion_fade_latent = F.interpolate(
-            expansion_fade.unsqueeze(1), size=(latent_h, latent_w), mode="area"
-        )
+        if float(mask_blur_amount) > 0.0:
+            expansion_for_denoise = _apply_feather(
+                expansion_for_denoise,
+                mode=mask_blur_mode,
+                amount=float(mask_blur_amount),
+                direction=mask_blur_direction,
+            )
+            expansion_noise_mask = F.interpolate(
+                expansion_for_denoise.unsqueeze(1),
+                size=(latent_h, latent_w),
+                mode="area",
+            )
+        else:
+            expansion_noise_mask = _token_aligned_soft_noise_mask(
+                expansion_for_denoise, latent_h, latent_w, patch_size=2
+            )
         # Any user-selected inpaint mask remains binary, just as in pure inpaint.
         user_generated = _apply_feather(
             _grow_or_shrink(user_mask, int(mask_grow)),
@@ -298,7 +306,7 @@ def prepare_paint_context(
         user_noise_mask = _token_aligned_soft_noise_mask(
             user_generated, latent_h, latent_w, patch_size=2
         )
-        noise_mask = torch.maximum(expansion_fade_latent, user_noise_mask)
+        noise_mask = torch.maximum(expansion_noise_mask, user_noise_mask)
     else:
         noise_mask = _token_aligned_soft_noise_mask(
             generated_mask, latent_h, latent_w, patch_size=2
