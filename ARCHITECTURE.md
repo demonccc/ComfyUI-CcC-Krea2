@@ -207,7 +207,7 @@ KSampler -> VAE Decode                            |
         +------------------> Paint Restore <--------+
 ~~~
 
-Paint Prepare uses internal padding geometry helpers to choose a curated Krea working canvas that contains the requested image. If the source exceeds all supported Krea geometries, it fails with a resize instruction instead of cropping source content.
+The sampling latent is VAE-encoded from the neutralized working canvas to prevent masked subjects leaking back into the generation. Paint Prepare still outputs the original prepared image for preview; the semantic reference and sampling latent both exclude selected inpaint content.\n\nPaint Prepare uses internal padding geometry helpers to choose a curated Krea working canvas that contains the requested image. If the source exceeds all supported Krea geometries, it fails with a resize instruction instead of cropping source content.
 
 Explicit outpaint expansion belongs to the requested/final canvas. Temporary Krea padding belongs only to the working canvas and is removed by Restore.
 
