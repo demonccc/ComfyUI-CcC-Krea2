@@ -28,7 +28,7 @@ def test_unmasked_reference_boost_is_global_and_neutral_is_noop():
     bias = bias_for(boosts=[2.0])
     # Three text tokens, four reference tokens, eight target tokens.
     torch.testing.assert_close(
-        bias[0, 0, 7:, 3:7], torch.full((8, 4), 2.0 * math.log(10.0) / 5.0)
+        bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(2.8))
     )
 
 
@@ -41,21 +41,21 @@ def test_boost_inputs_are_signed_and_increment_by_tenth():
         CcCKrea2Mask.INPUT_TYPES()["required"]["boost"],
     ):
         assert spec[1]["default"] == 0.0
-        assert spec[1]["min"] == -5.0
-        assert spec[1]["max"] == 5.0
+        assert spec[1]["min"] == -10.0
+        assert spec[1]["max"] == 10.0
         assert spec[1]["step"] == 0.1
 
     bias = bias_for(boosts=[0.1])
     torch.testing.assert_close(
         bias[0, 0, 7:, 3:7],
-        torch.full((8, 4), 0.1 * math.log(10.0) / 5.0),
+        torch.full((8, 4), math.log(1.09)),
     )
 
 
 def test_signed_boost_preserves_previous_multiplier_range():
     # Check the agreed symmetric exponential mapping at every integer step.
-    for value in range(-4, 6):
-        expected = 10.0 ** (value / 5.0)
+    for value in range(-9, 11):
+        expected = 1 + 0.9 * value if value >= 0 else 1 / (1 + 0.9 * abs(value))
         bias = bias_for(boosts=[value])
         if value == 0:
             assert bias is None
@@ -66,25 +66,25 @@ def test_signed_boost_preserves_previous_multiplier_range():
             )
 
 
-def test_minus_five_boost_blocks_direct_reference_attention():
-    bias = bias_for(boosts=[-5.0])
+def test_minus_ten_boost_blocks_direct_reference_attention():
+    bias = bias_for(boosts=[-10.0])
     assert torch.isneginf(bias[0, 0, 7:, 3:7]).all()
     assert (bias[0, 0, :7, :] == 0).all()
     assert (bias[0, 0, 7:, :3] == 0).all()
     assert (bias[0, 0, 7:, 7:] == 0).all()
 
 
-def test_minus_five_blocks_only_its_reference():
-    bias = bias_for(boosts=[-5.0, 2.0])
+def test_minus_ten_blocks_only_its_reference():
+    bias = bias_for(boosts=[-10.0, 2.0])
     assert torch.isneginf(bias[0, 0, 11:, 3:7]).all()
     torch.testing.assert_close(
         bias[0, 0, 11:, 7:11],
-        torch.full((8, 4), 2.0 * math.log(10.0) / 5.0),
+        torch.full((8, 4), math.log(2.8)),
     )
 
 
-def test_regional_minus_five_blocks_while_zero_remains_neutral():
-    weight_map = torch.tensor([[[-5., 2.], [0., -5.]]])
+def test_regional_minus_ten_blocks_while_zero_remains_neutral():
+    weight_map = torch.tensor([[[-10., 2.], [0., -5.]]])
     bias = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
         ref_token_grids=[(2, 2)], ref_attention_maps=[weight_map],
@@ -92,11 +92,11 @@ def test_regional_minus_five_blocks_while_zero_remains_neutral():
     )
     selected = bias[0, 0, 7:, 3:7]
     assert torch.isneginf(selected[:, [0, 3]]).all()
-    torch.testing.assert_close(selected[:, 1], torch.full((8,), 2.0 * math.log(10.0) / 5.0))
+    torch.testing.assert_close(selected[:, 1], torch.full((8,), math.log(2.8)))
     assert (selected[:, 2] == 0).all()
 
 
-@pytest.mark.parametrize("boost", [-5.0, -4.9, -4.0, -3.0, -2.0, -1.0, 0.0, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0])
+@pytest.mark.parametrize("boost", [-10.0, -4.9, -4.0, -3.0, -2.0, -1.0, 0.0, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0])
 def test_uniform_regional_boost_matches_global(boost):
     regional = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
@@ -113,12 +113,12 @@ def test_uniform_regional_boost_matches_global(boost):
 
 def test_negative_boost_reduces_attention():
     bias = bias_for(boosts=[-2.0])
-    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), -2.0 * math.log(10.0) / 5.0))
+    torch.testing.assert_close(bias[0, 0, 7:, 3:7], torch.full((8, 4), math.log(1.0 / 2.8)))
 
 
 def test_out_of_range_boost_is_rejected():
-    with pytest.raises(ValueError, match=r"\[-5, 5\]"):
-        bias_for(boosts=[-5.1])
+    with pytest.raises(ValueError, match=r"\[-10, 10\]"):
+        bias_for(boosts=[-10.1])
 
 
 def test_mask_composite_effective_boost_last_region_wins():
@@ -132,20 +132,20 @@ def test_mask_composite_effective_boost_last_region_wins():
     node = CcCKrea2Mask()
     _, _, first, _, _ = node.process(source, source="mask", mask=full, boost=-3.0)
     _, _, second, _, _ = node.process(
-        source, source="mask", mask=left, boost=5.0,
+        source, source="mask", mask=left, boost=10.0,
         previous_mask_attention=first,
     )
     original, union, third, composite, _ = node.process(
-        source, source="mask", mask=center, boost=-5.0,
+        source, source="mask", mask=center, boost=-10.0,
         previous_mask_attention=second, composite_color="#000000",
     )
     torch.testing.assert_close(original, source)
     assert torch.all(union == 1)
     assert len(third.regions) == 3
-    # The last region overrides even Boost +5; outside it is Boost -3 or +5.
+    # The last region overrides even Boost +10; outside it is Boost -3 or +5.
     assert composite[0, 1, 1, 0].item() == pytest.approx(0.0)
-    assert composite[0, 0, 0, 0].item() == pytest.approx(0.95)
-    assert composite[0, 0, 3, 0].item() == pytest.approx(0.19)
+    assert composite[0, 0, 0, 0].item() == pytest.approx(0.3325)
+    assert composite[0, 0, 3, 0].item() == pytest.approx(0.95)
 
 
 def test_mask_composite_color_and_unselected_pixels():
@@ -154,10 +154,10 @@ def test_mask_composite_color_and_unselected_pixels():
     selection = torch.zeros((1, 2, 2))
     selection[0, 0, 0] = 1.0
     _, _, _, composite, _ = CcCKrea2Mask().process(
-        source, source="mask", mask=selection, boost=5,
+        source, source="mask", mask=selection, boost=10,
         composite_color="#FF0000",
     )
-    # Selected Boost +5 is tinted slightly; unselected pixels remain original.
+    # Selected Boost +10 is tinted slightly; unselected pixels remain original.
     torch.testing.assert_close(composite[0, 0, 0], torch.tensor([1.0, 0.95, 0.95]))
     torch.testing.assert_close(composite[0, 1, 1], torch.ones(3))
 
@@ -171,12 +171,12 @@ def test_mask_composite_rejects_invalid_hex():
         )
 
 
-def test_composite_unselected_pixels_remain_exact_for_minus_five_boost():
+def test_composite_unselected_pixels_remain_exact_for_minus_ten_boost():
     from ccc_krea2.modular_nodes.mask_node import CcCKrea2Mask
     source = torch.tensor([[[[0.2, 0.3, 0.4], [0.7, 0.6, 0.5]]]])
     selection = torch.tensor([[[1.0, 0.0]]])
     original, _, _, composite, _ = CcCKrea2Mask().process(
-        source, source="mask", mask=selection, boost=-5,
+        source, source="mask", mask=selection, boost=-10,
         composite_color="#000000",
     )
     torch.testing.assert_close(composite[0, 0, 1], original[0, 0, 1])
@@ -191,7 +191,7 @@ def test_unified_reference_boost_regions_override_global_only_inside_masks():
     selected = torch.zeros((1, 4, 4))
     selected[:, 1:3, 1:3] = 1
     mask_chain = CcCKrea2Mask().process(
-        image, source="mask", mask=selected, boost=-5,
+        image, source="mask", mask=selected, boost=-10,
     )[2]
     node = CcCKrea2Reference()
     assert "mask_attention" in node.INPUT_TYPES()["optional"]
@@ -203,7 +203,7 @@ def test_unified_reference_boost_regions_override_global_only_inside_masks():
     entry = refs.entries[0]
     assert entry.boost == pytest.approx(2.0)
     assert entry.attention_weight_map[0, 0, 0].item() == pytest.approx(2.0)
-    assert entry.attention_weight_map[0, 1, 1].item() == pytest.approx(-5.0)
+    assert entry.attention_weight_map[0, 1, 1].item() == pytest.approx(-10.0
 
 
 def test_unified_reference_regional_masks_last_wins():
@@ -240,10 +240,10 @@ def test_mask_invert_is_opt_in_and_affects_output_chain_and_composite():
     node = CcCKrea2Mask()
     assert node.INPUT_TYPES()["required"]["invert"][1]["default"] is False
     original, plain_mask, plain_chain, plain_preview, _ = node.process(
-        source, source="mask", mask=selection, boost=-5, invert=False,
+        source, source="mask", mask=selection, boost=-10, invert=False,
     )
     _, inverse_mask, inverse_chain, inverse_preview, info = node.process(
-        source, source="mask", mask=selection, boost=-5, invert=True,
+        source, source="mask", mask=selection, boost=-10, invert=True,
     )
     torch.testing.assert_close(original, source)
     torch.testing.assert_close(plain_mask, selection)
@@ -269,7 +269,7 @@ def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
         image, source="mask", mask=first_mask, boost=3,
     )
     _, combined, final, composite, _ = mask_node.process(
-        image, source="mask", mask=second_mask, boost=-5, invert=True,
+        image, source="mask", mask=second_mask, boost=-10, invert=True,
         previous_mask_attention=first,
     )
     effective_second_mask = 1.0 - second_mask
@@ -277,7 +277,7 @@ def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
     torch.testing.assert_close(final.regions[-1].mask, effective_second_mask)
     assert len(final.regions) == 2
     # Pixel (0,0) is excluded by inversion so earlier +3 remains.
-    assert composite[0, 0, 0, 0].item() == pytest.approx(1.0 - (1.0 - 0.95 * 0.8))
+    assert composite[0, 0, 0, 0].item() == pytest.approx(1.0 - (1.0 - 0.95 * 0.65))
     # Pixel (0,1) belongs to both but inverted -5 wins.
     assert composite[0, 0, 1, 0].item() == pytest.approx(0.0)
 
@@ -287,8 +287,8 @@ def test_inverted_mask_overrides_previous_boost_with_last_mask_wins():
     )
     weights = refs.entries[0].attention_weight_map
     assert weights[0, 0, 0].item() == pytest.approx(3.0)
-    assert weights[0, 0, 1].item() == pytest.approx(-5.0)
-    assert weights[0, 1, 2].item() == pytest.approx(-5.0)
+    assert weights[0, 0, 1].item() == pytest.approx(-10.0
+    assert weights[0, 1, 2].item() == pytest.approx(-10.0
 
 
 def test_inverted_sam_mask_is_applied_after_detection(monkeypatch):
@@ -309,7 +309,7 @@ def test_hard_exclusion_survives_downsampling_to_reference_tokens():
     # A single excluded source pixel must not turn into a weak negative boost
     # when a 4x4 reference mask is encoded on a 2x2 token grid.
     regional = torch.zeros((1, 4, 4), dtype=torch.float32)
-    regional[0, 0, 0] = -5.0
+    regional[0, 0, 0] = -10.0
     bias = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=2, ref_token_lens=[4], tgt_len=3,
         ref_token_grids=[(2, 2)], ref_attention_maps=[regional],
@@ -327,37 +327,37 @@ def test_non_exclusion_regional_boosts_still_average_to_reference_tokens():
         ref_token_grids=[(2, 2)], ref_attention_maps=[regional],
         device=torch.device("cpu"), dtype=torch.float32,
     )
-    expected = math.log(10.0) / 5.0
+    expected = math.log(1.9)
     torch.testing.assert_close(
         bias[0, 0, 6:, 2], torch.full((3,), expected)
     )
     assert (bias[0, 0, 6:, 3:6] == 0).all()
 
 
-def test_positive_five_matches_legacy_ten_multiplier_for_full_reference():
+def test_positive_ten_matches_legacy_ten_multiplier_for_full_reference():
     # Legacy boost=10 used log(10) on target->reference attention.
-    # The signed +5 must retain that exact upper endpoint.
-    bias = bias_for(boosts=[5.0])
+    # The signed +10 must retain that exact upper endpoint.
+    bias = bias_for(boosts=[10.0])
     torch.testing.assert_close(
         bias[0, 0, 7:, 3:7],
         torch.full((8, 4), math.log(10.0)),
     )
 
 
-def test_positive_five_regional_full_mask_matches_global_boost():
-    region = torch.full((1, 16, 16), 5.0)
+def test_positive_ten_regional_full_mask_matches_global_boost():
+    region = torch.full((1, 16, 16), 10.0)
     regional = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
         ref_token_grids=[(2, 2)], ref_attention_maps=[region],
         device=torch.device("cpu"), dtype=torch.float32,
     )
-    global_bias = bias_for(boosts=[5.0])
+    global_bias = bias_for(boosts=[10.0])
     torch.testing.assert_close(regional, global_bias)
 
 
-def test_positive_five_regional_token_block_preserves_full_strength():
+def test_positive_ten_regional_token_block_preserves_full_strength():
     region = torch.zeros((1, 16, 16), dtype=torch.float32)
-    region[:, :8, :8] = 5.0
+    region[:, :8, :8] = 10.0
     bias = _compute_ref_attention_bias_patchified(
         boosts=[0.0], txt_len=3, ref_token_lens=[4], tgt_len=8,
         ref_token_grids=[(2, 2)], ref_attention_maps=[region],
