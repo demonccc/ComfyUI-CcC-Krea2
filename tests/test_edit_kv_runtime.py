@@ -20,7 +20,7 @@ def _bias(boosts, maps=None):
 
 
 def test_kv_toggle_is_off_by_default_and_describes_experimental_runtime():
-    schema = CcCKrea2Edit.INPUT_TYPES()["required"]
+    schema = CcCKrea2Edit.INPUT_TYPES()["optional"]
     assert schema["use_kv_reference"][0] == "BOOLEAN"
     assert schema["use_kv_reference"][1]["default"] is False
 
