@@ -86,7 +86,7 @@ def _composite_color_rgb(value, device, dtype):
 
 
 def _composite_attention_image(image, regions, composite_color="#000000"):
-    """Last Mask Wins in pixel space; -5 is fully opaque, +5 overlays 5%.
+    """Last Mask Wins in pixel space; -10 is fully opaque, +10 overlays 5%.
 
     Pixels outside all regions remain unchanged. This is a Vision-friendly
     rendered IMAGE, independent of the Reference node global Boost.
@@ -96,12 +96,12 @@ def _composite_attention_image(image, regions, composite_color="#000000"):
     effective = torch.zeros(image.shape[:3], device=image.device, dtype=torch.float32)
     selected_any = torch.zeros(image.shape[:3], device=image.device, dtype=torch.bool)
     for region in regions:
-        if not -5.0 <= float(region.boost) <= 5.0:
-            raise ValueError("[Krea2 CcC Mask] regional Boost must be in [-5, 5].")
+        if not -10.0 <= float(region.boost) <= 10.0:
+            raise ValueError("[Krea2 CcC Mask] regional Boost must be in [-10, 10].")
         selection = region.mask.to(image.device) > 0.5
         effective = torch.where(selection, float(region.boost), effective)
         selected_any |= selection
-    opacity = ((1.0 - 0.95 * ((effective + 5.0) / 10.0)) * selected_any).unsqueeze(-1)
+    opacity = ((1.0 - 0.95 * ((effective + 10.0) / 20.0)) * selected_any).unsqueeze(-1)
     rgb = image[..., :3]
     color = _composite_color_rgb(composite_color, rgb.device, rgb.dtype)
     return (rgb * (1.0 - opacity) + color * opacity).clamp(0.0, 1.0)
@@ -121,7 +121,7 @@ class CcCKrea2Mask:
                 "image": ("IMAGE",),
                 "source": (["sam3", "mask"], {"default": "sam3"}),
                 "prompt": ("STRING", {"default": "face"}),
-                "boost": ("FLOAT", {"default": 0.0, "min": -5.0, "max": 5.0, "step": 0.1}),
+                "boost": ("FLOAT", {"default": 0.0, "min": -10.0, "max": 10.0, "step": 0.1}),
                 "confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "composite_color": ("COLOR", {"default": "#000000", "tooltip": "Pick the overlay color applied to low-Boost regions in composite_image."}),
                 "invert": ("BOOLEAN", {"default": False, "tooltip": "Invert the selected mask before applying Boost, merging masks, and creating the composite."}),
