@@ -211,11 +211,11 @@ def prepare_paint_context(
     )
     keep_mask = (1.0 - generated_mask).clamp(0.0, 1.0)
 
-    # Expansion padding is visual guidance, not a user-selected region to hide.
-    # Keep both its fill pixels and the original pixels along the overlap visible
-    # to Qwen / reference K/V, even when mask grow or feather extends inward.
-    # For combined inpaint + outpaint, only the user mask is neutralized.
-    # Without expansion, retain the existing inpainting behavior exactly.
+    # Keep inpainting's existing semantic masking unchanged. For outpainting,
+    # the expansion pixels are a generation canvas, not reference content.
+    # Removing those fill pixels from Qwen and K/V conditioning prevents edge
+    # and reflect padding from being learned as a scene to preserve. The
+    # original image, including any overlap from mask grow, remains visible.
     if bool((expansion_mask > 0.0).any().item()):
         user_mask = paint_geometry.get("working_user_mask")
         if user_mask is None:
@@ -226,16 +226,19 @@ def prepare_paint_context(
                 raise ValueError("[Krea2 CcC Paint Prepare] working_user_mask must match working_mask geometry.")
         if fill_holes:
             user_mask = _fill_mask_holes(user_mask)
-        semantic_neutralize_mask = _apply_feather(
+        user_semantic_mask = _apply_feather(
             _grow_or_shrink(user_mask, int(mask_grow)),
             mode=mask_blur_mode,
             amount=float(mask_blur_amount),
             direction=mask_blur_direction,
         )
+        semantic_neutralize_mask = torch.maximum(expansion_mask, user_semantic_mask).clamp(0.0, 1.0)
+        # Compute neutral padding color only from actual, unmasked source pixels.
+        semantic_fill = _neutral_fill(known_image, 1.0 - semantic_neutralize_mask)
     else:
         semantic_neutralize_mask = (generated_mask - expansion_mask).clamp(0.0, 1.0)
+        semantic_fill = _neutral_fill(known_image, keep_mask)
     semantic_keep_mask = (1.0 - semantic_neutralize_mask).clamp(0.0, 1.0)
-    semantic_fill = _neutral_fill(known_image, keep_mask)
     semantic_full = (
         known_image * semantic_keep_mask.unsqueeze(-1).to(known_image.dtype)
         + semantic_fill * semantic_neutralize_mask.unsqueeze(-1).to(known_image.dtype)
